@@ -10,7 +10,7 @@
     home-manager.url = "github:nix-community/home-manager";
     home-manager.inputs.nixpkgs.follows = "nixpkgs";
 
-    # impermanence.url = "github:nix-community/impermanence";
+    impermanence.url = "github:nix-community/impermanence";
 
     # hyprland.url = "git+https://github.com/hyperwm/Hyprland?submodules=1";
     # hyprland.inputs.nixpkgs.follows = "nixpkgs";

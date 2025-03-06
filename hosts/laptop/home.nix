@@ -1,8 +1,13 @@
 {
-  config,
   pkgs,
+  inputs,
   ...
 }: {
+  imports = [
+    inputs.impermanence.nixosModules.home-manager.impermanence
+    ./../../modules/home-manager/git.nix
+  ];
+
   home.username = "lvdar";
   home.homeDirectory = "/home/lvdar";
 
@@ -10,10 +15,13 @@
     EDITOR = "nvim";
   };
 
-  imports = [
-    ./../../modules/home-manager/git.nix
-  ];
-
+  home.persistence."/persist/home/lvdar" = {
+    directories = [
+      "nixos-config"
+    ];
+    files = [];
+    allowOther = true;
+  };
   git.enable = true;
 
   programs.home-manager.enable = true;
