@@ -9,7 +9,7 @@
     ./hardware-configuration.nix
 
     inputs.disko.nixosModules.default
-    (import ./disko.nix {device = "/dev/nvme1n1";})
+    (import ./disko.nix {device = "/dev/nvme0n1";})
 
     inputs.home-manager.nixosModules.default
   ];
@@ -26,6 +26,33 @@
       useOSProber = true;
     };
   };
+
+  boot.initrd.postDeviceCommands = lib.mkBefore ''
+    mkdir -p /mnt
+
+    mount -o subvol=/ /dev/mapper/crypted /mnt
+
+    if [[ -e /mnt/root ]]; then
+        mkdir -p /mnt/old_roots
+        timestamp=$(date --date="@$(stat -c %Y /mnt/root)" "+%Y-%m-%d_%H:%M:%S")
+        mv /mnt/root "/mnt/old_roots/$timestamp"
+    fi
+
+    delete_subvolumes_recursively() {
+        IFS=$'\n'
+        for i in $(btrfs subvolume list -o "$1" | cut -f 9- -d ' '); do
+          delete_subvolume_recursively "/mnt/$i"
+        done
+        btrfs subvolume delete "$1"
+    }
+
+    for i in $(find /mnt/old_roots/ -maxdepth 1 -mtime +30); do
+        delete_subvolumes_recursively "$i"
+    done
+
+    btrfs subvolume create /mnt/root
+    umount /mnt
+  '';
 
   networking.hostName = "S20212041"; # Define your hostname.
   # networking.wireless.enable = true; # Enables wireless support via wpa_supplicant.
