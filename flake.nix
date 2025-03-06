@@ -26,15 +26,37 @@
     ...
   } @ inputs: let
     system = "x86_64-linux";
-    pkgs = nixpkgs.legacyPackages.${system};
+    pkgs = import nixpkgs {
+      inherit system;
+      config.allowUnfree = true;
+    };
+    mkConfig = host: users:
+      nixpkgs.lib.nixosSystem {
+        specialArgs = {inherit inputs system;};
+        modules = [
+          host
+          ./modules/nixos
+          inputs.disko.nixosModules.default
+          inputs.impermanence.nixosModules.impermanence
+          inputs.home-manager.nixosModules.home-manager
+          {
+            home-manager.extraSpecialArgs = {inherit inputs system;};
+            host = {inherit users;};
+          }
+        ];
+      };
   in {
     formatter.${system} = pkgs.alejandra;
 
-    nixosConfigurations.default = nixpkgs.lib.nixosSystem {
-      specialArgs = {inherit inputs;};
-      modules = [
-        ./hosts/laptop/configuration.nix
-      ];
+    nixosConfigurations = {
+      default = mkConfig ./hosts/laptop/configuration.nix {
+        "lvdar" = {
+          sudo = true;
+          config = ./users/lvdar.nix;
+        };
+      };
     };
+
+    homeManagerModules.default = ./modules/home-manager;
   };
 }

@@ -1,0 +1,7 @@
+{...}: {
+  imports = [
+    ./keyboard
+    ./locale
+    ./users
+  ];
+}
