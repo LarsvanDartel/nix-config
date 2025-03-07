@@ -3,23 +3,22 @@
   lib,
   pkgs,
   ...
-}:
-with lib; let
-  cfg = config.git;
+}: let
+  cfg = config.modules.git;
 in {
-  options.git = {
-    enable = mkEnableOption "Enable Git";
-    user = mkOption {
-      type = types.str;
+  options.modules.git = {
+    enable = lib.mkEnableOption "Enable Git";
+    user = lib.mkOption {
+      type = lib.types.str;
       description = "User name for git";
     };
-    email = mkOption {
-      type = types.str;
+    email = lib.mkOption {
+      type = lib.types.str;
       description = "User email for git";
     };
   };
 
-  config = mkIf cfg.enable {
+  config = lib.mkIf cfg.enable {
     home.packages = with pkgs; [
       git
       lazygit

@@ -11,6 +11,8 @@
     inputs.nixos-hardware.nixosModules.lenovo-thinkpad-p1-gen3
   ];
 
+  networking.hostName = "S20212041";
+
   boot.loader = {
     efi = {
       canTouchEfiVariables = true;
@@ -24,21 +26,13 @@
     };
   };
 
-  programs.hyprland = {
-    enable = true;
-    xwayland.enable = true;
+  modules = {
+    hyprland.enable = true;
+    nh.enable = true;
+    persist.enable = true;
   };
 
-  impermanence.enable = true;
-
-  networking.hostName = "S20212041";
-
-  programs.nh = {
-    enable = true;
-    clean.enable = true;
-    clean.extraArgs = "all --keep 4";
-  };
-
+  # TODO: Move to user config
   fonts.packages = with pkgs; [
     dejavu_fonts
     noto-fonts-color-emoji

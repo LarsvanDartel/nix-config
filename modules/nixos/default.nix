@@ -1,9 +1,10 @@
 {...}: {
   imports = [
-    # ./hyprland
-    ./impermanence
+    ./hyprland
     ./keyboard
     ./locale
+    ./nh
+    ./persist
     ./users
   ];
 }

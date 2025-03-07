@@ -2,19 +2,14 @@
   config,
   lib,
   ...
-}:
-let
-  cfg = config.impermanence;
+}: let
+  cfg = config.modules.persist;
 in {
-  options.impermanence = {
-    enable = lib.mkEnableOption "Enable impermanence";
+  options.modules.persist = {
+    enable = lib.mkEnableOption "impermanence";
     directories = lib.mkOption {
       type = lib.types.listOf lib.types.str;
-      default = [
-        "/var/log"
-        "/var/lib/nixos"
-        "/var/lib/systemd/coredump"
-      ];
+      default = [];
       description = "Directories to keep on boot";
     };
   };
@@ -51,7 +46,13 @@ in {
     fileSystems."/persist".neededForBoot = true;
     environment.persistence."/persist/system" = {
       hideMounts = true;
-      directories = cfg.directories;
+      directories =
+        cfg.directories
+        ++ [
+          "/var/log"
+          "/var/lib/nixos"
+          "/var/lib/systemd/coredump"
+        ];
     };
   };
 }

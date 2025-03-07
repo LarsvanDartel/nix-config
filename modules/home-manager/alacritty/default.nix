@@ -3,15 +3,14 @@
   lib,
   pkgs,
   ...
-}:
-with lib; let
-  cfg = config.alacritty;
+}: let
+  cfg = config.modules.alacritty;
 in {
-  options.alacritty = {
-    enable = mkEnableOption "Enable Alacritty";
+  options.modules.alacritty = {
+    enable = lib.mkEnableOption "alacritty";
   };
 
-  config = mkIf cfg.enable {
+  config = lib.mkIf cfg.enable {
     programs.alacritty = {
       enable = true;
     };
