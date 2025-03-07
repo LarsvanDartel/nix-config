@@ -8,6 +8,7 @@
   imports = [
     ./hardware-configuration.nix
     (import ./disko.nix {device = "/dev/nvme0n1";})
+    nixos-hardware.nixosModules.lenovo-thinkpad-p1-gen3
   ];
 
   boot.loader = {
@@ -55,11 +56,6 @@
     xwayland.enable = true;
   };
 
-  hardware = {
-    graphics.enable = true;
-    nvidia.modesetting.enable = true;
-  };
-
   programs.fuse.userAllowOther = true;
   fileSystems."/persist".neededForBoot = true;
   environment.persistence."/persist/system" = {
@@ -72,11 +68,6 @@
   };
 
   networking.hostName = "S20212041";
-  networking.networkmanager.enable = true;
-
-  hardware.bluetooth.enable = true;
-
-  programs.zsh.enable = true;
 
   programs.nh = {
     enable = true;
