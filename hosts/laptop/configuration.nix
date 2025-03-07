@@ -50,11 +50,15 @@
     umount /btrfs_tmp
   '';
 
-  # TODO: Make dependent on users config
-  # systemd.tmpfiles.rules = [
-  #   "d /persist/home/ 1777 root root -"
-  #   "d /persist/home/lvdar 0770 lvdar users -"
-  # ];
+  programs.hyprland = {
+    enable = true;
+    xwayland.enable = true;
+  };
+
+  hardware = {
+    graphics.enable = true;
+    nvidia.modesetting.enable = true;
+  };
 
   programs.fuse.userAllowOther = true;
   fileSystems."/persist".neededForBoot = true;
@@ -68,6 +72,54 @@
   };
 
   networking.hostName = "S20212041";
+  networking.networkmanager.enable = true;
+
+  hardware.bluetooth.enable = true;
+
+  programs.zsh.enable = true;
+
+  programs.nh = {
+    enable = true;
+    clean.enable = true;
+    clean.extraArgs = "all --keep 4";
+  };
+
+  fonts.packages = with pkgs; [
+    dejavu_fonts
+    noto-fonts-color-emoji
+    jetbrains-mono
+    nerd-fonts.jetbrains-mono
+  ];
+
+  stylix = {
+    enable = true;
+    base16Scheme = "${pkgs.base16-schemes}/share/themes/nord.yaml";
+    fonts.sizes.terminal = 16;
+    opacity.terminal = 0.6;
+    cursor = {
+      package = pkgs.bibata-cursors;
+      name = "Bibata-Modern-Ice";
+      size = 26;
+    };
+    fonts = {
+      serif = {
+        package = pkgs.dejavu_fonts;
+        name = "DejaVu Serif";
+      };
+      sansSerif = {
+        package = pkgs.dejavu_fonts;
+        name = "DejaVu Sans";
+      };
+      monospace = {
+        package = pkgs.nerd-fonts.jetbrains-mono;
+        name = "JetBrainsMono Nerd Font";
+      };
+      emoji = {
+        package = pkgs.noto-fonts-color-emoji;
+        name = "Noto Color Emoji";
+      };
+    };
+  };
 
   nix.settings.experimental-features = ["nix-command" "flakes"];
 

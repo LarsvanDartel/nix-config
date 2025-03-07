@@ -12,10 +12,6 @@
     home.username = "lvdar";
     home.homeDirectory = "/home/lvdar";
 
-    home.packages = with pkgs; [
-      neovim
-    ];
-
     home.sessionVariables = {
       EDITOR = "nvim";
     };
@@ -33,6 +29,12 @@
       user = "LarsvanDartel";
       email = "larsvandartel73@gmail.com";
     };
+
+    alacritty.enable = true;
+    hyprland.enable = true;
+    nvim.enable = true;
+    # zen.enable = true;
+    zsh.enable = true;
 
     home.stateVersion = "24.11";
     programs.home-manager.enable = true;

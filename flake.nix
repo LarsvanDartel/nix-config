@@ -12,10 +12,8 @@
 
     impermanence.url = "github:nix-community/impermanence";
 
-    # hyprland.url = "git+https://github.com/hyperwm/Hyprland?submodules=1";
-    # hyprland.inputs.nixpkgs.follows = "nixpkgs";
-    #
-    # hyprpanel.url = "github:Jas-SinghFSU/HyprPanel";
+    stylix.url = "github:danth/stylix";
+    stylix.inputs.nixpkgs.follows = "nixpkgs";
 
     # nixos-hardware.url = "github:nixos/nixos-hardware";
   };
@@ -43,13 +41,14 @@
             home-manager.extraSpecialArgs = {inherit inputs system;};
             host = {inherit users;};
           }
+          inputs.stylix.nixosModules.stylix
         ];
       };
   in {
     formatter.${system} = pkgs.alejandra;
 
     nixosConfigurations = {
-      default = mkConfig ./hosts/laptop/configuration.nix {
+      "S20212041" = mkConfig ./hosts/laptop/configuration.nix {
         "lvdar" = {
           sudo = true;
           config = ./users/lvdar.nix;
