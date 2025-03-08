@@ -11,8 +11,6 @@
     inputs.nixos-hardware.nixosModules.lenovo-thinkpad-p1-gen3
   ];
 
-  networking.hostName = "S20212041";
-
   boot.loader = {
     efi = {
       canTouchEfiVariables = true;
@@ -26,10 +24,15 @@
     };
   };
 
+  environment.sessionVariables = {
+    FLAKE = "/home/lvdar/nixos-config";
+  };
+
   modules = {
     hyprland.enable = true;
     nh.enable = true;
     persist.enable = true;
+    ssh.enable = true;
   };
 
   # TODO: Move to user config

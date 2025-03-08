@@ -28,28 +28,34 @@
       inherit system;
       config.allowUnfree = true;
     };
-    mkConfig = host: users:
-      nixpkgs.lib.nixosSystem {
-        specialArgs = {inherit inputs system;};
-        modules = [
-          host
-          ./modules/nixos
-          inputs.disko.nixosModules.default
-          inputs.impermanence.nixosModules.impermanence
-          inputs.home-manager.nixosModules.home-manager
-          {
-            home-manager.extraSpecialArgs = {inherit inputs system;};
-            host = {inherit users;};
-          }
-          inputs.stylix.nixosModules.stylix
-        ];
-      };
+    lib = nixpkgs.lib;
+    mkConfig = hosts:
+      lib.attrsets.concatMapAttrs (hostName: config: {
+        ${hostName} = lib.nixosSystem {
+          specialArgs = {inherit inputs system;};
+          modules = [
+            config.host
+            ./modules/nixos
+            {
+              home-manager.extraSpecialArgs = {inherit inputs system;};
+              host.users = config.users;
+              networking.hostName = lib.mkDefault hostName;
+            }
+            inputs.disko.nixosModules.default
+            inputs.impermanence.nixosModules.impermanence
+            inputs.home-manager.nixosModules.home-manager
+            inputs.stylix.nixosModules.stylix
+          ];
+        };
+      })
+      hosts;
   in {
     formatter.${system} = pkgs.alejandra;
 
-    nixosConfigurations = {
-      "S20212041" = mkConfig ./hosts/laptop/configuration.nix {
-        "lvdar" = {
+    nixosConfigurations = mkConfig {
+      "S20212041" = {
+        host = ./hosts/laptop/configuration.nix;
+        users."lvdar" = {
           sudo = true;
           config = ./users/lvdar.nix;
         };

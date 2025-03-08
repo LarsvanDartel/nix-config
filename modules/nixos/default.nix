@@ -5,6 +5,7 @@
     ./locale
     ./nh
     ./persist
+    ./ssh
     ./users
   ];
 }
