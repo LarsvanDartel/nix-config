@@ -11,6 +11,9 @@ in {
   };
 
   config = lib.mkIf cfg.enable {
+    modules.persist.directories = [
+      ".ssh"
+    ];
     programs.ssh = {
       enable = true;
       addKeysToAgent = "yes";

@@ -22,9 +22,12 @@ in {
   };
 
   config = lib.mkIf cfg.enable {
+    modules.persist.directories = [
+      "/var/cache/tuigreet"
+    ];
     modules.greetd = {
       enable = lib.mkDefault true;
-      command = lib.mkDefault "${tuigreet} --remember --remember-session --greeting \"${cfg.greeting}\" --time --cmd \"${cfg.command}\" --asterisks";
+      command = lib.mkDefault "${tuigreet} --remember --remember-user-session --greeting \"${cfg.greeting}\" --time --cmd \"${cfg.command}\" --asterisks";
     };
 
     systemd.services.greetd.serviceConfig = {

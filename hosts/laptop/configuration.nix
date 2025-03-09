@@ -32,12 +32,7 @@
     tuigreet.enable = true;
     hyprland.enable = true;
     nh.enable = true;
-    persist = {
-      enable = true;
-      directories = [
-        "/var/db/sudo/"
-      ];
-    };
+    persist.enable = true;
     ssh.enable = true;
     sudo.enable = true;
   };

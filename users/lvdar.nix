@@ -23,8 +23,6 @@
         enable = true;
         directories = [
           "nixos-config"
-          ".ssh"
-          ".mozilla"
         ];
       };
       # zen.enable = true;

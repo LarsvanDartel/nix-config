@@ -11,6 +11,9 @@ in {
   };
 
   config = lib.mkIf cfg.enable {
+    modules.persist.directories = [
+      ".mozilla"
+    ];
     programs.firefox.enable = true;
   };
 }
