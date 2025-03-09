@@ -32,8 +32,14 @@
     tuigreet.enable = true;
     hyprland.enable = true;
     nh.enable = true;
-    persist.enable = true;
+    persist = {
+      enable = true;
+      directories = [
+        "/var/db/sudo/"
+      ];
+    };
     ssh.enable = true;
+    sudo.enable = true;
   };
 
   # TODO: Move to user config

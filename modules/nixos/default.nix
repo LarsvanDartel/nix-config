@@ -7,6 +7,7 @@
     ./nh
     ./persist
     ./ssh
+    ./sudo
     ./users
   ];
 }
