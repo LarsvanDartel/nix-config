@@ -12,6 +12,7 @@ in {
   config = lib.mkIf cfg.enable {
     programs.hyprland = {
       enable = true;
+      withUWSM = true;
       xwayland.enable = true;
     };
   };
