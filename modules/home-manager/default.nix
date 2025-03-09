@@ -1,11 +1,12 @@
 {...}: {
   imports = [
     ./alacritty
+    ./firefox
     ./git
     ./hyprland
-    ./persist
     ./nvim
-    ./firefox
+    ./persist
+    ./ssh
     ./zsh
   ];
 }

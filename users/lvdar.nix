@@ -18,9 +18,13 @@
       firefox.enable = true;
       hyprland.enable = true;
       nvim.enable = true;
+      ssh.enable = true;
       persist = {
         enable = true;
-        directories = ["nixos-config"];
+        directories = [
+          "nixos-config"
+          ".ssh"
+        ];
       };
       # zen.enable = true;
       zsh.enable = true;
