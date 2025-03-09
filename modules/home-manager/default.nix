@@ -7,6 +7,7 @@
     ./nvim
     ./persist
     ./ssh
+    ./waybar
     ./zsh
   ];
 }
