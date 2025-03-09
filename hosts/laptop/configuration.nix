@@ -29,6 +29,7 @@
   };
 
   modules = {
+    tuigreet.enable = true;
     hyprland.enable = true;
     nh.enable = true;
     persist.enable = true;
@@ -46,7 +47,7 @@
   stylix = {
     enable = true;
     base16Scheme = "${pkgs.base16-schemes}/share/themes/nord.yaml";
-    fonts.sizes.terminal = 16;
+    fonts.sizes.terminal = 12;
     opacity.terminal = 0.6;
     cursor = {
       package = pkgs.bibata-cursors;
