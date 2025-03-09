@@ -6,8 +6,12 @@
 }: let
   cfg = config.modules.git;
 in {
+  imports = [
+    ./lazygit.nix
+  ];
+
   options.modules.git = {
-    enable = lib.mkEnableOption "Enable Git";
+    enable = lib.mkEnableOption "git";
     user = lib.mkOption {
       type = lib.types.str;
       description = "User name for git";
@@ -19,11 +23,7 @@ in {
   };
 
   config = lib.mkIf cfg.enable {
-    home.packages = with pkgs; [
-      git
-      lazygit
-    ];
-
+    modules.git.lazygit.enable = lib.mkDefault true;
     programs.git = {
       enable = true;
       userName = cfg.user;
