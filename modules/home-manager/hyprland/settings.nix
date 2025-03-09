@@ -19,9 +19,12 @@
         scroll_factor = 0.2;
       };
 
-      sensitivity = 0.1;
+      sensitivity = 0.2;
       follow_mouse = 2;
       accel_profile = "flat";
+
+      repeat_rate = 20;
+      repeat_delay = 300;
     };
 
     monitor = [

@@ -1,14 +1,21 @@
 let
-  toggle = program: "pkill ${program} || uwsm app -- ${program}";
-  runOnce = program: "prgep ${program} || uwsm app -- ${program}";
+  toggle = {
+    program,
+    args ? "",
+  }: "pkill ${program} || uwsm app -- ${program} ${args}";
+  runOnce = {
+    program,
+    args ? "",
+  }: "prgep ${program} || uwsm app -- ${program} ${args}";
 in {
   wayland.windowManager.hyprland.settings = {
     "$mod" = "SUPER";
     "$terminal" = "alacritty";
 
     bindm = [
-      "$mod, mouse:272, movewindow"
-      "$mod SHIFT, mouse:275, resizewindow"
+      "$mod      , mouse:272, movewindow"
+      "$mod      , mouse:273, resizewindow"
+      "$mod SHIFT, mouse:272, resizewindow"
     ];
 
     bind = [
@@ -44,8 +51,10 @@ in {
       "$mod      , code:14, workspace, 5"
       "$mod SHIFT, code:14, movetoworkspacesilent, 5"
 
-      # Applications
+      # Utilities
       "$mod SHIFT, Return, exec, uwsm app -- $terminal"
+
+      # Applications
       "$mod SHIFT, F, exec, uwsm app -- firefox"
     ];
   };
