@@ -31,6 +31,7 @@
   modules = {
     tuigreet.enable = true;
     hyprland.enable = true;
+    networkmanager.enable = true;
     nh.enable = true;
     persist.enable = true;
     ssh.enable = true;

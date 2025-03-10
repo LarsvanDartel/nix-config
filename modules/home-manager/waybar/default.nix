@@ -50,10 +50,11 @@ in {
             ];
           };
           "network" = {
-            interface = "wlp2*";
-            format-wifi = "󰤨  {signalStrength}%";
+            interval = 2;
+            interface = "wlp0*";
+            format-wifi = "󰤨  {bandwidthDownBits}";
             format-ethernet = "{ipaddr}/{cidr} 󰈀";
-            tooltip-format = "{essid}: {ifname} via {gwaddr} 󰩟\n\nClick to open nmtui.";
+            tooltip-format = "{essid}: {ifname} via 󰩟 {ipaddr}\n\nClick to open nmtui.";
             format-linked = "{essid} {ifname} (No IP) 󰩟";
             format-disconnected = "󰤭 ";
             on-click = "alacritty -e nmtui";
@@ -65,6 +66,7 @@ in {
             on-click = "alacritty -e btop";
           };
           "memory" = {
+            interval = 10;
             format = "   {percentage}%";
             tooltip-format = "{used:0.1f}GiB used\n\nClick to open btop.";
             on-click = "$alacrity -e btop";
