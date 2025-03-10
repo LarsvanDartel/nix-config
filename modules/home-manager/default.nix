@@ -8,6 +8,7 @@
     ./persist
     ./ssh
     ./waybar
+    ./yubico
     ./zsh
   ];
 }
