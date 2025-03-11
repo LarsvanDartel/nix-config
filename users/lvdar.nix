@@ -18,6 +18,7 @@
       firefox.enable = true;
       hyprland.enable = true;
       nvim.enable = true;
+      spotify.enable = true;
       ssh.enable = true;
       persist = {
         enable = true;

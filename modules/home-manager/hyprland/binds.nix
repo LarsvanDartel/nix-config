@@ -56,6 +56,7 @@ in {
 
       # Applications
       "$mod SHIFT, F, exec, uwsm app -- firefox"
+      "$mod SHIFT, S, exec, [workspace 5 silent] uwsm app -- $terminal -e spotify_player"
     ];
   };
 }

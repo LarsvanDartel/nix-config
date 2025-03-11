@@ -6,6 +6,7 @@
     ./hyprland
     ./nvim
     ./persist
+    ./spotify
     ./ssh
     ./waybar
     ./yubico
