@@ -28,7 +28,7 @@
       };
       # zen.enable = true;
       zsh.enable = true;
-      yubico.enable = true;
+      yubico.enable = false;
     };
 
     home.stateVersion = "24.11";

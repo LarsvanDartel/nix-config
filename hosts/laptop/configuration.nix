@@ -36,7 +36,7 @@
     persist.enable = true;
     ssh.enable = true;
     sudo.enable = true;
-    yubico.enable = true;
+    yubico.enable = false;
   };
 
   # TODO: Move to user config

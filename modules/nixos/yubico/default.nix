@@ -31,5 +31,13 @@ in {
       mode = "challenge-response";
       id = ["29617754" "32433838"];
     };
+
+    security.pam.u2f = {
+      enable = true;
+      settings = {
+        cue = true;
+        interactive = true;
+      };
+    };
   };
 }
