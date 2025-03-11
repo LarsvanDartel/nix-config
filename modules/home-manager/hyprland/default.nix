@@ -18,6 +18,8 @@ in {
 
   config = lib.mkIf cfg.enable {
     modules.waybar.enable = lib.mkForce true;
+    modules.rofi.enable = lib.mkForce true;
+
     wayland.windowManager.hyprland.enable = true;
   };
 }

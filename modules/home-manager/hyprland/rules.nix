@@ -1,7 +1,13 @@
 {
   wayland.windowManager.hyprland.settings = {
+    layerrule = [
+      "blur, notifications"
+      "blur, rofi"
+      "dimaround, rofi"
+    ];
+
     windowrulev2 = [
-      "float, class:^(org.gnome.Calculator)$"
+      "float, class:^(org.gnome.Calculator|Rofi)$"
       "size 390 490, class:^(org.gnome.Calculator)$"
 
       "float, title:^(Picture-in-Picture)$"
@@ -11,7 +17,7 @@
       "workspace special silent, title:^(.*is sharing (your screen|a window)\.)$"
 
       "idleinhibit focus, class:^(zen)$, title:^(.*YouTube.*)$"
-      "idleinhibit fullscreen, class:^(zen)$"
+      "idleinhibit fullscreen, class:.*"
     ];
   };
 }

@@ -6,6 +6,7 @@
     ./hyprland
     ./nvim
     ./persist
+    ./rofi
     ./spotify
     ./ssh
     ./waybar

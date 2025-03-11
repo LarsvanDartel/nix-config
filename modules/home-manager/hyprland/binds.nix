@@ -53,6 +53,18 @@ in {
 
       # Utilities
       "$mod SHIFT, Return, exec, uwsm app -- $terminal"
+      "$mod      , Tab   , exec, ${toggle {
+        program = "rofi";
+        args = "-normal-window -show-icons -show drun";
+      }}"
+      "$mod      , Period, exec, ${toggle {
+        program = "rofi";
+        args = "-normal-window -show-icons -show emoji";
+      }}"
+      "$mod      , K     , exec, ${toggle {
+        program = "rofi";
+        args = "-normal-window -show calc -modi calc -no-show-match -no-sort -no-persist-history -theme-str \"entry { placeholder: 'Enter calculation...'; } textbox { background-color: transparent; text-color: @accent-color; } listview { scrollbar: false; } inputbar { padding: 16px; }\"";
+      }}"
 
       # Applications
       "$mod SHIFT, F, exec, uwsm app -- firefox"
