@@ -1,12 +1,11 @@
-let
-  toggle = {
-    program,
-    args ? "",
-  }: "pkill ${program} || uwsm app -- ${program} ${args}";
-  runOnce = {
-    program,
-    args ? "",
-  }: "prgep ${program} || uwsm app -- ${program} ${args}";
+{
+  config,
+  lib,
+  ...
+}: let
+  programName = program: builtins.elemAt (lib.strings.splitString " " program) 0;
+  toggle = program: "pkill ${programName program} || uwsm app -- ${program}";
+  runOnce = program: "pgrep ${programName program} || uwsm app -- ${program}";
 in {
   wayland.windowManager.hyprland.settings = {
     "$mod" = "SUPER";
@@ -18,7 +17,7 @@ in {
       "$mod SHIFT, mouse:272, resizewindow"
     ];
 
-    bind = [
+    bind = with config.modules.graphical.commands; [
       # Compositor settings
       "$mod SHIFT, Q, exec, pkill Hyprland"
       "$mod SHIFT, C, killactive"
@@ -53,22 +52,15 @@ in {
 
       # Utilities
       "$mod SHIFT, Return, exec, uwsm app -- $terminal"
-      "$mod      , Tab   , exec, ${toggle {
-        program = "rofi";
-        args = "-normal-window -show-icons -show drun";
-      }}"
-      "$mod      , Period, exec, ${toggle {
-        program = "rofi";
-        args = "-normal-window -show-icons -show emoji";
-      }}"
-      "$mod      , K     , exec, ${toggle {
-        program = "rofi";
-        args = "-normal-window -show calc -modi calc -no-show-match -no-sort -no-persist-history -theme-str \"entry { placeholder: 'Enter calculation...'; } textbox { background-color: transparent; text-color: @accent-color; } listview { scrollbar: false; } inputbar { padding: 16px; }\"";
-      }}"
+      "$mod      , Tab   , exec, uwsm app -- ${toggle launcher}"
+      "$mod      , Period, exec, uwsm app -- ${toggle emoji}"
+      "$mod      , K     , exec, uwsm app -- ${toggle calculator}"
+      "ALT       , Tab   , exec, uwsm app -- ${toggle windowSwitch}"
+      "$mod SHIFT, W     , exec, uwsm app -- ${toggleBar}"
 
       # Applications
       "$mod SHIFT, F, exec, uwsm app -- firefox"
-      "$mod SHIFT, S, exec, [workspace 5 silent] uwsm app -- $terminal -e spotify_player"
+      "$mod SHIFT, S, exec, uwsm app -- $terminal --title 'Spotify Player' -e spotify_player"
     ];
   };
 }

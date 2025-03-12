@@ -1,0 +1,52 @@
+mainbox {
+    border:             3px;
+    border-radius:      7px;
+    border-color:       @fg1;
+}
+
+inputbar {
+    children:           [ textbox-prompt-colon, entry ];
+    border:             0px 0px 2px 0px;
+    margin:             6px;
+    border-color:       @fg1;
+}
+
+prompt, entry, element-icon, element-text {
+    vertical-align:     0.5;
+}
+
+textbox-prompt-colon {
+    expand:             false;
+    str:                ">";
+    margin:             0em 0.3em 0em 0.1em;
+    text-color:         @accent-color;
+}
+
+entry {
+    text-color:         @regular-color;
+}
+
+element {
+    padding:            1px 2px 3px 2px;
+}
+
+element selected {
+    background-color:   @select-color;
+    text-color:         @dark-color;
+}
+
+element normal normal {
+    text-color:         @regular-color;
+}
+
+element alternate.normal {
+    text-color:        @regular-color;
+}
+
+element normal active {
+    text-color:         @accent-color;
+}
+
+element-text {
+    text-color:         inherit;
+}

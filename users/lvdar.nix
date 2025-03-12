@@ -15,8 +15,8 @@
         user = "LarsvanDartel";
         email = "larsvandartel73@gmail.com";
       };
+      graphical.hyprland.enable = true;
       firefox.enable = true;
-      hyprland.enable = true;
       nvim.enable = true;
       spotify.enable = true;
       ssh.enable = true;

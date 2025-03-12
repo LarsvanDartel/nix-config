@@ -1,15 +1,13 @@
-{...}: {
+{
   imports = [
     ./alacritty
     ./firefox
     ./git
-    ./hyprland
+    ./graphical
     ./nvim
     ./persist
-    ./rofi
     ./spotify
     ./ssh
-    ./waybar
     ./yubico
     ./zsh
   ];

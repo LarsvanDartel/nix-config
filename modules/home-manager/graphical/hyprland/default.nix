@@ -4,7 +4,7 @@
   pkgs,
   ...
 }: let
-  cfg = config.modules.hyprland;
+  cfg = config.modules.graphical.hyprland;
 in {
   imports = [
     ./binds.nix
@@ -12,13 +12,13 @@ in {
     ./settings.nix
   ];
 
-  options.modules.hyprland = {
+  options.modules.graphical.hyprland = {
     enable = lib.mkEnableOption "hyprland";
   };
 
   config = lib.mkIf cfg.enable {
-    modules.waybar.enable = lib.mkForce true;
-    modules.rofi.enable = lib.mkForce true;
+    modules.graphical.waybar.enable = lib.mkForce true;
+    modules.graphical.rofi.enable = lib.mkForce true;
 
     wayland.windowManager.hyprland.enable = true;
   };
