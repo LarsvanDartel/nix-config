@@ -45,12 +45,13 @@ in {
       })
       config.host.users;
 
+    home-manager.sharedModules = [
+      inputs.self.outputs.homeManagerModules.default
+    ];
+
     home-manager.users =
       attrsets.concatMapAttrs (name: value: {
-        ${name}.imports = [
-          value.config
-          inputs.self.outputs.homeManagerModules.default
-        ];
+        ${name} = value.config;
       })
       config.host.users;
   };
