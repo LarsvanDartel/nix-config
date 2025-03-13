@@ -55,7 +55,9 @@ window#waybar {
     background: @base0A;
 }
 
-tooltip {
+tooltip,
+#tray window
+{
     background: @base00;
     border: 3px solid @base0A;
     border-radius: 10px;
@@ -65,7 +67,8 @@ tooltip {
     margin: 5px;
 }
 
-tooltip label {
+tooltip label,
+#tray window label {
     color: @base06;
 }
 
