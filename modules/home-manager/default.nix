@@ -7,6 +7,7 @@
     ./graphical
     ./nvim
     ./persist
+    ./signal
     ./spotify
     ./ssh
     ./unfree

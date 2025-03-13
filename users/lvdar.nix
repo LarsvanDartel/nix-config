@@ -27,6 +27,10 @@
       };
       firefox.enable = true;
       nvim.enable = true;
+      signal = {
+        enable = true;
+        autostart = true;
+      };
       spotify.enable = true;
       ssh.enable = true;
       persist = {

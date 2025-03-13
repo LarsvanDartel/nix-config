@@ -16,6 +16,7 @@
       "pin, title:^(Picture-in-Picture)$"
 
       "workspace 4 silent, class:^(discord)$"
+      "workspace 4 silent, class:^(signal)$"
 
       "workspace 5 silent, title:^(Spotify Player)$"
 
