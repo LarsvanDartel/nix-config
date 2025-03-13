@@ -24,6 +24,10 @@ in {
 
   config = lib.mkIf cfg.enable {
     modules.graphical.rofi.enable = true;
+    modules.persist.directories = [
+      ".cache/rbw"
+      ".local/share/rbw"
+    ];
 
     home.packages = with pkgs; [
       rofi-rbw
