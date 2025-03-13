@@ -40,7 +40,7 @@ in {
           builtins.toFile "theme.rasi" ''
             * {
               font:             "JetBrains Mono Regular 12";
-              bg0:              ${base00};
+              bg0:              ${base00}10;
               bg1:              ${base02};
               fg0:              ${base03};
               fg1:              ${base0D};

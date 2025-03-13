@@ -4,11 +4,12 @@
       "blur, notifications"
       "ignorezero, notifications"
       "blur, rofi"
+      "ignorezero, rofi"
       "dimaround, rofi"
     ];
 
     windowrulev2 = [
-      "float, class:^(org.gnome.Calculator|Rofi)$"
+      "float, class:^(org.gnome.Calculator)$"
       "size 390 490, class:^(org.gnome.Calculator)$"
 
       "float, title:^(Picture-in-Picture)$"

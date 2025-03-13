@@ -2,6 +2,7 @@ mainbox {
     border:             3px;
     border-radius:      7px;
     border-color:       @fg1;
+    background-color:   @bg0;
 }
 
 inputbar {
