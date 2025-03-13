@@ -10,6 +10,7 @@
 
     modules = {
       alacritty.enable = true;
+      discord.enable = true;
       git = {
         enable = true;
         user = "LarsvanDartel";
@@ -34,6 +35,7 @@
           "nixos-config"
         ];
       };
+      unfree.enable = true;
       # zen.enable = true;
       zsh.enable = true;
       yubico.enable = false;

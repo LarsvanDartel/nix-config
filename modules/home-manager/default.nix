@@ -1,6 +1,7 @@
 {
   imports = [
     ./alacritty
+    ./discord
     ./firefox
     ./git
     ./graphical
@@ -8,6 +9,7 @@
     ./persist
     ./spotify
     ./ssh
+    ./unfree
     ./yubico
     ./zsh
   ];
