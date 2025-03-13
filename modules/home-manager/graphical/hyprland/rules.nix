@@ -13,6 +13,8 @@
       "float, title:^(Picture-in-Picture)$"
       "pin, title:^(Picture-in-Picture)$"
 
+      "workspace 4 silent, class:^(discord)$"
+
       "workspace 5 silent, title:^(Spotify Player)$"
 
       "workspace special silent, title:^((Firefox|Zen) - Sharing Indicator)$"

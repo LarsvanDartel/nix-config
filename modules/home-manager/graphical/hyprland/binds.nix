@@ -61,6 +61,7 @@ in {
       # Applications
       "$mod SHIFT, F, exec, uwsm app -- firefox"
       "$mod SHIFT, S, exec, uwsm app -- $terminal --title 'Spotify Player' -e spotify_player"
+      "$mod SHIFT, D, exec, uwsm app -- discord"
     ];
   };
 }
