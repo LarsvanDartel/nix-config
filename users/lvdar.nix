@@ -10,7 +10,10 @@
 
     modules = {
       alacritty.enable = true;
-      discord.enable = true;
+      discord = {
+        enable = true;
+        autostart = true;
+      };
       git = {
         enable = true;
         user = "LarsvanDartel";
