@@ -18,9 +18,9 @@
       type = lib.types.str;
       description = "Command for power options menu";
     };
-    toggleBar = lib.mkOption {
+    passwordManager = lib.mkOption {
       type = lib.types.str;
-      description = "Command to toggle status bar";
+      description = "Command to open password manager menu";
     };
     audioSwitch = lib.mkOption {
       type = lib.types.str;

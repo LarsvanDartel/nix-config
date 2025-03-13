@@ -24,6 +24,7 @@ in {
 
   config = lib.mkIf cfg.enable {
     modules.graphical.rofi.enable = true;
+    modules.graphical.commands.passwordManager = "rofi-rbw";
     modules.persist.directories = [
       ".cache/rbw"
       ".local/share/rbw"

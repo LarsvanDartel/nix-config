@@ -56,7 +56,7 @@ in {
       "$mod      , Period, exec, uwsm app -- ${toggle emoji}"
       "$mod      , K     , exec, uwsm app -- ${toggle calculator}"
       "ALT       , Tab   , exec, uwsm app -- ${toggle windowSwitch}"
-      "$mod SHIFT, W     , exec, uwsm app -- ${toggleBar}"
+      "$mod SHIFT, P     , exec, uwsp app -- ${toggle passwordManager}"
 
       # Applications
       "$mod SHIFT, F, exec, uwsm app -- firefox"

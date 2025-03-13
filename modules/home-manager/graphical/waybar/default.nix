@@ -11,7 +11,6 @@ in {
 
   config = lib.mkIf cfg.enable {
     stylix.targets.waybar.enable = false;
-    modules.graphical.commands.toggleBar = "pkill -SIGUSR1 waybar || waybar";
     programs.waybar = {
       enable = true;
       systemd.enable = true;
