@@ -1,12 +1,11 @@
-{
+{config, ...}: {
   wayland.windowManager.hyprland.settings = {
     env = [
       "NIXOS_OZONE_WL,1"
       "WLR_NO_HARDWARE_CURSORS,1"
     ];
 
-    exec-once = [
-    ];
+    exec-once = config.modules.graphical.startupCommands;
 
     input = {
       kb_layout = "us";

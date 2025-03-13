@@ -2,6 +2,7 @@
   wayland.windowManager.hyprland.settings = {
     layerrule = [
       "blur, notifications"
+      "ignorezero, notifications"
       "blur, rofi"
       "dimaround, rofi"
     ];
