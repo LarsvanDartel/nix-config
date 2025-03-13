@@ -7,6 +7,10 @@
   cfg = config.modules.graphical.rofi;
   rofi-dir = ".local/share/rofi";
 in {
+  imports = [
+    ./rofi-rbw.nix
+  ];
+
   options.modules.graphical.rofi = {
     enable = lib.mkEnableOption "rofi";
   };

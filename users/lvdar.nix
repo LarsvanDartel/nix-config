@@ -15,7 +15,15 @@
         user = "LarsvanDartel";
         email = "larsvandartel73@gmail.com";
       };
-      graphical.hyprland.enable = true;
+      graphical = {
+        hyprland.enable = true;
+        rofi.rofi-rbw = {
+          enable = true;
+          email = "larsvandartel@proton.me";
+          base_url = "https://api.bitwarden.eu";
+          identity_url = "https://identity.bitwarden.eu";
+        };
+      };
       firefox.enable = true;
       nvim.enable = true;
       spotify.enable = true;
