@@ -13,7 +13,6 @@
     impermanence.url = "github:nix-community/impermanence";
 
     stylix.url = "github:danth/stylix";
-    stylix.inputs.nixpkgs.follows = "nixpkgs";
 
     nvf.url = "github:notashelf/nvf";
     nvf.inputs.nixpkgs.follows = "nixpkgs";
@@ -24,17 +23,13 @@
     nixos-hardware.url = "github:nixos/nixos-hardware";
   };
 
-  outputs = {
-    self,
-    nixpkgs,
-    ...
-  } @ inputs: let
+  outputs = {nixpkgs, ...} @ inputs: let
     system = "x86_64-linux";
     pkgs = import nixpkgs {
       inherit system;
       config.allowUnfree = true;
     };
-    lib = nixpkgs.lib;
+    inherit (nixpkgs) lib;
     mkConfig = hosts:
       lib.attrsets.concatMapAttrs (hostName: config: {
         ${hostName} = lib.nixosSystem {
@@ -47,6 +42,7 @@
               home-manager.sharedModules = [
                 ./modules/home-manager
                 inputs.nvf.homeManagerModules.default
+                inputs.stylix.homeManagerModules.stylix
                 inputs.nur.modules.homeManager.default
               ];
               host.users = config.users;
@@ -55,7 +51,6 @@
             inputs.disko.nixosModules.default
             inputs.impermanence.nixosModules.impermanence
             inputs.home-manager.nixosModules.home-manager
-            inputs.stylix.nixosModules.stylix
           ];
         };
       })
@@ -72,7 +67,5 @@
         };
       };
     };
-
-    homeManagerModules.default = ./modules/home-manager;
   };
 }

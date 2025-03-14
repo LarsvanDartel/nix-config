@@ -1,7 +1,5 @@
 {
-  config,
   inputs,
-  lib,
   pkgs,
   ...
 }: {
@@ -37,44 +35,6 @@
     ssh.enable = true;
     sudo.enable = true;
     yubico.enable = false;
-  };
-
-  # TODO: Move to user config
-  fonts.packages = with pkgs; [
-    dejavu_fonts
-    noto-fonts-color-emoji
-    jetbrains-mono
-    nerd-fonts.jetbrains-mono
-  ];
-
-  stylix = {
-    enable = true;
-    base16Scheme = "${pkgs.base16-schemes}/share/themes/nord.yaml";
-    fonts.sizes.terminal = 12;
-    opacity.terminal = 0.6;
-    cursor = {
-      package = pkgs.bibata-cursors;
-      name = "Bibata-Modern-Ice";
-      size = 24;
-    };
-    fonts = {
-      serif = {
-        package = pkgs.dejavu_fonts;
-        name = "DejaVu Serif";
-      };
-      sansSerif = {
-        package = pkgs.dejavu_fonts;
-        name = "DejaVu Sans";
-      };
-      monospace = {
-        package = pkgs.nerd-fonts.jetbrains-mono;
-        name = "JetBrainsMono Nerd Font";
-      };
-      emoji = {
-        package = pkgs.noto-fonts-color-emoji;
-        name = "Noto Color Emoji";
-      };
-    };
   };
 
   nix.settings.experimental-features = ["nix-command" "flakes"];

@@ -10,6 +10,7 @@
     ./signal
     ./spotify
     ./ssh
+    ./styling
     ./unfree
     ./yubico
     ./zsh
