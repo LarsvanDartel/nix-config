@@ -29,14 +29,6 @@
         type = lib.types.str;
         description = "Command to open password manager menu";
       };
-      audioSwitch = lib.mkOption {
-        type = lib.types.str;
-        description = "Command to choose audio source";
-      };
-      brightness = lib.mkOption {
-        type = lib.types.str;
-        description = "Command for adjusting brightness";
-      };
       calculator = lib.mkOption {
         type = lib.types.str;
         description = "Command for quick calculations";
