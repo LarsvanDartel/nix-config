@@ -1,7 +1,6 @@
 {
   config,
   lib,
-  pkgs,
   ...
 }: let
   cfg = config.modules.spotify;
@@ -13,6 +12,9 @@ in {
   config = lib.mkIf cfg.enable {
     modules.persist.directories = [
       ".cache/spotify-player"
+    ];
+    modules.graphical.startupCommands = [
+      "${config.modules.terminal.default} --title \"Spotify Player\" -e spotify_player"
     ];
 
     programs.spotify-player.enable = true;
