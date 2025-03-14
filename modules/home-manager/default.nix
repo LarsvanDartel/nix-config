@@ -1,6 +1,5 @@
 {
   imports = [
-    ./alacritty
     ./discord
     ./firefox
     ./git
@@ -11,6 +10,7 @@
     ./spotify
     ./ssh
     ./styling
+    ./terminal
     ./unfree
     ./yubico
     ./zsh

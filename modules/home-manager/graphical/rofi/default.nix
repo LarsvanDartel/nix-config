@@ -26,7 +26,7 @@ in {
     programs.rofi = {
       enable = true;
       package = pkgs.rofi-wayland;
-      terminal = "alacritty";
+      terminal = "${config.modules.terminal.default}";
       cycle = true;
       plugins = with pkgs; [
         rofi-emoji

@@ -6,7 +6,6 @@
   };
 
   modules = {
-    alacritty.enable = true;
     discord = {
       enable = true;
       autostart = true;
@@ -33,6 +32,7 @@
     };
     spotify.enable = true;
     ssh.enable = true;
+    terminal.foot.enable = true;
     persist = {
       enable = true;
       directories = [

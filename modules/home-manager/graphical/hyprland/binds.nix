@@ -9,7 +9,7 @@
 in {
   wayland.windowManager.hyprland.settings = {
     "$mod" = "SUPER";
-    "$terminal" = "alacritty";
+    "$terminal" = "${config.modules.terminal.default}";
 
     bindm = [
       "$mod      , mouse:272, movewindow"
