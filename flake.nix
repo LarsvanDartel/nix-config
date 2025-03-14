@@ -15,6 +15,12 @@
     stylix.url = "github:danth/stylix";
     stylix.inputs.nixpkgs.follows = "nixpkgs";
 
+    nvf.url = "github:notashelf/nvf";
+    nvf.inputs.nixpkgs.follows = "nixpkgs";
+
+    nur.url = "github:nix-community/NUR";
+    nur.inputs.nixpkgs.follows = "nixpkgs";
+
     nixos-hardware.url = "github:nixos/nixos-hardware";
   };
 
@@ -38,6 +44,11 @@
             ./modules/nixos
             {
               home-manager.extraSpecialArgs = {inherit inputs system;};
+              home-manager.sharedModules = [
+                ./modules/home-manager
+                inputs.nvf.homeManagerModules.default
+                inputs.nur.modules.homeManager.default
+              ];
               host.users = config.users;
               networking.hostName = lib.mkDefault hostName;
             }
