@@ -38,7 +38,7 @@ with lib; let
     ./dejavu-sans.nix
     ./dejavu-serif.nix
     # ./fira-code.nix
-    # ./nerd-fonts-symbols.nix
+    ./symbols-nerd-font.nix
     ./noto-color-emoji.nix
   ];
 

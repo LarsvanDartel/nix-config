@@ -1,37 +1,28 @@
 * {
-    font-family: JetBrainsMono Nerd Font, sans-serif;
-    font-size: 15px;
+    font-family: Cozette, sans-serif;
+    font-size: 12px;
     color: @base00;
     background: transparent;
 }
 
-window#waybar.hidden {
-    background: @base0A;
-}
-
 window#waybar {
     background: transparent;
-    color: @base0A;
-    margin-left: 20px;
-    margin-right: 20px;
-    transition-property: background-color;
-    transition-duration: .5s;
-    font-family: JetBrainsMono Nerd Font, sans-serif;
+    font-family: Cozette, sans-serif;
 }
 
 #workspaces button {
     margin: 3px;
+    min-width: 12px;
     font-weight: bold;
     border-radius: 100px;
-    padding-left: 10px;
-    padding-right: 10px;
     background: @base03;
     border: 1px solid transparent;
     transition: all 400ms ease-in-out;
 }
 
 #workspaces button label {
-    color: @base03;
+    font-size: 14px;
+    color: @base06;
 }
 
 #workspaces button.empty {
@@ -39,11 +30,14 @@ window#waybar {
 }
 
 #workspaces button.active {
+    min-width: 30px;
     color: @base00;
     background: @base04;
-    padding-left: 30px;
-    padding-right: 30px;
     transition: all 400ms ease-in-out;
+}
+
+#workspaces button.active label {
+    color: @base03;
 }
 
 #workspaces button:hover label {
@@ -61,7 +55,7 @@ tooltip,
     background: @base00;
     border: 3px solid @base0A;
     border-radius: 10px;
-    font-family: "DejaVu Sans", sans-serif;
+    font-family: Cozette, sans-serif;
     opacity: 0.8;
     box-shadow: 0 0 3px @base0A;
     margin: 5px;
@@ -95,17 +89,11 @@ tooltip label,
 #network,
 #pulseaudio,
 #memory,
-#bluetooth,
-#gamemode {
+#bluetooth {
     padding-left: 13px;
     padding-right: 13px;
     border: 3px solid transparent;
     color: @base06;
-}
-
-#gamemode label {
-    color: @base06;
-
 }
 
 #bluetooth.connected {
@@ -119,23 +107,16 @@ tooltip label,
 #network:hover,
 #pulseaudio:hover,
 #memory:hover,
-#bluetooth:hover,
-#gamemode:hover {
+#bluetooth:hover {
     color: @base00;
     background: @base0A;
     border-radius: 100px;
     transition: all 200ms ease-in-out;
 }
 
-#gamemode:hover label {
-    color: @base00;
-
-}
-
 #custom-cliphist {
-    padding-left: 13px;
-    padding-right: 17px;
     margin-right: 5px;
+    min-width: 35px;
     border: 3px solid @base05;
     border-radius: 100px;
     color: @base05;
@@ -150,8 +131,7 @@ tooltip label,
 }
 
 #custom-exit {
-    padding-left: 13px;
-    padding-right: 17px;
+    min-width: 35px;
     border: 0 solid @base00;
     border-radius: 100px;
     color: @base00;
@@ -173,16 +153,13 @@ tooltip label,
 }
 
 #battery {
-    padding-left: 17px;
-    padding-right: 17px;
+    min-width: 70px;
     margin-right: 5px;
     color: @base06;
 }
 
 #clock {
-    padding-top: 2px;
-    padding-left: 17px;
-    padding-right: 15px;
+    min-width: 70px;
     margin-right: 5px;
     color: @base0F;
     font-weight: bold;

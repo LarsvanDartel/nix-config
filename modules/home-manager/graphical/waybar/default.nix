@@ -29,9 +29,9 @@ in {
       settings = [
         {
           layer = "top";
-          height = 45;
+          height = 20;
           spacing = 5;
-          margin-top = 15;
+          margin-top = 5;
           margin-left = 20;
           margin-right = 20;
           margin-down = 0;
