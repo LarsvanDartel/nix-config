@@ -20,6 +20,7 @@
 
       "workspace 5 silent, title:^(Spotify Player)$"
 
+      "workspace special silent, class:^(xwaylandvideobridge)$"
       "workspace special silent, title:^((Firefox|Zen) - Sharing Indicator)$"
       "workspace special silent, title:^(.*is sharing (your screen|a window)\.)$"
 

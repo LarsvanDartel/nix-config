@@ -21,6 +21,12 @@ in {
     modules.graphical.rofi.enable = lib.mkForce true;
     modules.graphical.mako.enable = lib.mkForce true;
 
+    home.packages = with pkgs; [
+      kdePackages.xwaylandvideobridge
+      wl-clipboard
+      brightnessctl
+    ];
+
     wayland.windowManager.hyprland.enable = true;
   };
 }
