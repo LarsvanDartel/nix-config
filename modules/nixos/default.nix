@@ -11,5 +11,6 @@
     ./sudo
     ./users
     ./yubico
+    ./zsh
   ];
 }

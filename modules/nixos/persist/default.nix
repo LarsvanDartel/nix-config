@@ -12,6 +12,11 @@ in {
       default = [];
       description = "Directories to keep on boot";
     };
+    files = lib.mkOption {
+      type = lib.types.listOf lib.types.str;
+      default = [];
+      description = "Files to keep on boot";
+    };
   };
 
   config = lib.mkIf cfg.enable {
@@ -45,6 +50,7 @@ in {
     programs.fuse.userAllowOther = true;
     fileSystems."/persist".neededForBoot = true;
     environment.persistence."/persist/system" = {
+      inherit (cfg) files;
       hideMounts = true;
       directories =
         cfg.directories

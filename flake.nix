@@ -63,6 +63,7 @@
         host = ./hosts/laptop/configuration.nix;
         users."lvdar" = {
           sudo = true;
+          shell = pkgs.zsh;
           config = ./users/lvdar.nix;
         };
       };

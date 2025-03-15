@@ -1,6 +1,5 @@
 {
   config,
-  inputs,
   lib,
   pkgs,
   ...
@@ -17,6 +16,10 @@ with lib; let
       config = mkOption {
         type = types.path;
         description = "Home manager config for this user.";
+      };
+      shell = mkPackageOption pkgs "shell" {
+        default = "bash";
+        example = "zsh";
       };
     };
   };
@@ -38,6 +41,7 @@ in {
     users.users =
       attrsets.concatMapAttrs (name: value: {
         ${name} = {
+          inherit (value) shell;
           isNormalUser = true;
           extraGroups = mkIf value.sudo (["wheel"] ++ config.host.sudo-groups);
           initialPassword = "pwd";

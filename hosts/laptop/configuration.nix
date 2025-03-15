@@ -1,8 +1,4 @@
-{
-  inputs,
-  pkgs,
-  ...
-}: {
+{inputs, ...}: {
   imports = [
     ./hardware-configuration.nix
     (import ./disko.nix {device = "/dev/nvme0n1";})
@@ -35,6 +31,7 @@
     ssh.enable = true;
     sudo.enable = true;
     yubico.enable = false;
+    zsh.enable = true;
   };
 
   nix.settings.experimental-features = ["nix-command" "flakes"];
