@@ -17,12 +17,13 @@ in {
   };
 
   config = lib.mkIf cfg.enable {
-    modules.persist.directories = [".config/discord"];
-    modules.graphical.startupCommands = lib.mkIf cfg.autostart [
-      "${pkgs.discord}/bin/discord"
-    ];
-
-    modules.unfree.allowedPackages = ["discord"];
+    modules = {
+      persist.directories = [".config/discord"];
+      graphical.startupCommands =
+        lib.mkIf cfg.autostart
+        (lib.mkOrder 800 ["${pkgs.discord}/bin/discord"]);
+      unfree.allowedPackages = ["discord"];
+    };
 
     home.packages = with pkgs; [
       discord

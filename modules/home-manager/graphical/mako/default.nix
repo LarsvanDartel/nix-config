@@ -11,7 +11,7 @@ in {
   };
 
   config = lib.mkIf cfg.enable {
-    modules.graphical.startupCommands = [
+    modules.graphical.startupCommands = lib.mkOrder 800 [
       "${pkgs.mako}/bin/mako"
     ];
     stylix.targets.mako.enable = false;

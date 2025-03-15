@@ -19,7 +19,7 @@ in {
 
       policies = {
         AppAutoUpdate = false;
-        BlockAboutAddons = true;
+        BlockAboutAddons = false;
         BlockAboutConfig = true;
         BlockAboutProfiles = true;
         DisableAppUpdate = true;

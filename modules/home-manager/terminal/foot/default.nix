@@ -12,7 +12,7 @@ in {
 
   config = lib.mkIf cfg.enable {
     modules.terminal.default = lib.mkDefault "${pkgs.foot}/bin/footclient";
-    modules.graphical.startupCommands = ["${pkgs.foot}/bin/foot --server"];
+    modules.graphical.startupCommands = lib.mkOrder 200 ["${pkgs.foot}/bin/foot --server"];
 
     programs.foot = {
       enable = true;

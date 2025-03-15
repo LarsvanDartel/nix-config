@@ -13,7 +13,7 @@ in {
     modules.persist.directories = [
       ".cache/spotify-player"
     ];
-    modules.graphical.startupCommands = [
+    modules.graphical.startupCommands = lib.mkOrder 800 [
       "${config.modules.terminal.default} --title \"Spotify Player\" -e spotify_player"
     ];
 
