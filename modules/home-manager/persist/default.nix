@@ -17,12 +17,16 @@ in {
       default = [];
       description = "Directories to persist";
     };
+    files = lib.mkOption {
+      type = lib.types.listOf lib.types.str;
+      default = [];
+      description = "Files to persist";
+    };
   };
 
   config = lib.mkIf cfg.enable {
     home.persistence."/persist/home/lvdar" = {
-      directories = cfg.directories;
-      files = [];
+      inherit (cfg) files directories;
       allowOther = true;
     };
   };

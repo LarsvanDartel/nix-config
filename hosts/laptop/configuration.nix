@@ -1,4 +1,8 @@
-{inputs, ...}: {
+{
+  inputs,
+  pkgs,
+  ...
+}: {
   imports = [
     ./hardware-configuration.nix
     (import ./disko.nix {device = "/dev/nvme0n1";})
@@ -21,6 +25,7 @@
   environment.sessionVariables = {
     FLAKE = "/home/lvdar/nixos-config";
   };
+  environment.shells = with pkgs; [zsh];
 
   modules = {
     tuigreet.enable = true;
