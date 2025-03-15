@@ -26,6 +26,10 @@
     };
     firefox.enable = true;
     nvim.enable = true;
+    shell = {
+      zsh.enable = true;
+      prompt.p10k.enable = true;
+    };
     signal = {
       enable = true;
       autostart = true;
@@ -41,7 +45,6 @@
     };
     unfree.enable = true;
     # zen.enable = true;
-    zsh.enable = true;
     yubico.enable = false;
   };
 

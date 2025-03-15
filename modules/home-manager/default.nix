@@ -6,6 +6,7 @@
     ./graphical
     ./nvim
     ./persist
+    ./shell
     ./signal
     ./spotify
     ./ssh
@@ -13,6 +14,5 @@
     ./terminal
     ./unfree
     ./yubico
-    ./zsh
   ];
 }

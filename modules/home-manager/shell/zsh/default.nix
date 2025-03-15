@@ -3,14 +3,19 @@
   lib,
   ...
 }: let
-  cfg = config.modules.zsh;
+  cfg = config.modules.shell.zsh;
+  inherit (config.home) homeDirectory;
 in {
-  options.modules.zsh = {
+  options.modules.shell.zsh = {
     enable = lib.mkEnableOption "zsh";
   };
 
   config = lib.mkIf cfg.enable {
-    modules.persist.files = [".zsh_history"];
+    modules.persist = {
+      directories = [".zplug"];
+      files = [".zsh_history"];
+    };
+
     programs.zsh = {
       enable = true;
       enableCompletion = true;
@@ -21,26 +26,21 @@ in {
         append = true;
         ignoreAllDups = true;
         ignoreDups = true;
-        path = "${config.home.homeDirectory}/.zsh_history";
+        path = "${homeDirectory}/.zsh_history";
         share = true;
       };
       historySubstringSearch.enable = true;
 
       autocd = true;
       dirHashes = {
-        dev = "$HOME/dev";
-        nix = "$HOME/nixos-config/";
+        dev = "${homeDirectory}/dev";
+        nix = "${homeDirectory}/nixos-config/";
       };
 
       shellAliases = {
         grep = "grep --color";
         ip = "ip --color";
       };
-
-      # oh-my-zsh = {
-      #   enable = true;
-      #   plugins = [];
-      # };
     };
   };
 }
