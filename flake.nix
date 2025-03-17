@@ -37,20 +37,23 @@
           modules = [
             config.host
             ./modules/nixos
-            {
-              home-manager.extraSpecialArgs = {inherit inputs system;};
-              home-manager.sharedModules = [
-                ./modules/home-manager
-                inputs.nvf.homeManagerModules.default
-                inputs.stylix.homeManagerModules.stylix
-                inputs.nur.modules.homeManager.default
-              ];
-              host.users = config.users;
-              networking.hostName = lib.mkDefault hostName;
-            }
             inputs.disko.nixosModules.default
             inputs.impermanence.nixosModules.impermanence
             inputs.home-manager.nixosModules.home-manager
+            {
+              home-manager = {
+                extraSpecialArgs = {inherit inputs system;};
+                backupFileExtension = "backup";
+                sharedModules = [
+                  ./modules/home-manager
+                  inputs.nvf.homeManagerModules.default
+                  inputs.stylix.homeManagerModules.stylix
+                  inputs.nur.modules.homeManager.default
+                ];
+              };
+              host.users = config.users;
+              networking.hostName = lib.mkDefault hostName;
+            }
           ];
         };
       })

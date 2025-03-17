@@ -4,13 +4,13 @@
   ...
 }:
 with lib; let
-  cfg = config.modules.styling.themes;
+  cfg = config.modules.styling.theme;
 in {
   imports = [
     ./nord.nix
   ];
 
-  options.modules.styling.themes = {
+  options.modules.styling.theme = {
     colorScheme = mkOption {
       type = types.nullOr types.str;
       default = null;
@@ -21,7 +21,7 @@ in {
 
     schemeColors = mkOption {
       type = types.attrsOf types.anything;
-      default = config.stylix.colors;
+      default = config.lib.stylix.colors;
       description = "Generated colors from scheme";
     };
 

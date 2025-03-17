@@ -28,7 +28,7 @@
     nvim.enable = true;
     shell = {
       zsh.enable = true;
-      prompt.p10k.enable = true;
+      prompt.oh-my-posh.enable = true;
     };
     signal = {
       enable = true;
@@ -59,7 +59,7 @@
       interface = fontpkgs."Cozette";
       extraFonts = [];
     };
-    themes.nord = {
+    theme.nord = {
       enable = true;
       darkMode = true;
     };
