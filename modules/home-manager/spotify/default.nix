@@ -1,6 +1,7 @@
 {
   config,
   lib,
+  pkgs,
   ...
 }: let
   cfg = config.modules.spotify;
@@ -18,5 +19,12 @@ in {
     ];
 
     programs.spotify-player.enable = true;
+
+    xdg.desktopEntries.spotify-player = {
+      exec = "${pkgs.spotify-player}/bin/spotify_player";
+      name = "Spotify Player";
+      terminal = true;
+      type = "Application";
+    };
   };
 }
