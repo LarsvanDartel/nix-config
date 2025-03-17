@@ -104,7 +104,7 @@ in {
             format-disabled = " DISABLED";
             format-off = " OFF";
             interval = 30;
-            on-click = "bluetuith";
+            on-click = "${terminal} -e bluetuith";
             format-no-controller = "";
             tooltip-format = "{num_connections} devices are currently connected to '{controller_alias}'.\n\nClick to open bluetuith.";
             tooltip-format-connected = "Controller '{controller_alias}' has the following {num_connections} devices connected:\n\n{device_enumerate}";
