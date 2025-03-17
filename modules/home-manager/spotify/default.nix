@@ -14,7 +14,7 @@ in {
       ".cache/spotify-player"
     ];
     modules.graphical.startupCommands = lib.mkOrder 800 [
-      "${config.modules.terminal.default} --title \"Spotify Player\" -e spotify_player"
+      "${config.modules.terminal.defaultStandalone} --title \"Spotify Player\" -e spotify_player"
     ];
 
     programs.spotify-player.enable = true;
