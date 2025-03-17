@@ -51,10 +51,9 @@ in {
             ];
           };
           "network" = {
-            interval = 2;
             interface = "wlp0*";
-            format-wifi = "󰤨  {bandwidthDownBits}";
-            format-ethernet = "{ipaddr}/{cidr} 󰈀";
+            format-wifi = "󰤨  {essid}";
+            format-ethernet = "󰈀 {ipaddr}/{cidr}";
             tooltip-format = "{essid}: {ifname} via 󰩟 {ipaddr}\n\nClick to open nmtui.";
             format-linked = "{essid} {ifname} (No IP) 󰩟";
             format-disconnected = "󰤭 ";
@@ -99,35 +98,26 @@ in {
               default = ["󰕿" "󰖀" "󰕾"];
             };
           };
-          # TODO: Allow turning bluetooth off here with middle mouse click
           "bluetooth" = {
             format = "";
-            format-connected = " {num_connections} connected";
+            format-connected = " {num_connections}";
             format-disabled = " DISABLED";
             format-off = " OFF";
             interval = 30;
-            on-click = "blueman-manager";
+            on-click = "bluetuith";
             format-no-controller = "";
-            tooltip-format = "{num_connections} devices are currently connected to '{controller_alias}'.\n\nClick to open blueman-manager.";
+            tooltip-format = "{num_connections} devices are currently connected to '{controller_alias}'.\n\nClick to open bluetuith.";
             tooltip-format-connected = "Controller '{controller_alias}' has the following {num_connections} devices connected:\n\n{device_enumerate}";
             tooltip-format-enumerate-connected = "{device_alias} ({device_address})";
             tooltip-format-enumerate-connected-battery = "{device_alias} ({device_address}) {device_battery_percentage}% battery";
           };
           "hyprland/workspaces" = {
-            persistent-workspaces = [1 2 3 4 5 6 7 8 9];
+            persistent-workspaces = [1 2 3 4 5];
           };
           "tray" = {
             spacing = 10;
             icon-size = 24;
             show-passive-items = true;
-          };
-          # TODO: Try again after updates - displaying icons on startup and activate feature are currently broken
-          "wlr/taskbar" = {
-            format = "{icon}";
-            icon-size = 14;
-            tooltip-format = "{name}";
-            on-click = "activate";
-            on-click-middle = "close";
           };
           "group/right" = {
             orientation = "horizontal";
@@ -151,7 +141,7 @@ in {
               critical = 5;
             };
             bat = "BAT0";
-            format = "{icon}   {capacity}%";
+            format = "{icon} {capacity}%";
             format-charging = "  {capacity}%";
             format-plugged = "  {capacity}%";
             format-icons = ["" "" "" "" ""];

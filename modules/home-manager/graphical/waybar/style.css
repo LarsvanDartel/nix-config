@@ -96,6 +96,8 @@ tooltip label,
     color: @base06;
 }
 
+#network.wifi,
+#network.ethernet,
 #bluetooth.connected {
     background: @base0B;
     border-radius: 100px;
@@ -153,17 +155,18 @@ tooltip label,
 }
 
 #battery {
-    min-width: 70px;
+    padding-left: 10px;
+    padding-right: 10px;
     margin-right: 5px;
     color: @base06;
 }
 
 #clock {
-    min-width: 70px;
+    padding-left: 10px;
+    padding-right: 10px;
     margin-right: 5px;
     color: @base0F;
     font-weight: bold;
-    font-size: 14px;
 }
 
 #battery:hover,
