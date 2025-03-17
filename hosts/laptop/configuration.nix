@@ -28,6 +28,7 @@
   environment.shells = with pkgs; [zsh];
 
   modules = {
+    firewall.enable = true;
     tuigreet.enable = true;
     hyprland.enable = true;
     networkmanager.enable = true;

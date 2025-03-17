@@ -6,6 +6,7 @@
   };
 
   modules = {
+    "3d-printing".orca-slicer.enable = true;
     discord = {
       enable = true;
       autostart = true;

@@ -1,5 +1,6 @@
 {
   imports = [
+    ./3d-printing
     ./discord
     ./firefox
     ./git

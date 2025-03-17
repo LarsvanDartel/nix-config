@@ -1,5 +1,6 @@
 {...}: {
   imports = [
+    ./firewall
     ./greetd
     ./hyprland
     ./keyboard
