@@ -1,5 +1,6 @@
 {...}: {
   imports = [
+    ./bluetooth
     ./firewall
     ./greetd
     ./hyprland
