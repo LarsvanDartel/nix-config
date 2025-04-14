@@ -8,6 +8,10 @@
   modules = {
     "3d-printing".orca-slicer.enable = true;
     bluetuith.enable = true;
+    development = {
+      direnv.enable = true;
+      nvim.enable = true;
+    };
     discord = {
       enable = true;
       autostart = true;
@@ -27,7 +31,6 @@
       };
     };
     firefox.enable = true;
-    nvim.enable = true;
     shell = {
       zsh.enable = true;
       prompt.oh-my-posh.enable = true;

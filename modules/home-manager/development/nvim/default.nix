@@ -3,14 +3,19 @@
   lib,
   ...
 }: let
-  cfg = config.modules.nvim;
+  cfg = config.modules.development.nvim;
 in {
-  options.modules.nvim = {
+  options.modules.development.nvim = {
     enable = lib.mkEnableOption "nvim";
   };
 
   config = lib.mkIf cfg.enable {
     stylix.targets.nvf.enable = true;
+
+    home.sessionVariables = {
+      EDITOR = "nvim";
+    };
+
     programs.nvf = {
       enable = true;
       settings = {
@@ -62,7 +67,7 @@ in {
 
           autopairs.nvim-autopairs.enable = true;
 
-          autocomplete.blink-cmp.enable = true;
+          autocomplete.nvim-cmp.enable = true;
           snippets.luasnip.enable = true;
 
           filetree.neo-tree.enable = true;

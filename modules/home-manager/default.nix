@@ -2,11 +2,11 @@
   imports = [
     ./3d-printing
     ./bluetuith
+    ./development
     ./discord
     ./firefox
     ./git
     ./graphical
-    ./nvim
     ./persist
     ./shell
     ./signal
