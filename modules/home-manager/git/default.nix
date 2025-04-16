@@ -1,7 +1,6 @@
 {
   config,
   lib,
-  pkgs,
   ...
 }: let
   cfg = config.modules.git;
@@ -32,6 +31,7 @@ in {
       extraConfig = {
         pull.rebase = true;
         init.defaultBranch = "main";
+        fetch.prune = true;
       };
     };
   };
