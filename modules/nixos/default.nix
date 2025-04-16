@@ -12,6 +12,7 @@
     ./ssh
     ./sudo
     ./users
+    ./virt-manager
     ./yubico
     ./zsh
   ];
