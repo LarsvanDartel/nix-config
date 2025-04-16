@@ -10,7 +10,14 @@
     bluetuith.enable = true;
     development = {
       direnv.enable = true;
-      nvim.enable = true;
+      nvim = {
+        enable = true;
+        languages = {
+          markdown.enable = true;
+          ts.enable = true;
+          vue.enable = true;
+        };
+      };
     };
     discord = {
       enable = true;
