@@ -24,12 +24,12 @@ in {
       lib.mkIf cfg.autostart
       (lib.mkOrder 801 (
         let
-          signal = "${pkgs.signal-desktop}/bin/signal-desktop";
+          signal = "${pkgs.signal-desktop-source}/bin/signal-desktop";
         in ["${signal} & sleep 1 && ${signal}"]
       ));
 
     home.packages = with pkgs; [
-      signal-desktop
+      signal-desktop-source
     ];
   };
 }
