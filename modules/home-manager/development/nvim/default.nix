@@ -5,6 +5,10 @@
 }: let
   cfg = config.modules.development.nvim;
 in {
+  imports = [
+    ./languages
+  ];
+
   options.modules.development.nvim = {
     enable = lib.mkEnableOption "nvim";
   };
@@ -15,6 +19,8 @@ in {
     home.sessionVariables = {
       EDITOR = "nvim";
     };
+
+    modules.persist.directories = [".config/github-copilot"];
 
     programs.nvf = {
       enable = true;
@@ -28,12 +34,15 @@ in {
             logFile = "/tmp/nvim.log";
           };
 
-          spellcheck.enable = true;
-
           lsp = {
             formatOnSave = true;
             lightbulb.enable = true;
             trouble.enable = true;
+          };
+
+          treesitter = {
+            enable = true;
+            highlight.enable = true;
           };
 
           debugger.nvim-dap = {
@@ -46,8 +55,6 @@ in {
             enableFormat = true;
             enableTreesitter = true;
             enableExtraDiagnostics = true;
-
-            nix.enable = true;
           };
 
           visuals = {
