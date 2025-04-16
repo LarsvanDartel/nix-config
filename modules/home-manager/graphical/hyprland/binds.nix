@@ -54,7 +54,6 @@ in {
       "$mod SHIFT, Return, exec, uwsm app -- $terminal"
       "$mod      , Tab   , exec, uwsm app -- ${toggle launcher}"
       "$mod      , Period, exec, uwsm app -- ${toggle emoji}"
-      "$mod      , K     , exec, uwsm app -- ${toggle calculator}"
       "ALT       , Tab   , exec, uwsm app -- ${toggle windowSwitch}"
       "$mod SHIFT, P     , exec, uwsp app -- ${toggle passwordManager}"
 
