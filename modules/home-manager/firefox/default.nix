@@ -43,7 +43,7 @@ in {
         name = "default";
         isDefault = true;
 
-        search.default = "DuckDuckGo";
+        search.default = "ddg";
 
         extensions.packages = with pkgs.nur.repos.rycee.firefox-addons; [
           ublock-origin
