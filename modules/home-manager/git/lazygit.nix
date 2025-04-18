@@ -1,7 +1,6 @@
 {
   config,
   lib,
-  pkgs,
   ...
 }: let
   cfg = config.modules.git.lazygit;
@@ -15,6 +14,7 @@ in {
       enable = true;
       settings = {
         disableStartupPopups = true;
+        gui.skipDiscardChangeWarning = true;
       };
     };
   };
