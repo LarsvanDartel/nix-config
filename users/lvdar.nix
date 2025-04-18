@@ -14,6 +14,7 @@
         enable = true;
         languages = {
           markdown.enable = true;
+          tex.enable = true;
           ts.enable = true;
           vue.enable = true;
         };
