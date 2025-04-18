@@ -148,13 +148,14 @@ in {
           };
           "clock" = {
             #format = "<big>      <b>{:%H:%M</b></big>\n<small>󰃮  %d %h %Y</small>}"; # Time in row one, date in row two; suggested height = 45
+            locale = "nl_NL.UTF-8";
             format = "<big><b>{:%H:%M}</b></big>";
-            format-alt = "<big><b>󰃮  {:%d %h %Y}</b></big>";
+            format-alt = "<big><b>󰃮  {:%Y-%m-%d}</b></big>";
             tooltip-format = "<big>{:%Y %B}</big>\n<tt><small>{calendar}</small></tt>";
             calendar = {
               mode = "year";
               mode-mon-col = 3;
-              weeks-pos = "right";
+              weeks-pos = "left";
               on-scroll = 1;
               "format" = with config.lib.stylix.colors.withHashtag; {
                 months = "<span color='${base0D}'><b>{}</b></span>";
