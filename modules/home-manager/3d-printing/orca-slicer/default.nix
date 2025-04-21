@@ -4,13 +4,21 @@
   pkgs,
   ...
 }: let
+  inherit (lib.options) mkEnableOption;
+  inherit (lib.modules) mkIf;
+
   cfg = config.modules."3d-printing".orca-slicer;
 in {
   options.modules."3d-printing".orca-slicer = {
-    enable = lib.mkEnableOption "orca slicer";
+    enable = mkEnableOption "orca slicer";
+  };
+  options.systemwide.orca-slicer = {
+    enable = mkEnableOption "orca slicer";
   };
 
-  config = lib.mkIf cfg.enable {
+  config = mkIf cfg.enable {
+    systemwide.orca-slicer.enable = true;
+
     modules.persist.directories = [
       ".config/OrcaSlicer"
       ".local/share/orca-slicer"
