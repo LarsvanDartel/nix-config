@@ -12,6 +12,7 @@
     ./ssh
     ./sudo
     ./users
+    ./unfree
     ./virt-manager
     ./yubico
     ./zsh
