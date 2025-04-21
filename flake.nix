@@ -25,10 +25,7 @@
 
   outputs = {nixpkgs, ...} @ inputs: let
     system = "x86_64-linux";
-    pkgs = import nixpkgs {
-      inherit system;
-      config.allowUnfree = true;
-    };
+    pkgs = import nixpkgs {inherit system;};
     inherit (nixpkgs) lib;
     mkConfig = hosts:
       lib.attrsets.concatMapAttrs (hostName: config: {

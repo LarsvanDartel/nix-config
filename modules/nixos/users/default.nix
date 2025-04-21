@@ -24,6 +24,10 @@ with lib; let
     };
   };
 in {
+  imports = [
+    ./systemwide.nix
+  ];
+
   options = {
     host.sudo-groups = lib.mkOption {
       type = types.listOf types.str;
