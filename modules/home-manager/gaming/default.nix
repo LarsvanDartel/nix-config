@@ -15,8 +15,11 @@ in {
   options.modules.gaming = {
     enable = mkEnableOption "gaming";
   };
+  options.systemwide.gaming = {
+    enable = mkEnableOption "gaming";
+  };
 
   config = mkIf cfg.enable {
-    # Does nothing
+    systemwide.gaming.enable = true;
   };
 }

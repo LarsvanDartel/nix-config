@@ -28,6 +28,7 @@
       enable = true;
       launchers = {
         steam.enable = true;
+        minecraft.enable = true;
       };
     };
     git = {
