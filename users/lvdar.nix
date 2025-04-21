@@ -24,6 +24,12 @@
       enable = true;
       autostart = true;
     };
+    gaming = {
+      enable = true;
+      launchers = {
+        steam.enable = true;
+      };
+    };
     git = {
       enable = true;
       user = "LarsvanDartel";
