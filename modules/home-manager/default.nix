@@ -5,6 +5,7 @@
     ./development
     ./discord
     ./firefox
+    ./gaming
     ./git
     ./graphical
     ./persist
