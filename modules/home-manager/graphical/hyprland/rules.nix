@@ -15,10 +15,10 @@
       "float, title:^(Picture-in-Picture)$"
       "pin, title:^(Picture-in-Picture)$"
 
-      "workspace 4 silent, class:^(discord)$"
-      "workspace 4 silent, class:^(signal)$"
+      "workspace 8 silent, class:^(discord)$"
+      "workspace 8 silent, class:^(signal)$"
 
-      "workspace 5 silent, title:^(Spotify Player)$"
+      "workspace 9 silent, title:^(Spotify Player)$"
 
       "workspace special silent, class:^(xwaylandvideobridge)$"
       "workspace special silent, title:^((Firefox|Zen) - Sharing Indicator)$"

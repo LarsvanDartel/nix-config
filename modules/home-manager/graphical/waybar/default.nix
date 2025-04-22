@@ -112,7 +112,7 @@ in {
             tooltip-format-enumerate-connected-battery = "{device_alias} ({device_address}) {device_battery_percentage}% battery";
           };
           "hyprland/workspaces" = {
-            persistent-workspaces = [1 2 3 4 5];
+            persistent-workspaces = [1 2 3 4 5 6 7 8 9];
           };
           "tray" = {
             spacing = 10;
