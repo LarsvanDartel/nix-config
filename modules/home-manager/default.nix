@@ -8,6 +8,7 @@
     ./gaming
     ./git
     ./graphical
+    ./libre-office
     ./persist
     ./shell
     ./signal
