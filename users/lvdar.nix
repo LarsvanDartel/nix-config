@@ -45,6 +45,7 @@
         identity_url = "https://identity.bitwarden.eu";
       };
     };
+    libre-office.enable = true;
     firefox.enable = true;
     shell = {
       zsh.enable = true;
