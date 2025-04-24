@@ -18,5 +18,6 @@
     ./terminal
     ./unfree
     ./yubico
+    ./zathura
   ];
 }

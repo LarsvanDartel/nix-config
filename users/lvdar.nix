@@ -67,6 +67,7 @@
     unfree.enable = true;
     # zen.enable = true;
     yubico.enable = false;
+    zathura.enable = true;
   };
 
   modules.styling = let
