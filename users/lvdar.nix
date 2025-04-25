@@ -45,6 +45,7 @@
         identity_url = "https://identity.bitwarden.eu";
       };
     };
+    keyring.enable = true;
     libre-office.enable = true;
     firefox.enable = true;
     shell = {
@@ -58,6 +59,7 @@
     spotify.enable = true;
     ssh.enable = true;
     terminal.foot.enable = true;
+    vpn.eduvpn.enable = true;
     persist = {
       enable = true;
       directories = [

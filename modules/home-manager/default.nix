@@ -8,6 +8,7 @@
     ./gaming
     ./git
     ./graphical
+    ./keyring
     ./libre-office
     ./persist
     ./shell
@@ -17,6 +18,7 @@
     ./styling
     ./terminal
     ./unfree
+    ./vpn
     ./yubico
     ./zathura
   ];
