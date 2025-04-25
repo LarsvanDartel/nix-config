@@ -9,17 +9,25 @@
     inputs.nixos-hardware.nixosModules.lenovo-thinkpad-p1-gen3
   ];
 
-  boot.loader = {
-    efi = {
-      canTouchEfiVariables = true;
-      efiSysMountPoint = "/boot";
+  boot = {
+    loader = {
+      efi = {
+        canTouchEfiVariables = true;
+        efiSysMountPoint = "/boot";
+      };
+      grub = {
+        devices = ["nodev"];
+        efiSupport = true;
+        enable = true;
+        useOSProber = true;
+      };
     };
-    grub = {
-      devices = ["nodev"];
-      efiSupport = true;
-      enable = true;
-      useOSProber = true;
-    };
+
+    kernelParams = [
+      "resume_offset=533760"
+    ];
+
+    resumeDevice = "/dev/disk/by-uuid/c2dc9bb7-f815-4c9c-bd96-68bebb100aef";
   };
 
   environment.sessionVariables = {
