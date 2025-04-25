@@ -28,7 +28,7 @@ in {
           @define-color base0E ${base0E}; @define-color base0F ${base0F};
         ''
         + builtins.readFile ./style.css;
-      settings = [
+      settings = with config.modules.graphical.commands; [
         {
           layer = "top";
           height = 20;
@@ -176,7 +176,7 @@ in {
           };
           "custom/exit" = {
             format = "";
-            on-click = "sleep 0.2 && ${config.home.homeDirectory}/power-menu.sh";
+            on-click = "sleep 0.2 && ${powerMenu}";
             tooltip-format = "Power menu\n\n<small>Click to open menu.</small>";
           };
         }

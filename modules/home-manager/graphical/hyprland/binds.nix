@@ -51,6 +51,9 @@ in {
         "$mod CTRL , K, resizeactive, 0 -10"
         "$mod CTRL , J, resizeactive, 0 10"
 
+        # Power menu
+        "$mod      , Escape, exec, uwsm app -- ${toggle powerMenu}"
+
         # Utilities
         "$mod SHIFT, Return, exec, uwsm app -- $terminal"
         "$mod      , Tab   , exec, uwsm app -- ${toggle launcher}"

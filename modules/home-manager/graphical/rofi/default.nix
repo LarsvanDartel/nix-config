@@ -21,6 +21,7 @@ in {
     home.packages = with pkgs; [
       jq
       rofi-systemd
+      rofi-power-menu
     ];
 
     programs.rofi = {
@@ -62,7 +63,7 @@ in {
         show-icons = true;
         sort = true;
         kb-cancel = "Escape,Super+Shift+C";
-        modi = "window,run,ssh,emoji,calc,drun";
+        modi = "window,run,ssh,emoji,calc,drun,power-menu:rofi-power-menu";
       };
     };
 
@@ -71,6 +72,7 @@ in {
       windowSwitch = "rofi -show window";
       calculator = "rofi -show calc";
       emoji = "rofi -show emoji";
+      powerMenu = "rofi -show power-menu";
     };
   };
 }
