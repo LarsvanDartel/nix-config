@@ -1,6 +1,7 @@
 {
   config,
   lib,
+  pkgs,
   ...
 }: let
   cfg = config.modules.graphical.waybar;
@@ -57,7 +58,7 @@ in {
             tooltip-format = "{essid}: {ifname} via 󰩟 {ipaddr}\n\nClick to open nmtui.";
             format-linked = "{essid} {ifname} (No IP) 󰩟";
             format-disconnected = "󰤭 ";
-            on-click = "${terminal} -e nmtui";
+            on-click = "${terminal} -e ${pkgs.networkmanager}/bin/nmtui";
           };
           "cpu" = {
             interval = 10;
@@ -69,7 +70,7 @@ in {
             interval = 10;
             format = "   {percentage}%";
             tooltip-format = "{used:0.1f}GiB used\n\nClick to open btop.";
-            on-click = "${terminal} -e btop";
+            on-click = "${terminal} -e ${pkgs.btop}/bin/btop";
           };
           "backlight" = {
             format = "{icon}  {percent}%";
@@ -85,7 +86,7 @@ in {
             format-muted = "󰝟 {format_source}";
             format-source = "󰍬 {volume}%";
             format-source-muted = "󰍭";
-            on-click = "${terminal} -e pulsemixer";
+            on-click = "${terminal} -e ${pkgs.pulsemixer}/bin/pulsemixer";
             tooltip-format = "{desc}\n\nClick to open pulsemixer, scroll to change volume.";
             "format-icons" = {
               headphone = "󰋋";
@@ -104,7 +105,7 @@ in {
             format-disabled = " DISABLED";
             format-off = " OFF";
             interval = 30;
-            on-click = "${terminal} -e bluetuith";
+            on-click = "${terminal} -e ${pkgs.bluetuith}/bin/bluetuith";
             format-no-controller = "";
             tooltip-format = "{num_connections} devices are currently connected to '{controller_alias}'.\n\nClick to open bluetuith.";
             tooltip-format-connected = "Controller '{controller_alias}' has the following {num_connections} devices connected:\n\n{device_enumerate}";

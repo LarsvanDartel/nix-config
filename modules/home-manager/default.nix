@@ -1,6 +1,7 @@
 {
   imports = [
     ./3d-printing
+    ./btop
     ./bluetuith
     ./development
     ./discord
@@ -11,6 +12,7 @@
     ./keyring
     ./libre-office
     ./persist
+    ./pulsemixer
     ./shell
     ./signal
     ./spotify

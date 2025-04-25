@@ -8,6 +8,7 @@
   modules = {
     "3d-printing".orca-slicer.enable = true;
     bluetuith.enable = true;
+    btop.enable = true;
     development = {
       direnv.enable = true;
       nvim = {
@@ -48,6 +49,13 @@
     keyring.enable = true;
     libre-office.enable = true;
     firefox.enable = true;
+    persist = {
+      enable = true;
+      directories = [
+        "nixos-config"
+      ];
+    };
+    pulsemixer.enable = true;
     shell = {
       zsh.enable = true;
       prompt.oh-my-posh.enable = true;
@@ -60,12 +68,6 @@
     ssh.enable = true;
     terminal.foot.enable = true;
     vpn.eduvpn.enable = true;
-    persist = {
-      enable = true;
-      directories = [
-        "nixos-config"
-      ];
-    };
     unfree.enable = true;
     # zen.enable = true;
     yubico.enable = false;
