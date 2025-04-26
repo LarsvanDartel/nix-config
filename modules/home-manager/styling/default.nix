@@ -2,13 +2,14 @@
   imports = [
     ./fonts
     ./themes
+    ./wallpaper.nix
   ];
 
   config = {
     stylix = {
       enable = true;
       autoEnable = true;
-      opacity.terminal = 0.6;
+      opacity.terminal = 1.0;
 
       # TODO: Move to cursor module
       cursor = {

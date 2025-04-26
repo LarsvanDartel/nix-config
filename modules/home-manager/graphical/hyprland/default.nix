@@ -8,6 +8,7 @@
 in {
   imports = [
     ./binds.nix
+    ./hyprpaper.nix
     ./rules.nix
     ./settings.nix
   ];
@@ -17,9 +18,11 @@ in {
   };
 
   config = lib.mkIf cfg.enable {
-    modules.graphical.waybar.enable = lib.mkForce true;
-    modules.graphical.rofi.enable = lib.mkForce true;
-    modules.graphical.mako.enable = lib.mkForce true;
+    modules.graphical = {
+      waybar.enable = lib.mkForce true;
+      rofi.enable = lib.mkForce true;
+      mako.enable = lib.mkForce true;
+    };
 
     home.packages = with pkgs; [
       kdePackages.xwaylandvideobridge

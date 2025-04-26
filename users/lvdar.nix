@@ -89,6 +89,10 @@
       enable = true;
       darkMode = true;
     };
+    wallpaper = {
+      image = "digital/a_group_of_birds_flying_in_the_sky";
+      themed = true;
+    };
   };
 
   programs.home-manager.enable = true;

@@ -86,7 +86,8 @@
 
     misc = {
       disable_autoreload = true;
-      force_default_wallpaper = 0;
+      disable_splash_rendering = true;
+      disable_hyprland_logo = true;
       animate_mouse_windowdragging = false;
       vrr = 1;
     };
