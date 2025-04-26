@@ -8,6 +8,7 @@
 in {
   imports = [
     ./binds.nix
+    ./hyprlock.nix
     ./hyprpaper.nix
     ./rules.nix
     ./settings.nix

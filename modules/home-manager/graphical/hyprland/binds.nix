@@ -53,6 +53,7 @@ in {
 
         # Power menu
         "$mod      , Escape, exec, uwsm app -- ${toggle powerMenu}"
+        "$mod SHIFT, Escape, exec, hyprlock"
 
         # Utilities
         "$mod SHIFT, Return, exec, uwsm app -- $terminal"
