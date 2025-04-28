@@ -3,14 +3,18 @@
   lib,
   ...
 }: let
-  cfg = config.modules.shell.zsh;
+  inherit (lib.options) mkEnableOption;
+  inherit (lib.modules) mkIf;
   inherit (config.home) homeDirectory;
+
+  cfg = config.modules.shell.zsh;
+  shellCfg = config.modules.shell;
 in {
   options.modules.shell.zsh = {
-    enable = lib.mkEnableOption "zsh";
+    enable = mkEnableOption "zsh";
   };
 
-  config = lib.mkIf cfg.enable {
+  config = mkIf cfg.enable {
     modules.persist = {
       directories = [".zplug"];
       files = [".zsh_history"];
@@ -37,10 +41,12 @@ in {
         nix = "${homeDirectory}/nixos-config/";
       };
 
-      shellAliases = {
-        grep = "grep --color";
-        ip = "ip --color";
-      };
+      shellAliases =
+        {
+          grep = "grep --color";
+          ip = "ip --color";
+        }
+        // shellCfg.aliases;
     };
   };
 }
