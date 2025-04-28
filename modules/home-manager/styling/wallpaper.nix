@@ -102,8 +102,7 @@ in {
 
                 export HOME=$PWD
 
-                gowall convert ./${image} -o themed -t ./theme.json
-                mv Pictures/gowall/themed.* ./
+                gowall convert ./${image} --output ./themed.${fileExtension image} --theme ./theme.json
               ''
               else ''
                 cp ${image} ./themed.${fileExtension image}
