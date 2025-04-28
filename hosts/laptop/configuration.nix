@@ -30,9 +30,6 @@
     resumeDevice = "/dev/disk/by-uuid/c2dc9bb7-f815-4c9c-bd96-68bebb100aef";
   };
 
-  environment.sessionVariables = {
-    FLAKE = "/home/lvdar/nixos-config";
-  };
   environment.shells = with pkgs; [zsh];
 
   modules = {
@@ -41,7 +38,10 @@
     tuigreet.enable = true;
     hyprland.enable = true;
     networkmanager.enable = true;
-    nh.enable = true;
+    nh = {
+      enable = true;
+      flake-dir = "/home/lvdar/nixos-config";
+    };
     persist.enable = true;
     ssh.enable = true;
     sudo.enable = true;
