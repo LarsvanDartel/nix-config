@@ -34,6 +34,7 @@
 
   modules = {
     bluetooth.enable = true;
+    fingerprint.enable = true;
     firewall.enable = true;
     tuigreet.enable = true;
     hyprland.enable = true;
