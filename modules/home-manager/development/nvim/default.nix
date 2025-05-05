@@ -35,6 +35,7 @@ in {
           };
 
           lsp = {
+            enable = true;
             formatOnSave = true;
             lightbulb.enable = true;
             trouble.enable = true;
@@ -51,7 +52,6 @@ in {
           };
 
           languages = {
-            enableLSP = true;
             enableFormat = true;
             enableTreesitter = true;
             enableExtraDiagnostics = true;
