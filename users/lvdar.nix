@@ -14,7 +14,9 @@
       nvim = {
         enable = true;
         languages = {
+          clang.enable = true;
           markdown.enable = true;
+          python.enable = true;
           tex.enable = true;
           ts.enable = true;
           vue.enable = true;
