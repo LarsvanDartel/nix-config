@@ -48,7 +48,7 @@ in {
                     build = {
                       onSave = true;
                       forwardSearchAfter = true;
-                      args = { "-X", "compile", "%f", "--keep-logs" };
+                      args = { "-X", "compile", "%f", "--keep-logs", "-Z", "shell-escape-cwd=." };
                       executable = "${pkgs.tectonic}/bin/tectonic";
                     };
                     forwardSearch = {

@@ -26,8 +26,8 @@ in {
       enable = true;
       settings = {
         vim = {
-          viAlias = true;
-          vimAlias = true;
+          viAlias = false;
+          vimAlias = false;
           debugMode = {
             enable = false;
             level = 16;
