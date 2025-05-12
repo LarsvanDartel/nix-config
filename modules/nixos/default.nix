@@ -7,6 +7,7 @@
     ./hyprland
     ./keyboard
     ./locale
+    ./minecraft
     ./networkmanager
     ./nh
     ./persist

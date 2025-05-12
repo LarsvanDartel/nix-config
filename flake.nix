@@ -12,7 +12,10 @@
 
     impermanence.url = "github:nix-community/impermanence";
 
-    stylix.url = "github:danth/stylix";
+    modpack-create.url = "github:LarsvanDartel/Modpack-Create";
+    modpack-create.inputs.nixpkgs.follows = "nixpkgs";
+
+    nix-minecraft.url = "github:Infinidoge/nix-minecraft";
 
     nvf.url = "github:notashelf/nvf";
     nvf.inputs.nixpkgs.follows = "nixpkgs";
@@ -21,6 +24,8 @@
     nur.inputs.nixpkgs.follows = "nixpkgs";
 
     nixos-hardware.url = "github:nixos/nixos-hardware";
+
+    stylix.url = "github:danth/stylix";
   };
 
   outputs = {nixpkgs, ...} @ inputs: let
@@ -40,7 +45,6 @@
             {
               home-manager = {
                 extraSpecialArgs = {inherit inputs system;};
-                backupFileExtension = "backup";
                 sharedModules = [
                   ./modules/home-manager
                   inputs.nvf.homeManagerModules.default
