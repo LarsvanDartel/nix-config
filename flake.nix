@@ -45,6 +45,7 @@
             {
               home-manager = {
                 extraSpecialArgs = {inherit inputs system;};
+                backupFileExtension = "bak";
                 sharedModules = [
                   ./modules/home-manager
                   inputs.nvf.homeManagerModules.default
