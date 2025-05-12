@@ -4,27 +4,19 @@
   lib,
   ...
 }: let
-  inherit (builtins) readDir attrNames;
   inherit (lib.options) mkOption mkEnableOption;
   inherit (lib.types) str;
-  inherit (lib.strings) optionalString splitString removeSuffix concatStringsSep;
-  inherit (lib.lists) findFirst init last length;
+  inherit (lib.strings) optionalString splitString;
+  inherit (lib.lists) last length;
   cfg = config.modules.styling.wallpaper;
 in {
   options.modules.styling.wallpaper = {
-    image = mkOption {
-      type = str;
-      default = "minimal/a_flower_on_a_dark_background.png";
-      description = "Path to the background image in the source repository.";
-    };
     themed = mkEnableOption "themed background";
     inverted = mkEnableOption "invert background";
     src = mkOption {
-      default = pkgs.fetchFromGitHub {
-        owner = "dharmx";
-        repo = "walls";
-        rev = "6bf4d733ebf2b484a37c17d742eb47e5139e6a14";
-        sha256 = "sha256-M96jJy3L0a+VkJ+DcbtrRAquwDWaIG9hAUxenr/TcQU=";
+      default = pkgs.fetchurl {
+        url = "https://raw.githubusercontent.com/dharmx/walls/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/nord/a_blue_and_grey_logo.png";
+        hash = "sha256-jB7q1PAMKS0tfk0Ck6pGkbsfwO+7FHwI83dUHO86ftM=";
       };
     };
     path = mkOption {
@@ -32,7 +24,7 @@ in {
       description = "Path to the background image.";
       default = let
         theme = pkgs.writeTextFile {
-          name = "gowall-theme";
+          name = "gowall-theme.json";
           text = builtins.toJSON {
             name = "NixOS";
             colors = with config.lib.stylix.colors.withHashtag; [
@@ -54,31 +46,16 @@ in {
               base0F
             ];
           };
-          executable = true;
         };
 
-        fileExtension = name: let
-          parts = splitString "." name;
+        fileName = name: let
+          parts = splitString "/" name;
         in
           if length parts > 1
           then last parts
-          else "";
+          else name;
 
-        image = let
-          parts = splitString "/" cfg.image;
-          dirParts = init parts; # all but last part
-          fileBase = last parts; # last part (the base filename without extension)
-          dirPath = concatStringsSep "/" (["${cfg.src}"] ++ dirParts);
-          entries = attrNames (readDir dirPath);
-          match =
-            findFirst
-            (name: (removeSuffix ("." + fileExtension name) name) == fileBase)
-            null
-            entries;
-        in
-          if match != null
-          then "${concatStringsSep "/" dirParts}/${match}"
-          else throw "Image not found: ${cfg.image}";
+        image = fileName cfg.src;
 
         wallpaper-themed = pkgs.stdenv.mkDerivation {
           name = "wallpaper-themed-1.0.0";
@@ -87,35 +64,25 @@ in {
 
           buildInputs = with pkgs; [
             gowall
-            imagemagick
             (writeShellScriptBin "xdg-open" "")
           ];
 
+          unpackPhase = ''
+            cp ${cfg.src} ${image}
+            chmod u+w ${image}
+          '';
+
           buildPhase = ''
-            ${optionalString cfg.inverted ''
-              convert ./${image} -channel RGB -negate ./${image}
-            ''}
-            ${
-              if cfg.themed
-              then ''
-                cp ${theme} ./theme.json
-
-                export HOME=$PWD
-
-                gowall convert ./${image} --output ./themed.${fileExtension image} --theme ./theme.json
-              ''
-              else ''
-                cp ${image} ./themed.${fileExtension image}
-              ''
-            }
-            mogrify -format png themed.*
+            export HOME=$PWD
+            ${optionalString cfg.inverted "gowall invert ${image} --output ${image}"}
+            gowall convert ${image} --output wallpaper.png ${optionalString cfg.themed "-t ${theme}"}
           '';
 
           installPhase = ''
-            install -Dm644 -t $out themed.png
+            install -Dm644 -t $out wallpaper.png
           '';
         };
-      in "${wallpaper-themed}/themed.png";
+      in "${wallpaper-themed}/wallpaper.png";
     };
   };
 }

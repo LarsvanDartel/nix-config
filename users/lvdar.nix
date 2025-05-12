@@ -1,4 +1,8 @@
-{config, ...}: {
+{
+  config,
+  pkgs,
+  ...
+}: {
   home = {
     username = "lvdar";
     homeDirectory = "/home/lvdar";
@@ -55,6 +59,8 @@
       enable = true;
       directories = [
         "nixos-config"
+        "dev"
+        "school"
       ];
     };
     pulsemixer.enable = true;
@@ -92,7 +98,10 @@
       darkMode = true;
     };
     wallpaper = {
-      image = "digital/a_group_of_birds_flying_in_the_sky";
+      src = pkgs.fetchurl {
+        url = "https://raw.githubusercontent.com/dharmx/walls/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/digital/a_group_of_birds_flying_in_the_sky.jpg";
+        hash = "sha256-v6KVInk5JJZPLkOAfC8yuDQtnZtT1DWQI7u6UfG59WY=";
+      };
       themed = true;
     };
   };
