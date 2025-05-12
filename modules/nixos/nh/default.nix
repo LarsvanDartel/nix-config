@@ -19,13 +19,11 @@ in {
   };
 
   config = mkIf cfg.enable {
-    environment.sessionVariables = {
-      NH_FLAKE = cfg.flake-dir;
-    };
     programs.nh = {
       enable = true;
       clean.enable = true;
-      clean.extraArgs = "all --keep 4";
+      clean.extraArgs = "--keep-since 4d --keep 3";
+      flake = cfg.flake-dir;
     };
   };
 }
