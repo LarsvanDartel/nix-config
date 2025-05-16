@@ -1,6 +1,7 @@
 {
   imports = [
-    ./nvim
     ./direnv
+    ./matlab
+    ./nvim
   ];
 }
