@@ -5,6 +5,7 @@
     ./bluetuith
     ./development
     ./discord
+    ./file-manager
     ./firefox
     ./gaming
     ./git
@@ -23,5 +24,6 @@
     ./vpn
     ./yubico
     ./zathura
+    ./zoxide
   ];
 }

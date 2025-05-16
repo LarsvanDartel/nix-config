@@ -31,6 +31,7 @@
       enable = true;
       autostart = true;
     };
+    file-manager.yazi.enable = true;
     gaming = {
       enable = true;
       launchers = {
@@ -80,6 +81,7 @@
     # zen.enable = true;
     yubico.enable = false;
     zathura.enable = true;
+    zoxide.enable = true;
   };
 
   modules.styling = let
