@@ -12,10 +12,10 @@
 
     impermanence.url = "github:nix-community/impermanence";
 
-    modpack-create.url = "github:LarsvanDartel/Modpack-Create";
+    modpack-create.url = "github:LarsvanDartel/Modpack-Create/1.21.1-forge";
     modpack-create.inputs.nixpkgs.follows = "nixpkgs";
 
-    nix-minecraft.url = "github:Infinidoge/nix-minecraft";
+    nix-minecraft.url = "github:Jan-Bulthuis/nix-minecraft";
 
     nvf.url = "github:notashelf/nvf";
     nvf.inputs.nixpkgs.follows = "nixpkgs";
@@ -52,7 +52,7 @@
                 sharedModules = [
                   ./modules/home-manager
                   inputs.nvf.homeManagerModules.default
-                  inputs.stylix.homeManagerModules.stylix
+                  inputs.stylix.homeModules.stylix
                   inputs.nur.modules.homeManager.default
                 ];
               };

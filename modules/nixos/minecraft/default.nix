@@ -22,17 +22,26 @@ in {
       inputs.modpack-create.overlay
     ];
 
-    modules.persist.directories = ["/srv/minecraft"];
+    host.sudo-groups = ["minecraft"];
     services.minecraft-servers = {
       enable = true;
       eula = true;
       openFirewall = true;
+
+      # Does not work with tmux socket
+      managementSystem = {
+        tmux.enable = false;
+        systemd-socket.enable = true;
+      };
       servers.create = {
         enable = true;
 
-        package = pkgs.fabricServers.fabric-1_20_1.override {
-          loaderVersion = "0.16.14";
+        package = pkgs.neoForgeServers.neoforge-21_1_172.override {
+          extraJavaArgs = "-Xmx4G -Xms2G";
         };
+
+        # Hack, since jvm args are incorrectly passed
+        jvmOpts = [];
 
         symlinks = {
           mods = "${pkgs.modpack-create.server}/mods";
