@@ -16,29 +16,23 @@ in {
     ];
     stylix.targets.mako.enable = false;
 
-    services.mako = with config.lib.stylix.colors.withHashtag; {
+    services.mako = {
       enable = true;
-      settings = {
+      settings = with config.lib.stylix.colors.withHashtag; {
         defaultTimeout = 5000;
         anchor = "top-right";
         borderSize = 3;
         borderRadius = 7;
+        border-color = {
+          "urgency=low" = base0B;
+          "urgency=normal" = base0C;
+          "urgency=high" = base08;
+        };
         backgroundColor = "${base00}10";
         padding = "20";
         margin = "30";
         sort = "-time";
         format = "<b>%s</b>\\n<span color=\"${base03}\">(%a)</span>\\n%b";
-      };
-      criteria = {
-        "urgency=low" = {
-          border-color = base0B;
-        };
-        "urgency=normal" = {
-          border-color = base0C;
-        };
-        "urgency=high" = {
-          border-color = base08;
-        };
       };
     };
   };
