@@ -3,7 +3,7 @@
   i18n = {
     defaultLocale = "en_US.UTF-8";
     extraLocales = [
-      "nl_NL.UTF-8"
+      "nl_NL.UTF-8/UTF-8"
     ];
     extraLocaleSettings = {
       LC_NUMERIC = "C.UTF-8";
