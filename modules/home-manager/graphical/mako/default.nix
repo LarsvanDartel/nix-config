@@ -19,16 +19,20 @@ in {
     services.mako = {
       enable = true;
       settings = with config.lib.stylix.colors.withHashtag; {
-        defaultTimeout = 5000;
+        default-timeout = 5000;
         anchor = "top-right";
-        borderSize = 3;
-        borderRadius = 7;
-        border-color = {
-          "urgency=low" = base0B;
-          "urgency=normal" = base0C;
-          "urgency=high" = base08;
+        border-size = 3;
+        border-radius = 7;
+        "urgency=low" = {
+          border-color = base0B;
         };
-        backgroundColor = "${base00}10";
+        "urgency=normal" = {
+          border-color = base0C;
+        };
+        "urgency=high" = {
+          border-color = base08;
+        };
+        background-color = "${base00}10";
         padding = "20";
         margin = "30";
         sort = "-time";
