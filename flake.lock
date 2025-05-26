@@ -385,11 +385,11 @@
         "packwiz2nix": "packwiz2nix"
       },
       "locked": {
-        "lastModified": 1747496775,
-        "narHash": "sha256-eS/E9u1rUUuZBy2mCGfOU+oYkCQ23b/j/5J1A70JdW0=",
+        "lastModified": 1748254876,
+        "narHash": "sha256-WferMyXaFJAo6wz+GigH0m7Tr4pAobvx/1Kx7rmGWKU=",
         "owner": "LarsvanDartel",
         "repo": "Modpack-Create",
-        "rev": "dd20ab01663891d476dedd3a0a8239e3883fb5e6",
+        "rev": "fe237691904bbf79a66ff527589585b8c6ec3c35",
         "type": "github"
       },
       "original": {
@@ -553,11 +553,11 @@
         "treefmt-nix": "treefmt-nix"
       },
       "locked": {
-        "lastModified": 1748245705,
-        "narHash": "sha256-mLCnotOMzzVgQnPEIqKT90wd6aLbxW+X0ypJmOGW1Lg=",
+        "lastModified": 1748265123,
+        "narHash": "sha256-O9bDdixbIShL/uyw3nbRYU2k7vd/gKJGUzye+FzPQNE=",
         "owner": "nix-community",
         "repo": "NUR",
-        "rev": "abb4d9820a084cf4c95400993ac6041a2e7af2fb",
+        "rev": "4767c2d34da23c89d0436a92fae2582b0bcea60e",
         "type": "github"
       },
       "original": {
@@ -700,11 +700,11 @@
         "tinted-zed": "tinted-zed"
       },
       "locked": {
-        "lastModified": 1748213724,
-        "narHash": "sha256-ppmdSruEH7sKzhMNdrY+0NVGOe5Q68LDNVcBZuHuU5o=",
+        "lastModified": 1748264079,
+        "narHash": "sha256-ROBuBxMUBvj3QWUIBqABzzIWCnZHapCmAdPXramjf8E=",
         "owner": "danth",
         "repo": "stylix",
-        "rev": "e22f96de3f57b1ab1a393607bc08c003925f68fc",
+        "rev": "225b2ddbbaa4ae3c2076c1bd1616fefd35e11670",
         "type": "github"
       },
       "original": {
