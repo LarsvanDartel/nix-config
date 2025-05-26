@@ -11,8 +11,6 @@
 
   modules = {
     "3d-printing".orca-slicer.enable = true;
-    bluetuith.enable = true;
-    btop.enable = true;
     development = {
       direnv.enable = true;
       nvim = {
@@ -64,24 +62,32 @@
         "school"
       ];
     };
-    pulsemixer.enable = true;
-    shell = {
-      zsh.enable = true;
-      prompt.oh-my-posh.enable = true;
-    };
     signal = {
       enable = true;
       autostart = true;
     };
     spotify.enable = true;
     ssh.enable = true;
-    terminal.foot.enable = true;
+    terminal = {
+      emulator.foot.enable = true;
+      shell.zsh.enable = true;
+      programs = {
+        bat.enable = true;
+        btop.enable = true;
+        bluetuith.enable = true;
+        eza.enable = true;
+        fd.enable = true;
+        prompt.oh-my-posh.enable = true;
+        pulsemixer.enable = true;
+        ripgrep.enable = true;
+        xh.enable = true;
+        zoxide.enable = true;
+      };
+    };
     vpn.eduvpn.enable = true;
     unfree.enable = true;
-    # zen.enable = true;
     yubico.enable = false;
     zathura.enable = true;
-    zoxide.enable = true;
   };
 
   modules.styling = let

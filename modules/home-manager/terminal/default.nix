@@ -6,8 +6,9 @@
   cfg = config.modules.terminal;
 in {
   imports = [
-    ./alacritty
-    ./foot
+    ./emulator
+    ./programs
+    ./shell
   ];
 
   options.modules.terminal = {

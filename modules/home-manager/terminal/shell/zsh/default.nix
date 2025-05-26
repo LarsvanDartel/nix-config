@@ -7,10 +7,10 @@
   inherit (lib.modules) mkIf;
   inherit (config.home) homeDirectory;
 
-  cfg = config.modules.shell.zsh;
-  shellCfg = config.modules.shell;
+  shellCfg = config.modules.terminal.shell;
+  cfg = shellCfg.zsh;
 in {
-  options.modules.shell.zsh = {
+  options.modules.terminal.shell.zsh = {
     enable = mkEnableOption "zsh";
   };
 
@@ -41,12 +41,8 @@ in {
         nix = "${homeDirectory}/nixos-config/";
       };
 
-      shellAliases =
-        {
-          grep = "grep --color";
-          ip = "ip --color";
-        }
-        // shellCfg.aliases;
+      shellAliases = shellCfg.aliases;
+      inherit (shellCfg) initContent;
     };
   };
 }

@@ -7,9 +7,9 @@
   inherit (lib.options) mkEnableOption;
   inherit (lib.modules) mkIf;
 
-  cfg = config.modules.pulsemixer;
+  cfg = config.modules.terminal.programs.pulsemixer;
 in {
-  options.modules.pulsemixer = {
+  options.modules.terminal.programs.pulsemixer = {
     enable = mkEnableOption "pulsemixer";
   };
 

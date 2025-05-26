@@ -3,6 +3,10 @@
   lib,
   ...
 }: let
+  inherit (lib.options) mkEnableOption mkOption;
+  inherit (lib.types) str;
+  inherit (lib.modules) mkIf mkDefault;
+
   cfg = config.modules.git;
 in {
   imports = [
@@ -10,20 +14,21 @@ in {
   ];
 
   options.modules.git = {
-    enable = lib.mkEnableOption "git";
-    user = lib.mkOption {
-      type = lib.types.str;
+    enable = mkEnableOption "git";
+    user = mkOption {
+      type = str;
       description = "User name for git";
     };
-    email = lib.mkOption {
-      type = lib.types.str;
+    email = mkOption {
+      type = str;
       description = "User email for git";
     };
+    delta.enable = mkEnableOption "delta" // {default = true;};
   };
 
-  config = lib.mkIf cfg.enable {
-    modules.git.lazygit.enable = lib.mkDefault true;
-    modules.shell.aliases = {
+  config = mkIf cfg.enable {
+    modules.git.lazygit.enable = mkDefault true;
+    modules.terminal.shell.aliases = {
       gs = "git status --short";
       gd = "git diff";
 
@@ -45,10 +50,22 @@ in {
       userName = cfg.user;
       userEmail = cfg.email;
 
-      diff-so-fancy = {
-        enable = true;
-        markEmptyLines = false;
-        stripLeadingSymbols = true;
+      delta = {
+        inherit (cfg.delta) enable;
+        options = {
+          features = "unobtrusive-line-numbers decorations";
+          whitespace-error-style = "22 reverse";
+          decorations = {
+            commit-decoration-style = "bold yellow box ul";
+            file-decoration-style = "none";
+            file-style = "bold yellow ul";
+          };
+          line-numbers = true;
+          line-numbers-left-format = "{nm:>4}┊";
+          line-numbers-right-format = "{np:>4}│";
+          line-numbers-left-style = "blue";
+          line-numbers-right-style = "blue";
+        };
       };
 
       extraConfig = {
