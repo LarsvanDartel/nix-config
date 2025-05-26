@@ -3,26 +3,30 @@
   lib,
   ...
 }: let
-  cfg = config.modules.shell.prompt.oh-my-posh;
+  inherit (lib.options) mkEnableOption mkOption;
+  inherit (lib.types) nullOr str;
+  inherit (lib.modules) mkIf;
+
+  cfg = config.modules.terminal.programs.prompt.oh-my-posh;
 in {
-  options.modules.shell.prompt.oh-my-posh = {
-    enable = lib.mkEnableOption "oh-my-posh shell prompt";
-    theme = lib.mkOption {
-      type = lib.types.nullOr lib.types.str;
+  options.modules.terminal.programs.prompt.oh-my-posh = {
+    enable = mkEnableOption "oh-my-posh shell prompt";
+    theme = mkOption {
+      type = nullOr str;
       default = null;
       example = "star";
       description = "Preset theme to use";
     };
   };
 
-  config = lib.mkIf cfg.enable {
+  config = mkIf cfg.enable {
     # programs.zsh.initContent = lib.mkOrder 1500 "eval \"$(${pkgs.oh-my-posh}/bin/oh-my-posh init zsh --config ${})";
     programs.oh-my-posh = {
       enable = true;
       enableBashIntegration = true;
       enableZshIntegration = true;
       useTheme = cfg.theme;
-      settings = lib.mkIf (builtins.isNull cfg.theme) {
+      settings = mkIf (cfg.theme == null) {
         schema = "https://raw.githubusercontent.com/JanDeDobbeleer/oh-my-posh/main/themes/schema.json";
         blocks = [
           {

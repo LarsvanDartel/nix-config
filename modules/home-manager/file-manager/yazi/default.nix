@@ -1,6 +1,7 @@
 {
   config,
   lib,
+  pkgs,
   ...
 }: let
   inherit (lib.options) mkEnableOption;
@@ -12,9 +13,12 @@ in {
     enable = mkEnableOption "yazi file manager";
   };
   config = mkIf cfg.enable {
+    modules.terminal.shell.aliases = {
+      "y" = "${pkgs.yazi}/bin/yazi";
+    };
     programs.yazi = {
       enable = true;
-      enableZshIntegration = config.modules.shell.zsh.enable;
+      enableZshIntegration = config.modules.terminal.shell.zsh.enable;
     };
   };
 }

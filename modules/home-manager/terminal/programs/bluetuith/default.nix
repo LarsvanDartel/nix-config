@@ -4,13 +4,16 @@
   pkgs,
   ...
 }: let
-  cfg = config.modules.bluetuith;
+  inherit (lib.options) mkEnableOption;
+  inherit (lib.modules) mkIf;
+
+  cfg = config.modules.terminal.programs.bluetuith;
 in {
-  options.modules.bluetuith = {
-    enable = lib.mkEnableOption "bluetuith";
+  options.modules.terminal.programs.bluetuith = {
+    enable = mkEnableOption "bluetuith";
   };
 
-  config = lib.mkIf cfg.enable {
+  config = mkIf cfg.enable {
     home.packages = with pkgs; [bluetuith];
 
     xdg.desktopEntries.bluetuith = {

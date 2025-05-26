@@ -6,9 +6,9 @@
   inherit (lib.options) mkEnableOption;
   inherit (lib.modules) mkIf;
 
-  cfg = config.modules.btop;
+  cfg = config.modules.terminal.programs.btop;
 in {
-  options.modules.btop = {
+  options.modules.terminal.programs.btop = {
     enable = mkEnableOption "btop";
   };
 
