@@ -28,29 +28,17 @@ in {
       eula = true;
       openFirewall = true;
 
-      # Does not work with tmux socket
-      managementSystem = {
-        tmux.enable = false;
-        systemd-socket.enable = true;
-      };
       servers.create = {
         enable = true;
 
-        package = pkgs.neoForgeServers.neoforge-21_1_172.override {
-          extraJavaArgs = "-Xmx4G -Xms2G";
-        };
-
-        # Hack, since jvm args are incorrectly passed
-        jvmOpts = [];
+        package = pkgs.neoForgeServers.neoforge-21_1_172;
+        jvmOpts = "-Xms6144M -Xmx8192M";
 
         symlinks = {
           mods = "${pkgs.modpack-create.server}/mods";
         };
 
-        serverProperties = {
-          difficulty = 3;
-          gamemode = 1;
-        };
+        serverProperties = {};
       };
     };
   };
