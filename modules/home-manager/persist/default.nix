@@ -25,7 +25,7 @@ in {
   };
 
   config = lib.mkIf cfg.enable {
-    home.persistence."/persist/home/lvdar" = {
+    home.persistence."/persist/home/${config.home.username}" = {
       inherit (cfg) files directories;
       allowOther = true;
     };

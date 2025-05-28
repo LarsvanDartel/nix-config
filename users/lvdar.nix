@@ -84,6 +84,7 @@
         zoxide.enable = true;
       };
     };
+    virt-manager.enable = true;
     vpn.eduvpn.enable = true;
     unfree.enable = true;
     yubico.enable = false;
