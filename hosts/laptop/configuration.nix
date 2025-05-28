@@ -47,7 +47,6 @@
     ssh.enable = true;
     sudo.enable = true;
     unfree.enable = true;
-    virt-manager.enable = true;
     yubico.enable = false;
     zsh.enable = true;
   };

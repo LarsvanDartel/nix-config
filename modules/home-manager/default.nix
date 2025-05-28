@@ -18,6 +18,7 @@
     ./terminal
     ./unfree
     ./vpn
+    ./virtualization
     ./yubico
     ./zathura
   ];
