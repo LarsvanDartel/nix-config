@@ -8,6 +8,7 @@
     ./gaming
     ./git
     ./graphical
+    ./kde-connect
     ./keyring
     ./libre-office
     ./persist

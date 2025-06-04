@@ -51,6 +51,7 @@
         identity_url = "https://identity.bitwarden.eu";
       };
     };
+    kde-connect.enable = true;
     keyring.enable = true;
     libre-office.enable = true;
     firefox.enable = true;
