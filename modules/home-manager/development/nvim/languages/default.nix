@@ -6,6 +6,7 @@
     ./markdown.nix
     ./nix.nix
     ./python.nix
+    ./rust.nix
     ./tailwind.nix
     ./tex.nix
     ./ts.nix
