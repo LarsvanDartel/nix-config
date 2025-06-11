@@ -22,6 +22,7 @@
             markview = true;
           };
           python.enable = true;
+          rust.enable = true;
           tex.enable = true;
           ts.enable = true;
           vue.enable = true;
