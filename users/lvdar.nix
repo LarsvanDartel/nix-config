@@ -17,7 +17,10 @@
         enable = true;
         languages = {
           clang.enable = true;
-          markdown.enable = true;
+          markdown = {
+            enable = true;
+            markview = true;
+          };
           python.enable = true;
           tex.enable = true;
           ts.enable = true;
