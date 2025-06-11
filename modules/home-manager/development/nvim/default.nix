@@ -57,6 +57,10 @@ in {
             enableExtraDiagnostics = true;
           };
 
+          mini = {
+            surround.enable = true;
+          };
+
           visuals = {
             nvim-web-devicons.enable = true;
             nvim-cursorline.enable = true;
