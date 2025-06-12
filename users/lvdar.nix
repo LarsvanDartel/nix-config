@@ -37,8 +37,9 @@
     gaming = {
       enable = true;
       launchers = {
-        steam.enable = true;
+        lutris.enable = true;
         minecraft.enable = true;
+        steam.enable = true;
       };
     };
     git = {
