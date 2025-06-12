@@ -1,5 +1,6 @@
 {pkgs, ...}: {
   imports = [
+    ./icons
     ./fonts
     ./themes
     ./wallpaper.nix

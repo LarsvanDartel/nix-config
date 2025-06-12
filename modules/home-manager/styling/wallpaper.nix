@@ -8,6 +8,7 @@
   inherit (lib.types) str;
   inherit (lib.strings) optionalString splitString;
   inherit (lib.lists) last length;
+
   cfg = config.modules.styling.wallpaper;
 in {
   options.modules.styling.wallpaper = {
@@ -84,5 +85,9 @@ in {
         };
       in "${wallpaper-themed}/wallpaper.png";
     };
+  };
+
+  config = {
+    stylix.image = cfg.path;
   };
 }
