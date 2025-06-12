@@ -16,9 +16,12 @@ in {
   };
 
   config = lib.mkIf cfg.enable {
-    modules.styling.theme = {
-      darkMode = lib.mkForce cfg.darkMode;
-      colorScheme = "${pkgs.base16-schemes}/share/themes/nord${mode}.yaml";
+    modules.styling = {
+      icons.theme = lib.mkDefault "nordzy";
+      theme = {
+        darkMode = lib.mkForce cfg.darkMode;
+        colorScheme = "${pkgs.base16-schemes}/share/themes/nord${mode}.yaml";
+      };
     };
   };
 }
