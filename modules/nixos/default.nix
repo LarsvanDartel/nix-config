@@ -4,7 +4,6 @@
     ./fingerprint
     ./firewall
     ./greetd
-    ./hyprland
     ./keyboard
     ./locale
     ./minecraft

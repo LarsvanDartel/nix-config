@@ -18,7 +18,13 @@ in {
     enable = lib.mkEnableOption "hyprland";
   };
 
+  options.systemwide.hyprland = {
+    enable = lib.mkEnableOption "hyprland";
+  };
+
   config = lib.mkIf cfg.enable {
+    systemwide.hyprland.enable = true;
+
     modules.graphical = {
       waybar.enable = lib.mkForce true;
       rofi.enable = lib.mkForce true;

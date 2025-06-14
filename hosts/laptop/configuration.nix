@@ -37,7 +37,6 @@
     fingerprint.enable = true;
     firewall.enable = true;
     tuigreet.enable = true;
-    hyprland.enable = true;
     networkmanager.enable = true;
     nh = {
       enable = true;
