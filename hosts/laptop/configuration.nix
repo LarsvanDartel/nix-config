@@ -38,10 +38,6 @@
     firewall.enable = true;
     tuigreet.enable = true;
     networkmanager.enable = true;
-    nh = {
-      enable = true;
-      flake-dir = "/home/lvdar/nixos-config";
-    };
     persist.enable = true;
     ssh.enable = true;
     sudo.enable = true;

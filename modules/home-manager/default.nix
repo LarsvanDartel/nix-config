@@ -11,6 +11,7 @@
     ./kde-connect
     ./keyring
     ./libre-office
+    ./nh
     ./persist
     ./signal
     ./spotify
