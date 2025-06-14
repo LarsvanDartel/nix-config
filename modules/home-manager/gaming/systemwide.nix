@@ -1,5 +1,8 @@
 {
   gaming = {
-    programs.gamemode.enable = true;
+    programs = {
+      gamemode.enable = true;
+      gamescope.enable = true;
+    };
   };
 }
