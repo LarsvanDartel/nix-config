@@ -37,7 +37,7 @@
     gaming = {
       enable = true;
       launchers = {
-        lutris.enable = true;
+        geforce-now.enable = true;
         minecraft.enable = true;
         steam.enable = true;
       };

@@ -14,7 +14,15 @@ in {
     enable = mkEnableOption "lutris";
   };
 
+  options.systemwide.lutris = {
+    enable = mkEnableOption "lutris";
+  };
+
   config = mkIf cfg.enable {
+    systemwide.lutris.enable = true;
+
+    modules.persist.directories = [".local/share/lutris"];
+
     programs.lutris = {
       enable = true;
       protonPackages = with pkgs; [proton-ge-bin];
