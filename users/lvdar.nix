@@ -59,6 +59,10 @@
     kde-connect.enable = true;
     keyring.enable = true;
     libre-office.enable = true;
+    nh = {
+      enable = true;
+      flake-dir = "${config.home.homeDirectory}/nixos-config";
+    };
     firefox.enable = true;
     persist = {
       enable = true;
