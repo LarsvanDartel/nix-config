@@ -8,9 +8,9 @@
     exec-once = config.modules.graphical.startupCommands;
 
     input = {
-      kb_layout = "us";
-      kb_variant = "dvp";
-      kb_options = "caps:escape";
+      kb_layout = "us, us";
+      kb_variant = "dvp, intl";
+      kb_options = "caps:escape, grp:win_space_toggle";
 
       touchpad = {
         natural_scroll = "yes";
