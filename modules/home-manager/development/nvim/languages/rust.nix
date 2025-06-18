@@ -1,6 +1,7 @@
 {
   config,
   lib,
+  pkgs,
   ...
 }: let
   cfg = config.modules.development.nvim.languages.rust;
@@ -16,9 +17,20 @@ in {
         codeActions = true;
       };
       dap.enable = true;
-      format.enable = true;
+      format = {
+        enable = true;
+        # Use rustfmt on path
+        package = pkgs.writeShellApplication {
+          name = "rustfmt";
+          text = ''
+            rustfmt "$@"
+          '';
+        };
+      };
       lsp = {
         enable = true;
+        # Use rust-analyzer on path
+        package = ["rust-analyzer"];
         opts = ''
           ['rust-analyzer'] = {
             cargo = {
@@ -28,14 +40,7 @@ in {
             },
             checkOnSave = true,
             diagnostics = { enable = true, },
-            procMacro = {
-              enable = true,
-              ignored = {
-                ["async-trait"] = { "async_trait" },
-                ["napi-derive"] = { "napi" },
-                ["async-recursion"] = { "async_recursion" },
-              },
-            },
+            procMacro = { enable = true, },
           },
         '';
       };
