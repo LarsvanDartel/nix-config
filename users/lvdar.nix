@@ -12,6 +12,7 @@
   modules = {
     "3d-printing".orca-slicer.enable = true;
     development = {
+      devenv.enable = true;
       direnv.enable = true;
       nvim = {
         enable = true;
