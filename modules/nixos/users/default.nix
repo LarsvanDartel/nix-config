@@ -3,18 +3,22 @@
   lib,
   pkgs,
   ...
-}:
-with lib; let
-  userModule = types.submodule {
+}: let
+  inherit (lib.options) mkOption mkPackageOption;
+  inherit (lib.types) submodule bool path listOf str attrsOf;
+  inherit (lib.modules) mkIf;
+  inherit (lib.attrsets) concatMapAttrs;
+
+  userModule = submodule {
     options = {
       sudo = mkOption {
-        type = types.bool;
+        type = bool;
         default = false;
         example = true;
         description = "Whether the user is allowed sudo access.";
       };
       config = mkOption {
-        type = types.path;
+        type = path;
         description = "Home manager config for this user.";
       };
       shell = mkPackageOption pkgs "shell" {
@@ -30,12 +34,12 @@ in {
 
   options = {
     host.sudo-groups = lib.mkOption {
-      type = types.listOf types.str;
+      type = listOf str;
       default = [];
       description = "Additional groups assigned to sudo users.";
     };
     host.users = mkOption {
-      type = types.attrsOf userModule;
+      type = attrsOf userModule;
       default = {};
       description = "User configurations for this host";
     };
@@ -43,7 +47,7 @@ in {
 
   config = {
     users.users =
-      attrsets.concatMapAttrs (name: value: {
+      concatMapAttrs (name: value: {
         ${name} = {
           inherit (value) shell;
           isNormalUser = true;
@@ -54,9 +58,11 @@ in {
       config.host.users;
 
     home-manager.users =
-      attrsets.concatMapAttrs (name: value: {
+      concatMapAttrs (name: value: {
         ${name} = value.config;
       })
       config.host.users;
+
+    nix.settings.trusted-users = lib.attrNames config.host.users;
   };
 }
