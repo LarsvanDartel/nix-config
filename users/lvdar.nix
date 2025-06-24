@@ -29,6 +29,7 @@
           vue.enable = true;
         };
       };
+      tilp.enable = true;
     };
     discord = {
       enable = true;

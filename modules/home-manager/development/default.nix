@@ -4,5 +4,6 @@
     ./direnv
     ./matlab
     ./nvim
+    ./tilp
   ];
 }
