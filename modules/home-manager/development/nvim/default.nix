@@ -39,11 +39,13 @@ in {
             formatOnSave = true;
             lightbulb.enable = true;
             trouble.enable = true;
+            inlayHints.enable = true;
           };
 
           treesitter = {
             enable = true;
             highlight.enable = true;
+            fold = true;
           };
 
           debugger.nvim-dap = {
