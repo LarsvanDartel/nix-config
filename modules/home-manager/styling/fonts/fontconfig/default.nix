@@ -3,6 +3,10 @@
   config,
   ...
 }: let
+  inherit (lib.options) mkEnableOption;
+  inherit (lib.modules) mkIf;
+  inherit (lib.strings) concatStrings;
+
   cfg = config.modules.styling.fonts.fontconfig;
 
   aliasConfig = font: ''
@@ -11,12 +15,12 @@
 
       <prefer>
         <family>${font.name}</family>
-    ${lib.concatStrings (map (font: "    <family>${font}</family>\n") font.fallbackFonts)}
+    ${concatStrings (map (font: "    <family>${font}</family>\n") font.fallbackFonts)}
       </prefer>
     </alias>
   '';
 
-  configContent = lib.concatStrings (
+  configContent = concatStrings (
     map (
       font: aliasConfig config.modules.styling.fonts.pkgs.${font}
     )
@@ -24,10 +28,16 @@
   );
 in {
   options.modules.styling.fonts.fontconfig = {
-    enable = lib.mkEnableOption "fontconfig";
+    enable = mkEnableOption "fontconfig";
   };
 
-  config = lib.mkIf cfg.enable {
+  options.systemwide.fontconfig = {
+    enable = mkEnableOption "fontconfig";
+  };
+
+  config = mkIf cfg.enable {
+    systemwide.fontconfig.enable = true;
+
     fonts.fontconfig = {
       enable = true;
 

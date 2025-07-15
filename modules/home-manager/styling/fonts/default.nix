@@ -83,7 +83,7 @@ with lib; let
   fontPackageList = map (font: cfg.pkgs.${font}.package) fontNameList;
 in {
   imports = [
-    ./fontconfig.nix
+    ./fontconfig
   ];
 
   options.modules.styling.fonts = {
