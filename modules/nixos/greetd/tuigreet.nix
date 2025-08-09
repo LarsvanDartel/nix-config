@@ -5,7 +5,7 @@
   ...
 }: let
   cfg = config.modules.tuigreet;
-  tuigreet = "${pkgs.greetd.tuigreet}/bin/tuigreet";
+  tuigreet = "${pkgs.tuigreet}/bin/tuigreet";
 in {
   options.modules.tuigreet = {
     enable = lib.mkEnableOption "tuigreet";
