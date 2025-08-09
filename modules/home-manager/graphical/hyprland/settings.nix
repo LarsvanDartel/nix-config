@@ -14,7 +14,6 @@
 
       touchpad = {
         natural_scroll = "yes";
-        disable_while_typing = "yes";
         scroll_factor = 0.2;
       };
 
