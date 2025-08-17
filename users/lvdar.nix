@@ -61,6 +61,7 @@
     kde-connect.enable = true;
     keyring.enable = true;
     libre-office.enable = true;
+    mpv.enable = true;
     nh = {
       enable = true;
       flake-dir = "${config.home.homeDirectory}/nixos-config";
@@ -72,6 +73,7 @@
         "nixos-config"
         "dev"
         "school"
+        "Videos"
       ];
     };
     signal = {
