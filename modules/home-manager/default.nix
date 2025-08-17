@@ -11,6 +11,7 @@
     ./kde-connect
     ./keyring
     ./libre-office
+    ./mpv
     ./nh
     ./persist
     ./signal
