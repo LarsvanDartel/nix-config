@@ -10,7 +10,7 @@
   };
 
   modules = {
-    "3d-printing".orca-slicer.enable = false; # disabled because of https://github.com/NixOS/nixpkgs/issues/429433
+    "3d-printing".orca-slicer.enable = true;
     development = {
       devenv.enable = true;
       direnv.enable = true;
