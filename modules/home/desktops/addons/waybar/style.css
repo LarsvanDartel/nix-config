@@ -1,0 +1,200 @@
+* {
+    font-family: Cozette, sans-serif;
+    font-size: 12px;
+    color: @base00;
+    background: transparent;
+}
+
+window#waybar {
+    background: transparent;
+    font-family: Cozette, sans-serif;
+}
+
+#workspaces button {
+    margin: 3px;
+    min-width: 12px;
+    font-weight: bold;
+    border-radius: 100px;
+    background: @base03;
+    border: 1px solid transparent;
+    transition: all 400ms ease-in-out;
+}
+
+#workspaces button label {
+    font-size: 14px;
+    color: @base06;
+}
+
+#workspaces button.empty {
+    opacity: 0.3;
+}
+
+#workspaces button.active {
+    min-width: 30px;
+    color: @base00;
+    background: @base04;
+    transition: all 400ms ease-in-out;
+}
+
+#workspaces button.active label {
+    color: @base03;
+}
+
+#workspaces button:hover label {
+    color: @base00;
+}
+
+#workspaces button:hover {
+    color: @base06;
+    background: @base0A;
+}
+
+tooltip,
+#tray window
+{
+    background: @base00;
+    border: 3px solid @base0A;
+    border-radius: 10px;
+    font-family: Cozette, sans-serif;
+    opacity: 0.8;
+    box-shadow: 0 0 3px @base0A;
+    margin: 5px;
+}
+
+tooltip label,
+#tray window label {
+    color: @base06;
+}
+
+#hardware {
+    opacity: 0.9;
+    background: transparent;
+    border: 3px solid transparent;
+    border-radius: 100px;
+}
+
+#right {
+    opacity: 0.9;
+    background: @base00;
+    border: 3px solid @base00;
+    border-radius: 100px;
+}
+
+#tray {
+    margin-right: 15px;
+}
+
+#cpu,
+#backlight,
+#network,
+#pulseaudio,
+#memory,
+#bluetooth {
+    padding-left: 13px;
+    padding-right: 13px;
+    border: 3px solid transparent;
+    color: @base06;
+}
+
+#network.wifi,
+#network.ethernet,
+#bluetooth.connected {
+    background: @base0B;
+    border-radius: 100px;
+    margin-left: 5px;
+}
+
+#cpu:hover,
+#backlight:hover,
+#network:hover,
+#pulseaudio:hover,
+#memory:hover,
+#bluetooth:hover {
+    color: @base00;
+    background: @base0A;
+    border-radius: 100px;
+    transition: all 200ms ease-in-out;
+}
+
+#custom-clipse {
+    margin-right: 5px;
+    min-width: 35px;
+    border: 3px solid @base05;
+    border-radius: 100px;
+    color: @base05;
+    background: @base0D;
+}
+
+#custom-clipse:hover {
+    background: @base0A;
+    color: @base00;
+    border: 3px solid @base05;
+    transition: all 200ms ease-in-out;
+}
+
+#custom-exit {
+    min-width: 35px;
+    border: 0 solid @base00;
+    border-radius: 100px;
+    color: @base00;
+    background: @base0D;
+}
+
+#custom-exit:hover {
+    background: @base0A;
+    color: @base00;
+    border: 0 solid @base0A;
+    transition: all 200ms ease-in-out;
+}
+
+@keyframes blink {
+    to {
+        background-color: @base00;
+        color: @base06;
+    }
+}
+
+#battery {
+    padding-left: 10px;
+    padding-right: 10px;
+    margin-right: 5px;
+    color: @base06;
+}
+
+#clock {
+    padding-left: 10px;
+    padding-right: 10px;
+    margin-right: 5px;
+    color: @base0F;
+    font-weight: bold;
+}
+
+#battery:hover,
+#clock:hover {
+    background: @base0A;
+    color: @base00;
+    border-radius: 100px;
+}
+
+#battery.charging, #battery.plugged {
+    border-radius: 100px;
+    color: @base00;
+    background-color: @base0B;
+}
+
+#battery.warning:not(.charging) {
+    background-color: @base09;
+    border-radius: 100px;
+    color: @base00;
+}
+
+#battery.critical:not(.charging) {
+    border-radius: 100px;
+    background-color: @base08;
+    color: @base05;
+    animation-name: blink;
+    animation-duration: 0.5s;
+    animation-timing-function: linear;
+    animation-iteration-count: infinite;
+    animation-direction: alternate;
+}
