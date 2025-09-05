@@ -1,7 +1,6 @@
 {
   config,
   lib,
-  pkgs,
   ...
 }: let
   inherit (lib.options) mkEnableOption;
@@ -15,9 +14,5 @@ in {
 
   config = mkIf cfg.enable {
     system.impermanence.persist.directories = [".local/share/Steam"];
-
-    home.packages = with pkgs; [
-      steam
-    ];
   };
 }

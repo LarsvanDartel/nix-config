@@ -30,6 +30,7 @@
         greetd.tuigreet.enable = true;
       };
     };
+    gaming.enable = true;
   };
 
   hardware.fingerprint.enable = true;
