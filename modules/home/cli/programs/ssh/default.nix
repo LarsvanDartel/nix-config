@@ -25,12 +25,11 @@ in {
 
     programs.ssh = {
       enable = true;
-      addKeysToAgent = "yes";
 
       matchBlocks = {
         "git" = {
           host = "gitlab.com github.com";
-          user = "git";
+          addKeysToAgent = "yes";
           forwardAgent = true;
           identitiesOnly = true;
           identityFile =

@@ -3,11 +3,14 @@
   lib,
   ...
 }: let
+  inherit (lib.custom) get-flake-path;
   inherit (lib.options) mkEnableOption mkOption;
   inherit (lib.types) str;
+  inherit (lib.strings) fileContents;
   inherit (lib.modules) mkIf mkDefault;
 
   cfg = config.cli.programs.git;
+  publicKey = "${config.home.homeDirectory}/.ssh/id_ash.pub";
 in {
   options.cli.programs.git = {
     enable = mkEnableOption "git";
@@ -64,11 +67,21 @@ in {
         };
       };
 
+      signing = {
+        signByDefault = true;
+        key = publicKey;
+      };
+
+      ignores = [
+        ".direnv"
+        "result"
+      ];
+
       extraConfig = {
         gpg.format = "ssh";
         gpg.ssh.allowedSignersFile = "${config.home.homeDirectory}/.ssh/allowed_signers";
         commit.gpgsign = true;
-        user.signingkey = "${config.home.homeDirectory}/.ssh/id_ash.pub";
+        user.signingkey = publicKey;
 
         advice = {
           addEmptyPathspec = false;
@@ -141,5 +154,9 @@ in {
         };
       };
     };
+
+    home.file.".ssh/allowed_signers".text = ''
+      ${cfg.email} ${fileContents (get-flake-path "modules/nixos/services/ssh/keys/id_ash.pub")}
+    '';
   };
 }
