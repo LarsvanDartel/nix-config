@@ -9,12 +9,13 @@
 
   cli.programs.nvim = {
     languages = {
-      mcrl2.enable = true;
+      clang.enable = true;
       markdown = {
         enable = true;
         markview = true;
       };
       rust.enable = true;
+      python.enable = true;
       typst.enable = true;
     };
   };
