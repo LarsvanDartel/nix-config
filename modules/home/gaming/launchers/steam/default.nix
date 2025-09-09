@@ -13,6 +13,6 @@ in {
   };
 
   config = mkIf cfg.enable {
-    system.impermanence.persist.directories = [".local/share/Steam"];
+    system.impermanence.persist.directories = [".local/share/Steam" ".config/unity3d"];
   };
 }
