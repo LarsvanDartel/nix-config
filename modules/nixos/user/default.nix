@@ -6,7 +6,7 @@
   ...
 }: let
   inherit (lib.custom) get-flake-path;
-  inherit (lib.types) listOf str attrs;
+  inherit (lib.types) nullOr listOf str attrs;
   inherit (lib.options) mkOption;
   inherit (lib.modules) mkMerge;
 
@@ -22,8 +22,8 @@ in {
       description = "Username of the main user.";
     };
     initialPassword = mkOption {
-      type = str;
-      default = "pwd";
+      type = nullOr str;
+      default = null;
       description = "Initial password of the main user.";
     };
     extraGroups = mkOption {
@@ -60,28 +60,31 @@ in {
       };
     };
 
-    home-manager.users.${cfg.name} = let
-      host = config.networking.hostName;
-    in
-      mkMerge [
-        (get-flake-path "homes/${cfg.name}@${host}")
-        {
-          user = {
-            enable = true;
-            inherit (cfg) name;
-          };
-        }
-      ];
+    home-manager.backupFileExtension = ".bak";
+    home-manager.users = {
+      ${cfg.name} = let
+        host = config.networking.hostName;
+      in
+        mkMerge [
+          (get-flake-path "homes/${cfg.name}@${host}")
+          {
+            user = {
+              enable = true;
+              inherit (cfg) name;
+            };
+          }
+        ];
 
-    home-manager.users.root = {
-      profiles.common.enable = true;
+      root = {
+        profiles.common.enable = true;
 
-      home = {
-        username = "root";
-        homeDirectory = "/root";
+        home = {
+          username = "root";
+          homeDirectory = "/root";
+        };
+
+        home.stateVersion = "24.11";
       };
-
-      home.stateVersion = "24.11";
     };
   };
 }
