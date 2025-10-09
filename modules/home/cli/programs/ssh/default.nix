@@ -25,10 +25,10 @@ in {
 
     programs.ssh = {
       enable = true;
+      enableDefaultConfig = false;
 
       matchBlocks = {
-        "git" = {
-          host = "gitlab.com github.com";
+        "*" = {
           addKeysToAgent = "yes";
           forwardAgent = true;
           identitiesOnly = true;

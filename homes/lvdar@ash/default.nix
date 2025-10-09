@@ -22,7 +22,7 @@
 
   gaming = {
     launchers = {
-      geforce-now.enable = true;
+      # geforce-now.enable = true;
       minecraft.enable = true;
       steam.enable = true;
     };

@@ -8,11 +8,11 @@
   inherit (lib.modules) mkIf mkForce;
 
   cfg = config.desktops.addons.rofi;
-  rofi-dir = ".local/share/rofi"; # FIXME: Maybe there is some xdg- thing for this
+  rofi-dir = ".local/share/rofi";
 in {
   options.desktops.addons.rofi = {
     enable = mkEnableOption "rofi";
-    package = mkPackageOption pkgs "rofi-wayland" {};
+    package = mkPackageOption pkgs "rofi" {};
   };
 
   config = mkIf cfg.enable {
