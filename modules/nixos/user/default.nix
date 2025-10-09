@@ -60,7 +60,7 @@ in {
       };
     };
 
-    home-manager.backupFileExtension = ".bak";
+    home-manager.backupFileExtension = "bak";
     home-manager.users = {
       ${cfg.name} = let
         host = config.networking.hostName;
