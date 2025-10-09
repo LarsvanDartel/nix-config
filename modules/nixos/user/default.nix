@@ -8,7 +8,7 @@
   inherit (lib.custom) get-flake-path;
   inherit (lib.types) nullOr listOf str attrs;
   inherit (lib.options) mkOption;
-  inherit (lib.modules) mkMerge;
+  inherit (lib.modules) mkMerge mkForce;
 
   cfg = config.user;
 in {
@@ -72,6 +72,7 @@ in {
               enable = true;
               inherit (cfg) name;
             };
+            system.impermanence.enable = mkForce config.system.impermanence.enable;
           }
         ];
 
@@ -82,6 +83,8 @@ in {
           username = "root";
           homeDirectory = "/root";
         };
+
+        system.impermanence.enable = mkForce config.system.impermanence.enable;
 
         home.stateVersion = "24.11";
       };

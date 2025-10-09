@@ -14,6 +14,9 @@ in {
   config = mkIf cfg.enable {
     profiles = {
       common.enable = true;
+      desktop.addons = {
+        fontconfig.enable = true;
+      };
     };
 
     hardware = {

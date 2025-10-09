@@ -24,10 +24,7 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
-    nix-secrets = {
-      url = "git+ssh://git@github.com/LarsvanDartel/nix-secrets.git?shallow=1";
-      flake = false;
-    };
+    nix-secrets.url = "git+ssh://git@github.com/LarsvanDartel/nix-secrets.git?shallow=1";
 
     nixos-hardware.url = "github:nixos/nixos-hardware";
 

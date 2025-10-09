@@ -78,10 +78,10 @@ in {
 
           theme.transparent = true;
 
-          assistant.copilot = {
-            enable = true;
-            cmp.enable = true;
-          };
+          # assistant.copilot = {
+          #   enable = true;
+          #   cmp.enable = true;
+          # };
 
           autopairs.nvim-autopairs.enable = true;
 

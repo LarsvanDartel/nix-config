@@ -22,8 +22,8 @@ in {
     programs.foot = {
       enable = true;
       settings.main = let
-        font = config.styling.fonts.monospace.name;
-        size = toString config.styling.fonts.monospace.recommendedSize;
+        font = config.desktops.common.styling.fonts.monospace.name;
+        size = toString config.desktops.common.styling.fonts.monospace.recommendedSize;
       in {
         font = mkForce "${font}:style=Regular:size=${size}";
         font-bold = mkForce "${font}:style=Bold:size=${size}";

@@ -7,7 +7,7 @@
   inherit (lib.modules) mkIf;
   inherit (lib.strings) concatStrings;
 
-  cfg = config.styling.fonts.fontconfig;
+  cfg = config.desktops.common.styling.fonts.fontconfig;
 
   aliasConfig = font: ''
     <alias>
@@ -22,12 +22,12 @@
 
   configContent = concatStrings (
     map (
-      font: aliasConfig config.styling.fonts.pkgs.${font}
+      font: aliasConfig config.desktops.common.styling.fonts.pkgs.${font}
     )
-    config.styling.fonts.installed
+    config.desktops.common.styling.fonts.installed
   );
 in {
-  options.styling.fonts.fontconfig = {
+  options.desktops.common.styling.fonts.fontconfig = {
     enable = mkEnableOption "fontconfig";
   };
 
@@ -41,11 +41,11 @@ in {
     fonts.fontconfig = {
       enable = true;
 
-      defaultFonts = {
-        serif = [config.styling.fonts.serif.name];
-        sansSerif = [config.styling.fonts.sansSerif.name];
-        monospace = [config.styling.fonts.monospace.name];
-        emoji = [config.styling.fonts.emoji.name];
+      defaultFonts = with config.desktops.common.styling.fonts; {
+        serif = [serif.name];
+        sansSerif = [sansSerif.name];
+        monospace = [monospace.name];
+        emoji = [emoji.name];
       };
     };
 

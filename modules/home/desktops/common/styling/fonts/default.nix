@@ -8,11 +8,11 @@
   inherit (lib.attrsets) listToAttrs attrsToList getAttrs;
   inherit (lib.types) str submodule package int nullOr listOf attrsOf;
   inherit (lib.lists) flatten;
-  inherit (lib.options) mkOption;
+  inherit (lib.options) mkEnableOption mkOption;
   inherit (lib.fixedPoints) converge;
-  inherit (lib.modules) mkDefault;
+  inherit (lib.modules) mkDefault mkIf;
 
-  cfg = config.styling.fonts;
+  cfg = config.desktops.common.styling.fonts;
 
   # Font module type
   fontModule = submodule {
@@ -80,7 +80,9 @@
   fontNameList = map (font: font.name) (attrsToList fontPackages);
   fontPackageList = map (font: cfg.pkgs.${font}.package) fontNameList;
 in {
-  options.styling.fonts = {
+  options.desktops.common.styling.fonts = {
+    enable = mkEnableOption "font config";
+
     pkgs = mkOption {
       type = attrsOf fontModule;
       default = builtins.listToAttrs (
@@ -130,8 +132,8 @@ in {
     };
   };
 
-  config = {
-    styling.fonts.fontconfig.enable = true;
+  config = mkIf cfg.enable {
+    desktops.common.styling.fonts.fontconfig.enable = true;
     home.packages = fontPackageList;
 
     stylix.fonts = {
