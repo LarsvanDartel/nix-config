@@ -7,9 +7,9 @@
   inherit (lib.options) mkEnableOption;
   inherit (lib.modules) mkIf mkOrder;
 
-  cfg = config.desktops.addons.mako;
+  cfg = config.desktops.hyprland.addons.mako;
 in {
-  options.desktops.addons.mako = {
+  options.desktops.hyprland.addons.mako = {
     enable = mkEnableOption "mako";
   };
 

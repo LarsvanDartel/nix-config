@@ -28,7 +28,7 @@ in {
       clipse.enable = true;
     };
 
-    desktops.addons = {
+    desktops.hyprland.addons = {
       hyprlock.enable = true;
       hyprpaper.enable = true;
       mako.enable = true;

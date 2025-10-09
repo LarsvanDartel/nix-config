@@ -7,10 +7,10 @@
   inherit (lib.options) mkEnableOption mkPackageOption;
   inherit (lib.modules) mkIf mkForce;
 
-  cfg = config.desktops.addons.rofi;
+  cfg = config.desktops.hyprland.addons.rofi;
   rofi-dir = ".local/share/rofi";
 in {
-  options.desktops.addons.rofi = {
+  options.desktops.hyprland.addons.rofi = {
     enable = mkEnableOption "rofi";
     package = mkPackageOption pkgs "rofi" {};
   };

@@ -7,9 +7,9 @@
   inherit (lib.options) mkEnableOption;
   inherit (lib.modules) mkIf;
 
-  cfg = config.desktops.addons.waybar;
+  cfg = config.desktops.hyprland.addons.waybar;
 in {
-  options.desktops.addons.waybar = {
+  options.desktops.hyprland.addons.waybar = {
     enable = mkEnableOption "waybar";
   };
 
@@ -33,7 +33,7 @@ in {
         + builtins.readFile ./style.css;
       settings = let
         terminal = config.cli.terminals.default;
-        powermenu = "${config.desktops.addons.rofi.package}/bin/rofi -show power-menu";
+        powermenu = "${config.desktops.hyprland.addons.rofi.package}/bin/rofi -show power-menu";
       in [
         {
           layer = "top";

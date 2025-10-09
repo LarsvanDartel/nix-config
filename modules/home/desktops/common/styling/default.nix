@@ -9,11 +9,11 @@
   inherit (lib.options) mkEnableOption;
   inherit (lib.modules) mkIf;
 
-  cfg = config.styling;
+  cfg = config.desktops.common.styling;
 in {
   imports = [inputs.stylix.homeModules.stylix] ++ get-non-default-nix-files ./.;
 
-  options.styling = {
+  options.desktops.common.styling = {
     enable = mkEnableOption "styling configuration";
   };
 

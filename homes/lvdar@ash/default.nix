@@ -30,7 +30,6 @@
   };
 
   system.impermanence = {
-    enable = true;
     persist = {
       directories = [
         "nix-config"

@@ -14,7 +14,7 @@
   keys-path = get-flake-path "modules/nixos/services/ssh/keys";
   keys = get-files keys-path;
 
-  ssh-file = key: ".ssh/${get-file-name-without-extension key}.pub";
+  ssh-file = key: ".ssh/${get-file-name-without-extension key}";
 in {
   options.cli.programs.ssh = {
     enable = mkEnableOption "ssh";
@@ -42,7 +42,7 @@ in {
 
     home.file = mergeAttrsList (
       map (key: {
-        ${ssh-file key}.source = key;
+        "${ssh-file key}.pub".source = key;
       })
       keys
     );

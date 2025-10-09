@@ -9,10 +9,11 @@
   inherit (lib.types) nullOr str lines attrsOf anything;
   inherit (lib.strings) concatStrings;
 
-  cfg = config.styling.theme;
+  cfg = config.desktops.common.styling.theme;
 in {
   imports = get-non-default-nix-files ./.;
-  options.styling.theme = {
+
+  options.desktops.common.styling.theme = {
     colorScheme = mkOption {
       type = nullOr str;
       default = null;

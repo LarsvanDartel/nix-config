@@ -17,6 +17,12 @@ in {
   options.system.impermanence = {
     enable = mkEnableOption "impermanence";
 
+    device = mkOption {
+      type = str;
+      default = "/dev/mapper/crypted";
+      description = "The device the root filesystem is located on";
+    };
+
     persist = {
       files = mkOption {
         type = listOf str;
@@ -35,7 +41,7 @@ in {
     boot.initrd.postDeviceCommands = mkBefore ''
       mkdir -p /btrfs_tmp
 
-      mount -o subvol=/ /dev/mapper/crypted /btrfs_tmp
+      mount -o subvol=/ ${cfg.device} /btrfs_tmp
 
       if [[ -e /btrfs_tmp/root ]]; then
           mkdir -p /btrfs_tmp/old_roots

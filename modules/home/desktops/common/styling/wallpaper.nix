@@ -9,9 +9,9 @@
   inherit (lib.strings) optionalString splitString;
   inherit (lib.lists) last length;
 
-  cfg = config.styling.wallpaper;
+  cfg = config.desktops.common.styling.wallpaper;
 in {
-  options.styling.wallpaper = {
+  options.desktops.common.styling.wallpaper = {
     themed = mkEnableOption "themed background";
     inverted = mkEnableOption "invert background";
     src = mkOption {

@@ -5,7 +5,7 @@
 }: let
   inherit (lib.types) str nullOr;
   inherit (lib.options) mkEnableOption mkOption;
-  inherit (lib.modules) mkIf mkMerge mkDefault;
+  inherit (lib.modules) mkIf mkDefault;
 
   cfg = config.user;
 in {
@@ -23,19 +23,17 @@ in {
     };
   };
 
-  config = mkIf cfg.enable (mkMerge [
-    {
-      assertions = [
-        {
-          assertion = cfg.name != null;
-          message = "user.name must be set";
-        }
-      ];
+  config = mkIf cfg.enable {
+    assertions = [
+      {
+        assertion = cfg.name != null;
+        message = "user.name must be set";
+      }
+    ];
 
-      home = {
-        homeDirectory = mkDefault cfg.home;
-        username = mkDefault cfg.name;
-      };
-    }
-  ]);
+    home = {
+      homeDirectory = mkDefault cfg.home;
+      username = mkDefault cfg.name;
+    };
+  };
 }
