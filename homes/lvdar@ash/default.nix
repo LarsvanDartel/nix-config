@@ -17,6 +17,7 @@
       rust.enable = true;
       python.enable = true;
       typst.enable = true;
+      mcrl2.enable = true;
     };
   };
 
