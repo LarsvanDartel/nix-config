@@ -4,8 +4,9 @@
   ...
 }: let
   inherit (lib.options) mkEnableOption mkOption;
-  inherit (lib.types) nullOr str;
+  inherit (lib.types) nullOr str bool;
   inherit (lib.modules) mkIf;
+  inherit (lib.lists) optional;
 
   cfg = config.cli.programs.prompt.oh-my-posh;
 in {
@@ -16,6 +17,21 @@ in {
       default = null;
       example = "star";
       description = "Preset theme to use";
+    };
+    git = mkOption {
+      type = bool;
+      default = false;
+      description = "Whether to show git status";
+    };
+    time = mkOption {
+      type = bool;
+      default = false;
+      description = "Whether to show time";
+    };
+    session = mkOption {
+      type = bool;
+      default = true;
+      description = "Whether to show session";
     };
   };
 
@@ -28,61 +44,72 @@ in {
       useTheme = cfg.theme;
       settings = mkIf (cfg.theme == null) {
         schema = "https://raw.githubusercontent.com/JanDeDobbeleer/oh-my-posh/main/themes/schema.json";
-        blocks = [
-          {
-            alignment = "left";
-            newline = true;
+        blocks =
+          [
+            {
+              alignment = "left";
+              newline = true;
+              segments =
+                (optional cfg.session {
+                  foreground = "green";
+                  foreground_templates = ["{{ if .Root }}red{{end}}"];
+                  style = "plain";
+                  template = "{{ .UserName }}@{{ .HostName }} <white>in </>";
+                  type = "session";
+                })
+                ++ [
+                  {
+                    foreground = "blue";
+                    style = "plain";
+                    properties.style = "full";
+                    template = "{{ .Path }} ";
+                    type = "path";
+                  }
+                ]
+                ++ (optional cfg.git
+                  {
+                    foreground = "magenta";
+                    properties.fetch_status = true;
+                    style = "plain";
+                    template = "<white>on</> {{ .HEAD }}{{if .BranchStatus }} {{ .BranchStatus }}{{ end }}{{ if .Working.Changed }}  {{ .Working.String }}{{ end }}{{ if and (.Working.Changed) (.Staging.Changed) }} |{{ end }}{{ if .Staging.Changed }}  {{ .Staging.String }}{{ end }} ";
+                    type = "git";
+                  });
+              type = "prompt";
+            }
+          ]
+          ++ (optional cfg.time {
+            alignment = "right";
             segments = [
-              {
-                foreground = "red";
-                style = "plain";
-                template = "root <white>in</> ";
-                type = "root";
-              }
               {
                 foreground = "blue";
                 style = "plain";
-                properties.style = "full";
-                template = "{{ .Path }} ";
-                type = "path";
-              }
-              # {
-              #   foreground = "magenta";
-              #   properties.fetch_status = true;
-              #   style = "plain";
-              #   template = "<white>on</> {{ .HEAD }}{{if .BranchStatus }} {{ .BranchStatus }}{{ end }}{{ if .Working.Changed }}  {{ .Working.String }}{{ end }}{{ if and (.Working.Changed) (.Staging.Changed) }} |{{ end }}{{ if .Staging.Changed }}  {{ .Staging.String }}{{ end }} ";
-              #   type = "git";
-              # }
-              # {
-              #   foreground = "yellow";
-              #   properties.fetch_version = true;
-              #   style = "plain";
-              #   template = "<white>via</>  {{ if .PackageManagerIcon }}{{ .PackageManagerIcon }} {{ end }}{{ .Full }} ";
-              #   type = "node";
-              # }
-            ];
-            type = "prompt";
-          }
-          {
-            alignment = "left";
-            newline = true;
-            segments = [
-              {
-                foreground = "green";
-                foreground_templates = ["{{ if gt .Code 0 }}red{{end}}"];
-                style = "plain";
-                template = ">";
-                type = "text";
+                properties.time_format = "15:04:05";
+                template = " {{ .CurrentDate | date .Format }} ";
+                type = "time";
               }
             ];
-            type = "prompt";
-          }
-        ];
+          })
+          ++ [
+            {
+              alignment = "left";
+              newline = true;
+              segments = [
+                {
+                  foreground = "green";
+                  foreground_templates = ["{{ if gt .Code 0 }}red{{end}}"];
+                  style = "plain";
+                  template = "{{if .Root}}#{{else}}>{{end}}";
+                  type = "text";
+                }
+              ];
+              type = "prompt";
+            }
+          ];
         transient_prompt = {
           background = "transparent";
           foreground = "green";
           foreground_templates = ["{{ if gt .Code 0 }}red{{end}}"];
-          template = "> ";
+          template = "{{if .Root}}#{{else}}>{{end}} ";
         };
         final_space = true;
         version = 3;
