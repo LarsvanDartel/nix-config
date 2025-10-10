@@ -7,12 +7,15 @@
   inherit (lib.options) mkEnableOption mkOption;
   inherit (lib.types) bool int float;
   inherit (lib.modules) mkIf;
+  inherit (lib.strings) optionalString;
 
   cfg = config.hardware.ipmi-fancontrol;
   pollInterval = toString cfg.pollInterval;
   minSpeed = toString cfg.minSpeed;
   manualSpeed = toString cfg.manualSpeed;
   curve = toString cfg.curve;
+  gpuMaxTemp = toString cfg.nvidia-smi.maxTemp;
+  nvidia_x11 = config.hardware.nvidia.package;
 in {
   options.hardware.ipmi-fancontrol = {
     enable = mkEnableOption "Enable fan control via ipmitool";
@@ -51,6 +54,16 @@ in {
         - curve > 1: slower ramp early, aggressive later.
       '';
     };
+
+    nvidia-smi = {
+      enable = mkEnableOption "reading GPU temperature via nvidia-smi";
+
+      maxTemp = mkOption {
+        type = int;
+        default = 105;
+        description = "Maximum safe temperature for the GPU (used for fan curve)";
+      };
+    };
   };
 
   config = mkIf cfg.enable {
@@ -59,14 +72,25 @@ in {
       wantedBy = ["multi-user.target"];
       after = ["network.target"];
       serviceConfig = {
-        Type = "simple";
-        ExecStart =
+        Type =
           if cfg.dynamic
-          then ''
-            ${pkgs.bash}/bin/bash -euo pipefail -c '
-              ${pkgs.ipmitool}/bin/ipmitool raw 0x30 0x30 0x01 0x00
+          then "simple"
+          else "oneshot";
+        RemainAfterExit = mkIf (!cfg.dynamic) true;
+        Restart = mkIf cfg.dynamic "always";
+        ExecStart = let
+          script = pkgs.writeShellScript "ipmi-fan-control.sh" ''
+            set -euo pipefail
+            ${pkgs.ipmitool}/bin/ipmitool raw 0x30 0x30 0x01 0x00
+
+            ${optionalString cfg.dynamic ''
               while true; do
-                mapfile -t lines < <(${pkgs.lm_sensors}/bin/sensors | grep -E "([0-9]+\.[0-9]+)°C" | grep -E "high =")
+                mapfile -t lines < <(
+                  ${pkgs.lm_sensors}/bin/sensors \
+                  | grep -E "([0-9]+\.[0-9]+)°C" \
+                  | grep -E "high =" \
+                  | grep -v "loc"
+                )
 
                 max_ratio=0
                 for line in "''${lines[@]}"; do
@@ -77,14 +101,21 @@ in {
                     continue
                   fi
 
-                  threshold=$(awk "BEGIN {print 0.8 * $high}")
-                  ratio=$(awk "BEGIN {print $current / $threshold}")
-                  [ "$(awk "BEGIN {print ($ratio > 1)}")" -eq 1 ] && ratio=1
+                  threshold=$(${pkgs.gawk}/bin/awk "BEGIN {print 0.8 * $high}")
+                  ratio=$(${pkgs.gawk}/bin/awk "BEGIN {print $current / $threshold}")
+                  [ "$(${pkgs.gawk}/bin/awk "BEGIN {print ($ratio > 1)}")" -eq 1 ] && ratio=1
 
-                  [ "$(awk "BEGIN {print ($ratio > $max_ratio)}")" -eq 1 ] && max_ratio=$ratio
+                  [ "$(${pkgs.gawk}/bin/awk "BEGIN {print ($ratio > $max_ratio)}")" -eq 1 ] && max_ratio=$ratio
                 done
 
-                speed=$(awk "BEGIN {print int(${minSpeed} + (100 - ${minSpeed}) * $max_ratio ^ ${curve})}")
+                ${optionalString cfg.nvidia-smi.enable ''
+                  gpu_temp=$(${nvidia_x11.bin}/bin/nvidia-smi --query-gpu=temperature.gpu --format=csv,noheader,nounits | head -n1)
+                  gpu_ratio=$(${pkgs.gawk}/bin/awk "BEGIN {print $gpu_temp / ${gpuMaxTemp}}")
+                  [ "$(${pkgs.gawk}/bin/awk "BEGIN {print ($gpu_ratio > 1)}")" -eq 1 ] && gpu_ratio=1
+                  [ "$(${pkgs.gawk}/bin/awk "BEGIN {print ($gpu_ratio > $max_ratio)}")" -eq 1 ] && max_ratio=$gpu_ratio
+                ''}
+
+                speed=$(${pkgs.gawk}/bin/awk "BEGIN {print int(${minSpeed} + (100 - ${minSpeed}) * ($max_ratio ^ ${curve}))}")
                 [ "$speed" -gt 100 ] && speed=100
                 pwm=$(( speed * 255 / 100 ))
 
@@ -92,16 +123,17 @@ in {
                 ${pkgs.ipmitool}/bin/ipmitool raw 0x30 0x30 0x02 0xff $(printf "0x%02x" $pwm)
                 sleep ${pollInterval}
               done
-            '
-          ''
-          else ''
-            ${pkgs.ipmitool}/bin/ipmitool raw 0x30 0x30 0x01 0x00
-            ${pkgs.ipmitool}/bin/ipmitool raw 0x30 0x30 0x02 0xff $(printf "0x%02x" $(( ${manualSpeed} * 255 / 100 )))
+            ''}
+            ${optionalString (!cfg.dynamic) ''
+              pwm=$(( ${manualSpeed} * 255 / 100 ))
+              ${pkgs.ipmitool}/bin/ipmitool raw 0x30 0x30 0x02 0xff $(printf "0x%02x" $pwm)
+            ''}
           '';
+        in "${script}";
+
         ExecStop = ''
           ${pkgs.ipmitool}/bin/ipmitool raw 0x30 0x30 0x01 0x01
         '';
-        Restart = "always";
       };
     };
   };
