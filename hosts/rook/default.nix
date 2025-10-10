@@ -29,7 +29,15 @@
       nvidiaPersistenced = true;
       videoAcceleration = true;
     };
-    # ipmi-fancontrol.enable = true;
+    ipmi-fancontrol = {
+      enable = true;
+      dynamic = true;
+      minSpeed = 5;
+      nvidia-smi = {
+        enable = true;
+        maxTemp = 105;
+      };
+    };
   };
 
   system.stateVersion = "24.11";
