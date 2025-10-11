@@ -47,6 +47,7 @@ in {
           isNormalUser = true;
           inherit (cfg) name initialPassword;
           home = "/home/${cfg.name}";
+          createHome = true;
           shell = pkgs.zsh;
 
           extraGroups = ["wheel"] ++ cfg.extraGroups;
