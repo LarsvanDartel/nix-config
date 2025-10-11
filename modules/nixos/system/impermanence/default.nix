@@ -7,6 +7,8 @@
   inherit (lib.types) listOf str;
   inherit (lib.options) mkEnableOption mkOption;
   inherit (lib.modules) mkIf mkBefore;
+  inherit (lib.attrsets) mapAttrsToList filterAttrs;
+  inherit (lib.strings) concatLines escapeShellArg;
 
   cfg = config.system.impermanence;
 in {
@@ -78,6 +80,42 @@ in {
           "/var/lib/nixos"
           "/var/lib/systemd/coredump"
         ];
+    };
+
+    systemd.services."persist-home-create-root-paths" = let
+      persistentHomesRoot = "/persist";
+
+      listOfCommands =
+        mapAttrsToList
+        (
+          _: user: let
+            userHome = escapeShellArg (persistentHomesRoot + user.home);
+          in ''
+            if [[ ! -d ${userHome} ]]; then
+                echo "Persistent home root folder '${userHome}' not found, creating..."
+                mkdir -p --mode=${user.homeMode} ${userHome}
+                chown ${user.name}:${user.group} ${userHome}
+            fi
+          ''
+        )
+        (filterAttrs (_: user: user.createHome) config.users.users);
+
+      stringOfCommands = concatLines listOfCommands;
+    in {
+      script = stringOfCommands;
+      unitConfig = {
+        Description = "Ensure users' home folders exist in the persistent filesystem";
+        PartOf = ["local-fs.target"];
+        After = ["persist-home.mount"];
+      };
+
+      serviceConfig = {
+        Type = "oneshot";
+        StandardOutput = "journal";
+        StandardError = "journal";
+      };
+
+      wantedBy = ["local-fs.target"];
     };
   };
 }

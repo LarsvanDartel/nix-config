@@ -1,4 +1,8 @@
-{inputs, ...}: {
+{
+  inputs,
+  pkgs,
+  ...
+}: {
   imports = [
     # Hardware
     ./hardware-configuration.nix
@@ -16,6 +20,8 @@
       device = "/dev/disk/by-label/nixos";
     };
   };
+
+  networking.hostId = "b8433556";
 
   profiles = {
     server.enable = true;
@@ -38,6 +44,24 @@
         maxTemp = 105;
       };
     };
+  };
+
+  sops.secrets."keys/zfs/tank" = {};
+  systemd.services."zfs-decode-key" = {
+    description = "Decode ZFS raw key from SOPS secret";
+    after = ["sops-nix.service"];
+    before = ["zfs-load-key.service" "zfs-import.target"];
+    wantedBy = ["zfs-import.target"];
+    serviceConfig = {
+      Type = "oneshot";
+      StandardOutput = "journal";
+      StandardError = "journal";
+    };
+    script = ''
+      install -m 0700 -d /run/keys
+      base64 -d /run/secrets/keys/zfs/tank > /run/keys/zfs-tank.key
+      chmod 0400 /run/keys/zfs-tank.key
+    '';
   };
 
   system.stateVersion = "24.11";
