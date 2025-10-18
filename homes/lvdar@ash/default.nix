@@ -14,6 +14,8 @@
         enable = true;
         markview = true;
       };
+      ts.enable = true;
+      vue.enable = true;
       rust.enable = true;
       python.enable = true;
       typst.enable = true;
