@@ -39,6 +39,8 @@
       enable = true;
       dynamic = true;
       minSpeed = 5;
+      curve = 5.0;
+      ignoreDevices = ["loc"];
       nvidia-smi = {
         enable = true;
         maxTemp = 105;
@@ -47,11 +49,11 @@
   };
 
   sops.secrets."keys/zfs/tank" = {};
+  systemd.services.zfs-mount.after = ["sops-nix.service"];
   systemd.services."zfs-decode-key" = {
     description = "Decode ZFS raw key from SOPS secret";
     after = ["sops-nix.service"];
-    before = ["zfs-load-key.service" "zfs-import.target"];
-    wantedBy = ["zfs-import.target"];
+    before = ["zfs-load-key.service"];
     serviceConfig = {
       Type = "oneshot";
       StandardOutput = "journal";
