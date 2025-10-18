@@ -6,6 +6,7 @@
 }: let
   inherit (lib.options) mkEnableOption;
   inherit (lib.modules) mkIf mkForce;
+  inherit (lib.meta) getExe;
 
   cfg = config.cli.programs.nvim.languages.vue;
 in {
@@ -27,46 +28,24 @@ in {
           typescript
         ];
       };
-      lsp = {
-        lspconfig = {
-          enable = true;
-          sources = {
-            volar = ''
-              lspconfig.volar.setup {
-                init_options = {
-                  vue = {
-                    hybridMode = true;
-                  },
-                  typescript = {
-                    tsdk = "${pkgs.typescript}/lib/node_modules/typescript/lib",
-                  },
-                },
-                cmd = { "${pkgs.vue-language-server}/bin/vue-language-server", "--stdio" },
-              }
-            '';
-            ts_ls = ''
-              lspconfig.ts_ls.setup {
-                init_options = {
-                  plugins = {
-                    {
-                      name = "@vue/typescript-plugin",
-                      location = "${pkgs.vue-language-server}/lib/node_modules/@vue/language-server",
-                      languages = { "vue" },
-                    },
-                  },
-                },
-                filetypes = { "typescript", "javascript", "javascriptreact", "typescriptreact", "vue" },
-                settings = {
-                  typescript = {
-                    tsserver = {
-                      useSyntaxServer = false,
-                    },
-                  },
-                },
-                cmd = { "${pkgs.typescript-language-server}/bin/typescript-language-server", "--stdio" },
-              }
-            '';
+      lsp.servers = {
+        vtsls = {
+          filetypes = ["typescript" "javascript" "javascriptreact" "typescriptreact" "vue"];
+          settings = {
+            vtsls = {
+              tsserver = {
+                globalPlugins = [
+                  {
+                    name = "@vue/typescript-plugin";
+                    location = "${pkgs.vue-language-server}/lib/language-tools/packages/language-server/node_modules/@vue/typescript-plugin";
+                    languages = ["vue"];
+                    configNamespace = "typescript";
+                  }
+                ];
+              };
+            };
           };
+          cmd = [(getExe pkgs.vtsls) "--stdio"];
         };
       };
     };

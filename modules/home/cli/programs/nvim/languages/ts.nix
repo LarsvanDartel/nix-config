@@ -16,22 +16,27 @@ in {
     programs.nvf.settings.vim = {
       languages.ts = {
         enable = true;
-        extraDiagnostics.enable = false;
-        format.enable = true;
+        extraDiagnostics.enable = true;
+        format.enable = false;
         lsp.enable = true;
         treesitter.enable = true;
       };
-      lsp.lspconfig = {
-        enable = true;
-        sources.eslint = ''
-          lspconfig.eslint.setup {
-            settings = {
-              workingDirectories = { mode = "auto" },
-              format = true,
-            },
-            cmd = { "${pkgs.vscode-langservers-extracted}/bin/vscode-eslint-language-server", "--stdio" },
-          }
-        '';
+      lsp.servers = {
+        eslint = {
+          settings = {
+            workingDirectories = {
+              mode = "auto";
+            };
+            format = true;
+            nodePath = "";
+            experimental = {
+              useFlatConfig = false;
+            };
+            problems = {};
+            rulesCustomizations = {};
+          };
+          cmd = ["${pkgs.vscode-langservers-extracted}/bin/vscode-eslint-language-server" "--stdio"];
+        };
       };
     };
   };
