@@ -5,9 +5,9 @@
   ...
 }: let
   inherit (lib.options) mkEnableOption mkOption;
-  inherit (lib.types) bool int float;
+  inherit (lib.types) bool int float listOf str;
   inherit (lib.modules) mkIf;
-  inherit (lib.strings) optionalString;
+  inherit (lib.strings) optionalString concatMapStringsSep;
 
   cfg = config.hardware.ipmi-fancontrol;
   pollInterval = toString cfg.pollInterval;
@@ -42,6 +42,12 @@ in {
       type = int;
       default = 60;
       description = "Fixed fan speed percentage for manual mode.";
+    };
+
+    ignoreDevices = mkOption {
+      type = listOf str;
+      default = [];
+      description = "Devices to ignore in the sensors results";
     };
 
     curve = mkOption {
@@ -89,7 +95,9 @@ in {
                   ${pkgs.lm_sensors}/bin/sensors \
                   | grep -E "([0-9]+\.[0-9]+)°C" \
                   | grep -E "high =" \
-                  | grep -v "loc"
+                  ${optionalString
+                    (cfg.ignoreDevices != [])
+                    (concatMapStringsSep "\\\n" (d: ''| grep -v "${d}"'') cfg.ignoreDevices)}
                 )
 
                 max_ratio=0
@@ -117,16 +125,13 @@ in {
 
                 speed=$(${pkgs.gawk}/bin/awk "BEGIN {print int(${minSpeed} + (100 - ${minSpeed}) * ($max_ratio ^ ${curve}))}")
                 [ "$speed" -gt 100 ] && speed=100
-                pwm=$(( speed * 255 / 100 ))
-
                 printf "max ratio: %.2f, setting fan speed to %s%%\n" "$max_ratio" "$speed"
-                ${pkgs.ipmitool}/bin/ipmitool raw 0x30 0x30 0x02 0xff $(printf "0x%02x" $pwm)
+                ${pkgs.ipmitool}/bin/ipmitool raw 0x30 0x30 0x02 0xff $(printf "0x%02x" $speed)
                 sleep ${pollInterval}
               done
             ''}
             ${optionalString (!cfg.dynamic) ''
-              pwm=$(( ${manualSpeed} * 255 / 100 ))
-              ${pkgs.ipmitool}/bin/ipmitool raw 0x30 0x30 0x02 0xff $(printf "0x%02x" $pwm)
+              ${pkgs.ipmitool}/bin/ipmitool raw 0x30 0x30 0x02 0xff $(printf "0x%02x" ${manualSpeed})
             ''}
           '';
         in "${script}";
