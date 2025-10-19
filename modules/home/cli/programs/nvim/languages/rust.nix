@@ -15,10 +15,6 @@ in {
   config = mkIf cfg.enable {
     programs.nvf.settings.vim.languages.rust = {
       enable = true;
-      crates = {
-        enable = true;
-        codeActions = true;
-      };
       dap.enable = true;
       format = {
         enable = true;
