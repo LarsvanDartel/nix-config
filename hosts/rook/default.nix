@@ -1,8 +1,4 @@
-{
-  inputs,
-  pkgs,
-  ...
-}: {
+{inputs, ...}: {
   imports = [
     # Hardware
     ./hardware-configuration.nix
@@ -48,21 +44,39 @@
     };
   };
 
+  boot = {
+    kernelParams = [
+      "nohibernate"
+    ];
+    supportedFilesystems = ["vfat" "zfs"];
+    zfs.extraPools = ["tank"];
+  };
+
+  services.zfs = {
+    autoScrub = {
+      enable = true;
+      interval = "*-*-1,15 02:30";
+    };
+    trim.enable = true;
+  };
+
   sops.secrets."keys/zfs/tank" = {};
-  systemd.services.zfs-mount.after = ["sops-nix.service"];
   systemd.services."zfs-decode-key" = {
     description = "Decode ZFS raw key from SOPS secret";
-    after = ["sops-nix.service"];
-    before = ["zfs-load-key.service"];
+    partOf = ["zfs-import.target"];
+    wantedBy = ["zfs-import.target"];
+    unitConfig.DefaultDependencies = false;
     serviceConfig = {
       Type = "oneshot";
-      StandardOutput = "journal";
-      StandardError = "journal";
+      RemainAfterExit = true;
     };
     script = ''
       install -m 0700 -d /run/keys
       base64 -d /run/secrets/keys/zfs/tank > /run/keys/zfs-tank.key
       chmod 0400 /run/keys/zfs-tank.key
+    '';
+    postStop = ''
+      shred -u /run/keys/zfs-tank.key 2>/dev/null || rm -f /run/keys/zfs-tank.key
     '';
   };
 

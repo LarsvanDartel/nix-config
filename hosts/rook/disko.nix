@@ -103,7 +103,6 @@
           compression = "zstd";
           "com.sun:auto-snapshot" = "false";
         };
-        mountpoint = "/tank";
         datasets = {
           encrypted = {
             type = "zfs_fs";
@@ -116,8 +115,10 @@
           };
           "encrypted/main" = {
             type = "zfs_fs";
-            mountpoint = "/tank/crypted";
-            options."com.sun:auto-snapshot" = "true";
+            options = {
+              mountpoint = "/tank/crypted";
+              "com.sun:auto-snapshot" = "true";
+            };
           };
         };
       };
