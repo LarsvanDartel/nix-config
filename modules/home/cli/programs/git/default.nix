@@ -44,40 +44,32 @@ in {
       gcl = "git clone";
     };
 
+    programs.delta = {
+      inherit (cfg.delta) enable;
+      options = {
+        features = "unobtrusive-line-numbers decorations";
+        whitespace-error-style = "22 reverse";
+        decorations = {
+          commit-decoration-style = "bold yellow box ul";
+          file-decoration-style = "none";
+          file-style = "bold yellow ul";
+        };
+        line-numbers = true;
+        line-numbers-left-format = "{nm:>4}┊";
+        line-numbers-right-format = "{np:>4}│";
+        line-numbers-left-style = "blue";
+        line-numbers-right-style = "blue";
+      };
+    };
+
     programs.git = {
       enable = true;
-      userName = cfg.user;
-      userEmail = cfg.email;
-
-      delta = {
-        inherit (cfg.delta) enable;
-        options = {
-          features = "unobtrusive-line-numbers decorations";
-          whitespace-error-style = "22 reverse";
-          decorations = {
-            commit-decoration-style = "bold yellow box ul";
-            file-decoration-style = "none";
-            file-style = "bold yellow ul";
-          };
-          line-numbers = true;
-          line-numbers-left-format = "{nm:>4}┊";
-          line-numbers-right-format = "{np:>4}│";
-          line-numbers-left-style = "blue";
-          line-numbers-right-style = "blue";
+      settings = {
+        user = {
+          name = cfg.user;
+          inherit (cfg) email;
         };
-      };
 
-      signing = {
-        signByDefault = true;
-        key = publicKey;
-      };
-
-      ignores = [
-        ".direnv"
-        "result"
-      ];
-
-      extraConfig = {
         gpg.format = "ssh";
         gpg.ssh.allowedSignersFile = "${config.home.homeDirectory}/.ssh/allowed_signers";
         commit.gpgsign = true;
@@ -153,6 +145,16 @@ in {
           };
         };
       };
+
+      signing = {
+        signByDefault = true;
+        key = publicKey;
+      };
+
+      ignores = [
+        ".direnv"
+        "result"
+      ];
     };
 
     home.file.".ssh/allowed_signers".text = ''
