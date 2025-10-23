@@ -8,6 +8,7 @@
   inherit (lib.lists) flatten range;
   inherit (lib.strings) splitString;
   inherit (lib.modules) mkIf;
+  inherit (lib.meta) getExe;
 
   cfg = config.desktops.hyprland;
 
@@ -73,6 +74,8 @@ in {
           "$mod      , Period, exec, uwsm app -- ${toggle emoji}"
           "$mod SHIFT, D     , exec, uwsm app -- ${toggle systemd}"
           "$mod      , V     , exec, uwsm app -- ${clipse}"
+          "$mod      , S     , exec, ${getExe config.programs.hyprshot.package} -m region"
+          "$mod SHIFT, S     , exec, ${getExe config.programs.hyprshot.package} -m window"
         ]
         ++ workspaceBinds;
 
