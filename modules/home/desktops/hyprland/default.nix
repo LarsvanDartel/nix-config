@@ -38,6 +38,7 @@ in {
     desktops.hyprland.addons = {
       hyprlock.enable = true;
       hyprpaper.enable = true;
+      hyprshot.enable = true;
       mako.enable = true;
       rofi.enable = true;
       waybar.enable = true;
