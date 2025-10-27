@@ -34,7 +34,7 @@
       };
 
       # ========== nix ==========
-      nixfmt-rfc-style.enable = true;
+      alejandra.enable = true;
       deadnix = {
         enable = true;
         settings = {
@@ -44,7 +44,12 @@
 
       # ========== shellscripts ==========
       shfmt.enable = true;
-      shellcheck.enable = true;
+      shellcheck = {
+        enable = true;
+        excludes = [
+          "^\\.envrc$"
+        ];
+      };
 
       end-of-file-fixer.enable = true;
     };
