@@ -7,15 +7,17 @@
   inherit (lib.options) mkEnableOption;
   inherit (lib.modules) mkIf;
 
-  cfg = config.profiles.gaming;
+  cfg = config.cosmos.profiles.gaming;
 in {
-  options.profiles.gaming = {
+  options.cosmos.profiles.gaming = {
     enable = mkEnableOption "gaming configuration";
   };
   config = mkIf cfg.enable {
-    profiles = {
-      common.enable = true;
-      desktop.enable = true;
+    cosmos = {
+      profiles = {
+        common.enable = true;
+        desktop.enable = true;
+      };
     };
 
     # TODO: move to dedicated steam module

@@ -3,16 +3,16 @@
   lib,
   ...
 }: let
-  inherit (lib.custom) get-non-default-nix-files;
+  inherit (lib.cosmos) get-non-default-nix-files;
   inherit (lib.types) str;
   inherit (lib.options) mkOption mkEnableOption;
   inherit (lib.modules) mkIf;
 
-  cfg = config.profiles.desktop.addons.greetd;
+  cfg = config.cosmos.profiles.desktop.addons.greetd;
 in {
   imports = get-non-default-nix-files ./.;
 
-  options.profiles.desktop.addons.greetd = {
+  options.cosmos.profiles.desktop.addons.greetd = {
     enable = mkEnableOption "greetd";
     command = mkOption {
       type = str;
@@ -27,7 +27,7 @@ in {
       settings = rec {
         default_session = {
           inherit (cfg) command;
-          user = config.user.name;
+          user = config.cosmos.user.name;
         };
         initial_session = default_session;
       };

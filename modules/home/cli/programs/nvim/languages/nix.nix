@@ -6,9 +6,9 @@
   inherit (lib.options) mkEnableOption;
   inherit (lib.modules) mkIf;
 
-  cfg = config.cli.programs.nvim.languages.nix;
+  cfg = config.cosmos.cli.programs.nvim.languages.nix;
 in {
-  options.cli.programs.nvim.languages.nix = {
+  options.cosmos.cli.programs.nvim.languages.nix = {
     enable = mkEnableOption "nix" // {default = true;};
   };
   config = mkIf cfg.enable {

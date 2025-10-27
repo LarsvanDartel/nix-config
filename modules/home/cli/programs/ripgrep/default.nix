@@ -6,9 +6,9 @@
   inherit (lib.options) mkEnableOption;
   inherit (lib.modules) mkIf;
 
-  cfg = config.cli.programs.ripgrep;
+  cfg = config.cosmos.cli.programs.ripgrep;
 in {
-  options.cli.programs.ripgrep = {
+  options.cosmos.cli.programs.ripgrep = {
     enable = mkEnableOption "ripgrep";
   };
 

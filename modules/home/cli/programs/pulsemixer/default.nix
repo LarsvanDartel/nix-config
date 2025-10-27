@@ -7,9 +7,9 @@
   inherit (lib.options) mkEnableOption;
   inherit (lib.modules) mkIf;
 
-  cfg = config.cli.programs.pulsemixer;
+  cfg = config.cosmos.cli.programs.pulsemixer;
 in {
-  options.cli.programs.pulsemixer = {
+  options.cosmos.cli.programs.pulsemixer = {
     enable = mkEnableOption "pulsemixer";
   };
 

@@ -7,9 +7,9 @@
   inherit (lib.options) mkEnableOption;
   inherit (lib.modules) mkIf;
 
-  cfg = config.cli.programs.nvim.languages.rust;
+  cfg = config.cosmos.cli.programs.nvim.languages.rust;
 in {
-  options.cli.programs.nvim.languages.rust = {
+  options.cosmos.cli.programs.nvim.languages.rust = {
     enable = mkEnableOption "rust";
   };
   config = mkIf cfg.enable {

@@ -7,14 +7,14 @@
   inherit (lib.options) mkEnableOption;
   inherit (lib.modules) mkIf mkOrder;
 
-  cfg = config.desktops.hyprland.addons.mako;
+  cfg = config.cosmos.desktops.hyprland.addons.mako;
 in {
-  options.desktops.hyprland.addons.mako = {
+  options.cosmos.desktops.hyprland.addons.mako = {
     enable = mkEnableOption "mako";
   };
 
   config = mkIf cfg.enable {
-    desktops.hyprland.exec-once-extras = mkOrder 800 [
+    cosmos.desktops.hyprland.exec-once-extras = mkOrder 800 [
       "${pkgs.mako}/bin/mako"
     ];
 

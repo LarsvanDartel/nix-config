@@ -4,16 +4,16 @@
   pkgs,
   ...
 }: let
-  inherit (lib.custom) get-non-default-nix-files;
+  inherit (lib.cosmos) get-non-default-nix-files;
   inherit (lib.types) listOf str;
   inherit (lib.options) mkEnableOption mkOption;
   inherit (lib.modules) mkIf;
 
-  cfg = config.desktops.hyprland;
+  cfg = config.cosmos.desktops.hyprland;
 in {
   imports = get-non-default-nix-files ./.;
 
-  options.desktops.hyprland = {
+  options.cosmos.desktops.hyprland = {
     enable = mkEnableOption "hyprland";
 
     exec-once-extras = mkOption {
@@ -31,11 +31,11 @@ in {
       ];
     };
 
-    cli.programs = {
+    cosmos.cli.programs = {
       clipse.enable = true;
     };
 
-    desktops.hyprland.addons = {
+    cosmos.desktops.hyprland.addons = {
       hyprlock.enable = true;
       hyprpaper.enable = true;
       hyprshot.enable = true;

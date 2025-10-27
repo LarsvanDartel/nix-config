@@ -9,7 +9,7 @@
   inherit (lib.modules) mkIf;
   inherit (lib.strings) optionalString concatMapStringsSep;
 
-  cfg = config.hardware.ipmi-fancontrol;
+  cfg = config.cosmos.hardware.ipmi-fancontrol;
   pollInterval = toString cfg.pollInterval;
   minSpeed = toString cfg.minSpeed;
   manualSpeed = toString cfg.manualSpeed;
@@ -17,7 +17,7 @@
   gpuMaxTemp = toString cfg.nvidia-smi.maxTemp;
   nvidia_x11 = config.hardware.nvidia.package;
 in {
-  options.hardware.ipmi-fancontrol = {
+  options.cosmos.hardware.ipmi-fancontrol = {
     enable = mkEnableOption "Enable fan control via ipmitool";
 
     dynamic = mkOption {
@@ -96,8 +96,8 @@ in {
                   | grep -E "([0-9]+\.[0-9]+)°C" \
                   | grep -E "high =" \
                   ${optionalString
-                    (cfg.ignoreDevices != [])
-                    (concatMapStringsSep "\\\n" (d: ''| grep -v "${d}"'') cfg.ignoreDevices)}
+                (cfg.ignoreDevices != [])
+                (concatMapStringsSep "\\\n" (d: ''| grep -v "${d}"'') cfg.ignoreDevices)}
                 )
 
                 max_ratio=0
@@ -117,11 +117,11 @@ in {
                 done
 
                 ${optionalString cfg.nvidia-smi.enable ''
-                  gpu_temp=$(${nvidia_x11.bin}/bin/nvidia-smi --query-gpu=temperature.gpu --format=csv,noheader,nounits | head -n1)
-                  gpu_ratio=$(${pkgs.gawk}/bin/awk "BEGIN {print $gpu_temp / ${gpuMaxTemp}}")
-                  [ "$(${pkgs.gawk}/bin/awk "BEGIN {print ($gpu_ratio > 1)}")" -eq 1 ] && gpu_ratio=1
-                  [ "$(${pkgs.gawk}/bin/awk "BEGIN {print ($gpu_ratio > $max_ratio)}")" -eq 1 ] && max_ratio=$gpu_ratio
-                ''}
+                gpu_temp=$(${nvidia_x11.bin}/bin/nvidia-smi --query-gpu=temperature.gpu --format=csv,noheader,nounits | head -n1)
+                gpu_ratio=$(${pkgs.gawk}/bin/awk "BEGIN {print $gpu_temp / ${gpuMaxTemp}}")
+                [ "$(${pkgs.gawk}/bin/awk "BEGIN {print ($gpu_ratio > 1)}")" -eq 1 ] && gpu_ratio=1
+                [ "$(${pkgs.gawk}/bin/awk "BEGIN {print ($gpu_ratio > $max_ratio)}")" -eq 1 ] && max_ratio=$gpu_ratio
+              ''}
 
                 speed=$(${pkgs.gawk}/bin/awk "BEGIN {print int(${minSpeed} + (100 - ${minSpeed}) * ($max_ratio ^ ${curve}))}")
                 [ "$speed" -gt 100 ] && speed=100

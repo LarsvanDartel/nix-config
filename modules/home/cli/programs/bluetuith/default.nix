@@ -7,9 +7,9 @@
   inherit (lib.options) mkEnableOption;
   inherit (lib.modules) mkIf;
 
-  cfg = config.cli.programs.bluetuith;
+  cfg = config.cosmos.cli.programs.bluetuith;
 in {
-  options.cli.programs.bluetuith = {
+  options.cosmos.cli.programs.bluetuith = {
     enable = mkEnableOption "bluetuith";
   };
 

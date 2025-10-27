@@ -7,19 +7,19 @@
   inherit (lib.options) mkEnableOption;
   inherit (lib.modules) mkIf;
 
-  cfg = config.cli.programs.bat;
+  cfg = config.cosmos.cli.programs.bat;
 in {
-  options.cli.programs.bat = {
+  options.cosmos.cli.programs.bat = {
     enable = mkEnableOption "bat";
   };
 
   config = mkIf cfg.enable {
-    cli.shells.zsh.initContent = ''
+    cosmos.cli.shells.zsh.initContent = ''
       eval "$(batpipe)"
       eval "$(batman --export-env)"
     '';
 
-    home.sessionVariables = mkIf config.cli.programs.git.delta.enable {
+    home.sessionVariables = mkIf config.cosmos.cli.programs.git.delta.enable {
       BATDIFF_USE_DELTA = "true";
     };
 

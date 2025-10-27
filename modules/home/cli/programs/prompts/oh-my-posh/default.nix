@@ -8,9 +8,9 @@
   inherit (lib.modules) mkIf;
   inherit (lib.lists) optional;
 
-  cfg = config.cli.programs.prompt.oh-my-posh;
+  cfg = config.cosmos.cli.programs.prompt.oh-my-posh;
 in {
-  options.cli.programs.prompt.oh-my-posh = {
+  options.cosmos.cli.programs.prompt.oh-my-posh = {
     enable = mkEnableOption "oh-my-posh shell prompt";
     theme = mkOption {
       type = nullOr str;

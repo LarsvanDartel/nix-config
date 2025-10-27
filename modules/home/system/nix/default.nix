@@ -6,9 +6,9 @@
   inherit (lib.options) mkEnableOption;
   inherit (lib.modules) mkIf;
 
-  cfg = config.system.nix;
+  cfg = config.cosmos.system.nix;
 in {
-  options.system.nix = {
+  options.cosmos.system.nix = {
     enable = mkEnableOption "nix configuration";
   };
 

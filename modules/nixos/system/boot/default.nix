@@ -7,9 +7,9 @@
   inherit (lib.types) bool nullOr str;
   inherit (lib.modules) mkIf;
 
-  cfg = config.system.boot;
+  cfg = config.cosmos.system.boot;
 in {
-  options.system.boot = {
+  options.cosmos.system.boot = {
     enable = mkEnableOption "boot configuration";
     legacy = mkOption {
       type = bool;

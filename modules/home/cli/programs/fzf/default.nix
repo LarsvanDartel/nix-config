@@ -6,16 +6,16 @@
   inherit (lib.options) mkEnableOption;
   inherit (lib.modules) mkIf;
 
-  cfg = config.cli.programs.fzf;
+  cfg = config.cosmos.cli.programs.fzf;
 in {
-  options.cli.programs.fzf = {
+  options.cosmos.cli.programs.fzf = {
     enable = mkEnableOption "fzf";
   };
 
   config = mkIf cfg.enable {
     programs.fzf = {
       enable = true;
-      enableZshIntegration = config.cli.shells.zsh.enable;
+      enableZshIntegration = config.cosmos.cli.shells.zsh.enable;
       colors = with config.lib.stylix.colors.withHashtag;
         mkForce {
           "bg" = base00;

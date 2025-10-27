@@ -6,14 +6,14 @@
   inherit (lib.options) mkEnableOption;
   inherit (lib.modules) mkIf;
 
-  cfg = config.hardware.fingerprint;
+  cfg = config.cosmos.hardware.fingerprint;
 in {
-  options.hardware.fingerprint = {
+  options.cosmos.hardware.fingerprint = {
     enable = mkEnableOption "fingerprint reader support";
   };
 
   config = mkIf cfg.enable {
-    system.impermanence.persist.directories = ["/var/lib/fprint"];
+    cosmos.system.impermanence.persist.directories = ["/var/lib/fprint"];
 
     # Enable the fingerprint reader service
     systemd.services.fprintd = {

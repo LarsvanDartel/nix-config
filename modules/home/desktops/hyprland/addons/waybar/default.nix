@@ -7,9 +7,9 @@
   inherit (lib.options) mkEnableOption;
   inherit (lib.modules) mkIf;
 
-  cfg = config.desktops.hyprland.addons.waybar;
+  cfg = config.cosmos.desktops.hyprland.addons.waybar;
 in {
-  options.desktops.hyprland.addons.waybar = {
+  options.cosmos.desktops.hyprland.addons.waybar = {
     enable = mkEnableOption "waybar";
   };
 
@@ -32,8 +32,8 @@ in {
         ''
         + builtins.readFile ./style.css;
       settings = let
-        terminal = config.cli.terminals.default;
-        powermenu = "${config.desktops.hyprland.addons.rofi.package}/bin/rofi -show power-menu";
+        terminal = config.cosmos.cli.terminals.default;
+        powermenu = "${config.cosmos.desktops.hyprland.addons.rofi.package}/bin/rofi -show power-menu";
       in [
         {
           layer = "top";
@@ -139,8 +139,8 @@ in {
             format = "";
             on-click = "${terminal} -a clipse -e ${pkgs.clipse}/bin/clipse";
             # FIXME: add clipse functionality
-            # on-click-middle = "sleep 0.1 && ${config.home.homeDirectory}/cliphist-helper.sh wipe";
-            # on-click-right = "sleep 0.1 && ${config.home.homeDirectory}/cliphist-helper.sh remove";
+            # on-click-middle = "sleep 0.1 && ${config.cosmos.home.homeDirectory}/cliphist-helper.sh wipe";
+            # on-click-right = "sleep 0.1 && ${config.cosmos.home.homeDirectory}/cliphist-helper.sh remove";
             # tooltip-format = "Cliphist\n\n<small>Click to open and select to copy to clipboard, middle click to\nwipe entire history, and right click to open menu in order to\nremove a single item.</small>";
           };
           "battery" = {

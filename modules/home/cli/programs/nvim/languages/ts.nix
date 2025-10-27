@@ -7,9 +7,9 @@
   inherit (lib.options) mkEnableOption;
   inherit (lib.modules) mkIf;
 
-  cfg = config.cli.programs.nvim.languages.ts;
+  cfg = config.cosmos.cli.programs.nvim.languages.ts;
 in {
-  options.cli.programs.nvim.languages.ts = {
+  options.cosmos.cli.programs.nvim.languages.ts = {
     enable = mkEnableOption "typescript";
   };
   config = mkIf cfg.enable {

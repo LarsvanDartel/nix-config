@@ -7,18 +7,18 @@
   inherit (lib.options) mkEnableOption;
   inherit (lib.modules) mkIf;
 
-  cfg = config.cli.programs.yazi;
+  cfg = config.cosmos.cli.programs.yazi;
 in {
-  options.cli.programs.yazi = {
+  options.cosmos.cli.programs.yazi = {
     enable = mkEnableOption "yazi file manager";
   };
   config = mkIf cfg.enable {
-    cli.shells.zsh.aliases = {
+    cosmos.cli.shells.zsh.aliases = {
       "y" = "${pkgs.yazi}/bin/yazi";
     };
     programs.yazi = {
       enable = true;
-      enableZshIntegration = config.cli.shells.zsh.enable;
+      enableZshIntegration = config.cosmos.cli.shells.zsh.enable;
     };
   };
 }

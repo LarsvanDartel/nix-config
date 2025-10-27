@@ -6,9 +6,9 @@
   inherit (lib.options) mkEnableOption;
   inherit (lib.modules) mkIf;
 
-  cfg = config.cli.programs.ranger;
+  cfg = config.cosmos.cli.programs.ranger;
 in {
-  options.cli.programs.ranger = {
+  options.cosmos.cli.programs.ranger = {
     enable = mkEnableOption "ranger file manager";
   };
   config = mkIf cfg.enable {

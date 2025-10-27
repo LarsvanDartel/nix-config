@@ -4,19 +4,19 @@
   pkgs,
   ...
 }: let
-  cfg = config.desktops.common.styling.theme.nord;
+  cfg = config.cosmos.desktops.common.styling.theme.nord;
   mode =
     if cfg.darkMode
     then ""
     else "-light";
 in {
-  options.desktops.common.styling.theme.nord = {
+  options.cosmos.desktops.common.styling.theme.nord = {
     enable = lib.mkEnableOption "nord theme";
     darkMode = lib.mkEnableOption "dark mode";
   };
 
   config = lib.mkIf cfg.enable {
-    desktops.common.styling = {
+    cosmos.desktops.common.styling = {
       icons.theme = lib.mkDefault "nordzy";
       theme = {
         darkMode = lib.mkForce cfg.darkMode;

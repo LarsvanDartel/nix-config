@@ -6,9 +6,9 @@
   inherit (lib.types) str;
   inherit (lib.options) mkOption;
 
-  cfg = config.cli.terminal;
+  cfg = config.cosmos.cli.terminal;
 in {
-  options.cli.terminals = {
+  options.cosmos.cli.terminals = {
     default = mkOption {
       type = str;
       default = "foot";

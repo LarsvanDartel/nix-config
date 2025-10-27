@@ -7,9 +7,9 @@
   inherit (lib.options) mkEnableOption mkOption;
   inherit (lib.modules) mkIf;
 
-  cfg = config.cli.programs.nh;
+  cfg = config.cosmos.cli.programs.nh;
 in {
-  options.cli.programs.nh = {
+  options.cosmos.cli.programs.nh = {
     enable = mkEnableOption "nh";
     flake-dir = mkOption {
       type = str;

@@ -7,9 +7,9 @@
   inherit (lib.options) mkEnableOption;
   inherit (lib.modules) mkIf;
 
-  cfg = config.profiles.desktop.addons.xdg-portal;
+  cfg = config.cosmos.profiles.desktop.addons.xdg-portal;
 in {
-  options.profiles.desktop.addons.xdg-portal = {
+  options.cosmos.profiles.desktop.addons.xdg-portal = {
     enable = mkEnableOption "xdg desktop portal";
   };
 

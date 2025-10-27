@@ -7,9 +7,9 @@
   inherit (lib.options) mkEnableOption;
   inherit (lib.modules) mkIf;
 
-  cfg = config.cli.programs.xh;
+  cfg = config.cosmos.cli.programs.xh;
 in {
-  options.cli.programs.xh = {
+  options.cosmos.cli.programs.xh = {
     enable = mkEnableOption "xh";
   };
 

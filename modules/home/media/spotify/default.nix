@@ -7,14 +7,14 @@
   inherit (lib.options) mkEnableOption;
   inherit (lib.modules) mkIf;
 
-  cfg = config.media.spotify;
+  cfg = config.cosmos.media.spotify;
 in {
-  options.media.spotify = {
+  options.cosmos.media.spotify = {
     enable = mkEnableOption "spotify";
   };
 
   config = mkIf cfg.enable {
-    system.impermanence.persist.directories = [
+    cosmos.system.impermanence.persist.directories = [
       ".cache/spotify-player"
     ];
 

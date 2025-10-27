@@ -6,15 +6,15 @@
   inherit (lib.options) mkEnableOption;
   inherit (lib.modules) mkIf;
 
-  cfg = config.hardware.networking;
+  cfg = config.cosmos.hardware.networking;
 in {
-  options.hardware.networking = {
+  options.cosmos.hardware.networking = {
     enable = mkEnableOption "networkmanager";
   };
 
   config = mkIf cfg.enable {
-    system.impermanence.persist.directories = ["/etc/NetworkManager"];
-    user.extraGroups = ["networkmanager"];
+    cosmos.system.impermanence.persist.directories = ["/etc/NetworkManager"];
+    cosmos.user.extraGroups = ["networkmanager"];
 
     networking = {
       firewall.enable = true;

@@ -7,14 +7,14 @@
   inherit (lib.options) mkEnableOption;
   inherit (lib.modules) mkIf;
 
-  cfg = config.social.discord;
+  cfg = config.cosmos.social.discord;
 in {
-  options.social.discord = {
+  options.cosmos.social.discord = {
     enable = mkEnableOption "discord";
   };
 
   config = mkIf cfg.enable {
-    system.impermanence.persist.directories = [".config/discord"];
+    cosmos.system.impermanence.persist.directories = [".config/discord"];
 
     home.packages = with pkgs; [
       discord

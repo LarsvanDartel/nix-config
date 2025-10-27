@@ -6,9 +6,9 @@
   inherit (lib.options) mkEnableOption;
   inherit (lib.modules) mkIf;
 
-  cfg = config.cli.programs.lazygit;
+  cfg = config.cosmos.cli.programs.lazygit;
 in {
-  options.cli.programs.lazygit = {
+  options.cosmos.cli.programs.lazygit = {
     enable = mkEnableOption "lazygit";
   };
 

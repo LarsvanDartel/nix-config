@@ -6,28 +6,30 @@
   inherit (lib.options) mkEnableOption;
   inherit (lib.modules) mkIf;
 
-  cfg = config.profiles.desktop;
+  cfg = config.cosmos.profiles.desktop;
 in {
-  options.profiles.desktop = {
+  options.cosmos.profiles.desktop = {
     enable = mkEnableOption "desktop configuration";
   };
   config = mkIf cfg.enable {
-    profiles = {
-      common.enable = true;
-      desktop.addons = {
-        fontconfig.enable = true;
+    cosmos = {
+      profiles = {
+        common.enable = true;
+        desktop.addons = {
+          fontconfig.enable = true;
+        };
       };
-    };
 
-    hardware = {
-      audio.enable = true;
-      bluetoothctl.enable = true;
-    };
+      hardware = {
+        audio.enable = true;
+        bluetoothctl.enable = true;
+      };
 
-    cli.programs = {
-      nh.enable = true;
-    };
+      cli.programs = {
+        nh.enable = true;
+      };
 
-    user.name = "lvdar";
+      user.name = "lvdar";
+    };
   };
 }

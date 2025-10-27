@@ -6,9 +6,9 @@
   inherit (lib.options) mkEnableOption;
   inherit (lib.modules) mkIf;
 
-  cfg = config.desktops.hyprland.addons.hyprlock;
+  cfg = config.cosmos.desktops.hyprland.addons.hyprlock;
 in {
-  options.desktops.hyprland.addons.hyprlock = {
+  options.cosmos.desktops.hyprland.addons.hyprlock = {
     enable = mkEnableOption "hyprlock";
   };
 
@@ -31,7 +31,7 @@ in {
 
         background = [
           {
-            inherit (config.desktops.common.styling.wallpaper) path;
+            inherit (config.cosmos.desktops.common.styling.wallpaper) path;
           }
         ];
 

@@ -4,18 +4,18 @@
   ...
 }: let
   inherit (builtins) readFile;
-  inherit (lib.custom) get-files;
+  inherit (lib.cosmos) get-files;
   inherit (lib.lists) map;
   inherit (lib.options) mkEnableOption;
   inherit (lib.modules) mkIf;
   inherit (lib.strings) optionalString;
 
-  cfg = config.services.ssh;
-  impermanence = config.system.impermanence.enable;
+  cfg = config.cosmos.services.ssh;
+  impermanence = config.cosmos.system.impermanence.enable;
 
   keys = get-files ./keys;
 in {
-  options.services.ssh = {
+  options.cosmos.services.ssh = {
     enable = mkEnableOption "ssh";
   };
 
@@ -40,7 +40,7 @@ in {
       };
     };
 
-    users.users.${config.user.name} = {
+    cosmos.user.extraOptions = {
       openssh.authorizedKeys.keys = map readFile keys;
     };
   };

@@ -6,9 +6,9 @@
   inherit (lib.options) mkEnableOption;
   inherit (lib.modules) mkIf;
 
-  cfg = config.system.locale;
+  cfg = config.cosmos.system.locale;
 in {
-  options.system.locale = {
+  options.cosmos.system.locale = {
     enable = mkEnableOption "locale configuration";
   };
 

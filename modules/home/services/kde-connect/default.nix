@@ -6,14 +6,14 @@
   inherit (lib.options) mkEnableOption;
   inherit (lib.modules) mkIf;
 
-  cfg = config.services.kde-connect;
+  cfg = config.cosmos.services.kde-connect;
 in {
-  options.services.kde-connect = {
+  options.cosmos.services.kde-connect = {
     enable = mkEnableOption "KDE Connect";
   };
 
   config = mkIf cfg.enable {
-    system.impermanence.persist.directories = [".config/kdeconnect"];
+    cosmos.system.impermanence.persist.directories = [".config/kdeconnect"];
 
     # Hide all .desktop, except for org.kde.kdeconnect.settings
     xdg.desktopEntries = {

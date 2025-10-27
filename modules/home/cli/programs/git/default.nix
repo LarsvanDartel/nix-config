@@ -3,16 +3,16 @@
   lib,
   ...
 }: let
-  inherit (lib.custom) get-flake-path;
+  inherit (lib.cosmos) get-flake-path;
   inherit (lib.options) mkEnableOption mkOption;
   inherit (lib.types) str;
   inherit (lib.strings) fileContents;
   inherit (lib.modules) mkIf mkDefault;
 
-  cfg = config.cli.programs.git;
-  publicKey = "${config.home.homeDirectory}/.ssh/id_ash.pub";
+  cfg = config.cosmos.cli.programs.git;
+  publicKey = "${config.cosmos.user.home}/.ssh/id_voyager.pub";
 in {
-  options.cli.programs.git = {
+  options.cosmos.cli.programs.git = {
     enable = mkEnableOption "git";
     user = mkOption {
       type = str;
@@ -26,8 +26,8 @@ in {
   };
 
   config = mkIf cfg.enable {
-    cli.programs.lazygit.enable = mkDefault true;
-    cli.shells.zsh.aliases = {
+    cosmos.cli.programs.lazygit.enable = mkDefault true;
+    cosmos.cli.shells.zsh.aliases = {
       gs = "git status --short";
       gd = "git diff";
 
@@ -71,7 +71,7 @@ in {
         };
 
         gpg.format = "ssh";
-        gpg.ssh.allowedSignersFile = "${config.home.homeDirectory}/.ssh/allowed_signers";
+        gpg.ssh.allowedSignersFile = "${config.cosmos.user.home}/.ssh/allowed_signers";
         commit.gpgsign = true;
         user.signingkey = publicKey;
 
@@ -119,7 +119,7 @@ in {
           sort = "-taggerdate";
         };
         url = {
-          "git@github.com:${cfg.user}/".insteadOf = "${config.home.username}:";
+          "git@github.com:${cfg.user}/".insteadOf = "lvdar";
           "git@github.com:".insteadOf = "gh:";
         };
         color = {
@@ -158,7 +158,7 @@ in {
     };
 
     home.file.".ssh/allowed_signers".text = ''
-      ${cfg.email} ${fileContents (get-flake-path "modules/nixos/services/ssh/keys/id_ash.pub")}
+      ${cfg.email} ${fileContents (get-flake-path "modules/nixos/services/ssh/keys/id_voyager.pub")}
     '';
   };
 }

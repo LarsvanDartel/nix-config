@@ -7,9 +7,9 @@
   inherit (lib.options) mkEnableOption;
   inherit (lib.modules) mkIf;
 
-  cfg = config.security.yubikey;
+  cfg = config.cosmos.security.yubikey;
 in {
-  options.security.yubikey = {
+  options.cosmos.security.yubikey = {
     enable = mkEnableOption "yubikey";
   };
 

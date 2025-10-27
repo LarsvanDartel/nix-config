@@ -6,23 +6,23 @@
   inherit (lib.options) mkEnableOption;
   inherit (lib.modules) mkIf mkDefault;
 
-  cfg = config.cli.programs.eza;
+  cfg = config.cosmos.cli.programs.eza;
 in {
-  options.cli.programs.eza = {
+  options.cosmos.cli.programs.eza = {
     enable = mkEnableOption "eza";
   };
 
   config = mkIf cfg.enable {
     programs.eza = {
       enable = true;
-      enableZshIntegration = config.cli.shells.zsh.enable;
+      enableZshIntegration = config.cosmos.cli.shells.zsh.enable;
       colors = "auto";
       extraOptions = [
         "--group-directories-first"
         "--time-style=long-iso"
         "--header"
       ];
-      git = mkDefault config.cli.programs.git.enable;
+      git = mkDefault config.cosmos.cli.programs.git.enable;
       icons = "auto";
     };
   };

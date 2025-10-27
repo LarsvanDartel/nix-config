@@ -7,14 +7,14 @@
   inherit (lib.options) mkEnableOption;
   inherit (lib.modules) mkIf;
 
-  cfg = config.browsers.firefox;
+  cfg = config.cosmos.browsers.firefox;
 in {
-  options.browsers.firefox = {
+  options.cosmos.browsers.firefox = {
     enable = mkEnableOption "firefox browser";
   };
 
   config = mkIf cfg.enable {
-    system.impermanence.persist.directories = [
+    cosmos.system.impermanence.persist.directories = [
       ".mozilla"
     ];
     programs.firefox = {

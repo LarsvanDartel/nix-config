@@ -3,17 +3,17 @@
   lib,
   ...
 }: let
-  inherit (lib.custom) get-non-default-nix-files;
+  inherit (lib.cosmos) get-non-default-nix-files;
   inherit (lib.attrsets) attrsToList;
   inherit (lib.options) mkOption mkEnableOption;
   inherit (lib.types) nullOr str lines attrsOf anything;
   inherit (lib.strings) concatStrings;
 
-  cfg = config.desktops.common.styling.theme;
+  cfg = config.cosmos.desktops.common.styling.theme;
 in {
   imports = get-non-default-nix-files ./.;
 
-  options.desktops.common.styling.theme = {
+  options.cosmos.desktops.common.styling.theme = {
     colorScheme = mkOption {
       type = nullOr str;
       default = null;

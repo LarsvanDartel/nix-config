@@ -10,13 +10,13 @@
   inherit (lib.attrsets) mapAttrsToList filterAttrs;
   inherit (lib.strings) concatLines escapeShellArg;
 
-  cfg = config.system.impermanence;
+  cfg = config.cosmos.system.impermanence;
 in {
   imports = [
     inputs.impermanence.nixosModules.impermanence
   ];
 
-  options.system.impermanence = {
+  options.cosmos.system.impermanence = {
     enable = mkEnableOption "impermanence";
 
     device = mkOption {

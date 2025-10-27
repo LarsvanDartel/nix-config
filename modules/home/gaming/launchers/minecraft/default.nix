@@ -7,14 +7,14 @@
   inherit (lib.options) mkEnableOption;
   inherit (lib.modules) mkIf;
 
-  cfg = config.gaming.launchers.minecraft;
+  cfg = config.cosmos.gaming.launchers.minecraft;
 in {
-  options.gaming.launchers.minecraft = {
+  options.cosmos.gaming.launchers.minecraft = {
     enable = mkEnableOption "minecraft launcher";
   };
 
   config = mkIf cfg.enable {
-    system.impermanence.persist.directories = [".local/share/PrismLauncher"];
+    cosmos.system.impermanence.persist.directories = [".local/share/PrismLauncher"];
 
     home.packages = with pkgs; [
       (prismlauncher.override {

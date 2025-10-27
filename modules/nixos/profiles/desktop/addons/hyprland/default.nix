@@ -6,9 +6,9 @@
   inherit (lib.options) mkEnableOption;
   inherit (lib.modules) mkIf;
 
-  cfg = config.profiles.desktop.addons.hyprland;
+  cfg = config.cosmos.profiles.desktop.addons.hyprland;
 in {
-  options.profiles.desktop.addons.hyprland = {
+  options.cosmos.profiles.desktop.addons.hyprland = {
     enable = mkEnableOption "hyprland window manager";
   };
 
@@ -21,7 +21,7 @@ in {
       withUWSM = true;
     };
 
-    profiles.desktop.addons.greetd.enable = true;
-    profiles.desktop.addons.xdg-portal.enable = true;
+    cosmos.profiles.desktop.addons.greetd.enable = true;
+    cosmos.profiles.desktop.addons.xdg-portal.enable = true;
   };
 }

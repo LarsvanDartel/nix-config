@@ -7,9 +7,9 @@
   inherit (lib.options) mkEnableOption;
   inherit (lib.modules) mkIf;
 
-  cfg = config.cli.programs.nvim.languages.python;
+  cfg = config.cosmos.cli.programs.nvim.languages.python;
 in {
-  options.cli.programs.nvim.languages.python = {
+  options.cosmos.cli.programs.nvim.languages.python = {
     enable = mkEnableOption "python";
   };
   config = mkIf cfg.enable {

@@ -6,9 +6,9 @@
   inherit (lib.options) mkEnableOption;
   inherit (lib.modules) mkIf;
 
-  cfg = config.desktops.hyprland.addons.hyprshot;
+  cfg = config.cosmos.desktops.hyprland.addons.hyprshot;
 in {
-  options.desktops.hyprland.addons.hyprshot = {
+  options.cosmos.desktops.hyprland.addons.hyprshot = {
     enable = mkEnableOption "hyprshot";
   };
 

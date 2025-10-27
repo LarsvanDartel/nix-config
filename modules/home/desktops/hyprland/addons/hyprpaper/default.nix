@@ -6,9 +6,9 @@
   inherit (lib.options) mkEnableOption;
   inherit (lib.modules) mkIf;
 
-  cfg = config.desktops.hyprland.addons.hyprpaper;
+  cfg = config.cosmos.desktops.hyprland.addons.hyprpaper;
 in {
-  options.desktops.hyprland.addons.hyprpaper = {
+  options.cosmos.desktops.hyprland.addons.hyprpaper = {
     enable = mkEnableOption "hyprpaper";
   };
 
@@ -17,7 +17,7 @@ in {
       enable = true;
 
       settings = let
-        inherit (config.desktops.common.styling.wallpaper) path;
+        inherit (config.cosmos.desktops.common.styling.wallpaper) path;
       in {
         preload = ["${path}"];
         wallpaper = [", ${path}"];

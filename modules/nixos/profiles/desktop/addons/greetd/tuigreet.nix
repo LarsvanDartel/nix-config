@@ -8,10 +8,10 @@
   inherit (lib.options) mkOption mkEnableOption;
   inherit (lib.modules) mkIf mkDefault;
 
-  cfg = config.profiles.desktop.addons.greetd.tuigreet;
+  cfg = config.cosmos.profiles.desktop.addons.greetd.tuigreet;
   tuigreet = "${pkgs.tuigreet}/bin/tuigreet";
 in {
-  options.profiles.desktop.addons.greetd.tuigreet = {
+  options.cosmos.profiles.desktop.addons.greetd.tuigreet = {
     enable = mkEnableOption "tuigreet";
     greeting = mkOption {
       type = str;
@@ -26,10 +26,10 @@ in {
   };
 
   config = mkIf cfg.enable {
-    system.impermanence.persist.directories = [
+    cosmos.system.impermanence.persist.directories = [
       "/var/cache/tuigreet"
     ];
-    profiles.desktop.addons.greetd = {
+    cosmos.profiles.desktop.addons.greetd = {
       enable = mkDefault true;
       command = mkDefault "${tuigreet} --remember --remember-user-session --greeting \"${cfg.greeting}\" --time --cmd \"${cfg.command}\" --asterisks";
     };
