@@ -7,9 +7,9 @@
   inherit (lib.options) mkEnableOption;
   inherit (lib.modules) mkIf;
 
-  cfg = config.cli.programs.devenv;
+  cfg = config.cosmos.cli.programs.devenv;
 in {
-  options.cli.programs.devenv = {
+  options.cosmos.cli.programs.devenv = {
     enable = mkEnableOption "devenv";
   };
 

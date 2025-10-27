@@ -6,19 +6,19 @@
   inherit (lib.options) mkEnableOption;
   inherit (lib.modules) mkIf;
 
-  cfg = config.services.docker;
+  cfg = config.cosmos.services.docker;
 in {
-  options.services.docker = {
+  options.cosmos.services.docker = {
     enable = mkEnableOption "docker";
   };
 
   config = mkIf cfg.enable {
-    system.impermanence.persist.directories = ["/var/lib/docker"];
+    cosmos.system.impermanence.persist.directories = ["/var/lib/docker"];
 
     virtualisation.docker = {
       enable = true;
     };
 
-    user.extraGroups = ["docker"];
+    cosmos.user.extraGroups = ["docker"];
   };
 }

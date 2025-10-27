@@ -34,12 +34,20 @@
       };
 
       # ========== nix ==========
-      alejandra.enable = true;
+      alejandra = {
+        enable = true;
+        excludes = [
+          "hardware-configuration\\.nix$"
+        ];
+      };
       deadnix = {
         enable = true;
         settings = {
           noLambdaArg = true;
         };
+        excludes = [
+          "hardware-configuration\\.nix$"
+        ];
       };
 
       # ========== shellscripts ==========

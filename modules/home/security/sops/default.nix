@@ -11,15 +11,15 @@
 
   sopsFolder = builtins.toString inputs.nix-secrets + "/users";
 
-  hosts = ["ash"];
+  hosts = ["voyager"];
 
-  cfg = config.security.sops;
+  cfg = config.cosmos.security.sops;
 in {
   imports = [
     inputs.sops-nix.homeManagerModules.sops
   ];
 
-  options.security.sops = {
+  options.cosmos.security.sops = {
     enable = mkEnableOption "sops";
   };
 

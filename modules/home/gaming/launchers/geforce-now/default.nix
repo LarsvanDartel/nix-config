@@ -8,9 +8,9 @@
   inherit (lib.types) bool;
   inherit (lib.modules) mkIf;
 
-  cfg = config.gaming.launchers.geforce-now;
+  cfg = config.cosmos.gaming.launchers.geforce-now;
 in {
-  options.gaming.launchers.geforce-now = {
+  options.cosmos.gaming.launchers.geforce-now = {
     enable = mkEnableOption "GeForce Now launcher";
     gamescope = mkOption {
       type = bool;
@@ -21,7 +21,7 @@ in {
   };
 
   config = mkIf cfg.enable {
-    system.impermanence.persist.directories = [".config/GeForce Now"];
+    cosmos.system.impermanence.persist.directories = [".config/GeForce Now"];
 
     home.packages = [cfg.package];
 

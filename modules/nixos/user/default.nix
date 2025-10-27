@@ -5,17 +5,17 @@
   pkgs,
   ...
 }: let
-  inherit (lib.custom) get-flake-path;
+  inherit (lib.cosmos) get-flake-path;
   inherit (lib.types) nullOr listOf str attrs;
   inherit (lib.options) mkOption;
   inherit (lib.modules) mkMerge mkForce;
 
-  cfg = config.user;
+  cfg = config.cosmos.user;
 in {
   imports = [
     inputs.home-manager.nixosModules.home-manager
   ];
-  options.user = {
+  options.cosmos.user = {
     name = mkOption {
       type = str;
       default = "lvdar";
@@ -55,9 +55,14 @@ in {
         // cfg.extraOptions;
 
       users.root = {
-        shell = pkgs.zsh;
-        inherit (config.users.users.${cfg.name}) hashedPassword hashedPasswordFile;
-        openssh.authorizedKeys = config.users.users.${cfg.name}.openssh.authorizedKeys;
+        inherit
+          (config.users.users.${cfg.name})
+          hashedPassword
+          hashedPasswordFile
+          shell
+          ;
+        openssh.authorizedKeys =
+          config.users.users.${cfg.name}.openssh.authorizedKeys;
       };
     };
 
@@ -69,23 +74,23 @@ in {
         mkMerge [
           (get-flake-path "homes/${cfg.name}@${host}")
           {
-            user = {
-              enable = true;
+            cosmos.user = {
               inherit (cfg) name;
             };
-            system.impermanence.enable = mkForce config.system.impermanence.enable;
+            cosmos.system.impermanence.enable = mkForce config.cosmos.system.impermanence.enable;
           }
         ];
 
       root = {
-        profiles.common.enable = true;
+        cosmos = {
+          profiles.common.enable = true;
 
-        home = {
-          username = "root";
-          homeDirectory = "/root";
+          user = {
+            inherit (cfg) name;
+          };
+
+          system.impermanence.enable = mkForce config.cosmos.system.impermanence.enable;
         };
-
-        system.impermanence.enable = mkForce config.system.impermanence.enable;
 
         home.stateVersion = "24.11";
       };

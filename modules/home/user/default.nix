@@ -7,10 +7,10 @@
   inherit (lib.options) mkEnableOption mkOption;
   inherit (lib.modules) mkIf mkDefault;
 
-  cfg = config.user;
+  cfg = config.cosmos.user;
 in {
-  options.user = {
-    enable = mkEnableOption "user configuration";
+  options.cosmos.user = {
+    enable = mkEnableOption "user configuration" // {default = true;};
     name = mkOption {
       type = nullOr str;
       default = null;

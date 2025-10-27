@@ -3,25 +3,25 @@
   lib,
   ...
 }: let
-  inherit (lib.custom) get-files get-flake-path get-file-name-without-extension;
+  inherit (lib.cosmos) get-files get-flake-path get-file-name-without-extension;
   inherit (lib.attrsets) mergeAttrsList;
   inherit (lib.lists) map;
   inherit (lib.options) mkEnableOption;
   inherit (lib.modules) mkIf;
 
-  cfg = config.cli.programs.ssh;
+  cfg = config.cosmos.cli.programs.ssh;
 
   keys-path = get-flake-path "modules/nixos/services/ssh/keys";
   keys = get-files keys-path;
 
   ssh-file = key: ".ssh/${get-file-name-without-extension key}";
 in {
-  options.cli.programs.ssh = {
+  options.cosmos.cli.programs.ssh = {
     enable = mkEnableOption "ssh";
   };
 
   config = mkIf cfg.enable {
-    system.impermanence.persist.files = [".ssh/known_hosts"];
+    cosmos.system.impermanence.persist.files = [".ssh/known_hosts"];
 
     programs.ssh = {
       enable = true;

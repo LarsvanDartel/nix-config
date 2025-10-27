@@ -1,5 +1,5 @@
 {
-  profiles = {
+  cosmos.profiles = {
     common.enable = true;
   };
 

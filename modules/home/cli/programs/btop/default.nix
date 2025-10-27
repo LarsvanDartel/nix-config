@@ -6,9 +6,9 @@
   inherit (lib.options) mkEnableOption;
   inherit (lib.modules) mkIf;
 
-  cfg = config.cli.programs.btop;
+  cfg = config.cosmos.cli.programs.btop;
 in {
-  options.cli.programs.btop = {
+  options.cosmos.cli.programs.btop = {
     enable = mkEnableOption "btop";
   };
 

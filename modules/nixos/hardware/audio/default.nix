@@ -7,9 +7,9 @@
   inherit (lib.options) mkEnableOption;
   inherit (lib.modules) mkIf;
 
-  cfg = config.hardware.audio;
+  cfg = config.cosmos.hardware.audio;
 in {
-  options.hardware.audio = {
+  options.cosmos.hardware.audio = {
     enable = mkEnableOption "audio hardware support";
   };
 

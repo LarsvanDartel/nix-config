@@ -23,9 +23,9 @@
   };
   default-icon-theme = "adwaita";
 
-  cfg = config.desktops.common.styling.icons;
+  cfg = config.cosmos.desktops.common.styling.icons;
 in {
-  options.desktops.common.styling.icons = {
+  options.cosmos.desktops.common.styling.icons = {
     theme = mkOption {
       type = enum (attrNames icon-themes);
       default = default-icon-theme;

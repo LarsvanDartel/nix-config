@@ -6,9 +6,9 @@
   inherit (lib.options) mkEnableOption;
   inherit (lib.modules) mkIf;
 
-  cfg = config.cli.programs.nvim.languages.typst;
+  cfg = config.cosmos.cli.programs.nvim.languages.typst;
 in {
-  options.cli.programs.nvim.languages.typst = {
+  options.cosmos.cli.programs.nvim.languages.typst = {
     enable = mkEnableOption "typst";
   };
 

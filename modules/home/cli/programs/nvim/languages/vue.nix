@@ -8,13 +8,13 @@
   inherit (lib.modules) mkIf mkForce;
   inherit (lib.meta) getExe;
 
-  cfg = config.cli.programs.nvim.languages.vue;
+  cfg = config.cosmos.cli.programs.nvim.languages.vue;
 in {
-  options.cli.programs.nvim.languages.vue = {
+  options.cosmos.cli.programs.nvim.languages.vue = {
     enable = mkEnableOption "vue";
   };
   config = mkIf cfg.enable {
-    cli.programs.nvim.languages = {
+    cosmos.cli.programs.nvim.languages = {
       css.enable = mkForce true;
       html.enable = mkForce true;
       tailwind.enable = mkForce true;

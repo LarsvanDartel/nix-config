@@ -5,15 +5,15 @@
   pkgs,
   ...
 }: let
-  inherit (lib.custom) get-non-default-nix-files;
+  inherit (lib.cosmos) get-non-default-nix-files;
   inherit (lib.options) mkEnableOption;
   inherit (lib.modules) mkIf;
 
-  cfg = config.desktops.common.styling;
+  cfg = config.cosmos.desktops.common.styling;
 in {
   imports = [inputs.stylix.homeModules.stylix] ++ get-non-default-nix-files ./.;
 
-  options.desktops.common.styling = {
+  options.cosmos.desktops.common.styling = {
     enable = mkEnableOption "styling configuration";
   };
 

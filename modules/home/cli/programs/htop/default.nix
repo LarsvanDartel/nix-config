@@ -6,9 +6,9 @@
   inherit (lib.options) mkEnableOption;
   inherit (lib.modules) mkIf;
 
-  cfg = config.cli.programs.htop;
+  cfg = config.cosmos.cli.programs.htop;
 in {
-  options.cli.programs.htop = {
+  options.cosmos.cli.programs.htop = {
     enable = mkEnableOption "htop";
   };
 

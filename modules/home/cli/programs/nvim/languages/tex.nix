@@ -7,15 +7,15 @@
   inherit (lib.options) mkEnableOption;
   inherit (lib.modules) mkIf;
 
-  cfg = config.cli.programs.nvim.languages.tex;
+  cfg = config.cosmos.cli.programs.nvim.languages.tex;
 in {
   # TODO: Remove when https://github.com/NotAShelf/nvf/pull/569 is merged
-  options.cli.programs.nvim.languages.tex = {
+  options.cosmos.cli.programs.nvim.languages.tex = {
     enable = mkEnableOption "tex";
   };
 
   config = mkIf cfg.enable {
-    system.impermanence.persist.directories = [".cache/Tectonic"];
+    cosmos.system.impermanence.persist.directories = [".cache/Tectonic"];
     programs.nvf.settings.vim = {
       treesitter = {
         enable = true;

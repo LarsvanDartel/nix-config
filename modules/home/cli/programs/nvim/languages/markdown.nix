@@ -6,9 +6,9 @@
   inherit (lib.options) mkEnableOption;
   inherit (lib.modules) mkIf;
 
-  cfg = config.cli.programs.nvim.languages.markdown;
+  cfg = config.cosmos.cli.programs.nvim.languages.markdown;
 in {
-  options.cli.programs.nvim.languages.markdown = {
+  options.cosmos.cli.programs.nvim.languages.markdown = {
     enable = mkEnableOption "markdown";
     markview = mkEnableOption "markview";
   };

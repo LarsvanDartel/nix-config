@@ -66,7 +66,7 @@
       "x86_64-linux"
     ];
 
-    lib = nixpkgs.lib.extend (_: _: {custom = import ./lib {inherit (nixpkgs) lib;};});
+    lib = nixpkgs.lib.extend (_: _: {cosmos = import ./lib {inherit (nixpkgs) lib;};});
   in {
     # NixOS configurations
     nixosConfigurations = builtins.listToAttrs (
@@ -84,13 +84,13 @@
                     [
                       inputs.nur.modules.homeManager.default
                     ]
-                    ++ lib.custom.get-default-nix-files-recursive ./modules/home;
+                    ++ lib.cosmos.get-default-nix-files-recursive ./modules/home;
                 };
 
                 networking.hostName = host;
               }
             ]
-            ++ (lib.custom.get-default-nix-files-recursive ./modules/nixos);
+            ++ (lib.cosmos.get-default-nix-files-recursive ./modules/nixos);
         };
       }) (builtins.attrNames (builtins.readDir ./hosts))
     );

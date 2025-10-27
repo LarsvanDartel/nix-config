@@ -4,7 +4,7 @@
   pkgs,
   ...
 }: let
-  inherit (lib.custom) get-non-default-nix-files;
+  inherit (lib.cosmos) get-non-default-nix-files;
   inherit (lib.attrsets) listToAttrs attrsToList getAttrs;
   inherit (lib.types) str submodule package int nullOr listOf attrsOf;
   inherit (lib.lists) flatten;
@@ -12,7 +12,7 @@
   inherit (lib.fixedPoints) converge;
   inherit (lib.modules) mkDefault mkIf;
 
-  cfg = config.desktops.common.styling.fonts;
+  cfg = config.cosmos.desktops.common.styling.fonts;
 
   # Font module type
   fontModule = submodule {
@@ -80,7 +80,7 @@
   fontNameList = map (font: font.name) (attrsToList fontPackages);
   fontPackageList = map (font: cfg.pkgs.${font}.package) fontNameList;
 in {
-  options.desktops.common.styling.fonts = {
+  options.cosmos.desktops.common.styling.fonts = {
     enable = mkEnableOption "font config";
 
     pkgs = mkOption {
@@ -133,7 +133,7 @@ in {
   };
 
   config = mkIf cfg.enable {
-    desktops.common.styling.fonts.fontconfig.enable = true;
+    cosmos.desktops.common.styling.fonts.fontconfig.enable = true;
     home.packages = fontPackageList;
 
     stylix.fonts = {

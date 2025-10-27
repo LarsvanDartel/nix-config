@@ -6,13 +6,13 @@
   inherit (lib.options) mkEnableOption;
   inherit (lib.modules) mkIf;
 
-  cfg = config.gaming.launchers.steam;
+  cfg = config.cosmos.gaming.launchers.steam;
 in {
-  options.gaming.launchers.steam = {
+  options.cosmos.gaming.launchers.steam = {
     enable = mkEnableOption "steam";
   };
 
   config = mkIf cfg.enable {
-    system.impermanence.persist.directories = [".local/share/Steam" ".config/unity3d"];
+    cosmos.system.impermanence.persist.directories = [".local/share/Steam" ".config/unity3d"];
   };
 }

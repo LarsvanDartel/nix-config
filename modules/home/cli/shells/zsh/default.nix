@@ -6,11 +6,11 @@
   inherit (lib.types) str lines attrsOf;
   inherit (lib.options) mkEnableOption mkOption;
   inherit (lib.modules) mkIf;
-  inherit (config.home) homeDirectory;
+  inherit (config.cosmos.user) home;
 
-  cfg = config.cli.shells.zsh;
+  cfg = config.cosmos.cli.shells.zsh;
 in {
-  options.cli.shells.zsh = {
+  options.cosmos.cli.shells.zsh = {
     enable = mkEnableOption "zsh";
     aliases = mkOption {
       type = attrsOf str;
@@ -25,7 +25,7 @@ in {
   };
 
   config = mkIf cfg.enable {
-    system.impermanence.persist = {
+    cosmos.system.impermanence.persist = {
       directories = [".zplug"];
       files = [".zsh_history"];
     };
@@ -40,15 +40,15 @@ in {
         append = true;
         ignoreAllDups = true;
         ignoreDups = true;
-        path = "${homeDirectory}/.zsh_history";
+        path = "${home}/.zsh_history";
         share = true;
       };
       historySubstringSearch.enable = true;
 
       autocd = true;
       dirHashes = {
-        dev = "${homeDirectory}/dev";
-        nix = "${homeDirectory}/nixos-config/";
+        dev = "${home}/dev";
+        nix = "${home}/nixos-config/";
       };
 
       shellAliases = cfg.aliases;

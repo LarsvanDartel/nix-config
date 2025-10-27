@@ -5,7 +5,7 @@
 }: let
   inherit (lib.modules) mkIf;
 
-  cfg = config.desktops.hyprland;
+  cfg = config.cosmos.desktops.hyprland;
 in {
   config = mkIf cfg.enable {
     wayland.windowManager.hyprland.settings = {

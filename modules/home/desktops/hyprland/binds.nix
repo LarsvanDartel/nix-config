@@ -4,13 +4,13 @@
   pkgs,
   ...
 }: let
-  inherit (lib.custom) get-file-name-without-extension;
+  inherit (lib.cosmos) get-file-name-without-extension;
   inherit (lib.lists) flatten range;
   inherit (lib.strings) splitString;
   inherit (lib.modules) mkIf;
   inherit (lib.meta) getExe;
 
-  cfg = config.desktops.hyprland;
+  cfg = config.cosmos.desktops.hyprland;
 
   programName = program: get-file-name-without-extension (builtins.elemAt (splitString " " program) 0);
   toggle = program: "pkill ${programName program} || uwsm app -- ${program}";
@@ -19,7 +19,7 @@ in {
   config = mkIf cfg.enable {
     wayland.windowManager.hyprland.settings = {
       "$mod" = "SUPER";
-      "$terminal" = "${config.cli.terminals.default}";
+      "$terminal" = "${config.cosmos.cli.terminals.default}";
 
       bind = let
         launcher = "rofi -show drun";

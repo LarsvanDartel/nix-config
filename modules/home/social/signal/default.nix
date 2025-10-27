@@ -7,14 +7,14 @@
   inherit (lib.options) mkEnableOption;
   inherit (lib.modules) mkIf;
 
-  cfg = config.social.signal;
+  cfg = config.cosmos.social.signal;
 in {
-  options.social.signal = {
+  options.cosmos.social.signal = {
     enable = mkEnableOption "signal";
   };
 
   config = mkIf cfg.enable {
-    system.impermanence.persist.directories = [
+    cosmos.system.impermanence.persist.directories = [
       ".config/Signal"
     ];
 

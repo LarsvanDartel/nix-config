@@ -6,9 +6,9 @@
   inherit (lib.options) mkEnableOption;
   inherit (lib.modules) mkIf;
 
-  cfg = config.cli.programs.nvim.languages.html;
+  cfg = config.cosmos.cli.programs.nvim.languages.html;
 in {
-  options.cli.programs.nvim.languages.html = {
+  options.cosmos.cli.programs.nvim.languages.html = {
     enable = mkEnableOption "html";
   };
   config = mkIf cfg.enable {

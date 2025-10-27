@@ -7,14 +7,14 @@
   inherit (lib.options) mkEnableOption;
   inherit (lib.modules) mkIf;
 
-  cfg = config.cli.programs.direnv;
+  cfg = config.cosmos.cli.programs.direnv;
 in {
-  options.cli.programs.direnv = {
+  options.cosmos.cli.programs.direnv = {
     enable = mkEnableOption "direnv";
   };
 
   config = mkIf cfg.enable {
-    system.impermanence.persist.directories = [".local/share/direnv"];
+    cosmos.system.impermanence.persist.directories = [".local/share/direnv"];
 
     programs.direnv = {
       enable = true;

@@ -6,14 +6,18 @@
   inherit (lib.options) mkEnableOption;
   inherit (lib.modules) mkIf;
 
-  cfg = config.profiles.server;
+  cfg = config.cosmos.profiles.server;
 in {
-  options.profiles.server = {
+  options.cosmos.profiles.server = {
     enable = mkEnableOption "server configuration";
   };
   config = mkIf cfg.enable {
-    profiles = {
-      common.enable = true;
+    cosmos = {
+      profiles = {
+        common.enable = true;
+      };
+
+      user.name = "nixos";
     };
 
     services = {
@@ -75,7 +79,5 @@ in {
       "net.core.default_qdisc" = "fq";
       "net.ipv4.tcp_congestion_control" = "bbr";
     };
-
-    user.name = "nixos";
   };
 }

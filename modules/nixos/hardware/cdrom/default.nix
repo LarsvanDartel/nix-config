@@ -6,14 +6,14 @@
   inherit (lib.options) mkEnableOption;
   inherit (lib.modules) mkIf;
 
-  cfg = config.hardware.cdrom;
+  cfg = config.cosmos.hardware.cdrom;
 in {
-  options.hardware.cdrom = {
+  options.cosmos.hardware.cdrom = {
     enable = mkEnableOption "cdrom support";
   };
 
   config = mkIf cfg.enable {
-    user.extraGroups = ["cdrom"];
+    cosmos.user.extraGroups = ["cdrom"];
 
     boot.kernelModules = ["sg" "sr_mod" "cdrom"];
 

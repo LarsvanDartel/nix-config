@@ -6,9 +6,9 @@
   inherit (lib.options) mkEnableOption;
   inherit (lib.modules) mkIf;
 
-  cfg = config.media.mpv;
+  cfg = config.cosmos.media.mpv;
 in {
-  options.media.mpv = {
+  options.cosmos.media.mpv = {
     enable = mkEnableOption "mpv";
   };
 

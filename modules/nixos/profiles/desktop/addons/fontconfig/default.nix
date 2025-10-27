@@ -6,9 +6,9 @@
   inherit (lib.options) mkEnableOption;
   inherit (lib.modules) mkIf;
 
-  cfg = config.profiles.desktop.addons.fontconfig;
+  cfg = config.cosmos.profiles.desktop.addons.fontconfig;
 in {
-  options.profiles.desktop.addons.fontconfig = {
+  options.cosmos.profiles.desktop.addons.fontconfig = {
     enable = mkEnableOption "fontconfig";
   };
 

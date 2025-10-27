@@ -6,35 +6,36 @@
   inherit (lib.options) mkEnableOption;
   inherit (lib.modules) mkIf;
 
-  cfg = config.profiles.common;
+  cfg = config.cosmos.profiles.common;
 in {
-  options.profiles.common = {
+  options.cosmos.profiles.common = {
     enable = mkEnableOption "common configuration";
   };
 
   config = mkIf cfg.enable {
-    hardware = {
-      networking.enable = true;
-    };
+    cosmos = {
+      hardware = {
+        networking.enable = true;
+      };
 
+      services = {
+        ssh.enable = true;
+      };
+
+      security = {
+        sops.enable = true;
+        yubikey.enable = true;
+      };
+
+      system = {
+        nix.enable = true;
+        boot.enable = true;
+        locale.enable = true;
+      };
+    };
     programs = {
       git.enable = true;
       zsh.enable = true;
-    };
-
-    services = {
-      ssh.enable = true;
-    };
-
-    security = {
-      sops.enable = true;
-      yubikey.enable = true;
-    };
-
-    system = {
-      nix.enable = true;
-      boot.enable = true;
-      locale.enable = true;
     };
   };
 }

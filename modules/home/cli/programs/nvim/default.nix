@@ -4,17 +4,17 @@
   lib,
   ...
 }: let
-  inherit (lib.custom) get-non-default-nix-files;
+  inherit (lib.cosmos) get-non-default-nix-files;
   inherit (lib.options) mkEnableOption;
   inherit (lib.modules) mkIf;
 
-  cfg = config.cli.programs.nvim;
+  cfg = config.cosmos.cli.programs.nvim;
 in {
   imports =
     [inputs.nvf.homeManagerModules.default]
     ++ get-non-default-nix-files ./languages;
 
-  options.cli.programs.nvim = {
+  options.cosmos.cli.programs.nvim = {
     enable = mkEnableOption "nvim";
   };
 
@@ -25,7 +25,7 @@ in {
       EDITOR = "nvim";
     };
 
-    system.impermanence.persist.directories = [".config/github-copilot"];
+    cosmos.system.impermanence.persist.directories = [".config/github-copilot"];
 
     programs.nvf = {
       enable = true;

@@ -8,13 +8,13 @@
   inherit (lib.options) mkEnableOption mkOption;
   inherit (lib.modules) mkIf;
 
-  cfg = config.system.impermanence;
+  cfg = config.cosmos.system.impermanence;
 in {
   imports = [
     inputs.impermanence.nixosModules.home-manager.impermanence
   ];
 
-  options.system.impermanence = {
+  options.cosmos.system.impermanence = {
     enable = mkEnableOption "impermanence";
 
     persist = {

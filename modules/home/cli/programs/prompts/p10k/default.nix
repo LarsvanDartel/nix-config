@@ -5,16 +5,16 @@
 }: let
   inherit (lib.options) mkEnableOption;
   inherit (lib.modules) mkIf mkBefore mkMerge;
-  inherit (config.home) username homeDirectory;
+  inherit (config.cosmos.home) username homeDirectory;
 
-  cfg = config.cli.programs.prompt.p10k;
+  cfg = config.cosmos.cli.programs.prompt.p10k;
 in {
-  options.cli.programs.prompt.p10k = {
+  options.cosmos.cli.programs.prompt.p10k = {
     enable = mkEnableOption "p10k shell prompt";
   };
 
   config = mkIf cfg.enable {
-    system.impermanence.persist.files = [
+    cosmos.system.impermanence.persist.files = [
       ".p10k.zsh"
       ".cache/p10k-instant-prompt-${username}.zsh"
     ];

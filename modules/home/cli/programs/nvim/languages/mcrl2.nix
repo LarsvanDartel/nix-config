@@ -7,9 +7,9 @@
   inherit (lib.options) mkEnableOption;
   inherit (lib.modules) mkIf;
 
-  cfg = config.cli.programs.nvim.languages.mcrl2;
+  cfg = config.cosmos.cli.programs.nvim.languages.mcrl2;
 in {
-  options.cli.programs.nvim.languages.mcrl2 = {
+  options.cosmos.cli.programs.nvim.languages.mcrl2 = {
     enable = mkEnableOption "mcrl2";
   };
   config = mkIf cfg.enable {

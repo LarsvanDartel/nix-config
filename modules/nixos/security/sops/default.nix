@@ -9,13 +9,14 @@
   inherit (lib.modules) mkIf;
 
   sopsFolder = builtins.toString inputs.nix-secrets + "/hosts";
-  impermanence = config.system.impermanence.enable;
+  impermanence = config.cosmos.system.impermanence.enable;
+  userName = config.cosmos.user.name;
 
-  cfg = config.security.sops;
+  cfg = config.cosmos.security.sops;
 in {
   imports = [inputs.sops-nix.nixosModules.sops];
 
-  options.security.sops = {
+  options.cosmos.security.sops = {
     enable = mkEnableOption "sops";
   };
 
@@ -28,26 +29,26 @@ in {
 
       secrets = {
         "keys/age" = {
-          owner = config.user.name;
-          inherit (config.users.users.${config.user.name}) group;
-          path = "/home/${config.user.name}/.config/sops/age/keys.txt";
+          owner = userName;
+          inherit (config.users.users.${userName}) group;
+          path = "/home/${userName}/.config/sops/age/keys.txt";
         };
-        "passwords/${config.user.name}" = {
+        "passwords/${userName}" = {
           sopsFile = "${sopsFolder}/common/secrets.yaml";
           neededForUsers = true;
         };
       };
     };
 
-    user.extraOptions = {
-      hashedPasswordFile = config.sops.secrets."passwords/${config.user.name}".path;
+    cosmos.user.extraOptions = {
+      hashedPasswordFile = config.sops.secrets."passwords/${userName}".path;
     };
 
     # The containing folders are created as root and if this is the first ~/.config/ entry,
     # the ownership is busted and home-manager can't target because it can't write into .config...
     # FIXME(sops): We might not need this depending on how https://github.com/Mic92/sops-nix/issues/381 is fixed
     system.activationScripts.sopsSetAgeKeyOwnership = let
-      inherit (config.users.users.${config.user.name}) name group home;
+      inherit (config.users.users.${userName}) name group home;
       ageFolder = "${home}/.config/sops/age";
     in ''
       mkdir -p ${ageFolder} || true

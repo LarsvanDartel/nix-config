@@ -6,14 +6,14 @@
   inherit (lib.options) mkEnableOption;
   inherit (lib.modules) mkIf;
 
-  cfg = config.cli.programs.clipse;
+  cfg = config.cosmos.cli.programs.clipse;
 in {
-  options.cli.programs.clipse = {
+  options.cosmos.cli.programs.clipse = {
     enable = mkEnableOption "clipse";
   };
 
   config = mkIf cfg.enable {
-    system.impermanence.persist.files = [".config/clipse/clipboard_history.json"];
+    cosmos.system.impermanence.persist.files = [".config/clipse/clipboard_history.json"];
 
     services.clipse.enable = true;
   };

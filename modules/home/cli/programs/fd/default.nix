@@ -6,9 +6,9 @@
   inherit (lib.options) mkEnableOption;
   inherit (lib.modules) mkIf;
 
-  cfg = config.cli.programs.fd;
+  cfg = config.cosmos.cli.programs.fd;
 in {
-  options.cli.programs.fd = {
+  options.cosmos.cli.programs.fd = {
     enable = mkEnableOption "fd";
   };
 
