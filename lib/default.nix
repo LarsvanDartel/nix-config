@@ -8,6 +8,8 @@
 
   file-name-regex = "(.*)\\.(.*)$";
 in rec {
+  nginx = import ./nginx.nix {inherit lib;};
+
   split-file-extension = file: let
     match = builtins.match file-name-regex file;
   in
