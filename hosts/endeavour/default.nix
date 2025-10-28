@@ -68,6 +68,11 @@
         server.enable = true;
       };
 
+      services = {
+        nginx.enable = true;
+        kanidm.enable = true;
+      };
+
       hardware = {
         cdrom.enable = true;
         ipmi-fancontrol = {
