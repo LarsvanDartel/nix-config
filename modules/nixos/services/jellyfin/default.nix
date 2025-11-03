@@ -53,8 +53,19 @@ in {
           enableVppTonemapping = true;
           enableTonemapping = true;
           tonemappingAlgorithm = "bt2390";
-          # enableHardwareEncoding = true;
-          # hardwareAccelerationType = "nvenc";
+          enableHardwareEncoding = true;
+          hardwareAccelerationType = "vaapi";
+          enableDecodingColorDepth10Hevc = true;
+          allowHevcEncoding = true;
+          allowAv1Encoding = true;
+          hardwareDecodingCodecs = [
+            "h264"
+            "hevc"
+            "mpeg2video"
+            "vc1"
+            "vp9"
+            "av1"
+          ];
         };
 
         libraries = {

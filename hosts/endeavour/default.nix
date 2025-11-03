@@ -2,8 +2,8 @@
   imports = [
     # Hardware
     ./hardware-configuration.nix
-    inputs.nixos-hardware.nixosModules.common-cpu-intel-cpu-only
-    inputs.nixos-hardware.nixosModules.common-gpu-nvidia-nonprime
+    inputs.nixos-hardware.nixosModules.common-cpu-intel
+    inputs.nixos-hardware.nixosModules.common-gpu-nvidia
 
     # Disk layout
     inputs.disko.nixosModules.disko
@@ -12,12 +12,29 @@
 
   config = {
     networking.hostId = "b8433556";
-    hardware.nvidia = {
-      modesetting.enable = true;
-      powerManagement.enable = true;
-      open = false;
-      nvidiaPersistenced = true;
-      videoAcceleration = true;
+
+    nixpkgs.config.packageOverrides = pkgs: {
+      intel-vaapi-driver = pkgs.intel-vaapi-driver.override {enableHybridCodec = true;};
+    };
+
+    hardware = {
+      nvidia = {
+        modesetting.enable = true;
+        open = false;
+        powerManagement.enable = true;
+        nvidiaPersistenced = true;
+
+        prime = {
+          intelBusId = "PCI:7@0:0:0";
+          nvidiaBusId = "PCI:3@0:0:0";
+        };
+      };
+      intelgpu = {
+        driver = "xe";
+        vaapiDriver = "intel-media-driver";
+        enableHybridCodec = true;
+      };
+      graphics.enable = true;
     };
 
     boot = {
@@ -71,6 +88,7 @@
       services = {
         nginx.enable = true;
         kanidm.enable = true;
+        jellyfin.enable = true;
       };
 
       hardware = {
