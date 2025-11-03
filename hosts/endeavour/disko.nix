@@ -120,6 +120,13 @@
               "com.sun:auto-snapshot" = "true";
             };
           };
+          "media" = {
+            type = "zfs_fs";
+            options = {
+              mountpoint = "/tank/media";
+              "com.sun:auto-snapshot" = "false";
+            };
+          };
         };
       };
     };
