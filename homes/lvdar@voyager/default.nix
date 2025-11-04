@@ -6,7 +6,10 @@
 
     desktops.hyprland.enable = true;
 
-    "3d-printing".orca-slicer.enable = true;
+    "3d" = {
+      orca-slicer.enable = true;
+      freecad.enable = true;
+    };
 
     cli.programs.nvim = {
       languages = {

@@ -7,9 +7,9 @@
   inherit (lib.options) mkEnableOption;
   inherit (lib.modules) mkIf;
 
-  cfg = config.cosmos."3d-printing".orca-slicer;
+  cfg = config.cosmos."3d".orca-slicer;
 in {
-  options.cosmos."3d-printing".orca-slicer = {
+  options.cosmos."3d".orca-slicer = {
     enable = mkEnableOption "orca slicer";
   };
 
