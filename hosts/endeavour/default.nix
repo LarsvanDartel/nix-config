@@ -1,4 +1,8 @@
-{inputs, ...}: {
+{
+  inputs,
+  config,
+  ...
+}: {
   imports = [
     # Hardware
     ./hardware-configuration.nix
@@ -12,10 +16,6 @@
 
   config = {
     networking.hostId = "b8433556";
-
-    nixpkgs.config.packageOverrides = pkgs: {
-      intel-vaapi-driver = pkgs.intel-vaapi-driver.override {enableHybridCodec = true;};
-    };
 
     hardware = {
       nvidia = {
@@ -73,6 +73,10 @@
       '';
     };
 
+    sops.secrets = {
+      "keys/proton/private-key" = {};
+    };
+
     cosmos = {
       system = {
         impermanence = {
@@ -86,6 +90,14 @@
       };
 
       services = {
+        proton-vpn = {
+          enable = true;
+          interface.privateKeyFile = config.sops.secrets."keys/proton/private-key".path;
+          endpoint = {
+            publicKey = "D8Sqlj3TYwwnTkycV08HAlxcXXS3Ura4oamz8rB5ImM=";
+            ip = "103.69.224.4";
+          };
+        };
         nginx.enable = true;
         kanidm.enable = true;
         jellyfin.enable = true;
