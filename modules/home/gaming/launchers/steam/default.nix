@@ -13,6 +13,10 @@ in {
   };
 
   config = mkIf cfg.enable {
-    cosmos.system.impermanence.persist.directories = [".local/share/Steam" ".config/unity3d"];
+    cosmos.system.impermanence.persist.directories = [
+      ".local/share/Steam"
+      ".config/unity3d"
+      ".local/share/applications"
+    ];
   };
 }
