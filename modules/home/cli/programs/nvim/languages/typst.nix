@@ -1,30 +1,44 @@
 {
-  config,
   lib,
+  pkgs,
   ...
 }: let
-  inherit (lib.options) mkEnableOption;
-  inherit (lib.modules) mkIf;
-
-  cfg = config.cosmos.cli.programs.nvim.languages.typst;
+  inherit (lib.meta) getExe;
 in {
-  options.cosmos.cli.programs.nvim.languages.typst = {
-    enable = mkEnableOption "typst";
-  };
-
-  config = mkIf cfg.enable {
-    # Add templates to XDG_DATA_HOME
-    # home.file.""
-
-    programs.nvf.settings.vim.languages.typst = {
+  programs.nixvim = {
+    lsp.servers.tinymist = {
       enable = true;
-      format = {
-        enable = true;
-        type = "typstyle";
+      config = {
+        cmd = [
+          (getExe pkgs.tinymist)
+        ];
+        filetypes = [
+          "typst"
+        ];
+        root_markers = [
+          ".git"
+        ];
       };
-      lsp.enable = true;
-      treesitter.enable = true;
-      extensions.typst-preview-nvim.enable = true;
+    };
+
+    plugins.treesitter.grammarPackages = with pkgs.vimPlugins.nvim-treesitter.builtGrammars; [
+      typst
+    ];
+
+    plugins.conform-nvim.settings = {
+      formatters_by_ft.typst = ["typstyle"];
+      formatters.typstyle = {
+        command = getExe pkgs.typstyle;
+      };
+    };
+
+    plugins.typst-vim = {
+      enable = true;
+      settings = {
+        cmd = getExe pkgs.typst;
+        pdf_viewer = getExe pkgs.zathura;
+        conceal_math = 1;
+      };
     };
   };
 }

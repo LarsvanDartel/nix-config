@@ -1,25 +1,36 @@
 {
-  config,
   lib,
+  pkgs,
   ...
 }: let
-  inherit (lib.options) mkEnableOption;
-  inherit (lib.modules) mkIf;
-
-  cfg = config.cosmos.cli.programs.nvim.languages.nix;
+  inherit (lib.meta) getExe;
 in {
-  options.cosmos.cli.programs.nvim.languages.nix = {
-    enable = mkEnableOption "nix" // {default = true;};
-  };
-  config = mkIf cfg.enable {
-    programs.nvf.settings.vim.languages.nix = {
+  programs.nixvim = {
+    lsp.servers.nil = {
       enable = true;
-      format = {
-        enable = true;
-        type = "alejandra";
+      config = {
+        cmd = [
+          "${getExe pkgs.nil}"
+        ];
+        filetypes = [
+          "nix"
+        ];
+        root_markers = [
+          "flake.nix"
+          ".git"
+        ];
       };
-      lsp.enable = true;
-      treesitter.enable = true;
+    };
+
+    plugins.treesitter.grammarPackages = with pkgs.vimPlugins.nvim-treesitter.builtGrammars; [
+      nix
+    ];
+
+    plugins.conform-nvim.settings = {
+      formatters_by_ft.nix = ["alejandra"];
+      formatters.alejandra = {
+        command = getExe pkgs.alejandra;
+      };
     };
   };
 }
