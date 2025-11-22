@@ -23,7 +23,7 @@ in {
     # TODO: move to dedicated steam module
     programs.steam = {
       enable = true;
-      extraPackages = with pkgs; [
+      extraCompatPackages = with pkgs; [
         proton-ge-bin
       ];
     };
