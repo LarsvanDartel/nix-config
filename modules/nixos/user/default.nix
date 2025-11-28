@@ -36,6 +36,11 @@ in {
       default = {};
       description = "Extra options for the main user.";
     };
+    extraConfig = mkOption {
+      type = attrs;
+      default = {};
+      description = "Extra home manager options for the main user";
+    };
   };
 
   config = {
@@ -79,6 +84,7 @@ in {
             };
             cosmos.system.impermanence.enable = mkForce config.cosmos.system.impermanence.enable;
           }
+          cfg.extraConfig
         ];
 
       root = {
@@ -86,7 +92,7 @@ in {
           profiles.common.enable = true;
 
           user = {
-            inherit (cfg) name;
+            name = "root";
           };
 
           system.impermanence.enable = mkForce config.cosmos.system.impermanence.enable;
