@@ -119,7 +119,7 @@ in {
           sort = "-taggerdate";
         };
         url = {
-          "git@github.com:${cfg.user}/".insteadOf = "lvdar";
+          "git@github.com:${cfg.user}".insteadOf = "lvdar";
           "git@github.com:".insteadOf = "gh:";
         };
         color = {
