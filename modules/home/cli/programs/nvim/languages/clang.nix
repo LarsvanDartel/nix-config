@@ -50,6 +50,7 @@ in {
 
     plugins.conform-nvim.settings = {
       formatters_by_ft.cpp = ["clang_format"];
+      formatters_by_ft.c = ["clang_format"];
       formatters.clang_format = {
         command = getExe' pkgs.clang-tools "clang-format";
       };
