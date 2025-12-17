@@ -26,6 +26,8 @@
             [
               ./hosts/${host}
               {
+                nixpkgs.overlays = [self.overlays.default];
+
                 home-manager = {
                   extraSpecialArgs = {inherit inputs;};
                   sharedModules =
@@ -79,8 +81,8 @@
   inputs = {
     nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable";
 
-    nixpkgs-stable.url = "github:NixOS/nixpkgs/nixos-25.05";
-    nixpkgs-unstable.url = "github:NixOS/nixpkgs/nixos-unstable";
+    nixpkgs-stable.url = "github:NixOS/nixpkgs/nixos-25.11";
+    nixpkgs-unstable.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
 
     home-manager = {
       url = "github:nix-community/home-manager";

@@ -8,12 +8,12 @@
     # example = prev.example.overrideAttrs (previousAttrs: let ... in {
     # ...
     # });
-    steam = prev.steam.overrideAttrs {
-      package = final.unstable.steam;
-    };
-    gamemode = prev.gamemode.overrideAttrs {
-      package = final.unstable.gamemode;
-    };
+    # steam = prev.steam.overrideAttrs {
+    #   package = final.unstable.steam;
+    # };
+    # gamemode = prev.gamemode.overrideAttrs {
+    #   package = final.unstable.gamemode;
+    # };
   };
 
   stable-packages = final: _: {
