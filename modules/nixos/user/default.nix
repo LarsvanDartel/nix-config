@@ -93,6 +93,7 @@ in {
 
           user = {
             name = "root";
+            home = "/root";
           };
 
           system.impermanence.enable = mkForce config.cosmos.system.impermanence.enable;
