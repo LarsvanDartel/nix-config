@@ -37,7 +37,7 @@ in {
 
     plugins.treesitter = {
       enable = true;
-      folding = true;
+      folding.enable = true;
 
       grammarPackages = [];
     };
