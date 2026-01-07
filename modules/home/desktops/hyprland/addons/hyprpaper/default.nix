@@ -20,7 +20,12 @@ in {
         inherit (config.cosmos.desktops.common.styling.wallpaper) path;
       in {
         preload = ["${path}"];
-        wallpaper = [", ${path}"];
+        wallpaper = [
+          {
+            monitor = "";
+            path = "${path}";
+          }
+        ];
       };
     };
   };

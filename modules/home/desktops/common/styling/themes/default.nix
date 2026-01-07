@@ -1,6 +1,7 @@
 {
   config,
   lib,
+  pkgs,
   ...
 }: let
   inherit (lib.cosmos) get-non-default-nix-files;
@@ -16,7 +17,7 @@ in {
   options.cosmos.desktops.common.styling.theme = {
     colorScheme = mkOption {
       type = nullOr str;
-      default = null;
+      default = "${pkgs.base16-schemes}/share/themes/nord.yaml";
       description = "Base 16 color scheme";
     };
 

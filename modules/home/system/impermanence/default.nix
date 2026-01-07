@@ -1,5 +1,4 @@
 {
-  inputs,
   config,
   lib,
   ...
@@ -10,10 +9,6 @@
 
   cfg = config.cosmos.system.impermanence;
 in {
-  imports = [
-    inputs.impermanence.nixosModules.home-manager.impermanence
-  ];
-
   options.cosmos.system.impermanence = {
     enable = mkEnableOption "impermanence";
 
@@ -32,9 +27,8 @@ in {
   };
 
   config = mkIf cfg.enable {
-    home.persistence."/persist${config.home.homeDirectory}" = {
+    home.persistence."/persist" = {
       inherit (cfg.persist) files directories;
-      allowOther = true;
     };
   };
 }

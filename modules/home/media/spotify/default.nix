@@ -18,7 +18,10 @@ in {
       ".cache/spotify-player"
     ];
 
-    programs.spotify-player.enable = true;
+    programs.spotify-player = {
+      enable = true;
+      package = pkgs.spotify-player;
+    };
 
     xdg.desktopEntries.spotify-player = {
       exec = "${pkgs.spotify-player}/bin/spotify_player";

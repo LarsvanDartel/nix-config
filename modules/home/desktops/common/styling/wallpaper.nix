@@ -8,6 +8,7 @@
   inherit (lib.types) str;
   inherit (lib.strings) optionalString splitString;
   inherit (lib.lists) last length;
+  inherit (lib.modules) mkIf;
 
   cfg = config.cosmos.desktops.common.styling.wallpaper;
 in {
@@ -87,7 +88,7 @@ in {
     };
   };
 
-  config = {
+  config = mkIf config.cosmos.desktops.common.styling.enable {
     stylix.image = cfg.path;
   };
 }
