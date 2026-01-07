@@ -1,44 +1,23 @@
 {
-  config,
-  lib,
-  ...
-}: let
-  inherit (lib.modules) mkIf;
+  wayland.windowManager.hyprland.settings = {
+    layerrule = [
+      "blur on, ignore_alpha 0, match:namespace notifications"
+      "blur on, ignore_alpha 0, dim_around on, match:namespace rofi"
+    ];
 
-  cfg = config.cosmos.desktops.hyprland;
-in {
-  config = mkIf cfg.enable {
-    wayland.windowManager.hyprland.settings = {
-      layerrule = [
-        "blur, notifications"
-        "ignorezero, notifications"
-        "blur, rofi"
-        "ignorezero, rofi"
-        "dimaround, rofi"
-      ];
+    windowrule = [
+      "match:class clipse, float on, size 650 650"
 
-      windowrulev2 = [
-        "float, class:^(org.gnome.Calculator)$"
-        "size 390 490, class:^(org.gnome.Calculator)$"
+      "match:class discord, workspace 8 silent"
+      "match:class signal, workspace 8 silent"
 
-        "float, title:^(Picture-in-Picture)$"
-        "pin, title:^(Picture-in-Picture)$"
+      "match:title (Spotify Player), workspace 9 silent"
 
-        "float, class:(clipse)"
-        "size 622 652, class:(clipse)"
+      "match:class xwaylandvideobridge, workspace special silent"
+      "match:title ((Firefox|Zen) - Sharing Indicator), workspace special silent"
+      "match:title (.*is sharing (your screen|a window)\.), workspace special silent"
 
-        "workspace 8 silent, class:^(discord)$"
-        "workspace 8 silent, class:^(signal)$"
-
-        "workspace 9 silent, title:^(Spotify Player)$"
-
-        "workspace special silent, class:^(xwaylandvideobridge)$"
-        "workspace special silent, title:^((Firefox|Zen) - Sharing Indicator)$"
-        "workspace special silent, title:^(.*is sharing (your screen|a window)\.)$"
-
-        "idleinhibit focus, class:^(zen)$, title:^(.*YouTube.*)$"
-        "idleinhibit fullscreen, class:.*"
-      ];
-    };
+      "match:class .*, idle_inhibit fullscreen"
+    ];
   };
 }

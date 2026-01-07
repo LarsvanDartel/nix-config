@@ -47,6 +47,7 @@ in {
           "$mod SHIFT, C, killactive"
           "$mod      , F, fullscreen"
           "$mod      , T, togglefloating"
+          "$mod      , D, toggleswallow"
 
           # Move/resize window
           "$mod      , L, movefocus, r"

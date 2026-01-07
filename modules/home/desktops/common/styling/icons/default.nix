@@ -38,7 +38,7 @@ in {
     };
   };
   config = {
-    stylix.iconTheme = with icon-themes.${cfg.theme}; {
+    stylix.icons = with icon-themes.${cfg.theme}; {
       enable = true;
       inherit package;
       light =

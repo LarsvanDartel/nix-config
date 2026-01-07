@@ -26,15 +26,16 @@
             [
               ./hosts/${host}
               {
-                nixpkgs.overlays = [self.overlays.default];
+                nixpkgs.overlays = [
+                  self.overlays.default
+                  inputs.nur.overlays.default
+                ];
 
                 home-manager = {
+                  useGlobalPkgs = true;
                   extraSpecialArgs = {inherit inputs;};
                   sharedModules =
-                    [
-                      inputs.nur.modules.homeManager.default
-                    ]
-                    ++ lib.cosmos.get-default-nix-files-recursive ./modules/home;
+                    lib.cosmos.get-default-nix-files-recursive ./modules/home;
                 };
 
                 networking.hostName = host;

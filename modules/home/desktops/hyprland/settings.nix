@@ -52,10 +52,14 @@ in {
         general = {
           gaps_in = 3;
           gaps_out = 5;
+          gaps_workspaces = 0;
           border_size = 3;
+          resize_on_border = true;
+          layout = "dwindle";
+        };
 
-          layout = "master";
-          allow_tearing = false;
+        dwindle = {
+          force_split = 2;
         };
 
         decoration = {
@@ -80,24 +84,34 @@ in {
           shadow.enabled = false;
         };
 
-        animations = {
-          enabled = true;
-          bezier = "easeOutQuart, 0.25, 1, 0.25, 1";
-          animation = [
-            "windows, 1, 5, easeOutQuart"
-            "windowsOut, 1, 5, default, popin 60%"
-            "fade, 1, 5, easeOutQuart"
-            "workspaces, 1, 5, easeOutQuart"
-          ];
-        };
-
         misc = let
           FULLSCREEN_ONLY = 2;
         in {
+          vfr = true;
+          vrr = FULLSCREEN_ONLY;
+
+          animate_manual_resizes = true;
+          animate_mouse_windowdragging = true;
+          enable_swallow = true;
+          swallow_regex = "(foot|footclient|kitty|allacritty|Alacritty|ghostty|Ghostty)";
+          focus_on_activate = true;
+          # disable_scale_checks = true;
           disable_autoreload = true;
           disable_splash_rendering = true;
           disable_hyprland_logo = true;
-          vrr = FULLSCREEN_ONLY;
+          force_default_wallpaper = 0;
+          # new_window_takes_over_fullscreen = 2;
+          allow_session_lock_restore = true;
+          initial_workspace_tracking = true;
+        };
+
+        xwayland = {
+          force_zero_scaling = false;
+        };
+
+        cursor = {
+          sync_gsettings_theme = true;
+          no_hardware_cursors = true;
         };
       };
     };

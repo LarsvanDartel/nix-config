@@ -1,5 +1,4 @@
 {
-  inputs,
   config,
   lib,
   pkgs,
@@ -11,7 +10,7 @@
 
   cfg = config.cosmos.desktops.common.styling;
 in {
-  imports = [inputs.stylix.homeModules.stylix] ++ get-non-default-nix-files ./.;
+  imports = get-non-default-nix-files ./.;
 
   options.cosmos.desktops.common.styling = {
     enable = mkEnableOption "styling configuration";

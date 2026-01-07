@@ -6,6 +6,7 @@
   inherit (lib.types) str lines attrsOf;
   inherit (lib.options) mkEnableOption mkOption;
   inherit (lib.modules) mkIf;
+  inherit (lib.strings) optionalString;
   inherit (config.cosmos.user) home;
 
   cfg = config.cosmos.cli.shells.zsh;
@@ -27,7 +28,6 @@ in {
   config = mkIf cfg.enable {
     cosmos.system.impermanence.persist = {
       directories = [".zplug"];
-      files = [".zsh_history"];
     };
 
     programs.zsh = {
@@ -36,11 +36,13 @@ in {
       autosuggestion.enable = true;
       syntaxHighlighting.enable = true;
 
-      history = {
+      history = let
+        impermanence = config.cosmos.system.impermanence.enable;
+      in {
         append = true;
         ignoreAllDups = true;
         ignoreDups = true;
-        path = "${home}/.zsh_history";
+        path = "${optionalString impermanence "/persist"}${home}/.zsh_history";
         share = true;
       };
       historySubstringSearch.enable = true;

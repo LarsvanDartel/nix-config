@@ -1,7 +1,6 @@
 {
   config,
   lib,
-  pkgs,
   ...
 }: let
   inherit (lib.options) mkEnableOption;
@@ -39,7 +38,6 @@ in {
 
     services.nginx = {
       enable = true;
-      package = pkgs.nginxStable.override {openssl = pkgs.libressl;};
       recommendedGzipSettings = true;
       recommendedOptimisation = true;
       recommendedProxySettings = true;
