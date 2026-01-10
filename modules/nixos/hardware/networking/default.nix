@@ -19,6 +19,7 @@ in {
     networking = {
       firewall.enable = true;
       networkmanager.enable = true;
+      nameservers = ["9.9.9.9"];
     };
   };
 }
