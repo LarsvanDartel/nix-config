@@ -4,7 +4,10 @@
       desktop.enable = true;
     };
 
-    desktops.hyprland.enable = true;
+    desktops.hyprland = {
+      enable = true;
+      animations.enable = false;
+    };
 
     "3d" = {
       orca-slicer.enable = true;
