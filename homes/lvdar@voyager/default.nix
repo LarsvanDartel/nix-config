@@ -23,6 +23,7 @@
     };
 
     programs = {
+      zathura.enable = true;
       zotero.enable = true;
     };
 
