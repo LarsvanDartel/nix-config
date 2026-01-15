@@ -1,6 +1,7 @@
 {
   inputs,
   config,
+  pkgs,
   ...
 }: {
   imports = [
@@ -91,7 +92,7 @@
 
       services = {
         proton-vpn = {
-          enable = true;
+          enable = false;
           interface.privateKeyFile = config.sops.secrets."keys/proton/private-key".path;
           endpoint = {
             publicKey = "D8Sqlj3TYwwnTkycV08HAlxcXXS3Ura4oamz8rB5ImM=";
@@ -101,6 +102,51 @@
         nginx.enable = true;
         kanidm.enable = true;
         jellyfin.enable = true;
+        arr = {
+          enable = true;
+          stateDir = "/var/lib/arr";
+          mediaDir = "/tank/media";
+
+          transmission = {
+            enable = true;
+            vpn.enable = true;
+          };
+          vpn = let
+            name = "arr";
+            privateKeyFile = config.sops.secrets."keys/proton/private-key".path;
+            postUp = pkgs.writeShellApplication {
+              name = "${name}-postup";
+              runtimeInputs = with pkgs; [
+                wireguard-tools
+                iproute2
+              ];
+              text = ''
+                ip netns exec ${name} wg set ${name}0 private-key <(cat ${privateKeyFile})
+              '';
+            };
+            configDir = pkgs.writeTextFile {
+              name = "config-${name}";
+              executable = false;
+              destination = "/${name}.conf";
+              text = ''
+                [Interface]
+                Address = 10.2.0.2/32
+                DNS = 10.2.0.1
+
+                [Peer]
+                PublicKey = D8Sqlj3TYwwnTkycV08HAlxcXXS3Ura4oamz8rB5ImM=
+                AllowedIPs = 0.0.0.0/0, ::/0
+                Endpoint = 103.69.224.4:51820
+              '';
+            };
+            configFile = configDir + "/${name}.conf";
+          in {
+            enable = true;
+            inherit name configFile;
+            accessibleFrom = ["192.168.2.0/24"];
+            postUp = postUp + "/bin/${name}-postup";
+          };
+        };
       };
 
       hardware = {
