@@ -4,6 +4,7 @@
   ...
 }: let
   inherit (lib.meta) getExe;
+  inherit (lib.generators) mkLuaInline;
 in {
   programs.nixvim = {
     lsp.servers.tinymist = {
@@ -17,7 +18,35 @@ in {
         ];
         root_markers = [
           ".git"
+          "main.typ"
         ];
+        settings = {
+          exportPdf = "onType";
+          semanticTokens = "disable";
+          formatterMode = "typstyle";
+          formatterProseWrap = true;
+          formatterPrintWidth = 80;
+          formatterIndentSize = 4;
+        };
+        on_attach = mkLuaInline ''
+          function(client, bufnr)
+            vim.keymap.set("n", "<leader>tp", function()
+              client:exec_cmd({
+                title = "pin",
+                command = "tinymist.pinMain",
+                arguments = { vim.api.nvim_buf_get_name(0) },
+              }, { bufnr = bufnr })
+            end, { desc = "[T]inymist [P]in", noremap = true })
+
+            vim.keymap.set("n", "<leader>tu", function()
+              client:exec_cmd({
+                title = "unpin",
+                command = "tinymist.pinMain",
+                arguments = { vim.v.null },
+              }, { bufnr = bufnr })
+            end, { desc = "[T]inymist [U]npin", noremap = true })
+          end
+        '';
       };
     };
 
@@ -28,7 +57,7 @@ in {
     plugins.conform-nvim.settings = {
       formatters_by_ft.typst = ["typstyle"];
       formatters.typstyle = {
-        command = getExe pkgs.typstyle;
+        command = "${getExe pkgs.typstyle} -- wrap-lines";
       };
     };
 
