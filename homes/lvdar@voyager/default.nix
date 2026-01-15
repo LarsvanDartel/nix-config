@@ -22,6 +22,10 @@
       };
     };
 
+    programs = {
+      zotero.enable = true;
+    };
+
     system.impermanence = {
       persist = {
         directories = [
