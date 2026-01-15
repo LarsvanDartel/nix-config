@@ -1,6 +1,7 @@
 {
   config,
   lib,
+  pkgs,
   ...
 }: let
   inherit (lib.options) mkEnableOption;
@@ -18,7 +19,10 @@ in {
 
     networking = {
       firewall.enable = true;
-      networkmanager.enable = true;
+      networkmanager = {
+        enable = true;
+        plugins = [pkgs.networkmanager-openvpn];
+      };
       nameservers = ["9.9.9.9"];
     };
   };
