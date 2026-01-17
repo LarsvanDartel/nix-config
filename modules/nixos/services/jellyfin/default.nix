@@ -27,18 +27,16 @@ in {
 
     cosmos.system.impermanence.persist.directories = ["/var/lib/jellyfin"];
 
-    cosmos.user.extraGroups = ["media"];
-
     users.users = {
-      media = {
+      jellyfin = {
         isSystemUser = true;
-        group = "media";
+        group = "jellyfin";
         extraGroups = ["video" "render"];
       };
     };
 
     users.groups = {
-      media = {};
+      jellyfin = {};
     };
 
     services = {
@@ -46,8 +44,8 @@ in {
         enable = true;
         serverId = "67f0071ab42a4aeabc0c7175b9ba3191";
 
-        user = "media";
-        group = "media";
+        user = "jellyfin";
+        group = "jellyfin";
 
         encoding = {
           enableVppTonemapping = true;
@@ -72,7 +70,7 @@ in {
           Movies = {
             enabled = true;
             contentType = "movies";
-            pathInfos = ["/tank/media/Movies"];
+            pathInfos = ["/tank/media/movies"];
             typeOptions.Movies = {
               metadataFetchers = [
                 "The Open Movie Database"
@@ -87,17 +85,17 @@ in {
           Shows = {
             enabled = true;
             contentType = "tvshows";
-            pathInfos = ["/tank/media/Shows"];
+            pathInfos = ["/tank/media/shows"];
           };
           Books = {
             enabled = true;
             contentType = "books";
-            pathInfos = ["/tank/media/Books"];
+            pathInfos = ["/tank/media/books"];
           };
           Music = {
             enabled = true;
             contentType = "music";
-            pathInfos = ["/tank/media/Music"];
+            pathInfos = ["/tank/media/music"];
           };
         };
 
