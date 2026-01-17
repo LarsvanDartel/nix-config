@@ -119,6 +119,7 @@
 
           prowlarr.enable = true;
           radarr.enable = true;
+          sonarr.enable = true;
 
           vpn = let
             name = "arr";
