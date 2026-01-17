@@ -128,9 +128,9 @@ in {
     };
 
     systemd.tmpfiles.rules = [
-      "d '${cfg.stateDir}'                             0750 ${cfg.user} media - -"
-      "d '${cfg.stateDir}/.config'                     0750 ${cfg.user} media - -"
-      "d '${cfg.stateDir}/.config/transmission-daemon' 0750 ${cfg.user} media - -"
+      "d '${cfg.stateDir}'                             0750 ${cfg.user} root - -"
+      "d '${cfg.stateDir}/.config'                     0750 ${cfg.user} root - -"
+      "d '${cfg.stateDir}/.config/transmission-daemon' 0750 ${cfg.user} root - -"
 
       # Media Dirs
       "d '${cfg.downloadDir}'             0755 ${cfg.user} media - -"

@@ -104,13 +104,22 @@
         jellyfin.enable = true;
         arr = {
           enable = true;
-          stateDir = "/var/lib/arr";
+          stateDir = "/persist/var/lib/arr";
           mediaDir = "/tank/media";
 
           transmission = {
             enable = true;
             vpn.enable = true;
           };
+
+          sabnzbd = {
+            enable = true;
+            vpn.enable = true;
+          };
+
+          prowlarr.enable = true;
+          radarr.enable = true;
+
           vpn = let
             name = "arr";
             privateKeyFile = config.sops.secrets."keys/proton/private-key".path;
