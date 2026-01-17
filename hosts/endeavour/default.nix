@@ -120,6 +120,8 @@
           prowlarr.enable = true;
           radarr.enable = true;
           sonarr.enable = true;
+          lidarr.enable = true;
+
           jellyseerr = {
             enable = true;
             expose = true;
