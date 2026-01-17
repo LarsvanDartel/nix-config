@@ -120,6 +120,10 @@
           prowlarr.enable = true;
           radarr.enable = true;
           sonarr.enable = true;
+          jellyseerr = {
+            enable = true;
+            expose = true;
+          };
 
           vpn = let
             name = "arr";
