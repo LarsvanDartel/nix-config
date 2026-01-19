@@ -5,9 +5,10 @@
   ...
 }: let
   inherit (lib.options) mkEnableOption mkOption mkPackageOption;
-  inherit (lib.types) str path bool port listOf;
+  inherit (lib.types) str path bool port listOf attrs;
   inherit (lib.modules) mkIf;
-  inherit (lib.strings) optionalString concatStringsSep;
+  inherit (lib.strings) optionalString concatStringsSep removePrefix;
+  inherit (lib.lists) imap0;
 
   cfg-arr = config.cosmos.services.arr;
   cfg = cfg-arr.sabnzbd;
@@ -54,6 +55,16 @@ in {
       type = bool;
       default = false;
     };
+
+    secretFiles = mkOption {
+      type = listOf path;
+      default = [];
+    };
+
+    extraSettings = mkOption {
+      type = attrs;
+      default = {};
+    };
   };
 
   config = let
@@ -80,11 +91,6 @@ in {
         }
       ];
 
-      users.users.${cfg.user} = {
-        isSystemUser = true;
-        group = "media";
-      };
-
       systemd.tmpfiles.rules = [
         "d '${cfg.stateDir}' 0700 ${cfg.user} root - -"
 
@@ -101,25 +107,47 @@ in {
 
       services.sabnzbd = {
         enable = true;
-        inherit (cfg) package user;
+        inherit (cfg) package user secretFiles;
+        allowConfigWrite = false;
         group = "media";
-        settings = {
-          misc = {
-            host =
-              if cfg.openFirewall
-              then "0.0.0.0"
-              else if cfg.vpn.enable
-              then "192.168.15.1"
-              else "127.0.0.1";
-            port = cfg.uiPort;
-            download_dir = "${cfg-arr.mediaDir}/usenet/.incomplete";
-            complete_dir = "${cfg-arr.mediaDir}/usenet/manual";
-            dirscan_dir = "${cfg-arr.mediaDir}/usenet/watch";
-            host_whitelist = concatStringsCommaIfExists cfg.whitelistHostnames;
-            local_ranges = concatStringsCommaIfExists cfg.whitelistRanges;
-            permissions = "775";
-          };
-        };
+        stateDir = removePrefix "/var/lib/" cfg.stateDir;
+        settings =
+          {
+            misc = {
+              host =
+                if cfg.openFirewall
+                then "0.0.0.0"
+                else if cfg.vpn.enable
+                then "192.168.15.1"
+                else "127.0.0.1";
+              port = cfg.uiPort;
+              download_dir = "${cfg-arr.mediaDir}/usenet/.incomplete";
+              complete_dir = "${cfg-arr.mediaDir}/usenet/manual";
+              dirscan_dir = "${cfg-arr.mediaDir}/usenet/watch";
+              host_whitelist = concatStringsCommaIfExists cfg.whitelistHostnames;
+              local_ranges = concatStringsCommaIfExists cfg.whitelistRanges;
+              permissions = "775";
+            };
+            categories =
+              {
+                "*" = {
+                  name = "*";
+                  order = 0;
+                  dir = "";
+                  priority = 0;
+                };
+              }
+              // builtins.listToAttrs (imap0 (index: name: {
+                inherit name;
+                value = {
+                  inherit name;
+                  order = index + 1;
+                  dir = "/tank/media/usenet/${name}";
+                  priority = -100;
+                };
+              }) ["radarr" "sonarr" "lidarr"]);
+          }
+          // cfg.extraSettings;
       };
 
       networking.firewall.allowedTCPPorts = mkIf cfg.openFirewall [cfg.uiPort];
