@@ -76,6 +76,7 @@
 
     sops.secrets = {
       "keys/proton/private-key" = {};
+      "keys/eweka" = {owner = config.cosmos.services.arr.sabnzbd.user;};
     };
 
     cosmos = {
@@ -83,6 +84,7 @@
         impermanence = {
           enable = true;
           device = "/dev/disk/by-label/nixos";
+          persist.directories = ["/var/lib/arr"];
         };
       };
 
@@ -91,20 +93,12 @@
       };
 
       services = {
-        proton-vpn = {
-          enable = false;
-          interface.privateKeyFile = config.sops.secrets."keys/proton/private-key".path;
-          endpoint = {
-            publicKey = "D8Sqlj3TYwwnTkycV08HAlxcXXS3Ura4oamz8rB5ImM=";
-            ip = "103.69.224.4";
-          };
-        };
         nginx.enable = true;
         kanidm.enable = true;
         jellyfin.enable = true;
         arr = {
           enable = true;
-          stateDir = "/persist/var/lib/arr";
+          stateDir = "/var/lib/arr";
           mediaDir = "/tank/media";
 
           transmission = {
@@ -115,6 +109,14 @@
           sabnzbd = {
             enable = true;
             vpn.enable = true;
+            secretFiles = [config.sops.secrets."keys/eweka".path];
+            extraSettings.servers = {
+              eweka = {
+                displayname = "Eweka";
+                name = "Eweka News Server";
+                host = "news.eweka.nl";
+              };
+            };
           };
 
           prowlarr.enable = true;

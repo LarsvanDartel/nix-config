@@ -37,7 +37,7 @@ in {
         origin = "https://auth.lvdar.nl";
         tls_chain = "/var/lib/acme/lvdar.nl/fullchain.pem";
         tls_key = "/var/lib/acme/lvdar.nl/key.pem";
-        trust_x_forward_for = true;
+        http_client_address_info.x-forward-for = ["127.0.0.1"];
       };
 
       provision = {
