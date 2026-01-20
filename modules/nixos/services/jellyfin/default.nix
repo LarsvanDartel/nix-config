@@ -185,9 +185,11 @@ in {
       kanidm.provision = {
         groups = {
           jellyfin-users = {
+            overwriteMembers = false;
             members = ["lvdar"];
           };
           jellyfin-movies = {
+            overwriteMembers = false;
             members = ["lvdar"];
           };
           jellyfin-admin = {
