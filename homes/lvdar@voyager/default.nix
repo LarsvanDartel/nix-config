@@ -4,6 +4,10 @@
       desktop.enable = true;
     };
 
+    cli.programs = {
+      simplelogin.enable = true;
+    };
+
     desktops.hyprland = {
       enable = true;
       animations.enable = false;
