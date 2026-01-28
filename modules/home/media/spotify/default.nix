@@ -6,6 +6,7 @@
 }: let
   inherit (lib.options) mkEnableOption;
   inherit (lib.modules) mkIf;
+  inherit (lib.meta) getExe;
 
   cfg = config.cosmos.media.spotify;
 in {
@@ -24,7 +25,7 @@ in {
     };
 
     xdg.desktopEntries.spotify-player = {
-      exec = "${pkgs.spotify-player}/bin/spotify_player";
+      exec = getExe pkgs.spotify-player;
       name = "Spotify Player";
       terminal = true;
       type = "Application";
