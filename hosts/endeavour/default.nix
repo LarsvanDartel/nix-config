@@ -128,6 +128,7 @@
 
           jellyseerr = {
             enable = true;
+            port = 4055;
             expose = true;
           };
 
@@ -166,6 +167,13 @@
             accessibleFrom = ["192.168.2.0/24"];
             postUp = postUp + "/bin/${name}-postup";
           };
+        };
+
+        traccar = {
+          enable = true;
+          protocols = ["osmand"];
+          openFirewall = true;
+          expose = true;
         };
       };
 
