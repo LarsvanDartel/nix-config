@@ -59,6 +59,7 @@ in {
           "devtools.chrome.enabled" = true;
           "devtools.debugger.remote-enabled" = true;
           "toolkit.legacyUserProfileCustomizations.stylesheets" = true;
+          "network.trr.mode" = 5;
         };
 
         search.force = true;

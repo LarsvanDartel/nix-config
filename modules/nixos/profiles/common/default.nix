@@ -14,9 +14,7 @@ in {
 
   config = mkIf cfg.enable {
     cosmos = {
-      hardware = {
-        networking.enable = true;
-      };
+      networking.enable = true;
 
       services = {
         ssh.enable = true;

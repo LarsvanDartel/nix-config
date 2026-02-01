@@ -94,6 +94,10 @@
 
       services = {
         nginx.enable = true;
+        unbound = {
+          enable = true;
+          blocklists = ["https://big.oisd.nl/unbound" "https://nsfw.oisd.nl/unbound"];
+        };
         kanidm.enable = true;
         jellyfin.enable = true;
         arr = {
