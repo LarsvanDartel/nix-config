@@ -20,6 +20,8 @@ in {
         };
       };
 
+      networking.networkmanager.enable = true;
+
       hardware = {
         audio.enable = true;
         bluetoothctl.enable = true;

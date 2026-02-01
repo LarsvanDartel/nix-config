@@ -43,6 +43,10 @@
         boot.detect-windows = true;
       };
 
+      networking = {
+        dnscrypt.enable = true;
+      };
+
       hardware.fingerprint.enable = true;
 
       cli.programs.nh = {
