@@ -27,7 +27,10 @@
     };
 
     programs = {
-      zathura.enable = true;
+      zathura = {
+        enable = true;
+        defaultApplication = true;
+      };
       zotero.enable = true;
     };
 
