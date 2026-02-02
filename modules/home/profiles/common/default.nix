@@ -37,7 +37,10 @@ in {
           lazygit.enable = true;
           ripgrep.enable = true;
           xh.enable = true;
-          yazi.enable = true;
+          yazi = {
+            enable = true;
+            defaultApplication = true;
+          };
           zoxide.enable = true;
         };
       };
