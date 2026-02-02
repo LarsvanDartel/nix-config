@@ -13,6 +13,8 @@ in {
   };
 
   config = mkIf cfg.enable {
+    cosmos.system.impermanence.persist.directories = ["/var/lib/acme"];
+
     sops.secrets."keys/cloudflare/dns" = {};
     security.acme = {
       acceptTerms = true;
