@@ -70,7 +70,7 @@ in {
           Movies = {
             enabled = true;
             contentType = "movies";
-            pathInfos = ["/tank/media/movies"];
+            pathInfos = ["/tank/media/library/movies"];
             typeOptions.Movies = {
               metadataFetchers = [
                 "The Open Movie Database"
@@ -85,17 +85,7 @@ in {
           Shows = {
             enabled = true;
             contentType = "tvshows";
-            pathInfos = ["/tank/media/shows"];
-          };
-          Books = {
-            enabled = true;
-            contentType = "books";
-            pathInfos = ["/tank/media/books"];
-          };
-          Music = {
-            enabled = true;
-            contentType = "music";
-            pathInfos = ["/tank/media/music"];
+            pathInfos = ["/tank/media/library/shows"];
           };
         };
 
