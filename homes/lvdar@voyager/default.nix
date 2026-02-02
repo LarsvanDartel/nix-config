@@ -6,6 +6,14 @@
 
     cli.programs = {
       simplelogin.enable = true;
+      nvim = {
+        languages = {
+          rust.enable = true;
+          clang.enable = true;
+          typst.enable = true;
+          python.enable = true;
+        };
+      };
     };
 
     desktops.hyprland = {
