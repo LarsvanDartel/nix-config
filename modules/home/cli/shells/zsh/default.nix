@@ -5,7 +5,7 @@
 }: let
   inherit (lib.types) str lines attrsOf;
   inherit (lib.options) mkEnableOption mkOption;
-  inherit (lib.modules) mkIf;
+  inherit (lib.modules) mkIf mkMerge mkAfter;
   inherit (lib.strings) optionalString;
   inherit (config.cosmos.user) home;
 
@@ -54,7 +54,12 @@ in {
       };
 
       shellAliases = cfg.aliases;
-      inherit (cfg) initContent;
+      initContent = mkMerge [
+        cfg.initContent
+        (mkAfter ''
+          setopt dotglob
+        '')
+      ];
     };
   };
 }
