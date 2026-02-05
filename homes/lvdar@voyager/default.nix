@@ -12,6 +12,7 @@
           clang.enable = true;
           typst.enable = true;
           python.enable = true;
+          rocq.enable = true;
         };
       };
     };
