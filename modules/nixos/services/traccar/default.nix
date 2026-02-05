@@ -78,11 +78,24 @@
       url = "jdbc:h2:${stateDirectory}/traccar";
       user = "sa";
     };
-    logger.console = "true";
+    logger = {
+      console = "true";
+      level = "all";
+    };
     web = {
       port = toString cfg.port;
       url = "https://traccar.lvdar.nl";
       override = "${stateDirectory}/override";
+      showUnknownDevices = "true";
+    };
+    notificator.types = "traccar,web,mail,command";
+    mail.smtp = {
+      host = "smtp.protonmail.ch";
+      port = "587";
+      starttls.enable = "true";
+      from = "traccar@lvdar.nl";
+      auth = "true";
+      username = "traccar@lvdar.nl";
     };
     openid = {
       force = "true";
@@ -96,6 +109,8 @@
 
   secrets = {
     openid.clientSecret = config.sops.secrets."keys/traccar/oauth-client-secret".path;
+    notificator.traccar.key = config.sops.secrets."keys/traccar/notifications-key".path;
+    mail.smtp.password = config.sops.secrets."keys/traccar/smtp-token".path;
   };
 in {
   options.cosmos.services.traccar = {
@@ -125,6 +140,8 @@ in {
   };
 
   config = mkIf cfg.enable {
+    cosmos.system.impermanence.persist.directories = [stateDirectory];
+
     users.users.traccar = {
       isSystemUser = true;
       group = "traccar";
@@ -139,6 +156,8 @@ in {
         group = "traccar";
         mode = "0640";
       };
+      "keys/traccar/notifications-key".owner = "traccar";
+      "keys/traccar/smtp-token".owner = "traccar";
     };
 
     networking.firewall = mkIf cfg.openFirewall {
@@ -212,7 +231,7 @@ in {
             displayName = "Traccar";
             basicSecretFile = config.sops.secrets."keys/traccar/oauth-client-secret".path;
             allowInsecureClientDisablePkce = true;
-            originUrl = "https://traccar.lvdar.nl/api/session/openid/callback";
+            originUrl = ["https://traccar.lvdar.nl/api/session/openid/callback" "org.traccar.manager://api/session/openid/callback"];
             originLanding = "https://traccar.lvdar.nl";
             scopeMaps = {
               traccar-users = ["openid" "profile" "email" "traccar_groups"];
