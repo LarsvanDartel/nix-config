@@ -1,9 +1,13 @@
 {
   inputs,
   config,
+  lib,
   pkgs,
   ...
-}: {
+}: let
+  inherit (lib.strings) splitString concatStringsSep;
+  inherit (lib.lists) filter uniqueStrings;
+in {
   imports = [
     # Hardware
     ./hardware-configuration.nix
@@ -96,7 +100,13 @@
         nginx.enable = true;
         unbound = {
           enable = true;
-          blocklists = ["https://big.oisd.nl/unbound" "https://nsfw.oisd.nl/unbound"];
+          blocklist = let
+            lines = str: filter (x: x != "") (splitString "\n" str);
+            bigLines = lines (builtins.readFile inputs.oisd-big-unbound);
+            nsfwLines = lines (builtins.readFile inputs.oisd-nsfw-unbound);
+            merged = concatStringsSep "\n" (uniqueStrings bigLines ++ nsfwLines);
+            file = pkgs.writeText "unbound-blocklist" merged;
+          in "${file}";
         };
         kanidm.enable = true;
         jellyfin.enable = true;

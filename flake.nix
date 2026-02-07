@@ -133,6 +133,15 @@
 
     vpn-confinement.url = "github:Maroka-chan/VPN-Confinement";
 
+    oisd-big-unbound = {
+      url = "https://big.oisd.nl/unbound";
+      flake = false;
+    };
+    oisd-nsfw-unbound = {
+      url = "https://nsfw.oisd.nl/unbound";
+      flake = false;
+    };
+
     # Minecraft
 
     modpack-create = {
