@@ -1,15 +1,12 @@
 {
   config,
   lib,
-  pkgs,
   ...
 }: let
   inherit (lib.options) mkEnableOption mkOption;
   inherit (lib.modules) mkIf mkMerge mkDefault;
-  inherit (lib.types) port listOf str;
+  inherit (lib.types) port str nullOr;
   inherit (lib.lists) optional;
-  inherit (lib.meta) getExe getExe';
-  inherit (lib.strings) concatMapStringsSep;
 
   cfg = config.cosmos.services.unbound;
 in {
@@ -20,10 +17,10 @@ in {
       default = 53;
       description = "Port for Unbound DNS service";
     };
-    blocklists = mkOption {
-      type = listOf str;
-      default = [];
-      description = "List of blocklist URLs to use for DNS blocking";
+    blocklist = mkOption {
+      type = nullOr str;
+      default = null;
+      description = "File to use for DNS blocking";
     };
     dns64 = {
       enable = mkEnableOption "dns64";
@@ -66,7 +63,7 @@ in {
               "fe80::/10"
             ];
 
-            include = optional (cfg.blocklists != []) "/var/lib/unbound/blocklists/blocked-domains.conf";
+            include = optional (cfg.blocklist != null) cfg.blocklist;
 
             harden-glue = true;
             harden-dnssec-stripped = true;
@@ -101,55 +98,6 @@ in {
     networking.firewall = {
       allowedUDPPorts = [cfg.port];
       allowedTCPPorts = [cfg.port];
-    };
-
-    # Blocklist configuration
-    systemd.services.unbound-blocklist = mkIf (cfg.blocklists != []) {
-      description = "Download and update DNS blocklists";
-      wantedBy = ["multi-user.target"];
-      requires = ["unbound.service"];
-      serviceConfig.Type = "oneshot";
-      script = ''
-        set -euo pipefail
-
-        BLOCKLIST_DIR="/var/lib/unbound/blocklists"
-        OUTPUT_FILE="$BLOCKLIST_DIR/blocked-domains.conf"
-        TEMP_FILE="$BLOCKLIST_DIR/blocked-domains-temp.conf"
-
-        mkdir -p "$BLOCKLIST_DIR"
-        touch "$OUTPUT_FILE"
-
-        process_blocklist() {
-          url="$1"
-          echo "Processing blocklist: $url"
-
-          ${getExe pkgs.curlMinimal} -s -L "$url" >> "$TEMP_FILE"
-          echo "" >> "$TEMP_FILE"
-        }
-
-        : > "$TEMP_FILE"
-        ${concatMapStringsSep "\n" (x: "process_blocklist ${x}") cfg.blocklists}
-
-        ${getExe pkgs.gawk} '!x[$0]++' "$TEMP_FILE" > "$OUTPUT_FILE"
-        echo "Blocklist updated successfully"
-
-        if systemctl is-active --quiet unbound.service; then
-          echo "Reloading unbound to apply new blocklist"
-          ${getExe' pkgs.unbound "unbound-control"} reload
-        else
-          echo "Unbound is not running, skipping reload"
-        fi
-      '';
-    };
-
-    systemd.timers.unbound-blocklist = mkIf (cfg.blocklists != []) {
-      description = "Update DNS blocklists daily";
-      wantedBy = ["timers.target"];
-      timerConfig = {
-        OnCalendar = "daily";
-        AccuracySec = "1h";
-        Persistent = true;
-      };
     };
   };
 }
