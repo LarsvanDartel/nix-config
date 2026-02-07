@@ -108,6 +108,7 @@ in {
       services.sabnzbd = {
         enable = true;
         inherit (cfg) package user secretFiles;
+        configFile = null;
         allowConfigWrite = false;
         group = "media";
         stateDir = removePrefix "/var/lib/" cfg.stateDir;
