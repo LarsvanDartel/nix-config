@@ -48,9 +48,6 @@
       install -d -m 750 -o traccar -g traccar "${stateDirectory}"
       install -m 600 -o traccar -g traccar "${mkConfig (addSecretPlaceholders settings secrets)}" "${configFilePath}"
 
-      # Create the environment file with placeholders
-      cp ${mkConfig (addSecretPlaceholders settings secrets)} ${configFilePath}
-
       # Replace each placeholder with the actual secret
       ${concatStringsSep "\n" (mapAttrsToListRecursive (path: value: ''
           ${pkgs.replace-secret}/bin/replace-secret \
