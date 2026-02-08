@@ -25,6 +25,10 @@
       profiles = {
         server.enable = true;
       };
+
+      services = {
+        pangolin.enable = true;
+      };
     };
 
     system.stateVersion = "24.11";
