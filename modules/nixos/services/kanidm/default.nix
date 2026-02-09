@@ -46,13 +46,15 @@ in {
 
     services.kanidm = {
       package = pkgs.kanidmWithSecretProvisioning_1_8;
-      enableServer = true;
-      serverSettings = {
-        domain = "lvdar.nl";
-        origin = "https://auth.lvdar.nl";
-        tls_chain = "/var/lib/acme/lvdar.nl/fullchain.pem";
-        tls_key = "/var/lib/acme/lvdar.nl/key.pem";
-        http_client_address_info.x-forward-for = ["127.0.0.1"];
+      server = {
+        enable = true;
+        settings = {
+          domain = "lvdar.nl";
+          origin = "https://auth.lvdar.nl";
+          tls_chain = "/var/lib/acme/lvdar.nl/fullchain.pem";
+          tls_key = "/var/lib/acme/lvdar.nl/key.pem";
+          http_client_address_info.x-forward-for = ["127.0.0.1"];
+        };
       };
 
       provision = {
