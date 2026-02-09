@@ -32,8 +32,12 @@ in {
   };
 
   config = mkIf cfg.enable {
-    cosmos.system.impermanence.persist.directories = [
-      "/var/lib/unbound"
+    cosmos.system.impermanence.persist.directories = with config.services.unbound; [
+      {
+        directory = stateDir;
+        inherit user group;
+        mode = "0750";
+      }
     ];
     cosmos.networking = {
       dnscrypt.port = mkDefault 51;

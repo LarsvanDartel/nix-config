@@ -49,7 +49,14 @@ in {
   };
 
   config = mkIf cfg.enable {
-    cosmos.system.impermanence.persist.directories = [config.services.pangolin.dataDir];
+    cosmos.system.impermanence.persist.directories = [
+      {
+        directory = config.services.pangolin.dataDir;
+        user = "pangolin";
+        group = "fossorial";
+        mode = "0770";
+      }
+    ];
 
     sops.secrets = {
       "keys/pangolin/server_secret" = {};
