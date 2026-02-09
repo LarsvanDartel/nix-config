@@ -4,13 +4,18 @@
   pkgs,
   ...
 }: let
-  inherit (lib.options) mkEnableOption;
+  inherit (lib.options) mkEnableOption mkOption;
+  inherit (lib.types) bool;
   inherit (lib.modules) mkIf;
 
   cfg = config.cosmos.services.kanidm;
 in {
   options.cosmos.services.kanidm = {
     enable = mkEnableOption "kanidm";
+    expose = mkOption {
+      type = bool;
+      default = false;
+    };
   };
 
   config = mkIf cfg.enable {
@@ -28,6 +33,9 @@ in {
         owner = "kanidm";
       };
       "keys/kanidm/idm-admin-password" = {
+        owner = "kanidm";
+      };
+      "keys/pangolin/oauth-client-secret" = {
         owner = "kanidm";
       };
     };
@@ -63,11 +71,38 @@ in {
           users = {
             members = ["lvdar"];
           };
+          pangolin-users = {
+            overwriteMembers = false;
+            members = ["lvdar"];
+          };
+          pangolin-admin = {
+            members = ["lvdar"];
+          };
+        };
+        systems.oauth2 = {
+          pangolin = {
+            displayName = "Pangolin";
+            basicSecretFile = config.sops.secrets."keys/pangolin/oauth-client-secret".path;
+            originUrl = "https://pangolin.lvdar.nl/auth/idp/1/oidc/callback";
+            originLanding = "https://pangolin.lvdar.nl";
+            scopeMaps = {
+              pangolin-users = ["openid" "profile" "email"];
+            };
+            claimMaps = {
+              groups = {
+                joinType = "array";
+                valuesByGroup = {
+                  pangolin-users = ["cosmos"];
+                  pangolin-admin = ["admin"];
+                };
+              };
+            };
+          };
         };
       };
     };
 
-    services.nginx.virtualHosts = {
+    services.nginx.virtualHosts = mkIf cfg.expose {
       "auth.lvdar.nl" = {
         forceSSL = true;
         enableACME = false;
