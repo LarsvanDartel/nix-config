@@ -93,6 +93,11 @@ in {
           domains.domain1 = {
             prefer_wildcard_cert = true;
           };
+          flags = {
+            disable_signup_without_invite = true;
+            disable_user_create_org = true;
+            disable_product_help_banners = true;
+          };
         };
       };
 
