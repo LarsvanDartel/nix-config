@@ -58,6 +58,10 @@ in {
       }
     ];
 
+    systemd.tmpfiles.rules = [
+      "d /var/log/traefik 0750 traefik fossorial - -"
+    ];
+
     sops.secrets = {
       "keys/pangolin/server_secret" = {};
       "keys/cloudflare/dns" = {};
@@ -81,7 +85,15 @@ in {
       };
     };
 
-    services.traefik.environmentFiles = [traefikEnv];
+    services.traefik = {
+      staticConfigOptions = {
+        accessLog = {
+          filePath = "/var/log/traefik/access.log";
+          bufferingSize = 100;
+        };
+      };
+      environmentFiles = [traefikEnv];
+    };
 
     systemd.services.pangolin-env = {
       description = "Generate Pangolin environment file";
