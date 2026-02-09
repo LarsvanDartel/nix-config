@@ -13,7 +13,14 @@ in {
   };
 
   config = mkIf cfg.enable {
-    cosmos.system.impermanence.persist.directories = ["/var/lib/acme"];
+    cosmos.system.impermanence.persist.directories = [
+      {
+        directory = "/var/lib/acme";
+        user = "acme";
+        group = "acme";
+        mode = "0750";
+      }
+    ];
 
     sops.secrets."keys/cloudflare/dns" = {};
     security.acme = {

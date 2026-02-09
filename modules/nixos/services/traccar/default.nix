@@ -137,7 +137,14 @@ in {
   };
 
   config = mkIf cfg.enable {
-    cosmos.system.impermanence.persist.directories = [stateDirectory];
+    cosmos.system.impermanence.persist.directories = [
+      {
+        directory = stateDirectory;
+        user = "traccar";
+        group = "traccar";
+        mode = "0750";
+      }
+    ];
 
     users.users.traccar = {
       isSystemUser = true;

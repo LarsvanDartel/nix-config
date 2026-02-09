@@ -3,7 +3,7 @@
   lib,
   ...
 }: let
-  inherit (lib.types) listOf str;
+  inherit (lib.types) listOf str coercedTo attrsOf;
   inherit (lib.options) mkEnableOption mkOption;
   inherit (lib.modules) mkIf;
 
@@ -14,14 +14,29 @@ in {
 
     persist = {
       files = mkOption {
-        type = listOf str;
+        type = listOf (coercedTo str (f: {file = f;}) (attrsOf str));
         default = [];
-        description = "List of files to persist";
+        example = [
+          "/etc/machine-id"
+          "/etc/nix/id_rsa"
+        ];
+        description = ''
+          Files that should be stored in persistent storage.
+        '';
       };
       directories = mkOption {
-        type = listOf str;
+        type = listOf (coercedTo str (d: {directory = d;}) (attrsOf str));
         default = [];
-        description = "List of directories to persist";
+        example = [
+          "/var/log"
+          "/var/lib/bluetooth"
+          "/var/lib/nixos"
+          "/var/lib/systemd/coredump"
+          "/etc/NetworkManager/system-connections"
+        ];
+        description = ''
+          Directories to bind mount to persistent storage.
+        '';
       };
     };
   };

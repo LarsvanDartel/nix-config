@@ -88,7 +88,14 @@ in {
         impermanence = {
           enable = true;
           device = "/dev/disk/by-label/nixos";
-          persist.directories = ["/var/lib/arr"];
+          persist.directories = [
+            {
+              directory = "/var/lib/arr";
+              user = "root";
+              group = "media";
+              mode = "0770";
+            }
+          ];
         };
       };
 

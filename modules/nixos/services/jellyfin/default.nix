@@ -25,7 +25,14 @@ in {
       };
     };
 
-    cosmos.system.impermanence.persist.directories = ["/var/lib/jellyfin"];
+    cosmos.system.impermanence.persist.directories = [
+      {
+        directory = "/var/lib/jellyfin";
+        user = "jellyfin";
+        group = "jellyfin";
+        mode = "0750";
+      }
+    ];
 
     users.users = {
       jellyfin = {

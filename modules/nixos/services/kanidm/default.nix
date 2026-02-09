@@ -14,7 +14,14 @@ in {
   };
 
   config = mkIf cfg.enable {
-    cosmos.system.impermanence.persist.directories = ["/var/lib/kanidm"];
+    cosmos.system.impermanence.persist.directories = [
+      {
+        directory = "/var/lib/kanidm";
+        user = "kanidm";
+        group = "kadidm";
+        mode = "0750";
+      }
+    ];
 
     sops.secrets = {
       "keys/kanidm/admin-password" = {
