@@ -9,6 +9,14 @@
   inherit (lib.lists) optional;
   inherit (lib.meta) getExe getExe';
 
+  writeYamlFile = (pkgs.formats.yaml {}).generate;
+  etcDefaults = {
+    enable = true;
+    user = "crowdsec";
+    group = "crowdsec";
+    mode = "0770";
+  };
+
   cfg = config.cosmos.services.crowdsec;
 in {
   options.cosmos.services.crowdsec = {
@@ -56,8 +64,15 @@ in {
         ++ (optional config.services.openssh.enable "crowdsecurity/sshd")
         ++ (optional config.services.traefik.enable "crowdsecurity/traefik");
 
-      hub.parsers = [];
-      hub.postOverflows = [];
+      hub.parsers = [
+        "crowdsecurity/whitelists"
+        "crowdsecurity/jellyfin-whitelist"
+        "crowdsecurity/jellyseerr-whitelist"
+      ];
+
+      hub.postOverflows = [
+        "crowdsecurity/auditd-nix-wrappers-whitelist-process"
+      ];
 
       # Where to get logs from
       localConfig.acquisitions =
@@ -168,6 +183,42 @@ in {
     };
 
     users.users.${config.services.crowdsec.user}.extraGroups = ["nginx" "auditd" "fossorial"];
+
+    environment.etc = {
+      "crowdsec/postoverflows/s01-whitelist/myfqdns-whitelist.yaml" =
+        etcDefaults
+        // {
+          source = writeYamlFile "crowdsec-parser-myfqdns-whitelist.yaml" {
+            description = "Whitelist my own IPs";
+            name = "myfqdns/whitelist";
+            whitelist = {
+              expression = [
+                ''evt.Overflow.Alert.Source.IP in LookupHost("lvdar.nl")''
+                ''evt.Overflow.Alert.Source.IP in LookupHost("gradientvera.duckdns.org")''
+              ];
+            };
+          };
+        };
+
+      "crowdsec/parsers/s02-enrich/myips-whitelist.yaml" =
+        etcDefaults
+        // {
+          source = writeYamlFile "crowdsec-parser-myips-whitelist.yaml" {
+            description = "Whitelist my own IPs";
+            name = "myips/whitelist";
+            whitelist = {
+              ip = [
+                "86.86.217.11"
+              ];
+              cidr = [
+                "10.0.0.0/8"
+                "192.168.1.0/24"
+                "2a02:a440:3fcb::/48"
+              ];
+            };
+          };
+        };
+    };
 
     services.crowdsec-firewall-bouncer.enable = true;
 
