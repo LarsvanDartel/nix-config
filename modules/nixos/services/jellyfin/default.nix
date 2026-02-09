@@ -4,7 +4,8 @@
   inputs,
   ...
 }: let
-  inherit (lib.options) mkEnableOption;
+  inherit (lib.options) mkEnableOption mkOption;
+  inherit (lib.types) bool;
   inherit (lib.modules) mkIf;
 
   cfg = config.cosmos.services.jellyfin;
@@ -15,6 +16,10 @@ in {
 
   options.cosmos.services.jellyfin = {
     enable = mkEnableOption "jellyfin";
+    expose = mkOption {
+      type = bool;
+      default = false;
+    };
   };
 
   config = mkIf cfg.enable {
@@ -166,7 +171,7 @@ in {
         # };
       };
 
-      nginx.virtualHosts = {
+      nginx.virtualHosts = mkIf cfg.expose {
         "jellyfin.lvdar.nl" = {
           forceSSL = true;
           enableACME = false;

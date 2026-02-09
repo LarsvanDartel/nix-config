@@ -104,7 +104,8 @@ in {
       };
 
       services = {
-        nginx.enable = true;
+        pangolin.newt.enable = true;
+        nginx.acme.enable = true;
         unbound = {
           enable = true;
           blocklist = let
@@ -150,7 +151,6 @@ in {
           jellyseerr = {
             enable = true;
             port = 4055;
-            expose = true;
           };
 
           vpn = let
@@ -193,8 +193,7 @@ in {
         traccar = {
           enable = true;
           protocols = ["osmand"];
-          openFirewall = true;
-          expose = true;
+          openFirewall = false;
         };
       };
 
