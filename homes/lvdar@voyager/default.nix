@@ -6,6 +6,7 @@
 
     cli.programs = {
       simplelogin.enable = true;
+      pangolin.enable = true;
       nvim = {
         languages = {
           rust.enable = true;
