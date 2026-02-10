@@ -97,9 +97,12 @@ in {
             disable_signup_without_invite = true;
             disable_user_create_org = true;
             disable_product_help_banners = true;
+            allow_raw_resources = true;
           };
         };
       };
+
+      networking.firewall.allowedUDPPorts = [21820];
 
       services.traefik = {
         staticConfigOptions = {
