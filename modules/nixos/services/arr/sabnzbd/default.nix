@@ -8,6 +8,7 @@
   inherit (lib.types) str path bool port listOf attrs;
   inherit (lib.modules) mkIf;
   inherit (lib.strings) optionalString concatStringsSep removePrefix;
+  inherit (lib.attrsets) recursiveUpdate;
   inherit (lib.lists) imap0;
 
   cfg-arr = config.cosmos.services.arr;
@@ -113,6 +114,7 @@ in {
         group = "media";
         stateDir = removePrefix "/var/lib/" cfg.stateDir;
         settings =
+          recursiveUpdate
           {
             misc = {
               host =
@@ -148,7 +150,7 @@ in {
                 };
               }) ["radarr" "sonarr" "lidarr"]);
           }
-          // cfg.extraSettings;
+          cfg.extraSettings;
       };
 
       networking.firewall.allowedTCPPorts = mkIf cfg.openFirewall [cfg.uiPort];
