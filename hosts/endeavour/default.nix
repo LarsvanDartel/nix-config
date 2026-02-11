@@ -105,7 +105,7 @@ in {
 
       services = {
         pangolin.newt.enable = true;
-        nginx.acme.enable = true;
+        nginx.enable = true;
         unbound = {
           enable = true;
           blocklist = let
@@ -118,6 +118,10 @@ in {
         };
         kanidm.enable = true;
         jellyfin.enable = true;
+        immich = {
+          mediaDir = "/tank/media/library/images";
+          enable = true;
+        };
         arr = {
           enable = true;
           stateDir = "/var/lib/arr";
