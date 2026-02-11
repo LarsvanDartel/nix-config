@@ -132,11 +132,14 @@ in {
             enable = true;
             vpn.enable = true;
             secretFiles = [config.sops.secrets."keys/eweka".path];
-            extraSettings.servers = {
-              eweka = {
-                displayname = "Eweka";
-                name = "Eweka News Server";
-                host = "news.eweka.nl";
+            extraSettings = {
+              misc.host_whitelist = "${config.networking.hostName}, sabnzbd.lvdar.nl";
+              servers = {
+                eweka = {
+                  displayname = "Eweka";
+                  name = "Eweka News Server";
+                  host = "news.eweka.nl";
+                };
               };
             };
           };
