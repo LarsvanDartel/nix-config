@@ -38,6 +38,9 @@ in {
       "keys/pangolin/oauth-client-secret" = {
         owner = "kanidm";
       };
+      "keys/immich/oauth-client-secret" = {
+        owner = "kanidm";
+      };
     };
 
     users.users = {
@@ -80,6 +83,13 @@ in {
           pangolin-admin = {
             members = ["lvdar"];
           };
+          immich-users = {
+            overwriteMembers = false;
+            members = ["lvdar"];
+          };
+          immich-admin = {
+            members = ["lvdar"];
+          };
         };
         systems.oauth2 = {
           pangolin = {
@@ -96,6 +106,27 @@ in {
                 valuesByGroup = {
                   pangolin-users = ["cosmos"];
                   pangolin-admin = ["admin"];
+                };
+              };
+            };
+          };
+          immich = {
+            displayName = "Immich";
+            basicSecretFile = config.sops.secrets."keys/immich/oauth-client-secret".path;
+            originUrl = [
+              "app.immich:///oauth-callback"
+              "https://immich.lvdar.nl/auth/login"
+              "https://immich.lvdar.nl/user-settings"
+            ];
+            originLanding = "https://immich.lvdar.nl";
+            scopeMaps = {
+              immich-users = ["openid" "profile" "email"];
+            };
+            claimMaps = {
+              immich_groups = {
+                joinType = "array";
+                valuesByGroup = {
+                  immich-admin = ["admin"];
                 };
               };
             };
