@@ -14,6 +14,7 @@
           typst.enable = true;
           python.enable = true;
           rocq.enable = true;
+          formal.enable = true;
         };
       };
     };
