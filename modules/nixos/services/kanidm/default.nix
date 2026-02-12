@@ -90,6 +90,13 @@ in {
           immich-admin = {
             members = ["lvdar"];
           };
+          opencloud-users = {
+            overwriteMembers = false;
+            members = ["lvdar"];
+          };
+          opencloud-admin = {
+            members = ["lvdar"];
+          };
         };
         systems.oauth2 = {
           pangolin = {
@@ -110,9 +117,30 @@ in {
               };
             };
           };
+          opencloud = {
+            displayName = "Opencloud";
+            public = true;
+            originUrl = [
+              "https://cloud.lvdar.nl/"
+              "https://cloud.lvdar.nl/oidc-callback.html"
+              "https://cloud.lvdar.nl/oidc-silent-redirect.html"
+            ];
+            originLanding = "https://cloud.lvdar.nl";
+            scopeMaps = {
+              opencloud-users = ["openid" "profile" "email" "opencloud_groups"];
+            };
+            claimMaps = {
+              opencloud_groups = {
+                joinType = "array";
+                valuesByGroup = {
+                  opencloud-users = ["user"];
+                  opencloud-admin = ["admin"];
+                };
+              };
+            };
+          };
           immich = {
             displayName = "Immich";
-            basicSecretFile = config.sops.secrets."keys/immich/oauth-client-secret".path;
             originUrl = [
               "app.immich:///oauth-callback"
               "https://immich.lvdar.nl/auth/login"

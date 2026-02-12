@@ -122,6 +122,7 @@ in {
           mediaDir = "/tank/media/library/images";
           enable = true;
         };
+        opencloud.enable = true;
         arr = {
           enable = true;
           stateDir = "/var/lib/arr";
