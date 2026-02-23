@@ -126,6 +126,7 @@ in {
           enable = true;
           # collabora.enable = true;
         };
+        forgejo.enable = false;
         arr = {
           enable = true;
           stateDir = "/var/lib/arr";
