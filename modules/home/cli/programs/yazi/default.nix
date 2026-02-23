@@ -1,7 +1,6 @@
 {
   config,
   lib,
-  pkgs,
   ...
 }: let
   inherit (lib.options) mkEnableOption mkOption;
@@ -19,12 +18,10 @@ in {
   };
 
   config = mkIf cfg.enable {
-    cosmos.cli.shells.zsh.aliases = {
-      "y" = "${pkgs.yazi}/bin/yazi";
-    };
     programs.yazi = {
       enable = true;
       enableZshIntegration = config.cosmos.cli.shells.zsh.enable;
+      shellWrapperName = "y";
     };
     xdg.mimeApps = mkIf cfg.defaultApplication {
       enable = true;
