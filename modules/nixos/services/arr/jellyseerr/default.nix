@@ -9,6 +9,7 @@
   inherit (lib.modules) mkIf mkMerge;
   inherit (lib.meta) getExe;
   inherit (lib.lists) optional;
+  inherit (lib.strings) removePrefix;
 
   cfg-arr = config.cosmos.services.arr;
   cfg = cfg-arr.jellyseerr;
@@ -92,7 +93,7 @@ in {
 
       serviceConfig = {
         Type = "exec";
-        StateDirectory = "jellyseerr";
+        StateDirectory = removePrefix "/var/lib/" cfg.stateDir;
         DynamicUser = false;
         User = cfg.user;
         Group = "jellyseerr";
