@@ -44,6 +44,9 @@ in {
             map
             (key: "~/${ssh-file key}")
             keys;
+          extraOptions = {
+            UpdateHostKeys = "no";
+          };
         };
       };
     };
