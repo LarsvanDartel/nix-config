@@ -36,6 +36,7 @@
 in {
   default = final: prev:
     (additions final prev)
+    // (inputs.nix-matlab.overlay final prev)
     // (modifications final prev)
     // (stable-packages final prev)
     // (unstable-packages final prev);

@@ -142,6 +142,11 @@
       flake = false;
     };
 
+    nix-matlab = {
+      url = "gitlab:doronbehar/nix-matlab";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+
     # Minecraft
 
     modpack-create = {
