@@ -43,7 +43,10 @@ in {
       networking.networkmanager = {
         enable = true;
         plugins = [pkgs.networkmanager-openvpn];
-        dns = "none";
+        dns =
+          if (cfg.nameservers == [] && !cfg.dnscrypt.enable)
+          then "default"
+          else "none";
       };
     })
     (mkIf cfg.dnscrypt.enable {

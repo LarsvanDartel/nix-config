@@ -24,10 +24,10 @@
       animations.enable = false;
     };
 
-    "3d" = {
-      orca-slicer.enable = true;
-      freecad.enable = true;
-    };
+    # "3d" = {
+    #   orca-slicer.enable = true;
+    #   freecad.enable = true;
+    # };
 
     gaming = {
       launchers = {
@@ -56,6 +56,12 @@
           ".config/Code"
         ];
       };
+    };
+  };
+
+  programs.ssh.matchBlocks = {
+    "co25.ics.ele.tue.nl" = {
+      setEnv = {TERM = "xterm-256color";};
     };
   };
 
