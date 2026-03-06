@@ -10,6 +10,7 @@
 
     forAllSystems = nixpkgs.lib.genAttrs [
       "x86_64-linux"
+      "aarch64-linux"
     ];
 
     lib = nixpkgs.lib.extend (_: _: {cosmos = import ./lib {inherit (nixpkgs) lib;};});

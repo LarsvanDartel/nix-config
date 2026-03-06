@@ -48,7 +48,7 @@
         # dnscrypt.enable = true;
       };
 
-      virtualisation.enable = true;
+      # virtualisation.enable = true;
 
       hardware.fingerprint.enable = true;
 
