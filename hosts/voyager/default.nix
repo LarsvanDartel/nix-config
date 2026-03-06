@@ -44,8 +44,11 @@
       };
 
       networking = {
-        dnscrypt.enable = true;
+        nameservers = [];
+        # dnscrypt.enable = true;
       };
+
+      virtualisation.enable = true;
 
       hardware.fingerprint.enable = true;
 
