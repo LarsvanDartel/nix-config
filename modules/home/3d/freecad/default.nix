@@ -16,6 +16,7 @@ in {
   config = mkIf cfg.enable {
     cosmos.system.impermanence.persist.directories = [
       ".local/share/FreeCAD"
+      ".config/FreeCAD"
     ];
 
     home.packages = with pkgs; [freecad];
