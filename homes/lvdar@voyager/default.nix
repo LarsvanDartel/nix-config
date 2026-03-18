@@ -24,10 +24,10 @@
       animations.enable = false;
     };
 
-    # "3d" = {
-    #   orca-slicer.enable = true;
-    #   freecad.enable = true;
-    # };
+    "3d" = {
+      orca-slicer.enable = true;
+      freecad.enable = true;
+    };
 
     gaming = {
       launchers = {
@@ -54,6 +54,7 @@
           "school"
           "Videos"
           ".config/Code"
+          "balatro"
         ];
       };
     };
