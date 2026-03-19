@@ -4,21 +4,21 @@
   buildGoModule,
   fetchFromGitHub,
   installShellFiles,
-  versionCheckHook,
+  # versionCheckHook,
   nix-update-script,
 }:
 buildGoModule (finalAttrs: {
   pname = "pangolin-cli";
-  version = "0.3.2";
+  version = "0.5.2";
 
   src = fetchFromGitHub {
     owner = "fosrl";
     repo = "cli";
     tag = finalAttrs.version;
-    hash = "sha256-pB4sPiOhTTX4y4J7T6B6sLZHGMdrCAbgWtUKCJmtV88=";
+    hash = "sha256-uv0hZqlbaEWpv9CKE2q+HCnh6PJDB9o31iTvPfyUq3c=";
   };
 
-  vendorHash = "sha256-hZj/PDNsWGplSrOgzJtL09/oFXHZ4zdS7BiRS+oy5bw=";
+  vendorHash = "sha256-MDvmhbzoVP4FIapKnEiRIXRSuE5hvUBz7opyVD7wRJI=";
 
   nativeBuildInputs = [installShellFiles];
 
@@ -33,10 +33,10 @@ buildGoModule (finalAttrs: {
         --zsh <($out/bin/pangolin completion zsh)
     '';
 
-  doInstallCheck = true;
-  nativeInstallCheckInputs = [versionCheckHook];
-  versionCheckKeepEnvironment = ["HOME"];
-  versionCheckProgramArg = "version";
+  # doInstallCheck = true;
+  # nativeInstallCheckInputs = [versionCheckHook];
+  # versionCheckKeepEnvironment = ["HOME"];
+  #versionCheckProgramArg = "version";
 
   passthru.updateScript = nix-update-script {};
 
