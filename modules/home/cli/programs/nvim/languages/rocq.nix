@@ -14,6 +14,14 @@ in {
   };
   config = mkIf cfg.enable {
     programs.nixvim = {
+      withPython3 = true;
+
+      extraPackages = with pkgs; [
+        (python3.withPackages (ps:
+          with ps; [
+            pynvim
+          ]))
+      ];
       extraPlugins = [
         (pkgs.vimPlugins.Coqtail.overrideAttrs
           (old: {
