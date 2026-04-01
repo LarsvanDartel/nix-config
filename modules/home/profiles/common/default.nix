@@ -36,6 +36,7 @@ in {
           };
           lazygit.enable = true;
           ripgrep.enable = true;
+          tmux.enable = true;
           xh.enable = true;
           yazi = {
             enable = true;
