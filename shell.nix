@@ -1,7 +1,5 @@
 {
-  pkgs ?
-  # If pkgs is not defined, instantiate nixpkgs from locked commit
-  let
+  pkgs ? let
     lock = (builtins.fromJSON (builtins.readFile ./flake.lock)).nodes.nixpkgs.locked;
     nixpkgs = fetchTarball {
       url = "https://github.com/nixos/nixpkgs/archive/${lock.rev}.tar.gz";
@@ -22,14 +20,9 @@
       inherit
         (pkgs)
         nix
-        home-manager
-        nh
         git
         pre-commit
         deadnix
-        sops
-        age # for bootstrap script
-        ssh-to-age # for bootstrap script
         ;
     };
   };

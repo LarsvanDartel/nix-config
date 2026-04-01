@@ -37,6 +37,7 @@ in {
           kb_options = "caps:escape, grp:win_space_toggle";
 
           touchpad = {
+            disable_while_typing = false;
             natural_scroll = "yes";
             scroll_factor = 0.2;
           };

@@ -113,7 +113,7 @@
     impermanence.url = "github:nix-community/impermanence";
 
     stylix = {
-      url = "github:danth/stylix";
+      url = "github:MrSom3body-contrib/stylix/fix/foot-theme";
       inputs.nixpkgs.follows = "nixpkgs";
     };
 

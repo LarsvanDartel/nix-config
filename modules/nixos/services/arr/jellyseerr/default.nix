@@ -12,21 +12,21 @@
   inherit (lib.strings) removePrefix;
 
   cfg-arr = config.cosmos.services.arr;
-  cfg = cfg-arr.jellyseerr;
+  cfg = cfg-arr.seerr;
 in {
-  options.cosmos.services.arr.jellyseerr = {
-    enable = mkEnableOption "jellyseerr";
-    package = mkPackageOption pkgs "jellyseerr" {};
+  options.cosmos.services.arr.seerr = {
+    enable = mkEnableOption "seerr";
+    package = mkPackageOption pkgs "seerr" {};
 
     stateDir = mkOption {
       type = path;
-      default = "${cfg-arr.stateDir}/jellyseerr";
+      default = "${cfg-arr.stateDir}/seerr";
     };
 
     port = mkOption {
       type = port;
       default = 5055;
-      description = "Jellyseerr web-UI port.";
+      description = "seerr web-UI port.";
     };
 
     openFirewall = mkOption {
@@ -36,9 +36,9 @@ in {
 
     user = mkOption {
       type = str;
-      default = "jellyseerr";
+      default = "seerr";
       description = ''
-        jellyseerr
+        seerr
       '';
     };
 
@@ -50,7 +50,7 @@ in {
     expose = mkOption {
       type = bool;
       default = false;
-      description = "Whether to expose jellyseerr";
+      description = "Whether to expose seerr";
     };
   };
 
@@ -59,21 +59,21 @@ in {
       {
         assertion = cfg.enable -> cfg-arr.enable;
         message = ''
-          jellyseerr requires arr to be enabled
+          seerr requires arr to be enabled
         '';
       }
       {
         assertion = cfg.vpn.enable -> cfg-arr.vpn.enable;
         message = ''
-          The jellyseerr.vpn.enable option requires the
+          The seerr.vpn.enable option requires the
           arr.vpn.enable option to be set, but it was not.
         '';
       }
       {
         assertion = !(cfg.vpn.enable && cfg.expose);
         message = ''
-          The jellyseerr.vpn.enable option conflicts with the
-          jellyseerr.expose option. You cannot set both.
+          The seerr.vpn.enable option conflicts with the
+          seerr.expose option. You cannot set both.
         '';
       }
     ];
@@ -82,8 +82,8 @@ in {
       "d '${cfg.stateDir}' 0700 ${cfg.user} root - -"
     ];
 
-    systemd.services.jellyseerr = {
-      description = "Jellyseerr, a requests manager for Jellyfin";
+    systemd.services.seerr = {
+      description = "seerr, a requests manager for Jellyfin";
       after = ["network.target"];
       wantedBy = ["multi-user.target"];
       environment = {
@@ -96,7 +96,7 @@ in {
         StateDirectory = removePrefix "/var/lib/" cfg.stateDir;
         DynamicUser = false;
         User = cfg.user;
-        Group = "jellyseerr";
+        Group = "seerr";
         ExecStart = getExe cfg.package;
         Restart = "on-failure";
 
@@ -121,10 +121,10 @@ in {
     };
 
     users = {
-      groups."jellyseerr" = {};
+      groups."seerr" = {};
       users.${cfg.user} = {
         isSystemUser = true;
-        group = "jellyseerr";
+        group = "seerr";
       };
     };
 
@@ -132,7 +132,7 @@ in {
 
     services.nginx = mkMerge [
       (mkIf cfg.expose {
-        virtualHosts."jellyseerr.lvdar.nl" = {
+        virtualHosts."seerr.lvdar.nl" = {
           forceSSL = true;
           enableACME = false;
           sslCertificate = "/var/lib/acme/lvdar.nl/fullchain.pem";
@@ -162,7 +162,7 @@ in {
     ];
 
     # Enable and specify VPN namespace to confine service in.
-    systemd.services.jellyseerr.vpnConfinement = mkIf cfg.vpn.enable {
+    systemd.services.seerr.vpnConfinement = mkIf cfg.vpn.enable {
       enable = true;
       vpnNamespace = cfg-arr.vpn.name;
     };
