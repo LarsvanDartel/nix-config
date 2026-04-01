@@ -160,7 +160,7 @@ in {
 
           bazarr.enable = true;
 
-          jellyseerr = {
+          seerr = {
             enable = true;
             port = 4055;
           };

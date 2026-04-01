@@ -149,6 +149,7 @@ in {
       signing = {
         signByDefault = true;
         key = publicKey;
+        format = "openpgp";
       };
 
       ignores = [
