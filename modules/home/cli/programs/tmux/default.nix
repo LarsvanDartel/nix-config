@@ -24,8 +24,14 @@ in {
 
       plugins = with pkgs.tmuxPlugins; [
         yank
-        tmux-sessionx
       ];
+
+      extraConfig = ''
+        bind-key -T copy-mode-vi v send -X begin-selection
+        bind-key -T copy-mode-vi V send -X select-line
+        bind-key -T copy-mode-vi C-v send -X rectangle-toggle
+        bind-key -T copy-mode-vi y send -X copy-selection-and-cancel
+      '';
     };
   };
 }
