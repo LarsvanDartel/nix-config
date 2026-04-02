@@ -7,6 +7,9 @@
     cli.programs = {
       simplelogin.enable = true;
       pangolin.enable = true;
+      tmux = {
+        plugins.which-key.enable = true;
+      };
       nvim = {
         languages = {
           rust.enable = true;
