@@ -23,7 +23,6 @@ in {
 
       plugins = with pkgs.tmuxPlugins; [
         yank
-        tmux-which-key
         tmux-sessionx
       ];
     };
