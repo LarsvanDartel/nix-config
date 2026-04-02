@@ -16,6 +16,7 @@ in {
   config = mkIf cfg.enable {
     programs.tmux = {
       enable = true;
+      escapeTime = 0;
       clock24 = true;
       customPaneNavigationAndResize = true;
       disableConfirmationPrompt = true;
