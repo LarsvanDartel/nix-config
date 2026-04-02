@@ -35,7 +35,10 @@
     gaming = {
       launchers = {
         # geforce-now.enable = true;
-        minecraft.enable = true;
+        minecraft = {
+          enable = true;
+          mcsr.enable = true;
+        };
         steam.enable = true;
       };
     };
