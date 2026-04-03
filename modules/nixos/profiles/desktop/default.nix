@@ -33,5 +33,13 @@ in {
 
       user.name = "lvdar";
     };
+
+    services.libinput = {
+      enable = true;
+      mouse = {
+        accelSpeed = "0.0";
+        accelProfile = "flat";
+      };
+    };
   };
 }

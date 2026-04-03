@@ -42,7 +42,7 @@ in {
             scroll_factor = 0.2;
           };
 
-          sensitivity = 0.2;
+          sensitivity = 0.0;
           follow_mouse = 2;
           accel_profile = "flat";
 

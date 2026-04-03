@@ -10,8 +10,8 @@ local Processes = require("waywork.processes")
 local bg_col, primary_col, secondary_col = "#000000", "#ec6e4e", "#E446C4"
 local ninbot_anchor, ninbot_opacity = "topright", 1
 
-local base_sens = 6.6666668
-local tall_sens = 0.44973
+local base_sens = 7.98042104
+local tall_sens = 0.53835443
 
 -- === waywall config ===
 local config = {
@@ -180,7 +180,7 @@ local actions = Keys.actions({
 
 	["*-J"] = function()
 		if waywall.get_key("F3") then
-			waywall.press_key("J")
+			waywall.press_key("C")
 			floating.show()
 			floating.hide_after_timeout(10000)
 		else
