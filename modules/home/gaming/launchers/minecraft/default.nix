@@ -34,6 +34,7 @@ in {
         })
       ]
       ++ optionals cfg.mcsr.enable [
+        pkgs.mcsr.modcheck
         pkgs.mcsr.ninjabrain-bot
       ];
 

@@ -20,6 +20,12 @@ in {
       };
     };
 
+    services.ratbagd.enable = true;
+
+    environment.systemPackages = with pkgs; [
+      piper
+    ];
+
     # TODO: move to dedicated steam module
     programs.steam = {
       enable = true;
