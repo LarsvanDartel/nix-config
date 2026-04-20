@@ -1,8 +1,11 @@
 {
   inputs,
   config,
+  lib,
   ...
-}: {
+}: let
+  inherit (lib.modules) mkForce;
+in {
   imports = [
     # Hardware
     ./hardware-configuration.nix
@@ -44,11 +47,11 @@
       };
 
       networking = {
-        nameservers = [];
+        nameservers = mkForce [];
         # dnscrypt.enable = true;
       };
 
-      # virtualisation.enable = true;
+      virtualisation.containers.enable = true;
 
       hardware.fingerprint.enable = true;
 

@@ -44,6 +44,7 @@
     };
 
     programs = {
+      winboat.enable = true;
       zathura = {
         enable = true;
         defaultApplication = true;
