@@ -126,7 +126,10 @@ in {
           in "${file}";
         };
         kanidm.enable = true;
-        jellyfin.enable = true;
+        jellyfin = {
+          enable = true;
+          openFirewall = true;
+        };
         immich = {
           mediaDir = "/tank/media/library/images";
           enable = true;
