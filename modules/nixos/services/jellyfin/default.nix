@@ -5,7 +5,8 @@
   ...
 }: let
   inherit (lib.options) mkEnableOption mkOption;
-  inherit (lib.types) bool;
+  inherit (lib.lists) optional;
+  inherit (lib.types) bool port;
   inherit (lib.modules) mkIf;
 
   cfg = config.cosmos.services.jellyfin;
@@ -17,6 +18,16 @@ in {
   options.cosmos.services.jellyfin = {
     enable = mkEnableOption "jellyfin";
     expose = mkOption {
+      type = bool;
+      default = false;
+    };
+    port = mkOption {
+      type = port;
+      default = 8096;
+      description = "jellyfin web-UI port.";
+    };
+
+    openFirewall = mkOption {
       type = bool;
       default = false;
     };
@@ -50,6 +61,8 @@ in {
     users.groups = {
       jellyfin = {};
     };
+
+    networking.firewall.allowedTCPPorts = optional cfg.openFirewall cfg.port;
 
     services = {
       declarative-jellyfin = {
@@ -179,7 +192,7 @@ in {
           sslCertificateKey = "/var/lib/acme/lvdar.nl/key.pem";
 
           locations."/" = {
-            proxyPass = "http://127.0.0.1:8096";
+            proxyPass = "http://127.0.0.1:${cfg.port}";
           };
         };
       };
