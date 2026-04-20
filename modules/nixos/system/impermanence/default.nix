@@ -6,25 +6,21 @@
 }: let
   inherit (lib.types) listOf str coercedTo attrsOf;
   inherit (lib.options) mkEnableOption mkOption;
-  inherit (lib.modules) mkIf mkBefore;
+  inherit (lib.modules) mkIf;
   inherit (lib.attrsets) mapAttrsToList filterAttrs;
   inherit (lib.strings) concatLines escapeShellArg;
-
   cfg = config.cosmos.system.impermanence;
 in {
   imports = [
     inputs.impermanence.nixosModules.impermanence
   ];
-
   options.cosmos.system.impermanence = {
     enable = mkEnableOption "impermanence";
-
     device = mkOption {
       type = str;
       default = "/dev/mapper/crypted";
       description = "The device the root filesystem is located on";
     };
-
     persist = {
       files = mkOption {
         type = listOf (coercedTo str (f: {file = f;}) (attrsOf str));
@@ -55,32 +51,39 @@ in {
   };
 
   config = mkIf cfg.enable {
-    boot.initrd.postDeviceCommands = mkBefore ''
-      mkdir -p /btrfs_tmp
-
-      mount -o subvol=/ ${cfg.device} /btrfs_tmp
-
-      if [[ -e /btrfs_tmp/root ]]; then
-          mkdir -p /btrfs_tmp/old_roots
-          timestamp=$(date --date="@$(stat -c %Y /btrfs_tmp/root)" "+%Y-%m-%d_%H:%M:%S")
-          mv /btrfs_tmp/root "/btrfs_tmp/old_roots/$timestamp"
-      fi
-
-      delete_subvolumes_recursively() {
-          IFS=$'\n'
-          for i in $(btrfs subvolume list -o "$1" | cut -f 9- -d ' '); do
-            delete_subvolumes_recursively "/btrfs_tmp/$i"
-          done
-          btrfs subvolume delete "$1"
-      }
-
-      for i in $(find /btrfs_tmp/old_roots/ -maxdepth 1 -mtime +30); do
-          delete_subvolumes_recursively "$i"
-      done
-
-      btrfs subvolume create /btrfs_tmp/root
-      umount /btrfs_tmp
-    '';
+    boot.initrd.systemd.services.rollback = {
+      description = "Roll back BTRFS root subvolume to a blank snapshot";
+      wantedBy = ["initrd.target"];
+      after = ["systemd-cryptsetup@${builtins.baseNameOf cfg.device}.service"];
+      before = ["sysroot.mount"];
+      unitConfig.DefaultDependencies = "no";
+      serviceConfig = {
+        Type = "oneshot";
+        StandardOutput = "journal";
+        StandardError = "journal";
+      };
+      script = ''
+        mkdir -p /btrfs_tmp
+        mount -o subvol=/ ${cfg.device} /btrfs_tmp
+        if [[ -e /btrfs_tmp/root ]]; then
+            mkdir -p /btrfs_tmp/old_roots
+            timestamp=$(date --date="@$(stat -c %Y /btrfs_tmp/root)" "+%Y-%m-%d_%H:%M:%S")
+            mv /btrfs_tmp/root "/btrfs_tmp/old_roots/$timestamp"
+        fi
+        delete_subvolumes_recursively() {
+            IFS=$'\n'
+            for i in $(btrfs subvolume list -o "$1" | cut -f 9- -d ' '); do
+              delete_subvolumes_recursively "/btrfs_tmp/$i"
+            done
+            btrfs subvolume delete "$1"
+        }
+        for i in $(find /btrfs_tmp/old_roots/ -maxdepth 1 -mtime +30); do
+            delete_subvolumes_recursively "$i"
+        done
+        btrfs subvolume create /btrfs_tmp/root
+        umount /btrfs_tmp
+      '';
+    };
 
     programs.fuse.userAllowOther = true;
 
@@ -99,7 +102,6 @@ in {
 
     systemd.services."persist-home-create-root-paths" = let
       persistentHomesRoot = "/persist";
-
       listOfCommands =
         mapAttrsToList
         (
@@ -114,7 +116,6 @@ in {
           ''
         )
         (filterAttrs (_: user: user.createHome) config.users.users);
-
       stringOfCommands = concatLines listOfCommands;
     in {
       script = stringOfCommands;
