@@ -30,12 +30,13 @@ in {
             "main.typ"
           ];
           settings = {
-            exportPdf = "onType";
+            # exportPdf = "onType";
             semanticTokens = "disable";
             formatterMode = "typstyle";
             formatterProseWrap = true;
             formatterPrintWidth = 80;
-            formatterIndentSize = 4;
+            formatterIndentSize = 2;
+            lint.enabled = true;
           };
           on_attach = mkLuaInline ''
             function(client, bufnr)
@@ -54,6 +55,10 @@ in {
                   arguments = { vim.v.null },
                 }, { bufnr = bufnr })
               end, { desc = "[T]inymist [U]npin", noremap = true })
+
+              vim.keymap.set("n", "<leader>tx", function()
+                client:stop()
+              end, { desc = "[T]inymist [X] stop", noremap = true })
             end
           '';
         };
