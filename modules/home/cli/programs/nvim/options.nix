@@ -26,6 +26,7 @@
       scrolloff = 8;
       cursorline = false;
       cursorcolumn = false;
+      colorcolumn = "80";
       laststatus = 3;
       fileencoding = "utf-8";
       termguicolors = true;
