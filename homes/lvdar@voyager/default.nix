@@ -18,6 +18,7 @@
           python.enable = true;
           rocq.enable = true;
           formal.enable = true;
+          mcrl2.enable = true;
         };
       };
     };
