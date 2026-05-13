@@ -33,8 +33,8 @@ stdenvNoCC.mkDerivation rec {
       src
       ;
     pnpm = pnpm_9;
-    fetcherVersion = 1;
-    hash = "sha256-CXeHNjzmAnaVnGL7yqXc/oBApKx6VyFoO09yah8M808=";
+    fetcherVersion = 3;
+    hash = "sha256-c4aCzK+Xga8Y/akf4+753ffFvC6cE2hXhyy0EQFx4Fo=";
   };
 
   buildPhase = ''

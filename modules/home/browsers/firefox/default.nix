@@ -15,10 +15,11 @@ in {
 
   config = mkIf cfg.enable {
     cosmos.system.impermanence.persist.directories = [
-      ".mozilla"
+      ".config/mozilla"
     ];
     programs.firefox = {
       enable = true;
+      configPath = "${config.xdg.configHome}/mozilla/firefox";
 
       policies = {
         AppAutoUpdate = false;
@@ -51,6 +52,7 @@ in {
         extensions.packages = with pkgs.nur.repos.rycee.firefox-addons; [
           ublock-origin
           proton-pass
+          zotero-connector
         ];
 
         settings = {
