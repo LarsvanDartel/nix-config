@@ -88,7 +88,6 @@ in {
         misc = let
           FULLSCREEN_ONLY = 2;
         in {
-          vfr = true;
           vrr = FULLSCREEN_ONLY;
 
           animate_manual_resizes = true;
