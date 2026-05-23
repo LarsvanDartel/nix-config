@@ -6,6 +6,7 @@
 
     cli.programs = {
       simplelogin.enable = true;
+      claude.enable = true;
       pangolin.enable = true;
       tmux = {
         plugins.which-key.enable = true;
@@ -45,11 +46,11 @@
     };
 
     programs = {
-      winboat.enable = true;
       zathura = {
         enable = true;
         defaultApplication = true;
       };
+      libreoffice.enable = true;
       zotero.enable = true;
     };
 
@@ -69,7 +70,7 @@
   };
 
   programs.ssh.matchBlocks = {
-    "co25.ics.ele.tue.nl" = {
+    "es-pynq047.ics.ele.tue.nl" = {
       setEnv = {TERM = "xterm-256color";};
     };
   };
