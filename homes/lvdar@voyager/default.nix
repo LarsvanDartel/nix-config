@@ -11,6 +11,7 @@
       tmux = {
         plugins.which-key.enable = true;
       };
+      taskwarrior.enable = true;
       nvim = {
         languages = {
           rust.enable = true;
