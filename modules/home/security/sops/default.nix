@@ -4,14 +4,9 @@
   inputs,
   ...
 }: let
-  inherit (lib.attrsets) mergeAttrsList;
-  inherit (lib.lists) map;
-  inherit (lib.options) mkEnableOption;
+  inherit (lib.options) mkEnableOption mkOption;
+  inherit (lib.types) str;
   inherit (lib.modules) mkIf;
-
-  sopsFolder = builtins.toString inputs.nix-secrets + "/users";
-
-  hosts = ["voyager"];
 
   cfg = config.cosmos.security.sops;
 in {
@@ -21,6 +16,10 @@ in {
 
   options.cosmos.security.sops = {
     enable = mkEnableOption "sops";
+    sopsFolder = mkOption {
+      type = str;
+      default = builtins.toString inputs.nix-secrets + "/users";
+    };
   };
 
   config = mkIf cfg.enable {
@@ -30,22 +29,8 @@ in {
       # secrets repository
       age.keyFile = "/home/${config.home.username}/.config/sops/age/keys.txt";
 
-      defaultSopsFile = "${sopsFolder}/${config.home.username}.yaml";
+      defaultSopsFile = "${cfg.sopsFolder}/${config.home.username}.yaml";
       validateSopsFiles = false;
-
-      secrets =
-        {
-          # placeholder
-        }
-        // mergeAttrsList (
-          map (name: {
-            "keys/ssh/${name}" = {
-              sopsFile = "${sopsFolder}/common/secrets.yaml";
-              path = "${config.home.homeDirectory}/.ssh/id_${name}";
-            };
-          })
-          hosts
-        );
     };
   };
 }

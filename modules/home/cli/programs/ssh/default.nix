@@ -1,25 +1,34 @@
 {
   config,
+  osConfig,
   lib,
   ...
 }: let
-  inherit (lib.cosmos) get-files get-flake-path get-file-name-without-extension;
+  inherit (lib.cosmos) get-file-names get-flake-path get-file-name-without-extension;
   inherit (lib.attrsets) mergeAttrsList;
   inherit (lib.lists) map;
-  inherit (lib.strings) optionalString;
-  inherit (lib.options) mkEnableOption;
+  inherit (lib.strings) optionalString removePrefix removeSuffix;
+  inherit (lib.options) mkEnableOption mkOption;
+  inherit (lib.types) listOf enum;
   inherit (lib.modules) mkIf;
 
   cfg = config.cosmos.cli.programs.ssh;
 
+  private-key-file = "${config.cosmos.security.sops.sopsFolder}/common/secrets.yaml";
+
   keys-path = get-flake-path "modules/nixos/services/ssh/keys";
-  keys = get-files keys-path;
+  available-identities = map (name: removeSuffix ".pub" (removePrefix "id_" name)) (get-file-names keys-path);
+  keys = map (name: "${keys-path}/id_${name}.pub") cfg.identities;
 
   ssh-file = key: ".ssh/${get-file-name-without-extension key}";
   ssh-dir = "${optionalString config.cosmos.system.impermanence.enable "/persist"}${config.cosmos.user.home}/.ssh";
 in {
   options.cosmos.cli.programs.ssh = {
     enable = mkEnableOption "ssh";
+    identities = mkOption {
+      type = listOf (enum available-identities);
+      default = [osConfig.networking.hostName];
+    };
   };
 
   config = mkIf cfg.enable {
@@ -52,6 +61,16 @@ in {
         "${ssh-file key}.pub".source = key;
       })
       keys
+    );
+
+    sops.secrets = mergeAttrsList (
+      map (name: {
+        "keys/ssh/${name}" = {
+          sopsFile = private-key-file;
+          path = "${config.home.homeDirectory}/${ssh-file "id_${name}"}";
+        };
+      })
+      cfg.identities
     );
   };
 }
