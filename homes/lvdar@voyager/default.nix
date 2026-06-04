@@ -1,4 +1,4 @@
-{
+{pkgs, ...}: {
   cosmos = {
     profiles = {
       desktop.enable = true;
@@ -70,11 +70,13 @@
     };
   };
 
-  programs.ssh.matchBlocks = {
+  programs.ssh.settings = {
     "es-pynq047.ics.ele.tue.nl" = {
-      setEnv = {TERM = "xterm-256color";};
+      setEnv = "TERM=xterm-256color";
     };
   };
+
+  home.packages = [pkgs.mcrl2];
 
   home.stateVersion = "24.11";
 }
