@@ -1,7 +1,7 @@
 {lib, ...}: let
   inherit (builtins) readDir pathExists;
   inherit (lib) assertMsg;
-  inherit (lib.attrsets) filterAttrs mapAttrsToList;
+  inherit (lib.attrsets) filterAttrs mapAttrsToList attrNames;
   inherit (lib.path) append;
   inherit (lib.lists) flatten last init;
   inherit (lib.strings) concatStringsSep;
@@ -57,6 +57,11 @@ in rec {
     filtered-entries = filterAttrs (_: is-directory-kind) entries;
   in
     mapAttrsToList (name: _: "${path}/${name}") filtered-entries;
+
+  get-file-names = path: let
+    entries = safe-read-directory path;
+  in
+    attrNames (filterAttrs (_: is-file-kind) entries);
 
   get-files = path: let
     entries = safe-read-directory path;

@@ -502,10 +502,10 @@
         "nixpkgs": "nixpkgs_3"
       },
       "locked": {
-        "lastModified": 1772837484,
-        "narHash": "sha256-teBpysp45UwNCmV8SOqZs5pfWIdIxLC1zCKUQak3Hms=",
+        "lastModified": 1780611574,
+        "narHash": "sha256-5USHmZjMhIcFbF9jhW9WfoOSJWCGfPx2pbOEE8z8Oss=",
         "ref": "refs/heads/main",
-        "rev": "dfd188b0d9e561f3ac1ff8e2bd48c1c7c699c1dc",
+        "rev": "fbbfc84d784cf3fe6a6aed6be1d3b3996c882431",
         "shallow": true,
         "type": "git",
         "url": "ssh://git@github.com/LarsvanDartel/nix-secrets.git"
@@ -600,11 +600,11 @@
     },
     "nixpkgs_3": {
       "locked": {
-        "lastModified": 1772624091,
-        "narHash": "sha256-QKyJ0QGWBn6r0invrMAK8dmJoBYWoOWy7lN+UHzW1jc=",
+        "lastModified": 1780243769,
+        "narHash": "sha256-x5UQuRsH3MqI0U9afaXSNqzTPSeZlRLvFAav2Ux1pNw=",
         "owner": "NixOS",
         "repo": "nixpkgs",
-        "rev": "80bdc1e5ce51f56b19791b52b2901187931f5353",
+        "rev": "331800de5053fcebacf6813adb5db9c9dca22a0c",
         "type": "github"
       },
       "original": {
