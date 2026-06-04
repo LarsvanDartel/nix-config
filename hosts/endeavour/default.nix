@@ -56,7 +56,10 @@ in {
         "nohibernate"
       ];
       supportedFilesystems = ["vfat" "zfs"];
-      zfs.extraPools = ["tank"];
+      zfs = {
+        extraPools = ["tank"];
+        forceImportRoot = false;
+      };
     };
 
     services.zfs = {

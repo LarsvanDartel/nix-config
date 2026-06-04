@@ -1,23 +1,97 @@
 {
   wayland.windowManager.hyprland.settings = {
-    layerrule = [
-      "blur on, ignore_alpha 0, match:namespace notifications"
-      "blur on, ignore_alpha 0, dim_around on, match:namespace rofi"
+    layer_rule = [
+      {
+        _args = [
+          {
+            match = {namespace = "notifications";};
+            blur = true;
+            ignore_alpha = 0;
+          }
+        ];
+      }
+      {
+        _args = [
+          {
+            match = {namespace = "rofi";};
+            blur = true;
+            ignore_alpha = 0;
+            dim_around = true;
+          }
+        ];
+      }
     ];
 
-    windowrule = [
-      "match:class clipse, float on, size 650 650"
+    window_rule = [
+      {
+        _args = [
+          {
+            match = {class = "clipse";};
+            float = true;
+            size = "650 650";
+          }
+        ];
+      }
 
-      "match:class discord, workspace 8 silent"
-      "match:class signal, workspace 8 silent"
+      {
+        _args = [
+          {
+            match = {class = "discord";};
+            workspace = "8 silent";
+          }
+        ];
+      }
+      {
+        _args = [
+          {
+            match = {class = "signal";};
+            workspace = "8 silent";
+          }
+        ];
+      }
 
-      "match:title (Spotify Player), workspace 9 silent"
+      {
+        _args = [
+          {
+            match = {title = "(Spotify Player)";};
+            workspace = "9 silent";
+          }
+        ];
+      }
 
-      "match:class xwaylandvideobridge, workspace special silent"
-      "match:title ((Firefox|Zen) - Sharing Indicator), workspace special silent"
-      "match:title (.*is sharing (your screen|a window)\.), workspace special silent"
+      {
+        _args = [
+          {
+            match = {class = "xwaylandvideobridge";};
+            workspace = "special silent";
+          }
+        ];
+      }
+      {
+        _args = [
+          {
+            match = {title = "((Firefox|Zen) - Sharing Indicator)";};
+            workspace = "special silent";
+          }
+        ];
+      }
+      {
+        _args = [
+          {
+            match = {title = "(.*is sharing (your screen|a window)\\.)";};
+            workspace = "special silent";
+          }
+        ];
+      }
 
-      "match:class .*, idle_inhibit fullscreen"
+      {
+        _args = [
+          {
+            match = {class = ".*";};
+            idle_inhibit = "fullscreen";
+          }
+        ];
+      }
     ];
   };
 }
