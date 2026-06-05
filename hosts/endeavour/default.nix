@@ -138,7 +138,7 @@ in {
           enable = true;
         };
         opencloud = {
-          enable = true;
+          # enable = true;
           # collabora.enable = true;
         };
         forgejo.enable = false;

@@ -127,10 +127,7 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
-    declarative-jellyfin = {
-      url = "github:Sveske-Juice/declarative-jellyfin";
-      inputs.nixpkgs.follows = "nixpkgs";
-    };
+    jellarr.url = "github:venkyr77/jellarr";
 
     vpn-confinement.url = "github:Maroka-chan/VPN-Confinement";
 
