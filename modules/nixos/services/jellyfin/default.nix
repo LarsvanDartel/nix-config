@@ -12,7 +12,7 @@
   cfg = config.cosmos.services.jellyfin;
 in {
   imports = [
-    inputs.declarative-jellyfin.nixosModules.default
+    inputs.jellarr.nixosModules.default
   ];
 
   options.cosmos.services.jellyfin = {
@@ -39,6 +39,17 @@ in {
         owner = "kanidm";
         mode = "0640";
       };
+      "keys/jellyfin/api-key" = {};
+      "keys/jellyfin/lvdar-password" = {
+        owner = "jellyfin";
+      };
+    };
+
+    sops.templates.jellarr-env = {
+      content = ''
+        JELLARR_API_KEY=${config.sops.placeholder."keys/jellyfin/api-key"}
+      '';
+      owner = "jellyfin";
     };
 
     cosmos.system.impermanence.persist.directories = [
@@ -50,32 +61,28 @@ in {
       }
     ];
 
-    users.users = {
-      jellyfin = {
-        isSystemUser = true;
-        group = "jellyfin";
-        extraGroups = ["video" "render"];
-      };
-    };
+    services.jellyfin.enable = true;
 
-    users.groups = {
-      jellyfin = {};
-    };
+    users.users.jellyfin.extraGroups = ["video" "render"];
 
     networking.firewall.allowedTCPPorts = optional cfg.openFirewall cfg.port;
 
-    services = {
-      declarative-jellyfin = {
-        enable = true;
-        serverId = "67f0071ab42a4aeabc0c7175b9ba3191";
+    services.jellarr = {
+      enable = true;
+      user = "jellyfin";
+      group = "jellyfin";
+      environmentFile = config.sops.templates.jellarr-env.path;
 
-        user = "jellyfin";
-        group = "jellyfin";
+      bootstrap = {
+        enable = true;
+        apiKeyFile = config.sops.secrets."keys/jellyfin/api-key".path;
+      };
+
+      config = {
+        version = 1;
+        base_url = "http://localhost:${toString cfg.port}";
 
         encoding = {
-          enableVppTonemapping = true;
-          enableTonemapping = true;
-          tonemappingAlgorithm = "bt2390";
           enableHardwareEncoding = true;
           hardwareAccelerationType = "vaapi";
           enableDecodingColorDepth10Hevc = true;
@@ -91,38 +98,31 @@ in {
           ];
         };
 
-        libraries = {
-          Movies = {
-            enabled = true;
-            contentType = "movies";
-            pathInfos = ["/tank/media/library/movies"];
-            typeOptions.Movies = {
-              metadataFetchers = [
-                "The Open Movie Database"
-                "TheMovieDb"
-              ];
-              imageFetchers = [
-                "The Open Movie Database"
-                "TheMovieDb"
-              ];
-            };
-          };
-          Shows = {
-            enabled = true;
-            contentType = "tvshows";
-            pathInfos = ["/tank/media/library/shows"];
-          };
-        };
+        library.virtualFolders = [
+          {
+            name = "Movies";
+            collectionType = "movies";
+            libraryOptions.pathInfos = [{path = "/tank/media/library/movies";}];
+          }
+          {
+            name = "Shows";
+            collectionType = "tvshows";
+            libraryOptions.pathInfos = [{path = "/tank/media/library/shows";}];
+          }
+        ];
 
-        users = {
-          Admin = {
-            mutable = false;
+        users = [
+          {
+            name = "Admin";
             password = "123";
-            permissions = {
-              isAdministrator = true;
-            };
-          };
-        };
+            policy.isAdministrator = true;
+          }
+          {
+            name = "lvdar@lvdar.nl";
+            passwordFile = config.sops.secrets."keys/jellyfin/lvdar-password".path;
+            policy.isAdministrator = true;
+          }
+        ];
 
         branding = {
           loginDisclaimer = ''
@@ -151,83 +151,71 @@ in {
           };
           pluginRepositories = [
             {
-              content = {
-                Name = "Jellyfin Stable";
-                Url = "https://repo.jellyfin.org/files/plugin/manifest.json";
-              };
-              tag = "RepositoryInfo";
+              name = "Jellyfin Stable";
+              url = "https://repo.jellyfin.org/files/plugin/manifest.json";
+              enabled = true;
             }
             {
-              content = {
-                Name = "Jellyfin SSO Plugin";
-                Url = "https://raw.githubusercontent.com/9p4/jellyfin-plugin-sso/manifest-release/manifest.json";
-              };
-              tag = "RepositoryInfo";
+              name = "Jellyfin SSO Plugin";
+              url = "https://raw.githubusercontent.com/9p4/jellyfin-plugin-sso/manifest-release/manifest.json";
+              enabled = true;
             }
             {
-              content = {
-                Name = "Intro Skipper";
-                Url = "https://intro-skipper.org/manifest.json";
-              };
-              tag = "RepositoryInfo";
+              name = "Intro Skipper";
+              url = "https://intro-skipper.org/manifest.json";
+              enabled = true;
             }
           ];
         };
-
-        # apikeys = {
-        #   Jellyseerr = {
-        #     key = "78878bf9fc654ff78ae332c63de5aeb6";
-        #   };
-        #   Homarr = {
-        #     keyPath = ../tests/example_apikey.txt;
-        #   };
-        # };
       };
+    };
 
-      nginx.virtualHosts = mkIf cfg.expose {
-        "jellyfin.lvdar.nl" = {
-          forceSSL = true;
-          enableACME = false;
-          sslCertificate = "/var/lib/acme/lvdar.nl/fullchain.pem";
-          sslCertificateKey = "/var/lib/acme/lvdar.nl/key.pem";
+    services.nginx.virtualHosts = mkIf cfg.expose {
+      "jellyfin.lvdar.nl" = {
+        forceSSL = true;
+        enableACME = false;
+        sslCertificate = "/var/lib/acme/lvdar.nl/fullchain.pem";
+        sslCertificateKey = "/var/lib/acme/lvdar.nl/key.pem";
 
-          locations."/" = {
-            proxyPass = "http://127.0.0.1:${cfg.port}";
-          };
+        locations."/" = {
+          proxyPass = "http://127.0.0.1:${toString cfg.port}";
         };
       };
+    };
 
-      kanidm.provision = {
-        groups = {
-          jellyfin-users = {
-            overwriteMembers = false;
-            members = ["lvdar"];
-          };
-          jellyfin-movies = {
-            overwriteMembers = false;
-            members = ["lvdar"];
-          };
-          jellyfin-admin = {
-            members = ["lvdar"];
-          };
+    services.kanidm.provision = {
+      groups = {
+        jellyfin-users = {
+          overwriteMembers = false;
+          members = ["lvdar"];
         };
-        systems.oauth2 = {
-          jellyfin = {
-            displayName = "Jellyfin";
-            basicSecretFile = config.sops.secrets."keys/jellyfin/oauth-client-secret".path;
-            originUrl = "https://jellyfin.lvdar.nl/sso/OID/redirect/kanidm";
-            originLanding = "https://jellyfin.lvdar.nl";
-            scopeMaps = {
-              jellyfin-users = ["openid" "profile" "email"];
-            };
-            claimMaps = {
-              jellyfin_groups = {
-                joinType = "array";
-                valuesByGroup = {
-                  jellyfin-users = ["jellyfin"];
-                  jellyfin-admin = ["jellyfin_admin"];
-                  jellyfin-movies = ["jellyfin_movies"];
-                };
+        jellyfin-movies = {
+          overwriteMembers = false;
+          members = ["lvdar"];
+        };
+        jellyfin-admin = {
+          members = ["lvdar"];
+        };
+      };
+      systems.oauth2 = {
+        jellyfin = {
+          displayName = "Jellyfin";
+          basicSecretFile = config.sops.secrets."keys/jellyfin/oauth-client-secret".path;
+          originUrl = "https://jellyfin.lvdar.nl/sso/OID/redirect/kanidm";
+          originLanding = "https://jellyfin.lvdar.nl";
+          scopeMaps = {
+            jellyfin-users = ["openid" "profile" "email"];
+          };
+          supplementaryScopeMaps = {
+            jellyfin-users = ["jellyfin_groups"];
+          };
+          claimMaps = {
+            jellyfin_groups = {
+              joinType = "array";
+              valuesByGroup = {
+                jellyfin-users = ["jellyfin"];
+                jellyfin-admin = ["jellyfin_admin"];
+                jellyfin-movies = ["jellyfin_movies"];
               };
             };
           };
