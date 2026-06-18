@@ -153,5 +153,7 @@
     };
 
     nix-minecraft.url = "github:Jan-Bulthuis/nix-minecraft";
+
+    typstnique.url = "github:LarsvanDartel/typstnique";
   };
 }
