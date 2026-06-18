@@ -29,6 +29,7 @@
       services = {
         pangolin.enable = true;
         crowdsec.enable = false;
+        typstnique.enable = true;
       };
     };
 
