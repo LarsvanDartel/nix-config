@@ -137,6 +137,13 @@ in {
           mediaDir = "/tank/media/library/images";
           enable = true;
         };
+        suwayomi = {
+          # Re-enable once endeavour is back up; runs locally on voyager in the meantime.
+          enable = false;
+          dataDir = "/tank/media/library/manga";
+          expose = true;
+          basicAuth.enable = true;
+        };
         opencloud = {
           # enable = true;
           # collabora.enable = true;
