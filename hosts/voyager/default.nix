@@ -25,6 +25,22 @@ in {
       resumeDevice = "/dev/disk/by-uuid/c2dc9bb7-f815-4c9c-bd96-68bebb100aef";
     };
 
+    networking.networkmanager.wifi.powersave = false;
+    environment.etc."NetworkManager/conf.d/wifi.conf".text = ''
+      [connection]
+      wifi.powersave = 2
+
+      [device]
+      wifi.scan-rand-mac-address = no
+    '';
+    networking.wireless.extraConfig = ''
+      bgscan=""
+    '';
+    boot.extraModprobeConfig = ''
+      options iwlwifi power_save=0 uapsd_disable=1
+      options iwlmvm power_scheme=1
+    '';
+
     cosmos = {
       profiles = {
         desktop = {
@@ -52,6 +68,15 @@ in {
       };
 
       virtualisation.containers.enable = true;
+
+      # Local-only manga reader. Bound to loopback, basic auth on top.
+      services.suwayomi = {
+        enable = true;
+        basicAuth.enable = true;
+        webview.enable = true;
+        downloadsDir = "/var/lib/suwayomi-downloads";
+        homeLink = "/home/${config.cosmos.user.name}/manga";
+      };
 
       hardware.fingerprint.enable = true;
 
