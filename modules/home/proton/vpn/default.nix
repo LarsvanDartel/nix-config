@@ -5,24 +5,36 @@
   ...
 }: let
   inherit (lib.options) mkEnableOption;
-  inherit (lib.modules) mkIf;
+  inherit (lib.modules) mkIf mkMerge;
 
   cfg = config.cosmos.proton.vpn;
 in {
   options.cosmos.proton.vpn = {
-    enable = mkEnableOption ''
-      Proton VPN (GUI). Note the app connects through NetworkManager, so the
-      host needs `networking.networkmanager.enable` with the wireguard/openvpn
-      plugins; credentials are stored in the keyring
+    gui.enable = mkEnableOption ''
+      Proton VPN (GUI). Connects through NetworkManager, so the host needs
+      `networking.networkmanager.enable` with the wireguard/openvpn plugins
+    '';
+
+    cli.enable = mkEnableOption ''
+      Proton VPN CLI (`protonvpn`). Same NetworkManager requirement as the GUI
     '';
   };
 
-  config = mkIf cfg.enable {
-    home.packages = [pkgs.proton-vpn];
+  config = mkMerge [
+    (mkIf cfg.gui.enable {
+      home.packages = [pkgs.proton-vpn];
+    })
 
-    # Proton VPN 4.x stores its account/session in a Secret Service keyring.
-    services.gnome-keyring.enable = true;
+    (mkIf cfg.cli.enable {
+      home.packages = [pkgs.proton-vpn-cli];
+    })
 
-    cosmos.system.impermanence.persist.directories = [".config/protonvpn"];
-  };
+    (mkIf (cfg.gui.enable || cfg.cli.enable) {
+      # Proton VPN 4.x stores its account/session in a Secret Service keyring
+      # and its settings under ~/.config/Proton/VPN.
+      cosmos.security.keyring.enable = true;
+
+      cosmos.system.impermanence.persist.directories = [".config/Proton"];
+    })
+  ];
 }

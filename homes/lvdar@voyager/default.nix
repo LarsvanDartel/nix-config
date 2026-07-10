@@ -80,9 +80,12 @@
     mail.thunderbird.enable = true;
 
     proton = {
-      mail.bridge.enable = true;
-      pass.enable = true;
-      vpn.enable = true;
+      mail = {
+        bridge.enable = true;
+        desktop.enable = true;
+      };
+      pass.cli.enable = true;
+      vpn.cli.enable = true;
     };
 
     system.impermanence = {
