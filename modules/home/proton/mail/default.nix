@@ -29,15 +29,12 @@ in {
       services.protonmail-bridge.enable = true;
 
       # The bridge keeps your Proton credentials in a Secret Service keyring;
-      # without one it can't start noninteractively. For it to auto-unlock at
-      # login (so the bridge starts without a prompt), the host also needs PAM
-      # integration, e.g. `security.pam.services.greetd.enableGnomeKeyring = true`.
-      services.gnome-keyring.enable = true;
+      # without one it can't start noninteractively.
+      cosmos.security.keyring.enable = true;
 
       cosmos.system.impermanence.persist.directories = [
         ".config/protonmail" # bridge config + encrypted vault
         ".local/share/protonmail" # bridge IMAP cache (gluon)
-        ".local/share/keyrings" # gnome-keyring stored Proton session
       ];
     })
 
