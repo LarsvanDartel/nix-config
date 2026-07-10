@@ -53,6 +53,28 @@
       };
       libreoffice.enable = true;
       zotero.enable = true;
+      obs-studio = {
+        enable = true;
+        cudaSupport = true;
+        plugins = with pkgs.obs-studio-plugins; [
+          advanced-scene-switcher
+          input-overlay
+          obs-advanced-masks
+          obs-backgroundremoval
+          obs-composite-blur
+          obs-move-transition
+          obs-source-clone
+          obs-source-record
+          obs-stroke-glow-shadow
+          obs-tuna
+          obs-mute-filter
+          obs-pipewire-audio-capture
+          obs-vkcapture
+          obs-vaapi
+          wlrobs
+          droidcam-obs
+        ];
+      };
     };
 
     system.impermanence = {
