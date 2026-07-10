@@ -10,6 +10,7 @@ in {
     # Hardware
     ./hardware-configuration.nix
     inputs.nixos-hardware.nixosModules.lenovo-thinkpad-p1-gen3
+    inputs.nixos-hardware.nixosModules.common-gpu-nvidia
 
     # Disk layout
     inputs.disko.nixosModules.disko
@@ -23,6 +24,18 @@ in {
         "resume_offset=533760"
       ];
       resumeDevice = "/dev/disk/by-uuid/c2dc9bb7-f815-4c9c-bd96-68bebb100aef";
+    };
+
+    hardware.nvidia = {
+      open = true;
+      powerManagement = {
+        enable = true;
+        finegrained = true;
+      };
+      prime.offload = {
+        enable = true;
+        enableOffloadCmd = true;
+      };
     };
 
     networking.networkmanager.wifi.powersave = false;
@@ -69,7 +82,6 @@ in {
 
       virtualisation.containers.enable = true;
 
-      # Local-only manga reader. Bound to loopback, basic auth on top.
       services.suwayomi = {
         enable = true;
         basicAuth.enable = true;
@@ -79,6 +91,17 @@ in {
       };
 
       hardware.fingerprint.enable = true;
+
+      # Virtual camera target for OBS (Start Virtual Camera). Shares the
+      # v4l2loopback module with DroidCam so they don't fight over the kernel
+      # module. Both DroidCam and OBS greedily grab the lowest-numbered free
+      # loopback, so DroidCam owns video1 and OBS lands on video2.
+      hardware.v4l2loopback.devices = [
+        {
+          number = 1;
+          label = "OBS Virtual Camera";
+        }
+      ];
 
       cli.programs.nh = {
         flake-dir = "/home/${config.cosmos.user.name}/nix-config";
