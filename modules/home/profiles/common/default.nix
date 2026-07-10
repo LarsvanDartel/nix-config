@@ -27,6 +27,7 @@ in {
           bat.enable = true;
           btop.enable = true;
           direnv.enable = true;
+          dnslookup.enable = true;
           eza.enable = true;
           fd.enable = true;
           git = {

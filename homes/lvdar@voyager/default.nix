@@ -77,6 +77,14 @@
       };
     };
 
+    mail.thunderbird.enable = true;
+
+    proton = {
+      mail.bridge.enable = true;
+      pass.enable = true;
+      vpn.enable = true;
+    };
+
     system.impermanence = {
       persist = {
         directories = [
