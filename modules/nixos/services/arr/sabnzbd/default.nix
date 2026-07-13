@@ -116,6 +116,7 @@ in {
         settings =
           recursiveUpdate
           {
+            inet_exposure = 4;
             misc = {
               host =
                 if cfg.openFirewall
