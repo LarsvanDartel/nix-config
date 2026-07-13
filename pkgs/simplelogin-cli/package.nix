@@ -2,7 +2,7 @@
   lib,
   stdenvNoCC,
   nodejs,
-  pnpm_9,
+  pnpm_10,
   fetchPnpmDeps,
   pnpmConfigHook,
   fetchFromGitHub,
@@ -22,7 +22,7 @@ stdenvNoCC.mkDerivation rec {
   nativeBuildInputs = [
     nodejs
     pnpmConfigHook
-    pnpm_9
+    pnpm_10
     makeWrapper
   ];
 
@@ -32,9 +32,9 @@ stdenvNoCC.mkDerivation rec {
       version
       src
       ;
-    pnpm = pnpm_9;
+    pnpm = pnpm_10;
     fetcherVersion = 3;
-    hash = "sha256-c4aCzK+Xga8Y/akf4+753ffFvC6cE2hXhyy0EQFx4Fo=";
+    hash = "sha256-FhLlbadxtTq2tjqOyyI1WcxjL/lrfEHh4UNHee206Uw=";
   };
 
   buildPhase = ''

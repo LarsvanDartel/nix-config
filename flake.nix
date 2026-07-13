@@ -140,20 +140,6 @@
       flake = false;
     };
 
-    nix-matlab = {
-      url = "gitlab:doronbehar/nix-matlab";
-      inputs.nixpkgs.follows = "nixpkgs";
-    };
-
-    # Minecraft
-
-    modpack-create = {
-      url = "github:LarsvanDartel/Modpack-Create/1.21.1-forge";
-      inputs.nixpkgs.follows = "nixpkgs";
-    };
-
-    nix-minecraft.url = "github:Jan-Bulthuis/nix-minecraft";
-
     typstnique.url = "github:LarsvanDartel/typstnique";
   };
 }
