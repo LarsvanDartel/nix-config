@@ -52,6 +52,10 @@ in {
     boot.extraModprobeConfig = ''
       options iwlwifi power_save=0 uapsd_disable=1
       options iwlmvm power_scheme=1
+
+      # NuPhy Air75 registers as an Apple keyboard; fnmode=0 makes the top row
+      # act as plain F1-F12 without needing Fn, fixing Fn key combos.
+      options hid_apple fnmode=0
     '';
 
     cosmos = {
