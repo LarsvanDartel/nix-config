@@ -1,19 +1,5 @@
-{
-  config,
-  lib,
-  pkgs,
-  ...
-}: let
-  inherit (lib.options) mkEnableOption;
-  inherit (lib.modules) mkIf;
-
-  cfg = config.cosmos.cli.programs.tmux;
-in {
-  options.cosmos.cli.programs.tmux = {
-    enable = mkEnableOption "tmux";
-  };
-
-  config = mkIf cfg.enable {
+{...}: {
+  flake.modules.homeManager.common = {pkgs, ...}: {
     programs.tmux = {
       enable = true;
       escapeTime = 0;
