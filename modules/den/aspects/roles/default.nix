@@ -5,5 +5,6 @@
   den.aspects.roles.default.includes = with den.aspects; [
     core.nix
     core.locale
+    core.users-base
   ];
 }
