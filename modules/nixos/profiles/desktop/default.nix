@@ -1,38 +1,12 @@
-{
-  config,
-  lib,
-  ...
-}: let
-  inherit (lib.options) mkEnableOption;
-  inherit (lib.modules) mkIf;
-
-  cfg = config.cosmos.profiles.desktop;
+# The `desktop` aggregate: adds the graphical baseline on top of `common`
+# (fontconfig, styling, networkmanager, audio, bluetooth, nh all self-register
+# into `flake.modules.nixos.desktop`). Desktop hosts import both `common` and
+# `desktop`. This file adds the profile-level glue + the desktop home aggregate.
+{config, ...}: let
+  home = config.flake.modules.homeManager;
 in {
-  options.cosmos.profiles.desktop = {
-    enable = mkEnableOption "desktop configuration";
-  };
-  config = mkIf cfg.enable {
-    cosmos = {
-      profiles = {
-        common.enable = true;
-        desktop.addons = {
-          fontconfig.enable = true;
-        };
-      };
-
-      networking.networkmanager.enable = true;
-
-      hardware = {
-        audio.enable = true;
-        bluetoothctl.enable = true;
-      };
-
-      cli.programs = {
-        nh.enable = true;
-      };
-
-      user.name = "lvdar";
-    };
+  flake.modules.nixos.desktop = {config, ...}: {
+    cosmos.user.name = "lvdar";
 
     services.libinput = {
       enable = true;
@@ -41,5 +15,8 @@ in {
         accelProfile = "flat";
       };
     };
+
+    # The primary user's home gets the desktop home aggregate.
+    home-manager.users.${config.cosmos.user.name}.imports = [home.desktop];
   };
 }

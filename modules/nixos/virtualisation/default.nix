@@ -1,51 +1,25 @@
-{
-  config,
-  lib,
-  ...
-}: let
-  inherit (lib.options) mkEnableOption;
-  inherit (lib.modules) mkIf mkMerge;
+# libvirt/virt-manager. The nixos half owns the daemon; the homeManager half
+# carries the virt-manager dconf defaults (replacing the old cosmos.user.extraConfig
+# bridge). A host wanting virtualisation imports both halves.
+{...}: {
+  flake.modules.nixos.virtualisation = {...}: {
+    cosmos.user.extraGroups = ["libvirtd"];
 
-  cfg = config.cosmos.virtualisation;
-in {
-  options.cosmos.virtualisation = {
-    enable = mkEnableOption "virtualisation";
-    containers.enable = mkEnableOption "containers";
+    programs.virt-manager.enable = true;
+
+    cosmos.system.impermanence.persist.directories = ["/var/lib/libvirt"];
+    virtualisation = {
+      libvirtd.enable = true;
+      spiceUSBRedirection.enable = true;
+    };
   };
 
-  config = mkMerge [
-    (mkIf cfg.enable {
-      cosmos.user = {
-        extraGroups = ["libvirtd"];
-        extraConfig = {
-          dconf.settings = {
-            "org/virt-manager/virt-manager/connections" = {
-              autoconnect = ["qemu:///system"];
-              uris = ["qemu:///system"];
-            };
-          };
-        };
+  flake.modules.homeManager.virtualisation = {...}: {
+    dconf.settings = {
+      "org/virt-manager/virt-manager/connections" = {
+        autoconnect = ["qemu:///system"];
+        uris = ["qemu:///system"];
       };
-
-      programs.virt-manager.enable = true;
-
-      cosmos.system.impermanence.persist.directories = ["/var/lib/libvirt"];
-      virtualisation = {
-        libvirtd.enable = true;
-        spiceUSBRedirection.enable = true;
-      };
-    })
-    (mkIf cfg.containers.enable {
-      cosmos.user.extraGroups = ["podman" "kvm"];
-      boot.kernelModules = ["kvm-intel"];
-      virtualisation = {
-        containers.enable = true;
-        podman = {
-          enable = true;
-          dockerCompat = true;
-          defaultNetwork.settings.dns_enabled = true;
-        };
-      };
-    })
-  ];
+    };
+  };
 }

@@ -1,33 +1,12 @@
-{
-  inputs,
-  config,
-  lib,
-  ...
-}: let
-  inherit (lib.cosmos) get-non-default-nix-files;
-  inherit (lib.options) mkEnableOption;
-  inherit (lib.modules) mkIf;
-
-  cfg = config.cosmos.cli.programs.nvim;
-in {
-  imports =
-    [
-      inputs.nixvim.homeModules.nixvim
-    ]
-    ++ get-non-default-nix-files ./.;
-
-  options.cosmos.cli.programs.nvim = {
-    enable = mkEnableOption "nvim";
+# nvim (nixvim). The implementation lives under ./_impl (import-tree ignores
+# `_` paths), which keeps its own nested options/keymaps/languages/plugins
+# structure. Language and plugin toggles (cosmos.cli.programs.nvim.languages.*)
+# are set by whichever host imports this feature.
+{...}: {
+  flake-file.inputs.nixvim = {
+    url = "github:nix-community/nixvim";
+    inputs.nixpkgs.follows = "nixpkgs";
   };
 
-  config = mkIf cfg.enable {
-    programs.nixvim = {
-      enable = true;
-      defaultEditor = true;
-
-      nixpkgs.useGlobalPackages = true;
-
-      waylandSupport = config.cosmos.desktops.hyprland.enable;
-    };
-  };
+  flake.modules.homeManager.common = ./_impl;
 }
