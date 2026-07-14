@@ -1,5 +1,6 @@
-{...}: {
-  flake.modules.homeManager.common = {...}: {
+# ripgrep. Standalone named module for wrapping; `common` imports it.
+{config, ...}: {
+  flake.modules.homeManager.ripgrep = {...}: {
     programs.ripgrep = {
       enable = true;
       arguments = [
@@ -13,4 +14,6 @@
       ];
     };
   };
+
+  flake.modules.homeManager.common.imports = [config.flake.modules.homeManager.ripgrep];
 }

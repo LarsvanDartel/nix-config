@@ -1,5 +1,6 @@
-{...}: {
-  flake.modules.homeManager.common = {
+# oh-my-posh. Standalone named module for wrapping; `common` imports it.
+{config, ...}: {
+  flake.modules.homeManager."oh-my-posh" = {
     config,
     lib,
     ...
@@ -116,4 +117,6 @@
       };
     };
   };
+
+  flake.modules.homeManager.common.imports = [config.flake.modules.homeManager."oh-my-posh"];
 }
