@@ -1,5 +1,6 @@
-{...}: {
-  flake.modules.homeManager.common = {...}: {
+# lazygit. Standalone named module for wrapping; `common` imports it.
+{config, ...}: {
+  flake.modules.homeManager.lazygit = {...}: {
     programs.lazygit = {
       enable = true;
       settings = {
@@ -8,4 +9,6 @@
       };
     };
   };
+
+  flake.modules.homeManager.common.imports = [config.flake.modules.homeManager.lazygit];
 }
