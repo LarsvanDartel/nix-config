@@ -14,7 +14,10 @@
   inputs,
   ...
 }: {
-  den.hosts.x86_64-linux.endeavourd.users.nixos = {};
+  den.hosts.x86_64-linux.endeavourd = {
+    hostName = "endeavour";
+    users.nixos = {};
+  };
 
   den.aspects.endeavourd = {
     includes = with den.aspects; [
