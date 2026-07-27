@@ -19,6 +19,9 @@
     includes = with den.aspects; [
       roles.server
       core.boot
+      core.impermanence
+      services.pangolin
+      services.typstnique
     ];
 
     nixos = {...}: {
@@ -29,9 +32,12 @@
         ../../hosts/gaia/_hw/disko.nix
       ];
 
-      cosmos.system.boot = {
-        legacy = true;
-        grub-device = "/dev/sda";
+      cosmos.system = {
+        boot = {
+          legacy = true;
+          grub-device = "/dev/sda";
+        };
+        impermanence.device = "/dev/disk/by-label/nixos";
       };
 
       system.stateVersion = "24.11";
