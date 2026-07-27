@@ -20,7 +20,11 @@
   };
 
   den.aspects.voyagerd = {
-    includes = [den.aspects.core.boot];
+    includes = with den.aspects; [
+      core.boot
+      roles.desktop
+      desktop.hyprland
+    ];
 
     nixos = {...}: {
       imports = [
