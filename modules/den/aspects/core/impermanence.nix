@@ -6,39 +6,12 @@
 # feature; the impermanence nixos module auto-injects the HM impermanence module
 # (home.persistence option).
 {inputs, ...}: let
-  # Home persistence activation + its option schema (home-relative persist paths).
-  # Self-contained so it works as a sharedModule regardless of the home baseline.
-  homeImpermanence = {
-    config,
-    lib,
-    ...
-  }: let
-    inherit (lib.types) listOf str coercedTo attrsOf bool;
-    inherit (lib.options) mkOption;
-  in {
-    options.cosmos.system.impermanence = {
-      active = mkOption {
-        type = bool;
-        default = false;
-        internal = true;
-      };
-      persist = {
-        files = mkOption {
-          type = listOf (coercedTo str (f: {file = f;}) (attrsOf str));
-          default = [];
-        };
-        directories = mkOption {
-          type = listOf (coercedTo str (d: {directory = d;}) (attrsOf str));
-          default = [];
-        };
-      };
-    };
-
-    config = {
-      cosmos.system.impermanence.active = true;
-      home.persistence."/persist" = {
-        inherit (config.cosmos.system.impermanence.persist) files directories;
-      };
+  # Home persistence activation. The cosmos.system.impermanence option schema is
+  # declared by home.core (in every user's baseline); here we only set values.
+  homeImpermanence = {config, ...}: {
+    cosmos.system.impermanence.active = true;
+    home.persistence."/persist" = {
+      inherit (config.cosmos.system.impermanence.persist) files directories;
     };
   };
 in {
