@@ -23,7 +23,10 @@
     })
     ["nixpkgs"];
 in {
-  den.hosts.aarch64-linux.pioneerd.users.nixos = {};
+  den.hosts.aarch64-linux.pioneerd = {
+    hostName = "pioneer";
+    users.nixos = {};
+  };
 
   den.aspects.pioneerd = {
     includes = [den.aspects.roles.server];

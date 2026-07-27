@@ -14,7 +14,10 @@
   inputs,
   ...
 }: {
-  den.hosts.x86_64-linux.voyagerd.users.lvdar = {};
+  den.hosts.x86_64-linux.voyagerd = {
+    hostName = "voyager";
+    users.lvdar = {};
+  };
 
   den.aspects.voyagerd = {
     includes = [den.aspects.core.boot];
