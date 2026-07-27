@@ -13,7 +13,10 @@
   inputs,
   ...
 }: {
-  den.hosts.x86_64-linux.gaiad.users.nixos = {};
+  den.hosts.x86_64-linux.gaiad = {
+    hostName = "gaia";
+    users.nixos = {};
+  };
 
   den.aspects.gaiad = {
     includes = with den.aspects; [
