@@ -3,6 +3,6 @@
 {den, ...}: {
   den.aspects.home.hyprland = {
     includes = [den.aspects.home.clipse];
-    homeManager.imports = [../../../home/desktops/hyprland/_impl];
+    homeManager.imports = [../../../../home/desktops/hyprland/_impl];
   };
 }
