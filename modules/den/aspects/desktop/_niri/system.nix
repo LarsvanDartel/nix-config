@@ -16,7 +16,54 @@
   # user-scoped noctalia package (see home.noctalia).
   noctalia = target: action: "noctalia-shell ipc call ${target} ${action}";
 
+  # No foot server runs under niri, so use the standalone binary.
   terminal = "foot";
+
+  # A bind that still fires while the screen is locked. `allow-when-locked` is a
+  # KDL *property* of the bind node, so it goes in `props`, with the action as
+  # the node's content.
+  locked = action: _: {
+    props.allow-when-locked = true;
+    content = action;
+  };
+
+  # Workspace keys, matching the Hyprland config's `code:10`..`code:18`.
+  #
+  # niri binds by XKB *key name* and has no keycode escape hatch, so we cannot
+  # say "physical key 1" directly. Under Programmer Dvorak (us/dvp) the number
+  # row's digits are both shifted AND reordered (Shift gives 7 5 3 1 9 0 2 4 6),
+  # so `Mod+1` would land on the physical 5 key. Binding the row's *unshifted*
+  # keysyms instead hits exactly the physical keys Hyprland's keycodes did.
+  #
+  #   physical:  1  2  3  4  5  6  7  8  9
+  #   us(dvp):   &  [  {  }  (  =  *  )  +
+  workspaceKeys = [
+    "ampersand"
+    "bracketleft"
+    "braceleft"
+    "braceright"
+    "parenleft"
+    "equal"
+    "asterisk"
+    "parenright"
+    "plus"
+  ];
+
+  workspaceBinds = lib.listToAttrs (
+    lib.flatten (
+      lib.imap1 (i: key: [
+        {
+          name = "Mod+${key}";
+          value.focus-workspace = i;
+        }
+        {
+          name = "Mod+Shift+${key}";
+          value.move-column-to-workspace = i;
+        }
+      ])
+      workspaceKeys
+    )
+  );
 
   niri = inputs.nix-wrapper-modules.wrappers.niri.wrap {
     inherit pkgs;
@@ -33,15 +80,28 @@
     v2-settings = true;
 
     settings = {
+      # Mirrors the Hyprland input block (_hyprland/settings.nix).
       input = {
-        keyboard.xkb = {
-          inherit (config.services.xserver.xkb) layout variant options;
+        keyboard = {
+          xkb = {
+            layout = "us,us";
+            variant = "dvp,intl";
+            options = "caps:escape,grp:win_space_toggle";
+          };
+          repeat-delay = 300;
+          repeat-rate = 20;
         };
         touchpad = {
           tap = _: {};
           natural-scroll = _: {};
-          dwt = _: {};
+          scroll-factor = 0.2;
+          # `dwt` is deliberately unset: Hyprland has disable_while_typing = false.
         };
+        mouse = {
+          accel-profile = "flat";
+          accel-speed = 0.0;
+        };
+        # Hyprland's follow_mouse = 2.
         focus-follows-mouse = _: {};
       };
 
@@ -68,64 +128,68 @@
 
       environment.NIXOS_OZONE_WL = "1";
 
-      binds = {
-        "Mod+Shift+Slash".show-hotkey-overlay = _: {};
+      # Ported from the Hyprland binds (_hyprland/binds.nix): same keys, same
+      # modifiers, niri's equivalent actions.
+      binds =
+        {
+          # Compositor
+          "Mod+Shift+Q".quit = _: {};
+          "Mod+Shift+C".close-window = _: {};
+          "Mod+F".fullscreen-window = _: {};
+          "Mod+T".toggle-window-floating = _: {};
+          # (Hyprland's Mod+D toggle_swallow has no niri equivalent.)
 
-        # launching — the shell's parts are reached over noctalia's IPC
-        "Mod+Return".spawn = terminal;
-        "Mod+D".spawn-sh = noctalia "launcher" "toggle";
-        "Mod+N".spawn-sh = noctalia "notifications" "toggleHistory";
-        "Mod+C".spawn-sh = noctalia "controlCenter" "toggle";
-        "Super+Alt+L".spawn-sh = noctalia "lockScreen" "lock";
-        "Mod+Shift+E".spawn-sh = noctalia "sessionMenu" "toggle";
+          # Move focus
+          "Mod+L".focus-column-right = _: {};
+          "Mod+H".focus-column-left = _: {};
+          "Mod+K".focus-window-up = _: {};
+          "Mod+J".focus-window-down = _: {};
 
-        # windows
-        "Mod+Q".close-window = _: {};
-        "Mod+H".focus-column-left = _: {};
-        "Mod+L".focus-column-right = _: {};
-        "Mod+J".focus-window-down = _: {};
-        "Mod+K".focus-window-up = _: {};
-        "Mod+Ctrl+H".move-column-left = _: {};
-        "Mod+Ctrl+L".move-column-right = _: {};
-        "Mod+Ctrl+J".move-window-down = _: {};
-        "Mod+Ctrl+K".move-window-up = _: {};
+          # Move window
+          "Mod+Shift+L".move-column-right = _: {};
+          "Mod+Shift+H".move-column-left = _: {};
+          "Mod+Shift+K".move-window-up = _: {};
+          "Mod+Shift+J".move-window-down = _: {};
 
-        "Mod+R".switch-preset-column-width = _: {};
-        "Mod+F".maximize-column = _: {};
-        "Mod+Shift+F".fullscreen-window = _: {};
-        "Mod+V".toggle-window-floating = _: {};
-        "Mod+O".toggle-overview = _: {};
+          # Resize window
+          "Mod+Ctrl+L".set-column-width = "+10%";
+          "Mod+Ctrl+H".set-column-width = "-10%";
+          "Mod+Ctrl+K".set-window-height = "-10%";
+          "Mod+Ctrl+J".set-window-height = "+10%";
 
-        # workspaces
-        "Mod+1".focus-workspace = 1;
-        "Mod+2".focus-workspace = 2;
-        "Mod+3".focus-workspace = 3;
-        "Mod+4".focus-workspace = 4;
-        "Mod+Ctrl+1".move-column-to-workspace = 1;
-        "Mod+Ctrl+2".move-column-to-workspace = 2;
-        "Mod+Ctrl+3".move-column-to-workspace = 3;
-        "Mod+Ctrl+4".move-column-to-workspace = 4;
-        "Mod+U".focus-workspace-down = _: {};
-        "Mod+I".focus-workspace-up = _: {};
+          # Power menu / lock
+          "Mod+Escape".spawn-sh = noctalia "sessionMenu" "toggle";
+          "Mod+Shift+Escape".spawn-sh = noctalia "lockScreen" "lock";
 
-        # screenshots
-        "Print".screenshot = _: {};
-        "Ctrl+Print".screenshot-screen = _: {};
-        "Alt+Print".screenshot-window = _: {};
+          # Utilities
+          "Mod+Shift+Return".spawn = terminal;
+          "Mod+Tab".spawn-sh = noctalia "launcher" "toggle";
+          "Alt+Tab".toggle-overview = _: {};
+          "Mod+V".spawn-sh = noctalia "launcher" "toggle"; # clipboard lives in the launcher
+          "Mod+S".screenshot = _: {};
+          "Mod+Shift+S".screenshot-window = _: {};
 
-        # media / hardware keys
-        "XF86AudioRaiseVolume".spawn = ["wpctl" "set-volume" "@DEFAULT_AUDIO_SINK@" "5%+"];
-        "XF86AudioLowerVolume".spawn = ["wpctl" "set-volume" "@DEFAULT_AUDIO_SINK@" "5%-"];
-        "XF86AudioMute".spawn = ["wpctl" "set-mute" "@DEFAULT_AUDIO_SINK@" "toggle"];
-        "XF86AudioMicMute".spawn = ["wpctl" "set-mute" "@DEFAULT_AUDIO_SOURCE@" "toggle"];
-        "XF86MonBrightnessUp".spawn = ["brightnessctl" "set" "5%+"];
-        "XF86MonBrightnessDown".spawn = ["brightnessctl" "set" "5%-"];
-        "XF86AudioPlay".spawn = ["playerctl" "play-pause"];
-        "XF86AudioNext".spawn = ["playerctl" "next"];
-        "XF86AudioPrev".spawn = ["playerctl" "previous"];
+          # niri extras with no Hyprland counterpart
+          "Mod+R".switch-preset-column-width = _: {};
+          "Mod+O".toggle-overview = _: {};
+          "Mod+Shift+Slash".show-hotkey-overlay = _: {};
 
-        "Ctrl+Alt+Delete".quit = _: {};
-      };
+          # Brightness / audio / media — `allow-when-locked` is a property on the
+          # bind node itself, so these use the wrapper's props/content form.
+          "XF86MonBrightnessUp" = locked {spawn = ["brightnessctl" "set" "+5%"];};
+          "XF86MonBrightnessDown" = locked {spawn = ["brightnessctl" "set" "5%-"];};
+
+          "XF86AudioRaiseVolume" = locked {spawn = ["pamixer" "-i" "5"];};
+          "XF86AudioLowerVolume" = locked {spawn = ["pamixer" "-d" "5"];};
+          "XF86AudioMute" = locked {spawn = ["pamixer" "--toggle-mute"];};
+          "XF86AudioMicMute" = locked {spawn = ["pamixer" "--default-source" "--toggle-mute"];};
+
+          "XF86AudioNext" = locked {spawn = ["playerctl" "next"];};
+          "XF86AudioPrev" = locked {spawn = ["playerctl" "previous"];};
+          "XF86AudioPlay" = locked {spawn = ["playerctl" "play-pause"];};
+          "XF86AudioStop" = locked {spawn = ["playerctl" "stop"];};
+        }
+        // workspaceBinds;
 
       window-rules = [
         {
@@ -157,7 +221,9 @@ in {
     # but the module does not install it.
     xwayland-satellite
     wl-clipboard
+    # referenced by the binds below (same tools the Hyprland binds use)
     brightnessctl
+    pamixer
     playerctl
   ];
 
