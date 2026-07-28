@@ -3,6 +3,6 @@
 # The nixvim input is declared by the legacy nvim module during migration.
 {...}: {
   den.aspects.home.nvim.homeManager.imports = [
-    ../../../../home/cli/programs/nvim/_impl
+    ./_nvim
   ];
 }

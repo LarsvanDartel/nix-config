@@ -1,19 +1,10 @@
-{
-  config,
-  lib,
-  pkgs,
-  ...
-}: let
-  inherit (lib.options) mkEnableOption;
-  inherit (lib.modules) mkIf;
-
-  cfg = config.cosmos.desktops.hyprland.addons.waybar;
-in {
-  options.cosmos.desktops.hyprland.addons.waybar = {
-    enable = mkEnableOption "waybar";
-  };
-
-  config = mkIf cfg.enable {
+# home.hyprland.waybar — status bar.
+{...}: {
+  den.aspects.home.hyprland.waybar.homeManager = {
+    config,
+    pkgs,
+    ...
+  }: {
     stylix.targets.waybar.enable = false;
 
     programs.waybar = {
@@ -30,10 +21,10 @@ in {
           @define-color base0C ${base0C}; @define-color base0D ${base0D};
           @define-color base0E ${base0E}; @define-color base0F ${base0F};
         ''
-        + builtins.readFile ./style.css;
+        + builtins.readFile ./waybar-style.css;
       settings = let
         terminal = config.cosmos.cli.terminals.default;
-        powermenu = "${config.cosmos.desktops.hyprland.addons.rofi.package}/bin/rofi -show power-menu";
+        powermenu = "${pkgs.rofi}/bin/rofi -show power-menu";
       in [
         {
           layer = "top";
@@ -68,14 +59,14 @@ in {
           };
           "cpu" = {
             interval = 10;
-            format = " {usage:d}%";
+            format = " {usage:d}%";
             max-length = 10;
             tooltip-format = "{usage:d}% used\n\nClick to open btop.";
             on-click = "${terminal} -e ${pkgs.btop}/bin/btop";
           };
           "memory" = {
             interval = 10;
-            format = " {percentage}%";
+            format = " {percentage}%";
             tooltip-format = "{used:0.1f}GiB used\n\nClick to open btop.";
             on-click = "${terminal} -e ${pkgs.btop}/bin/btop";
           };
@@ -86,8 +77,6 @@ in {
           };
           "pulseaudio" = {
             format = "{icon} {volume}%";
-            # format-alt = "{format_source}";
-            # format = "{icon} {volume}% {format_source}";
             format-bluetooth = "{volume}% 󰥰 {format_source}";
             format-bluetooth-muted = "󰟎 {format_source}";
             format-muted = "󰝟 {format_source}";
@@ -99,18 +88,18 @@ in {
               headphone = "󰋋";
               hands-free = "󰋋";
               headset = "󰋋";
-              phone = "";
-              portable = "";
-              car = "";
+              phone = "";
+              portable = "";
+              car = "";
               muted-icon = "󰝟";
               default = ["󰕿" "󰖀" "󰕾"];
             };
           };
           "bluetooth" = {
-            format = "";
-            format-connected = " {num_connections}";
-            format-disabled = " DISABLED";
-            format-off = " OFF";
+            format = "";
+            format-connected = " {num_connections}";
+            format-disabled = " DISABLED";
+            format-off = " OFF";
             interval = 30;
             on-click = "${terminal} -e ${pkgs.bluetuith}/bin/bluetuith";
             format-no-controller = "";
@@ -119,9 +108,7 @@ in {
             tooltip-format-enumerate-connected = "{device_alias} ({device_address})";
             tooltip-format-enumerate-connected-battery = "{device_alias} ({device_address}) {device_battery_percentage}% battery";
           };
-          "hyprland/workspaces" = {
-            persistent-workspaces = [1 2 3 4 5 6 7 8 9];
-          };
+          "hyprland/workspaces".persistent-workspaces = [1 2 3 4 5 6 7 8 9];
           "tray" = {
             spacing = 10;
             icon-size = 24;
@@ -136,12 +123,8 @@ in {
             ];
           };
           "custom/clipse" = {
-            format = "";
+            format = "";
             on-click = "${terminal} -a clipse -e ${pkgs.clipse}/bin/clipse";
-            # FIXME: add clipse functionality
-            # on-click-middle = "sleep 0.1 && ${config.cosmos.home.homeDirectory}/cliphist-helper.sh wipe";
-            # on-click-right = "sleep 0.1 && ${config.cosmos.home.homeDirectory}/cliphist-helper.sh remove";
-            # tooltip-format = "Cliphist\n\n<small>Click to open and select to copy to clipboard, middle click to\nwipe entire history, and right click to open menu in order to\nremove a single item.</small>";
           };
           "battery" = {
             "states" = {
@@ -151,12 +134,11 @@ in {
             };
             bat = "BAT0";
             format = "{icon} {capacity}%";
-            format-charging = "  {capacity}%";
-            format-plugged = "  {capacity}%";
-            format-icons = ["" "" "" "" ""];
+            format-charging = "  {capacity}%";
+            format-plugged = "  {capacity}%";
+            format-icons = ["" "" "" "" ""];
           };
           "clock" = {
-            #format = "<big>      <b>{:%H:%M</b></big>\n<small>󰃮  %d %h %Y</small>}"; # Time in row one, date in row two; suggested height = 45
             locale = "nl_NL.UTF-8";
             format = "<big><b>{:%H:%M}</b></big>";
             format-alt = "<big><b>󰃮  {:%Y-%m-%d}</b></big>";
@@ -183,7 +165,7 @@ in {
             };
           };
           "custom/exit" = {
-            format = "";
+            format = "";
             on-click = "${powermenu}";
             tooltip-format = "Power menu\n\n<small>Click to open menu.</small>";
           };
