@@ -1,6 +1,17 @@
-# services.unbound — recursive DNS + oisd blocklist. The oisd inputs are declared
-# by the legacy module during migration.
+# services.unbound — recursive DNS + oisd blocklist. Owns the oisd inputs
+# (referenced by hosts that build a blocklist, e.g. endeavour).
 {...}: {
+  flake-file.inputs = {
+    oisd-big-unbound = {
+      url = "https://big.oisd.nl/unbound";
+      flake = false;
+    };
+    oisd-nsfw-unbound = {
+      url = "https://nsfw.oisd.nl/unbound";
+      flake = false;
+    };
+  };
+
   den.aspects.services.unbound.nixos = {
     config,
     lib,

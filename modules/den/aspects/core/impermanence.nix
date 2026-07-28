@@ -15,6 +15,8 @@
     };
   };
 in {
+  flake-file.inputs.impermanence.url = "github:nix-community/impermanence";
+
   den.aspects.core.impermanence.nixos = {
     config,
     lib,

@@ -1,6 +1,7 @@
-# typstnique service (was flake.modules.nixos.typstnique). Input declared by the
-# legacy module during migration; referenced here.
+# typstnique service.
 {inputs, ...}: {
+  flake-file.inputs.typstnique.url = "github:LarsvanDartel/typstnique";
+
   den.aspects.services.typstnique.nixos = {...}: {
     imports = [inputs.typstnique.nixosModules.default];
 
