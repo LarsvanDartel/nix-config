@@ -24,6 +24,8 @@
     };
   };
 in {
+  flake-file.inputs.vpn-confinement.url = "github:Maroka-chan/VPN-Confinement";
+
   # Base: media group + shared media/state dirs.
   den.aspects.services.arr.nixos = {
     config,

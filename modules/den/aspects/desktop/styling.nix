@@ -2,6 +2,11 @@
 # config read it from the home user's stylix; setting it directly avoids a
 # home→nixos cross-eval and matches the scheme home uses).
 {inputs, ...}: {
+  flake-file.inputs.stylix = {
+    url = "github:nix-community/stylix";
+    inputs.nixpkgs.follows = "nixpkgs";
+  };
+
   den.aspects.desktop.styling.nixos = {pkgs, ...}: {
     imports = [inputs.stylix.nixosModules.stylix];
 

@@ -1,5 +1,7 @@
-# services.jellyfin (jellarr). jellyfin input declared in modules/den/inputs.nix.
+# services.jellyfin (jellarr).
 {inputs, ...}: {
+  flake-file.inputs.jellarr.url = "github:venkyr77/jellarr";
+
   den.aspects.services.jellyfin.nixos = {
     config,
     lib,

@@ -1,8 +1,14 @@
-# core.sops — sops-nix + per-host secrets, user password, age key ownership
-# (was flake.modules.nixos.common in modules/nixos/security/sops.nix). The
-# sops-nix + nix-secrets inputs are already declared by the old module during
-# the migration, so they are only referenced here, not re-declared.
+# core.sops — sops-nix + per-host secrets, user password, age key ownership.
+# Owns the sops-nix + nix-secrets inputs (home.core also references sops-nix).
 {inputs, ...}: {
+  flake-file.inputs = {
+    sops-nix = {
+      url = "github:mic92/sops-nix";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+    nix-secrets.url = "git+ssh://git@github.com/LarsvanDartel/nix-secrets.git?shallow=1";
+  };
+
   den.aspects.core.sops.nixos = {
     config,
     lib,
