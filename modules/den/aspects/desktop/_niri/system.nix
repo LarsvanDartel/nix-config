@@ -183,6 +183,15 @@
           "Mod+S".screenshot = _: {};
           "Mod+Shift+S".screenshot-window = _: {};
 
+          # The Print key keeps working too (niri's own defaults).
+          "Print".screenshot = _: {};
+          "Ctrl+Print".screenshot-screen = _: {};
+          "Alt+Print".screenshot-window = _: {};
+
+          # Calculator, on Hyprland's key. qalc does units/currency/bases;
+          # opens in a floating terminal (see the window-rule below).
+          "Alt+Shift+Return".spawn = "calculator";
+
           # niri extras with no Hyprland counterpart
           "Mod+R".switch-preset-column-width = _: {};
           "Mod+O".toggle-overview = _: {};
@@ -210,6 +219,11 @@
           matches = [{is-floating = true;}];
           geometry-corner-radius = 6.0;
           clip-to-geometry = true;
+        }
+        # The calculator pops up floating, rofi-calc style.
+        {
+          matches = [{app-id = "^calculator$";}];
+          open-floating = true;
         }
       ];
     };

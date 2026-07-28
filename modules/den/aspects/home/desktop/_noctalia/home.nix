@@ -48,11 +48,19 @@
         widgets = {
           left = map widget ["Workspace" "ActiveWindow"];
           center = map widget ["Clock"];
-          right = map widget (
-            ["MediaMini" "NightLight" "KeepAwake" "WallpaperSelector"]
-            ++ ["Volume" "Brightness" "Network" "Bluetooth" "Battery"]
-            ++ ["Tray" "NotificationHistory" "ControlCenter"]
-          );
+          right =
+            map widget ["MediaMini" "Volume" "Brightness" "Network" "Bluetooth"]
+            # `icon-always` keeps the pill open, so the charge percentage shows
+            # permanently instead of only on hover.
+            ++ [
+              {
+                id = "Battery";
+                displayMode = "icon-always";
+              }
+            ]
+            ++ map widget ["Tray" "NotificationHistory" "ControlCenter"];
+          # Night light, keep-awake and the wallpaper picker stay *enabled* —
+          # they just live in the control centre rather than on the bar.
         };
       };
 
@@ -94,6 +102,9 @@
       idle.enabled = cfg.widgets.idleInhibitor;
 
       notifications.enabled = cfg.notifications.enable;
+
+      # Backgrounds the wallpaper picker browses (see home.wallpapers).
+      wallpaper.directory = config.cosmos.desktops.wallpapers.directory;
     };
   };
 in {
