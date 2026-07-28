@@ -1,14 +1,5 @@
-# hardware.* — host hardware features (fingerprint, v4l2loopback).
+# hardware.v4l2loopback — virtual V4L2 loopback cameras (OBS virtual cam, etc).
 {...}: {
-  den.aspects.hardware.fingerprint.nixos = {...}: {
-    cosmos.system.impermanence.persist.directories = ["/var/lib/fprint"];
-    systemd.services.fprintd = {
-      wantedBy = ["multi-user.target"];
-      serviceConfig.Type = "simple";
-    };
-    services.fprintd.enable = true;
-  };
-
   den.aspects.hardware.v4l2loopback.nixos = {
     config,
     lib,

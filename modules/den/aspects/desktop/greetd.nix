@@ -29,7 +29,7 @@
     };
   };
 
-  den.aspects.desktop.tuigreet = {
+  den.aspects.desktop.greetd.tuigreet = {
     includes = [den.aspects.desktop.greetd];
     nixos = {
       config,
