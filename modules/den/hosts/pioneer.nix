@@ -29,7 +29,10 @@ in {
   };
 
   den.aspects.pioneerd = {
-    includes = [den.aspects.roles.server];
+    includes = with den.aspects; [
+      roles.server
+      services.pangolin-newt
+    ];
 
     nixos = {lib, ...}: {
       imports = [
