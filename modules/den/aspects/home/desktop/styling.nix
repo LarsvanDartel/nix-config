@@ -7,7 +7,7 @@
     pkgs,
     ...
   }: {
-    imports = [../../../home/desktops/common/styling/_impl];
+    imports = [../../../../home/desktops/common/styling/_impl];
 
     cosmos.desktops.common.styling = {
       fonts = let

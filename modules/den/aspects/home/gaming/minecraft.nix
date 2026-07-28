@@ -12,7 +12,7 @@
 
     cfg = config.cosmos.gaming.launchers.minecraft;
   in {
-    imports = [../../../home/gaming/launchers/minecraft/_waywall.nix];
+    imports = [../../../../home/gaming/launchers/minecraft/_waywall.nix];
 
     options.cosmos.gaming.launchers.minecraft.mcsr.enable = mkEnableOption "mcsr setup";
 
@@ -43,12 +43,12 @@
           enableWaywork = true;
           enableFloating = true;
           programs = [pkgs.mcsr.ninjabrain-bot];
-          files.eye_overlay = ../../../home/gaming/launchers/minecraft/eye-overlay.png;
+          files.eye_overlay = ../../../../home/gaming/launchers/minecraft/eye-overlay.png;
           text =
             ''
               local resolution = { w = 1920, h = 1080 }
             ''
-            + builtins.readFile ../../../home/gaming/launchers/minecraft/waywall.lua;
+            + builtins.readFile ../../../../home/gaming/launchers/minecraft/waywall.lua;
         };
       };
     };
