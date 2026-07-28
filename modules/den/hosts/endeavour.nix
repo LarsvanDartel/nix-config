@@ -1,5 +1,5 @@
 # endeavour (x86_64 media/services server, intel+nvidia, ZFS). den-produced;
-# named `endeavourd` during the migration to avoid colliding with the old one.
+# named `endeavour` during the migration to avoid colliding with the old one.
 #
 # Hardware from a nixos-facter report; filesystems from disko. Generate on it:
 #   sudo nix run nixpkgs#nixos-facter -- -o modules/den/hosts/_facter/endeavour.facter.json
@@ -14,12 +14,9 @@
   inputs,
   ...
 }: {
-  den.hosts.x86_64-linux.endeavourd = {
-    hostName = "endeavour";
-    users.nixos = {};
-  };
+  den.hosts.x86_64-linux.endeavour.users.nixos = {};
 
-  den.aspects.endeavourd = {
+  den.aspects.endeavour = {
     # host provides this home config to its users (just `nixos` here).
     provides.to-users.homeManager = {...}: {
       cosmos.system.impermanence.persist.directories = ["dev"];
