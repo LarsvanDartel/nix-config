@@ -27,7 +27,12 @@
     nixos = {...}: {
       imports = [
         inputs.nixos-facter-modules.nixosModules.facter
-        {facter.reportPath = ./_facter/gaia.facter.json;}
+        {
+          facter.reportPath = ./_facter/gaia.facter.json;
+          # Headless VM: skip graphics detection (mesa/llvm ~800MB). Set alongside
+          # reportPath so it isn't a config-read that recurses under den.
+          facter.detected.graphics.enable = false;
+        }
         inputs.disko.nixosModules.disko
         ../../hosts/gaia/_hw/disko.nix
       ];
