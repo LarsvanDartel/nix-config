@@ -4,6 +4,7 @@
   den.aspects.roles.desktop-home = {
     includes = with den.aspects.home; [
       styling
+      wallpapers
       hyprland
       foot
       firefox
@@ -14,6 +15,7 @@
       kde-connect
       bluetuith
       pulsemixer
+      calculator
     ];
 
     # profile value: nvim in wayland mode on desktop.
