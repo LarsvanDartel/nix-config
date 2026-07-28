@@ -26,6 +26,9 @@
       desktop.hyprland
     ];
 
+    # the primary user gets the desktop home environment on this host.
+    lvdar.includes = [den.aspects.roles.desktop-home];
+
     nixos = {...}: {
       imports = [
         inputs.nixos-facter-modules.nixosModules.facter
