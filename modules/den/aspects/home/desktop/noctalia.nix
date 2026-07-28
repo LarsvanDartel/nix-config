@@ -2,10 +2,10 @@
 # control centre) as ONE compositor-agnostic, WRAPPED package.
 #
 # Config is baked into the derivation by `nix-wrapper-modules`' noctalia-shell
-# wrapper. noctalia's settings panel is a GUI that rewrites its own config, so a
-# pure store config would be read-only; `outOfStoreConfig` + `autoCopyConfig`
-# seed our declarative look into a writable dir on first start (never
-# overwriting what is already there), keeping the GUI usable.
+# wrapper: NOCTALIA_SETTINGS_FILE points at the generated store file, so nix is
+# authoritative and a rebuild applies immediately. noctalia's settings panel
+# therefore cannot save — settings are edited here. The rest of its config dir
+# (colors.json, colorschemes/, plugins/) stays writable in ~/.config/noctalia.
 #
 # Started by a systemd user service bound to `graphical-session.target`, which
 # both niri (niri.service) and Hyprland (UWSM) reach — so this one aspect serves
