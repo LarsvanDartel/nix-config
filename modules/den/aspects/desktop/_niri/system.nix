@@ -49,16 +49,20 @@
     "plus"
   ];
 
+  # Refer to the workspaces by NAME (see `workspaces` below): named workspaces
+  # always exist, so 1..9 are permanently available like Hyprland's.
   workspaceBinds = lib.listToAttrs (
     lib.flatten (
-      lib.imap1 (i: key: [
+      lib.imap1 (i: key: let
+        ws = toString i;
+      in [
         {
           name = "Mod+${key}";
-          value.focus-workspace = i;
+          value.focus-workspace = ws;
         }
         {
           name = "Mod+Shift+${key}";
-          value.move-column-to-workspace = i;
+          value.move-column-to-workspace = ws;
         }
       ])
       workspaceKeys
@@ -121,6 +125,16 @@
         };
         border.off = _: {};
       };
+
+      # Nine permanent workspaces, like Hyprland's. niri's workspaces are
+      # normally dynamic (created/destroyed on demand); *named* ones always
+      # exist even when empty, so declaring "1".."9" keeps all nine live.
+      workspaces = lib.listToAttrs (
+        map (i: {
+          name = toString i;
+          value = _: {};
+        }) (lib.range 1 9)
+      );
 
       prefer-no-csd = true;
       screenshot-path = "~/Pictures/screenshots/%Y-%m-%d %H-%M-%S.png";
