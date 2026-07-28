@@ -108,7 +108,11 @@
       };
     };
 
-    nixos = {...}: {
+    nixos = {
+      lib,
+      pkgs,
+      ...
+    }: {
       imports = [
         inputs.nixos-facter-modules.nixosModules.facter
         {facter.reportPath = ./_facter/voyager.facter.json;}
@@ -180,6 +184,40 @@
       networking.firewall.allowedTCPPorts = [25565];
 
       cosmos.system.impermanence.device = "/dev/mapper/crypted";
+
+      # Compositor choice is a BOOT-time switch: each specialisation is its own
+      # GRUB entry. The default entry stays Hyprland, so nothing changes unless
+      # a specialisation is picked.
+      #
+      # Specialisation bodies are plain NixOS modules and cannot `include` den
+      # aspects, so the niri/noctalia content is applied from the shared factory
+      # modules that the aspects also use.
+      specialisation = {
+        # Explicit, labelled entry identical to the default (inherits the parent).
+        hyprland.configuration = {};
+
+        niri.configuration = {
+          imports = [(import ../aspects/desktop/_niri/system.nix {inherit inputs;})];
+
+          # Hyprland and niri must not both own the session.
+          programs.hyprland.enable = lib.mkForce false;
+
+          home-manager.users.lvdar = {
+            imports = [(import ../aspects/home/desktop/_noctalia/home.nix {inherit inputs;})];
+
+            # noctalia replaces the Hyprland-era shell pieces.
+            wayland.windowManager.hyprland.enable = lib.mkForce false;
+            programs.waybar.enable = lib.mkForce false;
+            programs.hyprlock.enable = lib.mkForce false;
+            programs.rofi.enable = lib.mkForce false;
+            services.mako.enable = lib.mkForce false;
+            services.hyprpaper.enable = lib.mkForce false;
+
+            home.packages = [pkgs.playerctl];
+            cosmos.system.impermanence.persist.directories = ["Pictures/screenshots"];
+          };
+        };
+      };
 
       # QEMU emulation so aarch64 derivations (e.g. the pioneer Pi toplevel) can
       # be built locally on this x86_64 machine. Slow, but avoids needing the Pi

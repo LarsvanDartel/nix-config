@@ -1,30 +1,58 @@
-# desktop.greetd (+ tuigreet). greetd provides the login manager; tuigreet
-# includes it and fills the launch command.
+# desktop.greetd (+ tuigreet). greetd is the login manager; tuigreet draws the
+# session picker.
+#
+# Sessions are CURATED: each compositor aspect contributes exactly one entry via
+# `cosmos.profiles.desktop.addons.greetd.sessions`, and tuigreet is pointed at a
+# linkFarm of just those. Pointing it at the system-wide wayland-sessions dir
+# instead lists Hyprland twice, because `programs.hyprland.withUWSM` installs
+# BOTH `hyprland.desktop` ("Hyprland") and `hyprland-uwsm.desktop`
+# ("Hyprland (uwsm-managed)") — that was the duplicate-sessions bug.
 {den, ...}: {
   den.aspects.desktop.greetd.nixos = {
     config,
     lib,
     ...
   }: let
-    inherit (lib.types) str;
+    inherit (lib.types) str listOf submodule path;
     inherit (lib.options) mkOption;
 
     cfg = config.cosmos.profiles.desktop.addons.greetd;
   in {
-    options.cosmos.profiles.desktop.addons.greetd.command = mkOption {
-      type = str;
-      default = "";
-      description = "Command to run to show greeter";
+    options.cosmos.profiles.desktop.addons.greetd = {
+      command = mkOption {
+        type = str;
+        default = "";
+        description = "Command to run to show greeter";
+      };
+
+      sessions = mkOption {
+        default = [];
+        description = ''
+          Wayland sessions offered by the greeter. Compositor aspects each
+          contribute one entry, so the picker never shows duplicates.
+        '';
+        type = listOf (submodule {
+          options = {
+            name = mkOption {
+              type = str;
+              description = ''File name of the entry, e.g. "niri.desktop".'';
+            };
+            path = mkOption {
+              type = path;
+              description = "The .desktop file to offer.";
+            };
+          };
+        });
+      };
     };
 
+    # Only `default_session` — that is the greeter. `initial_session` is greetd's
+    # *autologin* slot; pointing it at the same value registered the greeter twice.
     config.services.greetd = {
       enable = true;
-      settings = rec {
-        default_session = {
-          inherit (cfg) command;
-          user = config.cosmos.user.name;
-        };
-        initial_session = default_session;
+      settings.default_session = {
+        inherit (cfg) command;
+        user = config.cosmos.user.name;
       };
     };
   };
@@ -40,9 +68,16 @@
       inherit (lib.types) str;
       inherit (lib.options) mkOption;
       inherit (lib.modules) mkDefault;
+      inherit (lib.strings) concatStringsSep;
+      inherit (lib.lists) optional;
 
-      cfg = config.cosmos.profiles.desktop.addons.greetd.tuigreet;
+      greetd = config.cosmos.profiles.desktop.addons.greetd;
+      cfg = greetd.tuigreet;
+
       tuigreet = "${pkgs.tuigreet}/bin/tuigreet";
+
+      # Exactly the entries the compositor aspects asked for — nothing else.
+      sessionDir = pkgs.linkFarm "greetd-wayland-sessions" greetd.sessions;
     in {
       options.cosmos.profiles.desktop.addons.greetd.tuigreet = {
         greeting = mkOption {
@@ -53,14 +88,32 @@
         command = mkOption {
           type = str;
           default = "";
-          description = "Command to run after login";
+          description = ''
+            Fallback session command, used only when no `sessions` are
+            contributed (otherwise the picker drives the choice).
+          '';
         };
       };
 
       config = {
         cosmos.system.impermanence.persist.directories = ["/var/cache/tuigreet"];
-        cosmos.profiles.desktop.addons.greetd.command =
-          mkDefault ''${tuigreet} --remember --remember-user-session --greeting "${cfg.greeting}" --time --cmd "${cfg.command}" --asterisks'';
+
+        # `--remember-user-session` persists the picked session per user, so the
+        # choice sticks across logins (state lives in /var/cache/tuigreet).
+        cosmos.profiles.desktop.addons.greetd.command = mkDefault (
+          concatStringsSep " " (
+            [
+              tuigreet
+              "--remember"
+              "--remember-user-session"
+              ''--greeting "${cfg.greeting}"''
+              "--time"
+              "--asterisks"
+            ]
+            ++ optional (greetd.sessions != []) "--sessions ${sessionDir}"
+            ++ optional (cfg.command != "") ''--cmd "${cfg.command}"''
+          )
+        );
 
         systemd.services.greetd.serviceConfig = {
           Type = "idle";
