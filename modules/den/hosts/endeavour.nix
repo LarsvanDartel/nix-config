@@ -20,16 +20,44 @@
   };
 
   den.aspects.endeavourd = {
+    # host provides this home config to its users (just `nixos` here).
+    provides.to-users.homeManager = {...}: {
+      cosmos.system.impermanence.persist.directories = ["dev"];
+    };
+
     includes = with den.aspects; [
       roles.server
       core.boot
+      core.impermanence
+      services.nginx
+      services.unbound
+      services.kanidm
+      services.jellyfin
+      services.immich
+      services.traccar
+      services.pangolin-newt
+      services.cdrom
+      hardware.ipmi-fancontrol
+      services.arr-vpn
+      services.transmission
+      services.sabnzbd
+      services.prowlarr
+      services.radarr
+      services.sonarr
+      services.lidarr
+      services.bazarr
+      services.jellyseerr
     ];
 
     nixos = {
       config,
       lib,
+      pkgs,
       ...
-    }: {
+    }: let
+      inherit (lib.strings) splitString concatStringsSep;
+      inherit (lib.lists) filter uniqueStrings;
+    in {
       imports = [
         inputs.nixos-facter-modules.nixosModules.facter
         {facter.reportPath = ./_facter/endeavour.facter.json;}
@@ -92,7 +120,107 @@
         trim.enable = true;
       };
 
-      sops.secrets."keys/zfs/tank" = {};
+      sops.secrets = {
+        "keys/zfs/tank" = {};
+        "keys/proton/private-key" = {};
+        "keys/eweka".owner = config.cosmos.services.arr.sabnzbd.user;
+      };
+
+      cosmos.system.impermanence = {
+        device = "/dev/disk/by-label/nixos";
+        persist.directories = [
+          {
+            directory = "/var/lib/arr";
+            user = "root";
+            group = "media";
+            mode = "0770";
+          }
+        ];
+      };
+
+      cosmos.services = {
+        unbound.blocklist = let
+          lines = str: filter (x: x != "") (splitString "\n" str);
+          bigLines = lines (builtins.readFile inputs.oisd-big-unbound);
+          nsfwLines = lines (builtins.readFile inputs.oisd-nsfw-unbound);
+          merged = concatStringsSep "\n" (uniqueStrings bigLines ++ nsfwLines);
+          file = pkgs.writeText "unbound-blocklist" merged;
+        in "${file}";
+
+        jellyfin.openFirewall = true;
+        immich.mediaDir = "/tank/media/library/images";
+
+        arr = {
+          stateDir = "/var/lib/arr";
+          mediaDir = "/tank/media";
+
+          transmission.vpn.enable = true;
+
+          sabnzbd = {
+            vpn.enable = true;
+            secretFiles = [config.sops.secrets."keys/eweka".path];
+            extraSettings = {
+              misc.host_whitelist = "${config.networking.hostName}, sabnzbd.lvdar.nl";
+              servers.eweka = {
+                displayname = "Eweka";
+                name = "Eweka News Server";
+                host = "news.eweka.nl";
+              };
+            };
+          };
+
+          seerr.port = 4055;
+
+          vpn = let
+            name = "arr";
+            privateKeyFile = config.sops.secrets."keys/proton/private-key".path;
+            postUp = pkgs.writeShellApplication {
+              name = "${name}-postup";
+              runtimeInputs = with pkgs; [wireguard-tools iproute2];
+              text = ''
+                ip netns exec ${name} wg set ${name}0 private-key <(cat ${privateKeyFile})
+              '';
+            };
+            configDir = pkgs.writeTextFile {
+              name = "config-${name}";
+              executable = false;
+              destination = "/${name}.conf";
+              text = ''
+                [Interface]
+                Address = 10.2.0.2/32
+                DNS = 10.2.0.1
+
+                [Peer]
+                PublicKey = D8Sqlj3TYwwnTkycV08HAlxcXXS3Ura4oamz8rB5ImM=
+                AllowedIPs = 0.0.0.0/0, ::/0
+                Endpoint = 103.69.224.4:51820
+              '';
+            };
+            configFile = configDir + "/${name}.conf";
+          in {
+            inherit name configFile;
+            accessibleFrom = ["192.168.2.0/24"];
+            postUp = postUp + "/bin/${name}-postup";
+          };
+        };
+
+        traccar = {
+          protocols = ["osmand"];
+          openFirewall = false;
+        };
+      };
+
+      cosmos.hardware.ipmi-fancontrol = {
+        dynamic = true;
+        minSpeed = 5;
+        curve = 5.0;
+        ignoreDevices = ["loc"];
+        nvidia-smi = {
+          enable = true;
+          maxTemp = 105;
+        };
+      };
+
       systemd.services."zfs-decode-key" = {
         description = "Decode ZFS raw key from SOPS secret";
         partOf = ["zfs-import.target"];
