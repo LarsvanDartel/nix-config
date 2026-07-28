@@ -48,7 +48,11 @@
         launcher
       ];
 
-      cosmos.cli.shells.zsh.aliases."=" = "qalc";
+      # NOT `=`: zsh reserves a leading `=` for EQUALS expansion, so it cannot be
+      # a command name. home-manager emits `alias -- '='=qalc`, which zsh rejects
+      # at startup with "bad assignment"; escaping the name or `unsetopt equals`
+      # doesn't help either — the alias is simply never resolved.
+      cosmos.cli.shells.zsh.aliases.calc = "qalc";
 
       cosmos.system.impermanence.persist.directories = [".config/qalculate"];
     };
