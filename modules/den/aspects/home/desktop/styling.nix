@@ -13,6 +13,12 @@
       fonts = let
         fontpkgs = config.cosmos.desktops.common.styling.fonts.pkgs;
       in {
+        # Turn on the font feature so the configured fonts (Cozette monospace/
+        # interface, DejaVu serif/sans, Noto emoji) actually install and drive
+        # stylix.fonts. Without this, stylix silently falls back to DejaVu Sans
+        # Mono everywhere and Cozette is never installed (long-standing latent bug).
+        enable = true;
+
         serif = fontpkgs."DejaVu Serif";
         sansSerif = fontpkgs."DejaVu Sans";
         monospace = fontpkgs."Cozette";
