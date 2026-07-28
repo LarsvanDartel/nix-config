@@ -1,10 +1,10 @@
 # core.ssh — openssh server + authorized keys for the primary user and root
 # (was flake.modules.nixos.common in modules/nixos/services/ssh/default.nix).
-# Keys still live in modules/nixos/services/ssh/keys during the migration.
+# Keys live in ./_ssh-keys (import-tree-ignored).
 {cosmosLib, ...}: let
   inherit (cosmosLib) get-files get-flake-path;
 
-  keys = get-files (get-flake-path "modules/nixos/services/ssh/keys");
+  keys = get-files (get-flake-path "modules/den/aspects/core/_ssh-keys");
 in {
   den.aspects.core.ssh.nixos = {
     config,

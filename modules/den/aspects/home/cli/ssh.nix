@@ -2,7 +2,7 @@
 {cosmosLib, ...}: let
   inherit (cosmosLib) get-file-names get-flake-path get-file-name-without-extension;
 
-  keys-path = get-flake-path "modules/nixos/services/ssh/keys";
+  keys-path = get-flake-path "modules/den/aspects/core/_ssh-keys";
   available-identities = map (name: builtins.replaceStrings ["id_" ".pub"] ["" ""] name) (get-file-names keys-path);
 in {
   den.aspects.home.ssh.homeManager = {
