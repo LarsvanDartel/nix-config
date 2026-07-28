@@ -1,21 +1,14 @@
-{
-  config,
-  lib,
-  pkgs,
-  ...
-}: let
-  inherit (lib.options) mkEnableOption mkPackageOption;
-  inherit (lib.modules) mkIf mkForce;
-
-  cfg = config.cosmos.desktops.hyprland.addons.rofi;
-  rofi-dir = ".local/share/rofi";
-in {
-  options.cosmos.desktops.hyprland.addons.rofi = {
-    enable = mkEnableOption "rofi";
-    package = mkPackageOption pkgs "rofi" {};
-  };
-
-  config = mkIf cfg.enable {
+# home.hyprland.rofi — application launcher / menu.
+{...}: {
+  den.aspects.home.hyprland.rofi.homeManager = {
+    config,
+    lib,
+    pkgs,
+    ...
+  }: let
+    inherit (lib.modules) mkForce;
+    rofi-dir = ".local/share/rofi";
+  in {
     cosmos.system.impermanence.persist.directories = [rofi-dir];
 
     home.packages = with pkgs; [
@@ -26,7 +19,6 @@ in {
 
     programs.rofi = {
       enable = true;
-      inherit (cfg) package;
       terminal = "${config.cosmos.cli.terminals.default}";
       cycle = true;
       plugins = with pkgs; [
@@ -55,7 +47,7 @@ in {
               background:       transparent;
               text-color:       ${base06};
             }
-            ${builtins.readFile ./theme.rasi}
+            ${builtins.readFile ./rofi-theme.rasi}
           ''
       );
       extraConfig = {

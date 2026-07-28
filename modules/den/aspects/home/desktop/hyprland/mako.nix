@@ -1,19 +1,13 @@
-{
-  config,
-  lib,
-  pkgs,
-  ...
-}: let
-  inherit (lib.options) mkEnableOption;
-  inherit (lib.modules) mkIf mkOrder;
-
-  cfg = config.cosmos.desktops.hyprland.addons.mako;
-in {
-  options.cosmos.desktops.hyprland.addons.mako = {
-    enable = mkEnableOption "mako";
-  };
-
-  config = mkIf cfg.enable {
+# home.hyprland.mako — notification daemon (sibling of home.hyprland).
+{...}: {
+  den.aspects.home.hyprland.mako.homeManager = {
+    config,
+    lib,
+    pkgs,
+    ...
+  }: let
+    inherit (lib.modules) mkOrder;
+  in {
     cosmos.desktops.hyprland.exec-once-extras = mkOrder 800 [
       "${pkgs.mako}/bin/mako"
     ];
@@ -27,15 +21,9 @@ in {
         anchor = "top-right";
         border-size = 3;
         border-radius = 7;
-        "urgency=low" = {
-          border-color = base0B;
-        };
-        "urgency=normal" = {
-          border-color = base0C;
-        };
-        "urgency=high" = {
-          border-color = base08;
-        };
+        "urgency=low".border-color = base0B;
+        "urgency=normal".border-color = base0C;
+        "urgency=high".border-color = base08;
         background-color = "${base00}10";
         padding = "20";
         margin = "30";

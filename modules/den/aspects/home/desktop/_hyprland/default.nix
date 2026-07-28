@@ -17,16 +17,9 @@
     map (n: dir + "/${n}")
     (builtins.attrNames (filterAttrs (n: t: t == "regular" && n != "default.nix" && hasSuffix ".nix" n) (builtins.readDir dir)));
 in {
-  imports =
-    (nonDefault ./.)
-    ++ [
-      ./addons/hyprlock
-      ./addons/hyprpaper
-      ./addons/hyprshot
-      ./addons/mako
-      ./addons/rofi
-      ./addons/waybar
-    ];
+  # Addons (waybar, mako, rofi, hyprlock, hyprpaper, hyprshot) are now sibling
+  # aspects (home.hyprland.*), included by the home.hyprland aspect.
+  imports = nonDefault ./.;
 
   options.cosmos.desktops.hyprland = {
     # Internal: on when the feature is imported. The many part-files self-gate
@@ -46,15 +39,6 @@ in {
       trusted-public-keys = [
         "hyprland.cachix.org-1:a7pgxzMz7+chwVL3/pzj6jIBMioiJM7ypFP8PwtkuGc="
       ];
-    };
-
-    cosmos.desktops.hyprland.addons = {
-      hyprlock.enable = true;
-      hyprpaper.enable = true;
-      hyprshot.enable = true;
-      mako.enable = true;
-      rofi.enable = true;
-      waybar.enable = true;
     };
 
     home.packages = with pkgs; [
