@@ -105,6 +105,13 @@
 
       # Backgrounds the wallpaper picker browses (see home.wallpapers).
       wallpaper.directory = config.cosmos.desktops.wallpapers.directory;
+
+      # Drives the weather widget and the night light's sunrise/sunset schedule.
+      # Pinned rather than geolocated, so it works offline and doesn't phone out.
+      location = {
+        name = "Eindhoven";
+        autoLocate = false;
+      };
     };
   };
 in {
