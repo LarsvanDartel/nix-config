@@ -26,10 +26,14 @@
 
     terminal = config.cosmos.cli.terminals.defaultStandalone;
 
+    qalc =
+      pkgs.writeShellScriptBin "qalc"
+      ''exec ${lib.getExe' pkgs.libqalculate "qalc"} -set "autocalc 1" "$@"'';
+
     # `app-id` is what the compositor window rules match on to float it.
     launcher =
       pkgs.writeShellScriptBin "calculator"
-      ''exec ${terminal} --app-id=calculator -- ${lib.getExe' pkgs.libqalculate "qalc"} "$@"'';
+      ''exec ${terminal} --app-id=calculator -- ${lib.getExe qalc} "$@"'';
   in {
     options.cosmos.cli.programs.calculator.command = mkOption {
       type = str;
@@ -43,16 +47,10 @@
 
     config = {
       home.packages = [
-        pkgs.libqalculate # qalc
-        pkgs.qalculate-gtk # full GUI, for when a window beats a prompt
+        qalc
+        pkgs.qalculate-gtk
         launcher
       ];
-
-      # NOT `=`: zsh reserves a leading `=` for EQUALS expansion, so it cannot be
-      # a command name. home-manager emits `alias -- '='=qalc`, which zsh rejects
-      # at startup with "bad assignment"; escaping the name or `unsetopt equals`
-      # doesn't help either — the alias is simply never resolved.
-      cosmos.cli.shells.zsh.aliases.calc = "qalc";
 
       cosmos.system.impermanence.persist.directories = [".config/qalculate"];
     };

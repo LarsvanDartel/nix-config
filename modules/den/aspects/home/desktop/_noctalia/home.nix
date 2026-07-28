@@ -20,10 +20,14 @@
   noctalia = inputs.nix-wrapper-modules.wrappers.noctalia-shell.wrap {
     inherit pkgs;
 
-    # Seed the generated config into a writable location so noctalia's own
-    # settings panel keeps working; existing files are never overwritten.
-    outOfStoreConfig = "${config.xdg.configHome}/noctalia";
-    autoCopyConfig = true;
+    # No `outOfStoreConfig`: supplying only `settings` makes the wrapper point
+    # NOCTALIA_SETTINGS_FILE straight at the generated store file, so nix is
+    # authoritative and every rebuild applies immediately.
+    #
+    # Trade-off: noctalia's settings panel can no longer save — settings are
+    # changed here, not in the GUI. Everything else it owns (colors.json,
+    # colorschemes/, plugins/) still lives in ~/.config/noctalia and stays
+    # writable, so plugin installs and runtime state keep working.
 
     settings = {
       bar = {
