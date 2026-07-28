@@ -5,13 +5,26 @@
       greetd
       xdg-portal
     ];
-    nixos = {...}: {
+    nixos = {
+      config,
+      lib,
+      ...
+    }: {
       environment.sessionVariables.NIXOS_OZONE_WL = "1";
 
       programs.hyprland = {
         enable = true;
         xwayland.enable = true;
         withUWSM = true;
+      };
+
+      # Offer ONLY the uwsm-managed entry to the greeter. withUWSM also installs a
+      # plain `hyprland.desktop`; listing both is what produced duplicate rows.
+      # Gated on the program actually being enabled, so a specialisation that
+      # turns Hyprland off (see hosts/voyager.nix) drops the entry too.
+      cosmos.profiles.desktop.addons.greetd.sessions = lib.optional config.programs.hyprland.enable {
+        name = "hyprland.desktop";
+        path = "${config.programs.hyprland.package}/share/wayland-sessions/hyprland-uwsm.desktop";
       };
     };
   };
