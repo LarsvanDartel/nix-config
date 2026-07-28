@@ -192,12 +192,18 @@
       # Specialisation bodies are plain NixOS modules and cannot `include` den
       # aspects, so the niri/noctalia content is applied from the shared factory
       # modules that the aspects also use.
+      # `nh os switch` reads /etc/specialisation to stay in the specialisation
+      # you booted (nh 4.4.1, SPEC_LOCATION); NixOS itself never writes that
+      # file, so each specialisation declares its own name here. The base config
+      # deliberately has no such file, so it resolves to the parent system.
       specialisation = {
-        # Explicit, labelled entry identical to the default (inherits the parent).
-        hyprland.configuration = {};
+        # Explicit, labelled entry, otherwise identical to the default.
+        hyprland.configuration.environment.etc.specialisation.text = "hyprland";
 
         niri.configuration = {
           imports = [(import ../aspects/desktop/_niri/system.nix {inherit inputs;})];
+
+          environment.etc.specialisation.text = "niri";
 
           # Hyprland and niri must not both own the session.
           programs.hyprland.enable = lib.mkForce false;
