@@ -24,6 +24,7 @@
     stable
     unstable
     inputs.nur.overlays.default
+    inputs.self.overlays.default
   ];
 
   nixpkgs = {

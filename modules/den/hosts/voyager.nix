@@ -4,11 +4,6 @@
 # Hardware from a nixos-facter report; filesystems from disko. Generate on voyager:
 #   sudo nix run nixpkgs#nixos-facter -- -o modules/den/hosts/_facter/voyager.facter.json
 #
-# TODO (deferred until their aspects are converted): roles.desktop, roles.gaming,
-# hyprland, tuigreet, impermanence, containers, suwayomi, fingerprint,
-# v4l2loopback, nh.flake-dir, and the lvdar desktop home (hyprland/steam/obs/
-# proton/nvim-languages/…). This scaffold carries only the baseline + the
-# host-specific hardware so the facter report can be validated.
 {
   den,
   inputs,
@@ -22,12 +17,99 @@
   den.aspects.voyagerd = {
     includes = with den.aspects; [
       core.boot
+      core.impermanence
       roles.desktop
+      roles.gaming
       desktop.hyprland
+      desktop.tuigreet
+      services.containers
+      services.suwayomi
+      hardware.fingerprint
+      hardware.v4l2loopback
     ];
 
-    # the primary user gets the desktop home environment on this host.
-    lvdar.includes = [den.aspects.roles.desktop-home];
+    # the primary user gets the desktop home + the voyager-specific apps.
+    lvdar = {
+      includes = with den.aspects; [
+        roles.desktop-home
+        home.steam
+        home.minecraft
+        home.claude
+        home.taskwarrior
+        home.zathura
+        home.thunderbird
+        home.libreoffice
+        home.zotero
+        home.obs-studio
+        home.which-key
+        home.freecad
+        home.orca-slicer
+        home.simplelogin
+        home.pangolin
+        home.proton.mail-bridge
+        home.proton.mail-desktop
+        home.proton.pass-cli
+        home.proton.vpn-cli
+      ];
+
+      # voyager-specific home settings.
+      homeManager = {pkgs, ...}: {
+        cosmos = {
+          cli.programs.nvim.languages = {
+            rust.enable = true;
+            clang.enable = true;
+            typst.enable = true;
+            python.enable = true;
+            rocq.enable = true;
+            formal.enable = true;
+            mcrl2.enable = true;
+          };
+
+          desktops.hyprland.animations.enable = false;
+
+          gaming.launchers.minecraft.mcsr.enable = true;
+
+          programs = {
+            zathura.defaultApplication = true;
+            obs-studio = {
+              cudaSupport = true;
+              plugins = with pkgs.obs-studio-plugins; [
+                advanced-scene-switcher
+                input-overlay
+                obs-advanced-masks
+                obs-backgroundremoval
+                obs-composite-blur
+                obs-move-transition
+                obs-source-clone
+                obs-source-record
+                obs-stroke-glow-shadow
+                obs-tuna
+                obs-mute-filter
+                obs-pipewire-audio-capture
+                obs-vkcapture
+                obs-vaapi
+                wlrobs
+                droidcam-obs
+              ];
+            };
+          };
+
+          system.impermanence.persist.directories = [
+            "nix-config"
+            "nix-secrets"
+            "dev"
+            "school"
+            "Videos"
+            ".config/Code"
+            "balatro"
+          ];
+        };
+
+        programs.ssh.settings."es-pynq047.ics.ele.tue.nl".setEnv = "TERM=xterm-256color";
+
+        home.packages = [pkgs.mcrl2];
+      };
+    };
 
     nixos = {...}: {
       imports = [
@@ -39,7 +121,25 @@
         (import ../../hosts/voyager/_hw/disko.nix {device = "/dev/nvme0n1";})
       ];
 
-      cosmos.system.boot.detect-windows = true;
+      cosmos = {
+        system.boot.detect-windows = true;
+
+        services.suwayomi = {
+          basicAuth.enable = true;
+          webview.enable = true;
+          downloadsDir = "/var/lib/suwayomi-downloads";
+          homeLink = "/home/lvdar/manga";
+        };
+
+        hardware.v4l2loopback.devices = [
+          {
+            number = 1;
+            label = "OBS Virtual Camera";
+          }
+        ];
+
+        cli.programs.nh.flake-dir = "/home/lvdar/nix-config";
+      };
 
       # Hibernate
       boot = {
@@ -81,6 +181,8 @@
 
       networking.firewall.allowedUDPPorts = [25565];
       networking.firewall.allowedTCPPorts = [25565];
+
+      cosmos.system.impermanence.device = "/dev/mapper/crypted";
 
       system.stateVersion = "24.11";
     };
