@@ -181,6 +181,11 @@
 
       cosmos.system.impermanence.device = "/dev/mapper/crypted";
 
+      # QEMU emulation so aarch64 derivations (e.g. the pioneer Pi toplevel) can
+      # be built locally on this x86_64 machine. Slow, but avoids needing the Pi
+      # as a remote builder.
+      boot.binfmt.emulatedSystems = ["aarch64-linux"];
+
       system.stateVersion = "24.11";
     };
   };
