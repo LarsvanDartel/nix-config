@@ -1,4 +1,4 @@
-# gaia (x86_64 server). den-produced; named `gaiad` during the migration to
+# gaia (x86_64 server). den-produced; named `gaia` during the migration to
 # avoid colliding with the old `gaia`.
 #
 # Hardware comes from a nixos-facter report (generate on the host — see below);
@@ -13,12 +13,9 @@
   inputs,
   ...
 }: {
-  den.hosts.x86_64-linux.gaiad = {
-    hostName = "gaia";
-    users.nixos = {};
-  };
+  den.hosts.x86_64-linux.gaia.users.nixos = {};
 
-  den.aspects.gaiad = {
+  den.aspects.gaia = {
     includes = with den.aspects; [
       roles.server
       core.boot

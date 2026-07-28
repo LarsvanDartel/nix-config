@@ -1,4 +1,4 @@
-# pioneer (Raspberry Pi 3, aarch64 server). den-produced; named `pioneerd`
+# pioneer (Raspberry Pi 3, aarch64 server). den-produced; named `pioneer`
 # during the migration to avoid colliding with the old `pioneer`.
 #
 # NOTE: pioneer can't use the clean facter path yet. The raspberry-pi-3 module
@@ -23,12 +23,9 @@
     })
     ["nixpkgs"];
 in {
-  den.hosts.aarch64-linux.pioneerd = {
-    hostName = "pioneer";
-    users.nixos = {};
-  };
+  den.hosts.aarch64-linux.pioneer.users.nixos = {};
 
-  den.aspects.pioneerd = {
+  den.aspects.pioneer = {
     includes = with den.aspects; [
       roles.server
       services.pangolin-newt

@@ -1,5 +1,5 @@
 # voyager (x86_64 desktop/gaming laptop, ThinkPad P1 gen3 + nvidia). den-produced;
-# named `voyagerd` during the migration to avoid colliding with the old `voyager`.
+# named `voyager` during the migration to avoid colliding with the old `voyager`.
 #
 # Hardware from a nixos-facter report; filesystems from disko. Generate on voyager:
 #   sudo nix run nixpkgs#nixos-facter -- -o modules/den/hosts/_facter/voyager.facter.json
@@ -9,12 +9,9 @@
   inputs,
   ...
 }: {
-  den.hosts.x86_64-linux.voyagerd = {
-    hostName = "voyager";
-    users.lvdar = {};
-  };
+  den.hosts.x86_64-linux.voyager.users.lvdar = {};
 
-  den.aspects.voyagerd = {
+  den.aspects.voyager = {
     includes = with den.aspects; [
       core.boot
       core.impermanence
