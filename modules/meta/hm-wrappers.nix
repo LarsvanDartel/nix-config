@@ -15,18 +15,20 @@
 # feature file with `extraSpecialArgs`.
 {
   inputs,
-  config,
+  den,
   lib,
   ...
 }: let
-  hm = config.flake.modules.homeManager;
+  # Bridge to den: each wrapped program's home module is the den aspect's
+  # homeManager class content (den.aspects.home.<n>.homeManager).
+  hm = builtins.mapAttrs (_: a: a.homeManager) den.aspects.home;
 
   # Tier 1 programs wrapped as portable, stylix-themed packages. Grown as
   # per-program modules are split out of the common/desktop aggregates.
+  # NOTE: foot is intentionally omitted — its home aspect reads the desktop
+  # styling font options, which don't exist in an isolated wrap eval.
   wrapNames = [
-    # split out of the common/desktop aggregates
     "bat"
-    "foot"
     "mpv"
     "btop"
     "lazygit"
@@ -54,7 +56,6 @@
   # simply not listed.
   themedTargets = {
     bat = "bat";
-    foot = "foot";
     btop = "btop";
     yazi = "yazi";
     zathura = "zathura";
@@ -62,13 +63,6 @@
     lazygit = "lazygit";
     starship = "starship";
     alacritty = "alacritty";
-  };
-
-  # Identity injected into the git wrapper (no host-specific signing in a portable
-  # build); mirrors the deployment values in home/profiles/common.nix.
-  gitIdentity = {
-    user = "LarsvanDartel";
-    email = "larsvandartel73@gmail.com";
   };
 
   mkProgram = n: {
@@ -107,16 +101,14 @@ in {
     home-manager = inputs.home-manager;
     stateVersion = "26.11";
 
-    # Theming applied to every wrapped program.
-    baseModules = [hm.wrapper-stylix];
+    # Theming + cross-cutting option stubs applied to every wrapped program.
+    baseModules = [hm.wrapper-stylix hm.wrapper-stubs];
   };
 
+  # NOTE: git is omitted too — den's home.git bakes in ssh commit signing that
+  # reads cosmos.user.home (host-specific), which isn't portable/present in an
+  # isolated wrap. The deployed git (on every host) is unaffected.
   perSystem = _: {
-    hmWrappers.programs =
-      (lib.genAttrs wrapNames mkProgram)
-      // {
-        # Tier 2: git with identity injected via extraSpecialArgs.
-        git = (mkProgram "git") // {extraSpecialArgs.gitIdentity = gitIdentity;};
-      };
+    hmWrappers.programs = lib.genAttrs wrapNames mkProgram;
   };
 }
