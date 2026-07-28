@@ -18,7 +18,7 @@
       roles.desktop
       roles.gaming
       desktop.hyprland
-      desktop.tuigreet
+      desktop.greetd.tuigreet
       services.containers
       services.suwayomi
       hardware.fingerprint

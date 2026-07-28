@@ -1,14 +1,5 @@
-# services.cdrom + services.jellyfin (jellarr). jellyfin input declared by the
-# legacy module during migration.
+# services.jellyfin (jellarr). jellyfin input declared in modules/den/inputs.nix.
 {inputs, ...}: {
-  den.aspects.services.cdrom.nixos = {...}: {
-    cosmos.user.extraGroups = ["cdrom"];
-    boot.kernelModules = ["sg" "sr_mod" "cdrom"];
-    services.udev.extraRules = ''
-      KERNEL=="sr[0-9]*", GROUP="cdrom", MODE="0660"
-    '';
-  };
-
   den.aspects.services.jellyfin.nixos = {
     config,
     lib,

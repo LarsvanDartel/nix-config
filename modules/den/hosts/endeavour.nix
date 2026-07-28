@@ -32,18 +32,18 @@
       services.jellyfin
       services.immich
       services.traccar
-      services.pangolin-newt
+      services.pangolin.newt
       services.cdrom
       hardware.ipmi-fancontrol
-      services.arr-vpn
-      services.transmission
-      services.sabnzbd
-      services.prowlarr
-      services.radarr
-      services.sonarr
-      services.lidarr
-      services.bazarr
-      services.jellyseerr
+      services.arr.vpn
+      services.arr.transmission
+      services.arr.sabnzbd
+      services.arr.prowlarr
+      services.arr.radarr
+      services.arr.sonarr
+      services.arr.lidarr
+      services.arr.bazarr
+      services.arr.jellyseerr
     ];
 
     nixos = {

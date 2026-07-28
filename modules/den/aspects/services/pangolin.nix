@@ -1,6 +1,5 @@
 # Pangolin server + traefik (services.pangolin) and the Newt tunnel client
-# (services.pangolin-newt), was modules/nixos/services/pangolin.nix. Two aspects
-# sharing the env-file generator.
+# (services.pangolin.newt, nested). Two aspects sharing the env-file generator.
 {...}: let
   # Writes an env file with @NAME@ placeholders, then replaces each with the
   # secret's contents.
@@ -118,7 +117,7 @@ in {
   };
 
   # Newt tunnel client (connects out to a Pangolin server).
-  den.aspects.services.pangolin-newt.nixos = {
+  den.aspects.services.pangolin.newt.nixos = {
     config,
     lib,
     pkgs,

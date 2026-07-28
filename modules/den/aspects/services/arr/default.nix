@@ -54,7 +54,7 @@ in {
   };
 
   # VPN confinement namespace + optional test service.
-  den.aspects.services.arr-vpn = {
+  den.aspects.services.arr.vpn = {
     includes = [arr];
     nixos = {
       config,
@@ -173,7 +173,7 @@ in {
   };
 
   # Simple *arr services (radarr/sonarr/lidarr share the same shape).
-  den.aspects.services.radarr = {
+  den.aspects.services.arr.radarr = {
     includes = [arr];
     nixos = {
       config,
@@ -242,7 +242,7 @@ in {
     };
   };
 
-  den.aspects.services.sonarr = {
+  den.aspects.services.arr.sonarr = {
     includes = [arr];
     nixos = {
       config,
@@ -311,7 +311,7 @@ in {
     };
   };
 
-  den.aspects.services.lidarr = {
+  den.aspects.services.arr.lidarr = {
     includes = [arr];
     nixos = {
       config,
@@ -380,7 +380,7 @@ in {
     };
   };
 
-  den.aspects.services.prowlarr = {
+  den.aspects.services.arr.prowlarr = {
     includes = [arr];
     nixos = {
       config,
@@ -452,7 +452,7 @@ in {
     };
   };
 
-  den.aspects.services.bazarr = {
+  den.aspects.services.arr.bazarr = {
     includes = [arr];
     nixos = {
       config,
@@ -532,7 +532,7 @@ in {
     };
   };
 
-  den.aspects.services.transmission = {
+  den.aspects.services.arr.transmission = {
     includes = [arr];
     nixos = {
       config,
@@ -694,7 +694,7 @@ in {
     };
   };
 
-  den.aspects.services.sabnzbd = {
+  den.aspects.services.arr.sabnzbd = {
     includes = [arr];
     nixos = {
       config,
@@ -837,7 +837,7 @@ in {
     };
   };
 
-  den.aspects.services.jellyseerr = {
+  den.aspects.services.arr.jellyseerr = {
     includes = [arr];
     nixos = {
       config,
