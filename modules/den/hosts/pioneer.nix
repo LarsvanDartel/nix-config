@@ -15,7 +15,7 @@
 }: let
   hardware =
     builtins.removeAttrs
-    (import ../../hosts/pioneer/_hw/hardware-configuration.nix {
+    (import ./_hw/pioneer/hardware-configuration.nix {
       lib = inputs.nixpkgs.lib;
       modulesPath = inputs.nixpkgs + "/nixos/modules";
       config = {};

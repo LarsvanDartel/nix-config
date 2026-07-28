@@ -61,7 +61,7 @@
         inputs.nixos-hardware.nixosModules.common-cpu-intel
         inputs.nixos-hardware.nixosModules.common-gpu-nvidia
         inputs.disko.nixosModules.disko
-        ../../hosts/endeavour/_hw/disko.nix
+        ./_hw/endeavour/disko.nix
       ];
 
       cosmos.system.boot = {

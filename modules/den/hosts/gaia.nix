@@ -34,7 +34,7 @@
           facter.detected.graphics.enable = false;
         }
         inputs.disko.nixosModules.disko
-        ../../hosts/gaia/_hw/disko.nix
+        ./_hw/gaia/disko.nix
       ];
 
       cosmos.system = {

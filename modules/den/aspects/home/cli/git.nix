@@ -155,7 +155,7 @@ in {
       };
 
       home.file.".ssh/allowed_signers".text = ''
-        ${cfg.email} ${fileContents (get-flake-path "modules/nixos/services/ssh/keys/id_voyager.pub")}
+        ${cfg.email} ${fileContents (get-flake-path "modules/den/aspects/core/_ssh-keys/id_voyager.pub")}
       '';
     };
   };

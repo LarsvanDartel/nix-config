@@ -115,7 +115,7 @@
         inputs.nixos-hardware.nixosModules.lenovo-thinkpad-p1-gen3
         inputs.nixos-hardware.nixosModules.common-gpu-nvidia
         inputs.disko.nixosModules.disko
-        (import ../../hosts/voyager/_hw/disko.nix {device = "/dev/nvme0n1";})
+        (import ./_hw/voyager/disko.nix {device = "/dev/nvme0n1";})
       ];
 
       cosmos = {
