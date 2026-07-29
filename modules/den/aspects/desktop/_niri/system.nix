@@ -201,6 +201,12 @@
           "Mod+O".toggle-overview = _: {};
           "Mod+Shift+Slash".show-hotkey-overlay = _: {};
 
+          # noctalia plugins that ship no bar widget slot. Their IPC targets are
+          # namespaced `plugin:<id>`, same as their bar widgets.
+          "Mod+Slash".spawn-sh = noctalia "plugin:keybind-cheatsheet" "toggle";
+          "Mod+P".spawn-sh = noctalia "plugin:display-settings" "toggle";
+          "Mod+Shift+P".spawn-sh = noctalia "plugin:screen-toolkit" "colorPicker";
+
           # Brightness / audio / media — `allow-when-locked` is a property on the
           # bind node itself, so these use the wrapper's props/content form.
           "XF86MonBrightnessUp" = locked {spawn = ["brightnessctl" "set" "+5%"];};
@@ -259,19 +265,14 @@ in {
     playerctl
   ];
 
-  # programs.niri turns polkit on but ships no authentication agent.
-  systemd.user.services.hyprpolkitagent = {
-    description = "polkit authentication agent";
-    wantedBy = ["graphical-session.target"];
-    partOf = ["graphical-session.target"];
-    after = ["graphical-session.target"];
-    serviceConfig = {
-      Type = "simple";
-      ExecStart = lib.getExe' pkgs.hyprpolkitagent "hyprpolkitagent";
-      Restart = "on-failure";
-      Slice = "session.slice";
-    };
-  };
+  # programs.niri turns polkit on but ships no authentication agent. That job is
+  # now noctalia's `polkit-agent` plugin (see _noctalia/plugins.nix) — only one
+  # process can hold the polkit agent registration, so a standalone
+  # hyprpolkitagent unit here would race it and one of the two would lose.
+  #
+  # The trade-off: no agent runs before noctalia is up. In this specialisation
+  # noctalia is the session shell, so that window is the same one in which
+  # nothing could prompt anyway.
 
   # One entry in the greeter (see desktop/greetd.nix for why it is curated).
   cosmos.profiles.desktop.addons.greetd.sessions = [

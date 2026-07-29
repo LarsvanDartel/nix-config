@@ -22,6 +22,7 @@
       services.containers
       services.suwayomi
       hardware.fingerprint
+      hardware.thinkpad
       hardware.v4l2loopback
     ];
 
