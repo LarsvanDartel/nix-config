@@ -77,6 +77,9 @@
             # Readings stay on screen instead of appearing on hover.
             ++ map valueWidget ["Volume" "Brightness" "Network" "Bluetooth"]
             ++ [
+              # Replaces kdeconnect-indicator's tray icon, which plugins.nix
+              # turns off.
+              (pluginWidget "kde-connect")
               # Auto-hides when disconnected.
               (pluginWidget "protonvpn")
               (pluginWidget "thinkpad-fan")
@@ -93,34 +96,49 @@
                 hideIfNotDetected = false;
               }
             ]
-            ++ map widget ["Tray" "NotificationHistory" "ControlCenter"];
+            ++ [
+              {
+                id = "Tray";
+                # blueman-applet duplicates the Bluetooth widget three slots to
+                # the left. Two rules because noctalia matches on the tooltip
+                # title when there is one and falls back to the item id: the
+                # tooltip is state-dependent ("Bluetooth Disabled", "Bluetooth
+                # Enabled", …), the id is always "blueman". Globs, anchored,
+                # case-insensitive. The applet keeps running — it is also the
+                # pairing agent.
+                blacklist = ["blueman" "Bluetooth*"];
+              }
+            ]
+            ++ map widget ["NotificationHistory" "ControlCenter"];
           # Night light, keep-awake and the wallpaper picker stay *enabled* —
           # they just live in the control centre rather than on the bar.
           #
           # So do several installed plugins, deliberately kept off the bar:
-          # plugin-manager, screen-toolkit and kde-connect are control-centre
-          # shortcuts (below); ssh-sessions and niri-workspaces are launcher
-          # providers (type `>ws`); keybind-cheatsheet and display-settings are
-          # on keybinds (see _niri/system.nix). battery-monitor-plus and
+          # screen-toolkit is a control-centre shortcut (below); ssh-sessions
+          # and niri-workspaces are launcher providers (type `>ws`);
+          # keybind-cheatsheet, display-settings and plugin-manager are on
+          # keybinds (see _niri/system.nix). battery-monitor-plus and
           # model-usage have bar widgets but no default slot — add
           # `plugin:battery-monitor-plus` / `plugin:model-usage` here to
           # surface them.
         };
       };
 
-      # The four defaults per side, plus the plugins that ship a control-centre
-      # widget — the natural home for things you open occasionally.
+      # FOUR PER SIDE, no more. ShortcutsCard is a fixed-height row of
+      # non-shrinking items in a half-width box with no wrapping, so a fifth
+      # entry renders outside the card's rounded background instead of being
+      # laid out. NoctaliaPerformance gives up its slot to screen-toolkit;
+      # plugin-manager moved to a keybind for the same reason.
       controlCenter.shortcuts = {
         left =
-          map widget ["Network" "Bluetooth" "WallpaperSelector" "NoctaliaPerformance"]
+          map widget ["Network" "Bluetooth" "WallpaperSelector"]
           ++ [(pluginWidget "screen-toolkit")];
-        right =
-          map widget ["Notifications" "PowerProfile" "KeepAwake" "NightLight"]
-          ++ [
-            (pluginWidget "kde-connect")
-            (pluginWidget "plugin-manager")
-          ];
+        right = map widget ["Notifications" "PowerProfile" "KeepAwake" "NightLight"];
       };
+
+      # The bar covers everything the dock would, and a second always-present
+      # surface on a laptop panel is just lost pixels.
+      dock.enabled = false;
 
       # Built-in Nord scheme — the same base16 palette stylix themes the rest with.
       colorSchemes = {

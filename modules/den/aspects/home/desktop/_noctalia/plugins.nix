@@ -129,6 +129,13 @@ in {
   };
 
   config = {
+    # The kde-connect plugin is a bar widget over the same D-Bus daemon, so
+    # kdeconnect-indicator would only put a duplicate icon in the tray. mkForce
+    # because home.kde-connect enables it outright — and it should stay enabled
+    # there, since the Hyprland side has no such plugin and the tray icon is its
+    # only way in.
+    services.kdeconnect.indicator = lib.mkForce false;
+
     # Runtime dependencies the plugins shell out to. niri and hyprctl come from
     # the compositor's own session PATH.
     home.packages = with pkgs; [

@@ -217,6 +217,9 @@
           "Mod+Slash".spawn-sh = noctalia "plugin:keybind-cheatsheet" "toggle";
           "Mod+P".spawn-sh = noctalia "plugin:display-settings" "toggle";
           "Mod+Shift+P".spawn-sh = noctalia "plugin:screen-toolkit" "colorPicker";
+          # No control-centre slot for this one — the shortcuts card fits four
+          # per side and no more.
+          "Mod+Shift+N".spawn-sh = noctalia "plugin:plugin-manager" "toggle";
 
           # Brightness / audio / media — `allow-when-locked` is a property on the
           # bind node itself, so these use the wrapper's props/content form.
