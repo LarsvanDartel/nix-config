@@ -125,7 +125,9 @@
         };
       };
 
-      services.nginx.virtualHosts = mkIf cfg.expose {
+      # Dropped when the edge terminates TLS. Note this one is published from
+      # voyager, not endeavour.
+      services.nginx.virtualHosts = mkIf (cfg.expose && !config.cosmos.networking.edgeTerminated) {
         "suwayomi.lvdar.nl" = {
           forceSSL = true;
           enableACME = false;

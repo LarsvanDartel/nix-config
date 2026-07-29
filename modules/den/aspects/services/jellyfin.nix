@@ -157,7 +157,9 @@
         };
       };
 
-      services.nginx.virtualHosts = mkIf cfg.expose {
+      # Dropped when the edge terminates TLS: netbird-proxy forwards straight to
+      # cfg.port over the mesh, so there is nothing for a local vhost to do.
+      services.nginx.virtualHosts = mkIf (cfg.expose && !config.cosmos.networking.edgeTerminated) {
         "jellyfin.lvdar.nl" = {
           forceSSL = true;
           enableACME = false;
