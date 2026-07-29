@@ -96,8 +96,9 @@ in {
       battery-monitor-plus = official "battery-monitor-plus";
 
       # -- niri ---------------------------------------------------------------
-      # Reads the *live* bind list (`niri msg` / `hyprctl binds -j`) rather than
-      # parsing config, so it survives the wrapped-config indirection.
+      # Under Hyprland this asks the compositor (`hyprctl binds -j`); under niri
+      # it parses ~/.config/niri/config.kdl as a file, which the wrapped config
+      # would otherwise never create — see _niri/home.nix.
       keybind-cheatsheet = official "keybind-cheatsheet";
       display-settings = official "display-settings";
       niri-workspaces = official "niri-workspaces";
