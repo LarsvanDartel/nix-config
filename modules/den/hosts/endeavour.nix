@@ -4,11 +4,8 @@
 # Hardware from a nixos-facter report; filesystems from disko. Generate on it:
 #   sudo nix run nixpkgs#nixos-facter -- -o modules/den/hosts/_facter/endeavour.facter.json
 #
-# TODO (deferred until their aspects are converted): impermanence, nginx, unbound,
-# kanidm, jellyfin, immich, traccar, pangolin-newt, cdrom, ipmi-fancontrol, the
-# whole arr/VPN stack, and the service-coupled sops secrets (proton/eweka). This
-# scaffold carries the baseline + server role + host hardware (nvidia/intel/zfs)
-# so the facter report can be validated.
+# Hardware: a Dell Precision R7910 — Xeon + Tesla P100 (compute only, no display),
+# an Intel Arc A310 for transcoding, and the BMC's Matrox for the console.
 {
   den,
   inputs,
@@ -57,7 +54,19 @@
     in {
       imports = [
         inputs.nixos-facter-modules.nixosModules.facter
-        {facter.reportPath = ./_facter/endeavour.facter.json;}
+        {
+          facter.reportPath = ./_facter/endeavour.facter.json;
+          # facter turns its graphics module on when the report lists a monitor,
+          # and then puts *every* detected GPU driver into the initrd. Here that
+          # is nvidia (a Tesla P100, so ~100 MB of GSP firmware plus nvidia.ko),
+          # i915 for the Arc card and mgag200 for the BMC console — none of which
+          # is needed before stage 2. The report happens to have been taken with
+          # nothing plugged in, so this is already off; pin it so plugging a
+          # monitor in before the next `nixos-facter` run cannot silently change
+          # the initrd. `hardware.graphics.enable` is set explicitly below, so
+          # the userspace stack is unaffected.
+          facter.detected.graphics.enable = false;
+        }
         inputs.nixos-hardware.nixosModules.common-cpu-intel
         inputs.nixos-hardware.nixosModules.common-gpu-nvidia
         inputs.disko.nixosModules.disko
