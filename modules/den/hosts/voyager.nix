@@ -147,6 +147,15 @@
         cli.programs.nh.flake-dir = "/home/lvdar/nix-config";
       };
 
+      # nixos-facter puts every detected GPU driver into the initrd. Here that
+      # means nvidia, which drags in 103 MB of GSP firmware plus a 12 MB
+      # nvidia.ko and takes the initrd to 138 MB — three of those fill the
+      # 511 MB ESP on their own, which is what made `nh os boot` run out of
+      # space. Nothing needs it that early: the boot console and the LUKS
+      # prompt are on the internal panel, which is Intel, and nvidia loads at
+      # stage 2 via boot.kernelModules (nvidia_uvm) as before.
+      facter.detected.boot.graphics.kernelModules = ["i915"];
+
       # Hibernate
       boot = {
         kernelParams = ["resume_offset=533760"];
