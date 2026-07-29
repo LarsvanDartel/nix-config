@@ -18,7 +18,9 @@
   ...
 }: {
   den.aspects.desktop.niri = {
-    includes = [den.aspects.desktop.greetd];
+    # keyd supplies the tap-vs-hold Mod key the binds below use; niri has no way
+    # to bind a modifier on its own.
+    includes = with den.aspects.desktop; [greetd keyd];
     nixos = import ./_niri/system.nix {inherit inputs;};
   };
 }
