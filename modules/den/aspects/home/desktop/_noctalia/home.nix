@@ -138,8 +138,16 @@
           map widget ["Network" "Bluetooth" "WallpaperSelector" "NoctaliaPerformance"]
           ++ [(pluginWidget "screen-toolkit")];
         right =
-          map widget ["Notifications" "PowerProfile" "KeepAwake" "NightLight"]
-          ++ [(pluginWidget "plugin-manager")];
+          # Notifications (the do-not-disturb toggle) gave up its slot: the
+          # kde-connect bar widget only draws itself when a device is actually
+          # reachable, and its control-centre widget has no such condition, so
+          # this is the only way to reach it with the phone off the network.
+          # DND is still on `notifications toggleDND` over IPC.
+          map widget ["PowerProfile" "KeepAwake" "NightLight"]
+          ++ [
+            (pluginWidget "kde-connect")
+            (pluginWidget "plugin-manager")
+          ];
       };
 
       # The bar covers everything the dock would, and a second always-present
