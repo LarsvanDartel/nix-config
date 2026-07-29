@@ -126,17 +126,20 @@
       # FIVE PER SIDE, no more. ShortcutsCard is a fixed-height row of
       # non-shrinking items in a half-width box with no wrapping, so a sixth
       # entry renders outside the card's rounded background rather than being
-      # laid out — that is what pushed plugin-manager out, and why it lives on a
-      # keybind now (see _niri/system.nix) instead.
+      # laid out.
+      #
+      # A plugin can only go here if its manifest declares a
+      # `controlCenterWidget` entry point — of the installed set that is
+      # kde-connect, plugin-manager and screen-toolkit, and nothing else.
+      # battery-threshold has only `barWidget`, so it lives on a keybind
+      # (see _niri/system.nix); putting it here renders nothing.
       controlCenter.shortcuts = {
         left =
           map widget ["Network" "Bluetooth" "WallpaperSelector" "NoctaliaPerformance"]
           ++ [(pluginWidget "screen-toolkit")];
         right =
           map widget ["Notifications" "PowerProfile" "KeepAwake" "NightLight"]
-          # Charge thresholds are set-and-forget, not glance-at-it — off the bar,
-          # into the panel you open on purpose.
-          ++ [(pluginWidget "battery-threshold")];
+          ++ [(pluginWidget "plugin-manager")];
       };
 
       # The bar covers everything the dock would, and a second always-present
