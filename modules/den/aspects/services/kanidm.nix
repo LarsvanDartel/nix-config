@@ -76,8 +76,37 @@
               members = ["lvdar"];
             };
             opencloud-admin.members = ["lvdar"];
+            netbird-users = {
+              overwriteMembers = false;
+              members = ["lvdar"];
+            };
+            netbird-admin.members = ["lvdar"];
           };
           systems.oauth2 = {
+            # The NetBird dashboard is a browser app, so it authenticates with
+            # PKCE and holds no client secret — hence `public`. The client name
+            # doubles as the audience NetBird's management server expects.
+            netbird = {
+              displayName = "NetBird";
+              public = true;
+              originUrl = [
+                "https://netbird.lvdar.nl/peers"
+                # The CLI's device-login flow listens here. Peers enroll with
+                # setup keys so this is not on the critical path, but leaving it
+                # out would make an interactive `netbird up` fail confusingly.
+                "http://localhost:53000/"
+              ];
+              originLanding = "https://netbird.lvdar.nl";
+              scopeMaps.netbird-users = ["openid" "profile" "email"];
+              claimMaps.groups = {
+                joinType = "array";
+                valuesByGroup = {
+                  netbird-users = ["user"];
+                  netbird-admin = ["admin"];
+                };
+              };
+            };
+
             pangolin = {
               displayName = "Pangolin";
               basicSecretFile = config.sops.secrets."keys/pangolin/oauth-client-secret".path;
@@ -128,7 +157,10 @@
         };
       };
 
-      services.nginx.virtualHosts = mkIf cfg.expose {
+      # Dropped when the edge terminates TLS. kanidm keeps its own certificate
+      # either way — it serves HTTPS on 8443 itself, which is what the edge
+      # target points at.
+      services.nginx.virtualHosts = mkIf (cfg.expose && !config.cosmos.networking.edgeTerminated) {
         "auth.lvdar.nl" = {
           forceSSL = true;
           enableACME = false;

@@ -30,6 +30,7 @@
       services.immich
       services.traccar
       services.pangolin.newt
+      services.netbird.client
       services.cdrom
       hardware.ipmi-fancontrol
       services.arr.vpn
@@ -79,6 +80,24 @@
       };
 
       networking.hostId = "b8433556";
+
+      cosmos.services.netbird.client = {
+        # Publishes 192.168.2.0/24 into the mesh, so a roaming voyager reaches
+        # the whole home network and not just the peers. Turns on IP
+        # forwarding, which is why it is opt-in per host.
+        routingFeatures = "server";
+
+        # What netbird-proxy targets once cosmos.networking.edgeTerminated is
+        # on. Must track the service declarations in gaia.nix.
+        exposedPorts = [
+          8443 # kanidm      auth.lvdar.nl
+          8096 # jellyfin    jellyfin.lvdar.nl
+          2283 # immich      immich.lvdar.nl
+          8082 # traccar     traccar.lvdar.nl
+          4055 # jellyseerr  seerr.lvdar.nl     (via the netns bridge)
+          6336 # sabnzbd     sabnzbd.lvdar.nl   (via the netns bridge)
+        ];
+      };
 
       hardware = {
         nvidia = {

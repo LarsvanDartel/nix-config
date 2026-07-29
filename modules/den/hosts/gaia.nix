@@ -20,7 +20,10 @@
       roles.server
       core.boot
       core.impermanence
+      # Pangolin stays up alongside NetBird until the mesh is proven; gaia is
+      # the only public entry point, so there is no second way back in.
       services.pangolin
+      services.netbird
       services.typstnique
     ];
 
@@ -43,6 +46,74 @@
           grub-device = "/dev/sda";
         };
         impermanence.device = "/dev/disk/by-label/nixos";
+      };
+
+      # The published surface. Targets are peer name + port: den has no way to
+      # read another host's config, so the ports are literals here and must
+      # track the aspects that own them (jellyfin.nix, traccar.nix, …).
+      #
+      # INCOMPLETE until the Pangolin resource list is enumerated — `cloud`
+      # (opencloud) is published today but is not deployed from this repo at
+      # all, so there is nothing here to point at.
+      cosmos.services.netbird.services = {
+        # Not gated: NetBird's own dashboard authenticates against kanidm, so
+        # putting a NetBird identity check in front of kanidm would lock
+        # everyone out of the thing that grants the identity.
+        auth = {
+          bearerAuth.enable = false;
+          targets = [
+            {
+              peer = "endeavour";
+              port = 8443;
+              protocol = "https";
+            }
+          ];
+        };
+
+        jellyfin.targets = [
+          {
+            peer = "endeavour";
+            port = 8096;
+          }
+        ];
+
+        immich.targets = [
+          {
+            peer = "endeavour";
+            port = 2283;
+          }
+        ];
+
+        traccar.targets = [
+          {
+            peer = "endeavour";
+            port = 8082;
+          }
+        ];
+
+        # VPN-confined: these run inside endeavour's netns, so they are reached
+        # through the nginx bridges in arr/default.nix rather than directly.
+        seerr.targets = [
+          {
+            peer = "endeavour";
+            port = 4055;
+          }
+        ];
+
+        sabnzbd.targets = [
+          {
+            peer = "endeavour";
+            port = 6336;
+          }
+        ];
+
+        # Lives on voyager, not endeavour.
+        suwayomi.targets = [
+          {
+            peer = "voyager";
+            port = 8080;
+          }
+        ];
       };
 
       system.stateVersion = "24.11";
