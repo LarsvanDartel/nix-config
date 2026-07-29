@@ -23,9 +23,12 @@
       profiles.system = {
         user = "root";
         magicRollback = true;
-        # Cross-building the aarch64 Pi from an x86 host is impractical; build it
-        # on the target instead.
-        remoteBuild = system == "aarch64-linux";
+        # Everything is built here and the closure pushed. The aarch64 Pi is
+        # emulated via voyager's binfmt (boot.binfmt.emulatedSystems): slow, but
+        # the alternative — `remoteBuild` on a Pi 3 — means a 4x A53 with 1 GB of
+        # RAM compiling nixos-hardware's linux-rpi kernel, which is not in
+        # cache.nixos.org. That takes the better part of a day and tends to OOM.
+        remoteBuild = false;
         path = inputs.deploy-rs.lib.${system}.activate.nixos nixos;
       };
     })
