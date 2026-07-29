@@ -201,9 +201,16 @@
         hyprland.configuration.environment.etc.specialisation.text = "hyprland";
 
         niri.configuration = {
-          imports = [(import ../aspects/desktop/_niri/system.nix {inherit inputs;})];
+          imports = [
+            (import ../aspects/desktop/_niri/system.nix {inherit inputs;})
+            # Swap tuigreet for the noctalia greeter, so the login screen
+            # matches the shell this specialisation boots into.
+            (import ../aspects/desktop/_greetd/noctalia.nix {})
+          ];
 
           environment.etc.specialisation.text = "niri";
+
+          cosmos.profiles.desktop.addons.greetd.noctalia.defaultSession = "niri";
 
           # Hyprland and niri must not both own the session.
           programs.hyprland.enable = lib.mkForce false;

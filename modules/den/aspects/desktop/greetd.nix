@@ -25,6 +25,17 @@
         description = "Command to run to show greeter";
       };
 
+      user = mkOption {
+        type = str;
+        default = config.cosmos.user.name;
+        defaultText = "the primary user";
+        description = ''
+          Account the greeter itself runs as. tuigreet uses the primary user so
+          its remembered-session cache is per-user; graphical greeters override
+          this with the dedicated `greeter` system account.
+        '';
+      };
+
       sessions = mkOption {
         default = [];
         description = ''
@@ -51,10 +62,18 @@
     config.services.greetd = {
       enable = true;
       settings.default_session = {
-        inherit (cfg) command;
-        user = config.cosmos.user.name;
+        inherit (cfg) command user;
       };
     };
+  };
+
+  # The graphical alternative to tuigreet — same curated session list, noctalia's
+  # look. The body lives in ./_greetd/noctalia.nix so voyager's
+  # `specialisation.niri` can apply it too (specialisation bodies are plain
+  # modules and cannot `include` a den aspect).
+  den.aspects.desktop.greetd.noctalia = {
+    includes = [den.aspects.desktop.greetd];
+    nixos = import ./_greetd/noctalia.nix {};
   };
 
   den.aspects.desktop.greetd.tuigreet = {
