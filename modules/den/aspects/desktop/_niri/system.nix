@@ -183,12 +183,16 @@
           "Mod+Escape".spawn-sh = noctalia "sessionMenu" "toggle";
           "Mod+Shift+Escape".spawn-sh = noctalia "lockScreen" "lock";
 
-          # Tapping Mod on its own opens the control centre. Both forms are
-          # bound because keyd emits the tap key at the moment the meta layer
-          # is torn down, and whether the modifier has already been released by
-          # then is not something to rely on.
+          # Tapping Mod on its own opens the control centre. `keyd monitor`
+          # shows the tap arriving with no modifier held —
+          #
+          #   leftmeta down, leftcontrol down,     <- keyd's modifier guard
+          #   leftmeta up,   leftcontrol up,
+          #   f19 down,      f19 up
+          #
+          # so the unmodified form is the only one that can ever match; a
+          # `Mod+` variant was dead weight.
           ${modTap}.spawn-sh = noctalia "controlCenter" "toggle";
-          "Mod+${modTap}".spawn-sh = noctalia "controlCenter" "toggle";
 
           # Utilities
           "Mod+Shift+Return".spawn = terminal;
