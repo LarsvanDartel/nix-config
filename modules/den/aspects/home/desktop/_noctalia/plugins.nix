@@ -137,6 +137,19 @@ in {
     # only way in.
     services.kdeconnect.indicator = lib.mkForce false;
 
+    # …but the indicator's menu was also the only route to the KDE Connect GUI,
+    # because home.kde-connect replaces the packaged launcher entry with a
+    # hidden, `Exec=`-less stub. With no indicator here, that leaves no way to
+    # reach per-device plugin configuration at all, so restore a working entry.
+    # The plugin's own panel covers pairing and the common actions; this is for
+    # everything past that.
+    xdg.desktopEntries."org.kde.kdeconnect.app" = {
+      exec = lib.mkForce "kdeconnect-app";
+      icon = lib.mkForce "kdeconnect";
+      categories = lib.mkForce ["Qt" "KDE" "Network"];
+      settings.NoDisplay = lib.mkForce "false";
+    };
+
     # Runtime dependencies the plugins shell out to. niri and hyprctl come from
     # the compositor's own session PATH.
     home.packages = with pkgs; [
