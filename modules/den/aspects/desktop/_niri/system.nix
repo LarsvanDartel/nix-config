@@ -99,7 +99,7 @@
           tap = _: {};
           natural-scroll = _: {};
           scroll-factor = 0.2;
-          # `dwt` is deliberately unset: Hyprland has disable_while_typing = false.
+          accel-profile = "flat";
         };
         mouse = {
           accel-profile = "flat";
@@ -118,6 +118,10 @@
           {proportion = 0.5;}
           {proportion = 2.0 / 3.0;}
         ];
+        default-column-display = "tabbed";
+        tab-indicator = {
+          hide-when-single-tab = _: {};
+        };
         focus-ring = {
           width = 2;
           active-color = colors.base0D;

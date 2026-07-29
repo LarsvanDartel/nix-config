@@ -14,8 +14,17 @@
   inherit (lib.types) enum bool;
 
   cfg = config.cosmos.desktops.noctalia;
+  fonts = config.cosmos.desktops.common.styling.fonts;
+  wallpapers = config.cosmos.desktops.wallpapers;
 
   widget = id: {inherit id;};
+
+  # Widgets that can show their value permanently or only on hover. "alwaysShow"
+  # keeps the reading (volume %, brightness %, SSID, …) visible at all times.
+  valueWidget = id: {
+    inherit id;
+    displayMode = "alwaysShow";
+  };
 
   noctalia = inputs.nix-wrapper-modules.wrappers.noctalia-shell.wrap {
     inherit pkgs;
@@ -53,13 +62,18 @@
           left = map widget ["Workspace" "ActiveWindow"];
           center = map widget ["Clock"];
           right =
-            map widget ["MediaMini" "Volume" "Brightness" "Network" "Bluetooth"]
+            [(widget "MediaMini")]
+            # Readings stay on screen instead of appearing on hover.
+            ++ map valueWidget ["Volume" "Brightness" "Network" "Bluetooth"]
             # `icon-always` keeps the pill open, so the charge percentage shows
-            # permanently instead of only on hover.
+            # permanently. `hideIfNotDetected` is what makes the widget vanish
+            # entirely when UPower reports no battery — see desktop.power, which
+            # is what actually makes the battery detectable.
             ++ [
               {
                 id = "Battery";
                 displayMode = "icon-always";
+                hideIfNotDetected = false;
               }
             ]
             ++ map widget ["Tray" "NotificationHistory" "ControlCenter"];
@@ -81,18 +95,94 @@
         enableBlurBehind = false;
         showScreenCorners = false;
         showChangelogOnStartup = false;
+
+        # Lock screen.
+        #
+        # `autoStartAuth` begins the PAM conversation as soon as the lock screen
+        # appears, which is what starts the fprintd scan without a keypress, and
+        # `allowPasswordWithFprintd` keeps the password field live while the
+        # reader waits — without it a failed/absent finger locks you out of
+        # typing. `enableLockScreenCountdown` is the auto-dismiss timer on the
+        # session buttons; off, so nothing happens unless you pick it.
+        autoStartAuth = true;
+        allowPasswordWithFprintd = true;
+        enableLockScreenMediaControls = true;
+        enableLockScreenCountdown = false;
+        showSessionButtonsOnLockScreen = true;
+        showHibernateOnLockScreen = true;
+        lockScreenAnimations = false;
+        lockOnSuspend = true;
       };
 
       ui = {
-        fontDefault = config.stylix.fonts.sansSerif.name;
-        fontFixed = config.stylix.fonts.monospace.name;
+        # The interface font, not stylix's sansSerif: Cozette is what the rest of
+        # the desktop (bar, popups, terminal) is set in, and mixing it with
+        # DejaVu across the same screen is what made the shell look off.
+        fontDefault = fonts.interface.name;
+        fontFixed = fonts.monospace.name;
         panelBackgroundOpacity = 1.0;
         translucentWidgets = false;
       };
 
+      # Deliberately spare: a single-column list with no category headers, no
+      # icon plates and tight rows — the closest noctalia gets to a bare
+      # type-and-enter launcher. The search providers (settings, windows,
+      # sessions, clipboard) cost nothing visually and stay on.
       appLauncher = {
         enableClipboardHistory = cfg.widgets.clipboardHistory;
         terminalCommand = "${config.cosmos.cli.terminals.defaultStandalone} -e";
+        viewMode = "list";
+        density = "compact";
+        position = "center";
+        showCategories = false;
+        showIconBackground = false;
+        sortByMostUsed = true;
+      };
+
+      # No countdown — the menu waits for a choice instead of acting on its own.
+      # Keybinds are mnemonic rather than positional, so they read off the menu.
+      sessionMenu = {
+        enableCountdown = false;
+        showKeybinds = true;
+        showHeader = false;
+        position = "center";
+        powerOptions = [
+          {
+            action = "lock";
+            enabled = true;
+            keybind = "L";
+          }
+          {
+            action = "suspend";
+            enabled = true;
+            keybind = "S";
+          }
+          {
+            action = "hibernate";
+            enabled = true;
+            keybind = "H";
+          }
+          {
+            action = "reboot";
+            enabled = true;
+            keybind = "R";
+          }
+          {
+            action = "logout";
+            enabled = true;
+            keybind = "E";
+          }
+          {
+            action = "shutdown";
+            enabled = true;
+            keybind = "P";
+          }
+          {
+            action = "rebootToUefi";
+            enabled = true;
+            keybind = "U";
+          }
+        ];
       };
 
       # DDC/CI, so the brightness widget also drives an external monitor.
@@ -108,7 +198,7 @@
       notifications.enabled = cfg.notifications.enable;
 
       # Backgrounds the wallpaper picker browses (see home.wallpapers).
-      wallpaper.directory = config.cosmos.desktops.wallpapers.directory;
+      wallpaper.directory = wallpapers.directory;
 
       # Drives the weather widget and the night light's sunrise/sunset schedule.
       # Pinned rather than geolocated, so it works offline and doesn't phone out.
@@ -117,6 +207,16 @@
         autoLocate = false;
       };
     };
+  };
+
+  # The wallpaper choice is runtime state, not a setting: noctalia keeps it in
+  # its cache, and `defaultWallpaper` is the fallback used for any screen that
+  # has no pick yet. Seeding the cache is therefore how a *default* wallpaper is
+  # expressed — writing it into settings.json would do nothing.
+  wallpaperCache = builtins.toJSON {
+    wallpapers = {};
+    usedRandomWallpapers = {};
+    defaultWallpaper = wallpapers.defaultWallpaper;
   };
 in {
   options.cosmos.desktops.noctalia = {
@@ -167,7 +267,23 @@ in {
       [noctalia]
       ++ lib.optional cfg.widgets.clipboardHistory pkgs.cliphist;
 
-    cosmos.system.impermanence.persist.directories = [".config/noctalia"];
+    cosmos.system.impermanence.persist.directories = [
+      ".config/noctalia"
+      # Nominally a cache, actually where the picked wallpaper, per-screen, is
+      # remembered. Losing it on every boot would reset the background.
+      ".cache/noctalia"
+    ];
+
+    # Seeded, not managed: written once so a fresh machine comes up with a
+    # background, then left alone for the picker to overwrite.
+    home.activation.noctaliaDefaultWallpaper = lib.hm.dag.entryAfter ["writeBoundary"] ''
+      _cache=${lib.escapeShellArg "${config.xdg.cacheHome}/noctalia"}
+      if [ ! -e "$_cache/wallpapers.json" ]; then
+        run mkdir -p "$_cache"
+        run cp ${pkgs.writeText "noctalia-wallpapers.json" wallpaperCache} "$_cache/wallpapers.json"
+        run chmod u+w "$_cache/wallpapers.json"
+      fi
+    '';
 
     # Compositor-agnostic autostart: both niri and Hyprland/UWSM reach this target.
     systemd.user.services.noctalia = {
@@ -178,6 +294,11 @@ in {
       };
       Service = {
         ExecStart = lib.getExe noctalia;
+        # Without this the lock screen probes /etc/pam.d at startup to guess a
+        # stack. `login` is what it would land on anyway, and on NixOS that is
+        # the stack `services.fprintd` wires pam_fprintd into — naming it
+        # outright makes the fingerprint path deterministic.
+        Environment = ["NOCTALIA_PAM_SERVICE=login"];
         Restart = "on-failure";
         RestartSec = 2;
         Slice = "session.slice";
