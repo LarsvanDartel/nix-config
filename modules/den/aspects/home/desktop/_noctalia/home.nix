@@ -83,7 +83,6 @@
               # Auto-hides when disconnected.
               (pluginWidget "protonvpn")
               (pluginWidget "thinkpad-fan")
-              (pluginWidget "battery-threshold")
             ]
             # `icon-always` keeps the pill open, so the charge percentage shows
             # permanently. `hideIfNotDetected` is what makes the widget vanish
@@ -124,16 +123,20 @@
         };
       };
 
-      # FOUR PER SIDE, no more. ShortcutsCard is a fixed-height row of
-      # non-shrinking items in a half-width box with no wrapping, so a fifth
-      # entry renders outside the card's rounded background instead of being
-      # laid out. NoctaliaPerformance gives up its slot to screen-toolkit;
-      # plugin-manager moved to a keybind for the same reason.
+      # FIVE PER SIDE, no more. ShortcutsCard is a fixed-height row of
+      # non-shrinking items in a half-width box with no wrapping, so a sixth
+      # entry renders outside the card's rounded background rather than being
+      # laid out — that is what pushed plugin-manager out, and why it lives on a
+      # keybind now (see _niri/system.nix) instead.
       controlCenter.shortcuts = {
         left =
-          map widget ["Network" "Bluetooth" "WallpaperSelector"]
+          map widget ["Network" "Bluetooth" "WallpaperSelector" "NoctaliaPerformance"]
           ++ [(pluginWidget "screen-toolkit")];
-        right = map widget ["Notifications" "PowerProfile" "KeepAwake" "NightLight"];
+        right =
+          map widget ["Notifications" "PowerProfile" "KeepAwake" "NightLight"]
+          # Charge thresholds are set-and-forget, not glance-at-it — off the bar,
+          # into the panel you open on purpose.
+          ++ [(pluginWidget "battery-threshold")];
       };
 
       # The bar covers everything the dock would, and a second always-present

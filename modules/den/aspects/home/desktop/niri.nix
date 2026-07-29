@@ -8,13 +8,6 @@
   den.aspects.home.niri = {
     includes = [den.aspects.home.noctalia];
 
-    homeManager = {pkgs, ...}: {
-      home.packages = with pkgs; [
-        playerctl
-        wl-clipboard
-      ];
-
-      cosmos.system.impermanence.persist.directories = ["Pictures/screenshots"];
-    };
+    homeManager = import ../../desktop/_niri/home.nix {};
   };
 }

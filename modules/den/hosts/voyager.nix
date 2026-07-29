@@ -113,11 +113,7 @@
       };
     };
 
-    nixos = {
-      lib,
-      pkgs,
-      ...
-    }: {
+    nixos = {lib, ...}: {
       imports = [
         inputs.nixos-facter-modules.nixosModules.facter
         {facter.reportPath = ./_facter/voyager.facter.json;}
@@ -230,7 +226,10 @@
           programs.hyprland.enable = lib.mkForce false;
 
           home-manager.users.lvdar = {
-            imports = [(import ../aspects/home/desktop/_noctalia/home.nix {inherit inputs;})];
+            imports = [
+              (import ../aspects/home/desktop/_noctalia/home.nix {inherit inputs;})
+              (import ../aspects/desktop/_niri/home.nix {})
+            ];
 
             # noctalia replaces the Hyprland-era shell pieces.
             wayland.windowManager.hyprland.enable = lib.mkForce false;
@@ -239,9 +238,6 @@
             programs.rofi.enable = lib.mkForce false;
             services.mako.enable = lib.mkForce false;
             services.hyprpaper.enable = lib.mkForce false;
-
-            home.packages = [pkgs.playerctl];
-            cosmos.system.impermanence.persist.directories = ["Pictures/screenshots"];
           };
         };
       };
