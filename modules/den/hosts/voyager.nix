@@ -25,7 +25,6 @@
       desktop.keyd
       services.containers
       services.netbird.client
-      services.suwayomi
       hardware.fingerprint
       hardware.thinkpad
       hardware.v4l2loopback
@@ -127,13 +126,6 @@
       cosmos = {
         system.boot.detect-windows = true;
 
-        services.suwayomi = {
-          basicAuth.enable = true;
-          webview.enable = true;
-          downloadsDir = "/var/lib/suwayomi-downloads";
-          homeLink = "/home/lvdar/manga";
-        };
-
         hardware.v4l2loopback.devices = [
           {
             number = 1;
@@ -142,10 +134,6 @@
         ];
 
         cli.programs.nh.flake-dir = "/home/lvdar/nix-config";
-
-        # suwayomi.lvdar.nl is published from voyager, not endeavour, so the
-        # edge target lands here.
-        services.netbird.client.exposedPorts = [8080];
       };
 
       # nixos-facter puts every detected GPU driver into the initrd. Here that

@@ -125,8 +125,7 @@
         };
       };
 
-      # Dropped when the edge terminates TLS. Note this one is published from
-      # voyager, not endeavour.
+      # Dropped when the edge terminates TLS.
       services.nginx.virtualHosts = mkIf (cfg.expose && !config.cosmos.networking.edgeTerminated) {
         "suwayomi.lvdar.nl" = {
           forceSSL = true;
