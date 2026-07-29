@@ -19,6 +19,12 @@
 
   widget = id: {inherit id;};
 
+  # Plugin widgets are addressed as `plugin:<id>` (BarWidgetLoader splits on the
+  # prefix to look the component up in the plugin registry rather than
+  # Modules/Bar/Widgets). Placement has to live here: bar.widgets is part of the
+  # store-owned settings.json, so it cannot be changed from the settings panel.
+  pluginWidget = id: {id = "plugin:${id}";};
+
   # Widgets that can show their value permanently or only on hover. "alwaysShow"
   # keeps the reading (volume %, brightness %, SSID, …) visible at all times.
   valueWidget = id: {
@@ -62,9 +68,20 @@
           left = map widget ["Workspace" "ActiveWindow"];
           center = map widget ["Clock"];
           right =
-            [(widget "MediaMini")]
+            [
+              (widget "MediaMini")
+              # Only draws itself while the mic, camera or a screencast is
+              # actually live, so it costs nothing at rest.
+              (pluginWidget "privacy-indicator")
+            ]
             # Readings stay on screen instead of appearing on hover.
             ++ map valueWidget ["Volume" "Brightness" "Network" "Bluetooth"]
+            ++ [
+              # Auto-hides when disconnected.
+              (pluginWidget "protonvpn")
+              (pluginWidget "thinkpad-fan")
+              (pluginWidget "battery-threshold")
+            ]
             # `icon-always` keeps the pill open, so the charge percentage shows
             # permanently. `hideIfNotDetected` is what makes the widget vanish
             # entirely when UPower reports no battery — see desktop.power, which
@@ -79,7 +96,30 @@
             ++ map widget ["Tray" "NotificationHistory" "ControlCenter"];
           # Night light, keep-awake and the wallpaper picker stay *enabled* —
           # they just live in the control centre rather than on the bar.
+          #
+          # So do several installed plugins, deliberately kept off the bar:
+          # plugin-manager, screen-toolkit and kde-connect are control-centre
+          # shortcuts (below); ssh-sessions and niri-workspaces are launcher
+          # providers (type `>ws`); keybind-cheatsheet and display-settings are
+          # on keybinds (see _niri/system.nix). battery-monitor-plus and
+          # model-usage have bar widgets but no default slot — add
+          # `plugin:battery-monitor-plus` / `plugin:model-usage` here to
+          # surface them.
         };
+      };
+
+      # The four defaults per side, plus the plugins that ship a control-centre
+      # widget — the natural home for things you open occasionally.
+      controlCenter.shortcuts = {
+        left =
+          map widget ["Network" "Bluetooth" "WallpaperSelector" "NoctaliaPerformance"]
+          ++ [(pluginWidget "screen-toolkit")];
+        right =
+          map widget ["Notifications" "PowerProfile" "KeepAwake" "NightLight"]
+          ++ [
+            (pluginWidget "kde-connect")
+            (pluginWidget "plugin-manager")
+          ];
       };
 
       # Built-in Nord scheme — the same base16 palette stylix themes the rest with.
@@ -219,6 +259,8 @@
     defaultWallpaper = wallpapers.defaultWallpaper;
   };
 in {
+  imports = [(import ./plugins.nix {})];
+
   options.cosmos.desktops.noctalia = {
     bar = {
       enable = mkEnableOption "the noctalia bar" // {default = true;};
