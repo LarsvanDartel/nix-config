@@ -31,6 +31,7 @@
       services.traccar
       services.pangolin.newt
       services.netbird.client
+      services.suwayomi
       services.cdrom
       hardware.ipmi-fancontrol
       services.arr.vpn
@@ -94,6 +95,7 @@
           8096 # jellyfin    jellyfin.lvdar.nl
           2283 # immich      immich.lvdar.nl
           8082 # traccar     traccar.lvdar.nl
+          8080 # suwayomi    suwayomi.lvdar.nl
           4055 # jellyseerr  seerr.lvdar.nl     (via the netns bridge)
           6336 # sabnzbd     sabnzbd.lvdar.nl   (via the netns bridge)
         ];
@@ -174,6 +176,22 @@
 
         jellyfin.openFirewall = true;
         immich.mediaDir = "/tank/media/library/images";
+
+        # Moved here from voyager. The library and downloads do NOT come along
+        # with the config — they live in /var/lib/suwayomi-{server,downloads}
+        # on voyager and have to be copied across.
+        suwayomi = {
+          basicAuth.enable = true;
+          webview.enable = true;
+          # Same paths it used on voyager. Putting downloads under /tank would
+          # be the obvious move on the host with the array, but the aspect adds
+          # downloadsDir to impermanence — and /tank is a ZFS pool outside the
+          # persist layer, so it would get a bind mount from /persist over the
+          # top and land on the root disk anyway. Would need the aspect to stop
+          # persisting an explicitly-placed downloadsDir first.
+          downloadsDir = "/var/lib/suwayomi-downloads";
+          homeLink = "/home/${config.cosmos.user.name}/manga";
+        };
 
         arr = {
           stateDir = "/var/lib/arr";

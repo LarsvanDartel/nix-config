@@ -107,10 +107,9 @@
           }
         ];
 
-        # Lives on voyager, not endeavour.
         suwayomi.targets = [
           {
-            peer = "voyager";
+            peer = "endeavour";
             port = 8080;
           }
         ];
