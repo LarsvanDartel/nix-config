@@ -19,6 +19,10 @@
   # No foot server runs under niri, so use the standalone binary.
   terminal = "foot";
 
+  # What a *tap* of the Mod key produces, courtesy of keyd's overload (see
+  # desktop/keyd.nix). Holding Mod is unaffected, so this is free to bind.
+  modTap = config.cosmos.desktops.input.modTap.keysym;
+
   # A bind that still fires while the screen is locked. `allow-when-locked` is a
   # KDL *property* of the bind node, so it goes in `props`, with the action as
   # the node's content.
@@ -178,6 +182,13 @@
           # Power menu / lock
           "Mod+Escape".spawn-sh = noctalia "sessionMenu" "toggle";
           "Mod+Shift+Escape".spawn-sh = noctalia "lockScreen" "lock";
+
+          # Tapping Mod on its own opens the control centre. Both forms are
+          # bound because keyd emits the tap key at the moment the meta layer
+          # is torn down, and whether the modifier has already been released by
+          # then is not something to rely on.
+          ${modTap}.spawn-sh = noctalia "controlCenter" "toggle";
+          "Mod+${modTap}".spawn-sh = noctalia "controlCenter" "toggle";
 
           # Utilities
           "Mod+Shift+Return".spawn = terminal;

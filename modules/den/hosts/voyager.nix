@@ -19,6 +19,10 @@
       roles.gaming
       desktop.hyprland
       desktop.greetd.tuigreet
+      # Base-level, not specialisation-level: the niri specialisation inherits
+      # the parent config, so the Mod-tap option has to be declared here for its
+      # binds to read it.
+      desktop.keyd
       services.containers
       services.suwayomi
       hardware.fingerprint
