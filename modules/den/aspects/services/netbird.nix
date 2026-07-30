@@ -415,6 +415,43 @@
             type = str;
             default = "netbird";
           };
+
+          # The IdP is the one thing that cannot be published through
+          # netbird-proxy. Management fetches the discovery document at startup
+          # and exits if it fails; the proxy cannot route anywhere until
+          # management is up. Serving the IdP from the proxy therefore closes a
+          # loop with no way in — which is exactly what retiring Pangolin did,
+          # since Pangolin's traefik had been the independent path all along:
+          # management crash-looped, the proxy answered 502 for every domain,
+          # and no amount of retrying could break the tie.
+          #
+          # So gaia's own nginx publishes it instead, terminating with the same
+          # wildcard certificate and forwarding straight over the mesh. Only the
+          # SNI split and the mesh have to work, and neither needs management.
+          idp = {
+            domain = mkOption {
+              type = nullOr str;
+              default = null;
+              example = "auth.lvdar.nl";
+              description = ''
+                Domain of the OIDC provider, served from this host's nginx
+                rather than through netbird-proxy. Null leaves it to the proxy,
+                which is only safe if the control plane's own IdP lives
+                somewhere else entirely.
+              '';
+            };
+            upstream = mkOption {
+              type = nullOr str;
+              default = null;
+              example = "https://100.68.151.172:8443";
+              description = ''
+                Where that domain is proxied to — the IdP peer's mesh address.
+                An address, not a name: nginx resolves a literal `proxy_pass`
+                host once at startup, so a name would make nginx's boot depend
+                on NetBird's resolver being up first.
+              '';
+            };
+          };
         };
 
         services = mkOption {
@@ -578,31 +615,58 @@
         # The netbird modules contribute locations to this vhost but no listener
         # and no TLS, which is left to us. It is deliberately loopback-only: the
         # SNI splitter below owns the public socket.
-        services.nginx.virtualHosts.${cfg.domain} = {
-          onlySSL = true;
-          useACMEHost = "lvdar.nl";
-          listen = [
-            {
-              addr = "127.0.0.1";
-              port = cfg.localTlsPort;
-              ssl = true;
-              proxyProtocol = true;
-            }
-          ];
-          # The OIDC callback paths are not exported routes, so the dashboard's
-          # `try_files` would 404 them. The static export's 404 page carries the
-          # same root layout — and so the same OidcProvider — as every other
-          # page, which is all the callback needs; this only serves it as a 200
-          # rather than relying on the vhost's error_page.
-          locations = lib.genAttrs ["= /callback" "= /silent-callback"] (_: {
-            extraConfig = "try_files /404.html =404;";
-          });
+        services.nginx.virtualHosts =
+          {
+            ${cfg.domain} = {
+              onlySSL = true;
+              useACMEHost = "lvdar.nl";
+              listen = [
+                {
+                  addr = "127.0.0.1";
+                  port = cfg.localTlsPort;
+                  ssl = true;
+                  proxyProtocol = true;
+                }
+              ];
+              # The OIDC callback paths are not exported routes, so the
+              # dashboard's `try_files` would 404 them. The static export's 404
+              # page carries the same root layout — and so the same OidcProvider —
+              # as every other page, which is all the callback needs; this only
+              # serves it as a 200 rather than relying on the vhost's error_page.
+              locations = lib.genAttrs ["= /callback" "= /silent-callback"] (_: {
+                extraConfig = "try_files /404.html =404;";
+              });
 
-          extraConfig = ''
-            set_real_ip_from 127.0.0.1;
-            real_ip_header proxy_protocol;
-          '';
-        };
+              extraConfig = ''
+                set_real_ip_from 127.0.0.1;
+                real_ip_header proxy_protocol;
+              '';
+            };
+          }
+          # The IdP, published here rather than through the proxy that depends on
+          # it. `proxy_ssl_verify` stays off because the peer answers with the
+          # wildcard certificate for its public name, which cannot match the mesh
+          # address dialled to reach it; the hop is inside WireGuard either way.
+          // lib.optionalAttrs (cfg.oidc.idp.domain != null) {
+            ${cfg.oidc.idp.domain} = {
+              onlySSL = true;
+              useACMEHost = "lvdar.nl";
+              listen = [
+                {
+                  addr = "127.0.0.1";
+                  port = cfg.localTlsPort;
+                  ssl = true;
+                  proxyProtocol = true;
+                }
+              ];
+              locations."/".proxyPass = cfg.oidc.idp.upstream;
+              extraConfig = ''
+                set_real_ip_from 127.0.0.1;
+                real_ip_header proxy_protocol;
+                proxy_ssl_verify off;
+              '';
+            };
+          };
 
         # Split the public port by SNI without terminating. netbird-proxy
         # answers ACME tls-alpn-01 challenges on this socket, so decrypting
@@ -610,6 +674,8 @@
         services.nginx.streamConfig = ''
           map $ssl_preread_server_name $netbird_upstream {
             ${cfg.domain}  127.0.0.1:${toString cfg.localTlsPort};
+            ${lib.optionalString (cfg.oidc.idp.domain != null)
+            "${cfg.oidc.idp.domain}  127.0.0.1:${toString cfg.localTlsPort};"}
             default        127.0.0.1:${toString cfg.proxyPort};
           }
 
