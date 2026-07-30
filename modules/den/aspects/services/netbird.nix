@@ -520,6 +520,20 @@
               AUTH_AUTHORITY = cfg.oidc.authority;
               AUTH_CLIENT_ID = cfg.oidc.clientId;
               AUTH_AUDIENCE = cfg.oidc.clientId;
+
+              # Move the OIDC callbacks off hash routes. Left unset, the
+              # dashboard redirects to `/#callback` and `/#silent-callback`,
+              # which kanidm can never match: it strips the fragment from
+              # configured origins (RFC 6749 §3.1.2) while the incoming
+              # redirect_uri keeps it, so strict matching always fails — see
+              # kanidm#3217. NetBird's own setup.env.example exposes these two
+              # overrides for exactly this, and fixing it here rather than
+              # disabling kanidm's strict validation keeps the check on.
+              #
+              # Must stay in step with the netbird originUrl list in
+              # services/kanidm.nix.
+              AUTH_REDIRECT_URI = "/peers";
+              AUTH_SILENT_REDIRECT_URI = "/add-peers";
             };
           };
         };
