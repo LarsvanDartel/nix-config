@@ -29,7 +29,6 @@
       services.jellyfin
       services.immich
       services.traccar
-      services.pangolin.newt
       services.netbird.client
       services.suwayomi
       services.cdrom
@@ -100,8 +99,9 @@
         # forwarding, which is why it is opt-in per host.
         routingFeatures = "server";
 
-        # What netbird-proxy targets once cosmos.networking.edgeTerminated is
-        # on. Must track the service declarations in gaia.nix.
+        # What netbird-proxy targets. Must track the service declarations in
+        # gaia.nix — a port missing here is a published service that times
+        # out rather than one that fails loudly.
         exposedPorts = [
           8443 # kanidm      auth.lvdar.nl
           8096 # jellyfin    jellyfin.lvdar.nl

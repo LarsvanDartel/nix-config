@@ -14,7 +14,6 @@
   den.aspects.pioneer = {
     includes = with den.aspects; [
       roles.server
-      services.pangolin.newt
       services.netbird.client
     ];
 
