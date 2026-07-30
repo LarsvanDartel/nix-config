@@ -617,6 +617,36 @@
         # SNI splitter below owns the public socket.
         services.nginx.virtualHosts =
           {
+            # Everything the splitter sends here shares one wildcard
+            # certificate, and that is all HTTP/2 connection coalescing needs: a
+            # browser holding a connection to netbird.lvdar.nl or auth.lvdar.nl
+            # will reuse it for *any* other *.lvdar.nl name rather than open a
+            # second one — same address, and the certificate already covers the
+            # name. Those requests arrive with a Host no server here matches,
+            # fall through to the default server, and every published domain
+            # quietly becomes whichever vhost sorted first. Which is how
+            # jellyfin.lvdar.nl and friends started answering with kanidm's
+            # login page, while curl — one connection per host, correct SNI
+            # every time — saw nothing wrong.
+            #
+            # 421 is the defined answer: the client drops the coalesced
+            # connection and retries on a new one, whose SNI routes it to
+            # netbird-proxy as intended. Saying it still requires a certificate.
+            "_" = {
+              default = true;
+              onlySSL = true;
+              useACMEHost = "lvdar.nl";
+              listen = [
+                {
+                  addr = "127.0.0.1";
+                  port = cfg.localTlsPort;
+                  ssl = true;
+                  proxyProtocol = true;
+                }
+              ];
+              extraConfig = "return 421;";
+            };
+
             ${cfg.domain} = {
               onlySSL = true;
               useACMEHost = "lvdar.nl";
