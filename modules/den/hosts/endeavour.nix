@@ -88,6 +88,12 @@
 
       networking.hostId = "b8433556";
 
+      # TLS for every published service now terminates on gaia, at
+      # netbird-proxy, which forwards to each app's own port over the mesh.
+      # Drops the local `<name>.lvdar.nl` vhosts — nothing reaches this host
+      # by name any more, only by peer and port.
+      cosmos.networking.edgeTerminated = true;
+
       cosmos.services.netbird.client = {
         # Publishes 192.168.2.0/24 into the mesh, so a roaming voyager reaches
         # the whole home network and not just the peers. Turns on IP
