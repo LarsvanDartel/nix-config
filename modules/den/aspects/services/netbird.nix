@@ -509,6 +509,24 @@
               # The module hardcodes :443 here; peers dial whatever the splitter
               # actually listens on.
               Signal.URI = "${cfg.domain}:${toString cfg.publicPort}";
+
+              # Without these the dashboard authenticates but every API call is
+              # rejected, so it sits on a loading spinner forever.
+              #
+              # ApplyOIDCConfig fills AuthIssuer and AuthKeysLocation from the
+              # discovery document, but the audience cannot be derived and
+              # netbird only sets it on the EmbeddedIdP path, which is not in
+              # use here. Left empty, GetAuthAudiences returns [""], and
+              # jwt.WithAudience("") demands an `aud` containing the empty
+              # string — so validation can never succeed.
+              HttpConfig = {
+                AuthAudience = cfg.oidc.clientId;
+                # Used for the reverse proxy's browser-auth flow.
+                AuthClientID = cfg.oidc.clientId;
+                # kanidm puts the user id in `sub`. netbird only defaults this
+                # alongside its embedded IdP, so it too has to be explicit.
+                AuthUserIDClaim = "sub";
+              };
             };
           };
 
