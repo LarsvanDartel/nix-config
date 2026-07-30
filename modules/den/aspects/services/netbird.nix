@@ -266,7 +266,11 @@
         name = "netbird-reconcile-services";
         runtimeInputs = with pkgs; [curl jq];
         text = ''
-          api="https://${cfg.domain}/api"
+          # Straight to management's own listener. Going out via the public
+          # name would need DNS that may not exist yet, TLS, and the transitional
+          # port — three ways to fail for a request that never has to leave the
+          # host. nginx only proxies /api here anyway.
+          api="http://127.0.0.1:${toString mgmtPort}/api"
           token="$(cat "$CREDENTIALS_DIRECTORY/api-token")"
 
           req() {
@@ -380,7 +384,10 @@
 
       config = {
         sops.secrets = {
-          "keys/netbird/coturn-password" = {};
+          # coturn's preStart substitutes this into turnserver.cfg, and that
+          # runs as the service user — not root — so a root-only secret gives
+          # it EACCES and the unit never starts.
+          "keys/netbird/coturn-password".owner = "turnserver";
           "keys/netbird/turn-secret" = {};
           "keys/netbird/datastore-encryption-key" = {};
           "keys/netbird/proxy-token" = {};
@@ -561,25 +568,38 @@
           '';
         };
 
-        # Reconciled after management is up, so a fresh install converges on the
-        # first boot rather than needing a second one.
+        # Driven by the timer below, deliberately NOT by multi-user.target.
+        #
+        # This cannot succeed until peers have enrolled and a real API token
+        # exists, and both of those come *after* the control plane is first
+        # deployed. A unit that fails during activation makes
+        # switch-to-configuration exit non-zero, which deploy-rs reads as a
+        # failed deploy and auto-rolls-back — so wiring it into the boot
+        # target would make the control plane impossible to deploy at all.
+        #
+        # The timer retries until the world is ready; `systemctl start
+        # netbird-services` forces it once the credentials are in place.
         systemd.services.netbird-services = {
           description = "Reconcile declared NetBird reverse-proxy services";
-          after = ["netbird-management.service" "netbird-proxy.service"];
+          after = ["netbird-management.service"];
           wants = ["netbird-management.service"];
-          wantedBy = ["multi-user.target"];
 
           serviceConfig = {
             Type = "oneshot";
-            RemainAfterExit = true;
             ExecStart = lib.getExe reconcile;
             LoadCredential = [
               "api-token:${config.sops.secrets."keys/netbird/api-token".path}"
             ];
-            # Peers enroll asynchronously, and management may still be starting
-            # its HTTP listener, so failing here is expected and recoverable.
-            Restart = "on-failure";
-            RestartSec = "30s";
+          };
+        };
+
+        systemd.timers.netbird-services = {
+          description = "Periodically reconcile NetBird reverse-proxy services";
+          wantedBy = ["timers.target"];
+          timerConfig = {
+            OnBootSec = "2min";
+            OnUnitActiveSec = "5min";
+            Unit = "netbird-services.service";
           };
         };
       };
