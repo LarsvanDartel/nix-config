@@ -91,6 +91,21 @@ in {
 
     networking.firewall.allowedUDPPorts = [21820];
 
+    # gerbil dials pangolin's internal API on :3001 the instant systemd calls
+    # pangolin "started" — which for a Type=simple unit is immediately, while it
+    # is still running database migrations. With the module's Restart=always and
+    # no RestartSec it retries every 100ms, burns the default 5-restart limit in
+    # under a second and parks in `failed`. traefik has Requires=gerbil, so it
+    # then never starts and port 443 stays dead — which is exactly what happened
+    # after the 1.21.0 migration.
+    #
+    # Backing off and dropping the rate limiter lets gerbil wait out the
+    # migration instead of giving up during it.
+    systemd.services.gerbil = {
+      serviceConfig.RestartSec = "5s";
+      unitConfig.StartLimitIntervalSec = 0;
+    };
+
     services.traefik = {
       staticConfigOptions.accessLog = {
         filePath = "/var/log/traefik/access.log";
