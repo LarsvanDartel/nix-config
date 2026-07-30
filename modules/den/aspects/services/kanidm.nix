@@ -45,7 +45,27 @@
             origin = "https://auth.lvdar.nl";
             tls_chain = "/var/lib/acme/lvdar.nl/fullchain.pem";
             tls_key = "/var/lib/acme/lvdar.nl/key.pem";
-            http_client_address_info.x-forward-for = ["127.0.0.1"];
+
+            # nixpkgs defaults this to loopback, which is right only while the
+            # local nginx vhost fronts it. Under edge termination netbird-proxy
+            # dials `peer:8443` over the mesh and a loopback socket refuses it.
+            # Reach stays governed by the firewall, which opens 8443 on wt0
+            # alone (netbird.client.exposedPorts on endeavour).
+            bindaddress =
+              if config.cosmos.networking.edgeTerminated
+              then "0.0.0.0:8443"
+              else "127.0.0.1:8443";
+
+            # Who may set the client address. Trusting the wrong hop lets a
+            # client forge its own IP, and kanidm rate-limits per source, so
+            # this tracks whatever actually sits in front: nginx on loopback,
+            # or netbird-proxy arriving from the mesh. 100.64.0.0/10 is the
+            # CGNAT range NetBird assigns peers from; the interface is only
+            # reachable by enrolled peers.
+            http_client_address_info.x-forward-for =
+              if config.cosmos.networking.edgeTerminated
+              then ["100.64.0.0/10"]
+              else ["127.0.0.1"];
           };
         };
 
