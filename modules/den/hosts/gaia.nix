@@ -45,15 +45,6 @@
         impermanence.device = "/dev/disk/by-label/nixos";
       };
 
-      # The published surface, and the only one: with Pangolin gone this list
-      # is what the internet can reach. Targets are peer name + port, because
-      # den has no way to read another host's config — so the ports are
-      # literals here and must track the aspects that own them (jellyfin.nix,
-      # traccar.nix, …).
-      #
-      # `cloud.lvdar.nl` (opencloud) is NOT here and is therefore dark. It was
-      # published through Pangolin but is not deployed from this repo at all,
-      # so there is no peer or port to point at until it is brought in.
       # kanidm is served by nginx here rather than by netbird-proxy, because
       # management cannot start without it and the proxy cannot route without
       # management. The mesh address is a literal for the same reason the ports
@@ -64,50 +55,51 @@
         upstream = "https://100.68.151.172:8443";
       };
 
-      cosmos.services.netbird.services = {
-        jellyfin.targets = [
+      # The published surface, and the only one: with Pangolin gone this list
+      # is what the internet can reach. Targets are peer name + port, because
+      # den has no way to read another host's config — so the ports are
+      # literals here and must track the aspects that own them (jellyfin.nix,
+      # traccar.nix, …).
+      #
+      # Everything is gated by a NetBird identity check unless it says
+      # otherwise. `cloud.lvdar.nl` (opencloud) is NOT here and is therefore
+      # dark: it was published through Pangolin but is not deployed from this
+      # repo at all, so there is no peer or port to point at until it is.
+      cosmos.services.netbird.services = let
+        endeavour = port: [
           {
+            inherit port;
             peer = "endeavour";
-            port = 8096;
           }
         ];
 
-        immich.targets = [
-          {
-            peer = "endeavour";
-            port = 2283;
-          }
-        ];
+        # Open, not gated. Each of these has its own login and is shared with
+        # people who have no account here, and a NetBird check in front would
+        # make them get one first. Immich also drives its own OAuth flow from
+        # the mobile app, which a browser-redirect gate breaks outright.
+        shared = port: {
+          bearerAuth.enable = false;
+          targets = endeavour port;
+        };
+      in {
+        jellyfin = shared 8096;
+        immich = shared 2283;
+        seerr = shared 4055;
 
-        traccar.targets = [
-          {
-            peer = "endeavour";
-            port = 8082;
-          }
-        ];
+        traccar.targets = endeavour 8082;
+        suwayomi.targets = endeavour 8080;
+        sabnzbd.targets = endeavour 6336;
 
-        # VPN-confined: these run inside endeavour's netns, so they are reached
-        # through the nginx bridges in arr/default.nix rather than directly.
-        seerr.targets = [
-          {
-            peer = "endeavour";
-            port = 4055;
-          }
-        ];
-
-        sabnzbd.targets = [
-          {
-            peer = "endeavour";
-            port = 6336;
-          }
-        ];
-
-        suwayomi.targets = [
-          {
-            peer = "endeavour";
-            port = 8080;
-          }
-        ];
+        # The *arr suite. These sit on the host rather than in the VPN
+        # namespace — only the download clients are confined — so they are
+        # reached directly. Each ships an API key rather than a login, so the
+        # identity check in front is the only thing between them and the
+        # internet.
+        prowlarr.targets = endeavour 9696;
+        radarr.targets = endeavour 7878;
+        sonarr.targets = endeavour 8989;
+        lidarr.targets = endeavour 8686;
+        bazarr.targets = endeavour 6767;
       };
 
       system.stateVersion = "24.11";
