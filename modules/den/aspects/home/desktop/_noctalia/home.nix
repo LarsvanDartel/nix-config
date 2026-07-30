@@ -82,6 +82,7 @@
               (pluginWidget "kde-connect")
               # Auto-hides when disconnected.
               (pluginWidget "protonvpn")
+              (pluginWidget "netbird")
               (pluginWidget "thinkpad-fan")
             ]
             # `icon-always` keeps the pill open, so the charge percentage shows

@@ -124,6 +124,10 @@
               originUrl = [
                 "https://netbird.lvdar.nl/callback"
                 "https://netbird.lvdar.nl/silent-callback"
+                # Not the dashboard's — netbird-proxy's bearer auth, which
+                # management handles centrally for every published domain
+                # (HttpConfig.AuthCallbackURL in services/netbird.nix).
+                "https://netbird.lvdar.nl/api/reverse-proxy/callback"
                 # The CLI's device-login flow listens here. Peers enroll with
                 # setup keys so this is not on the critical path, but leaving it
                 # out would make an interactive `netbird up` fail confusingly.
