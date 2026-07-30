@@ -571,6 +571,19 @@
                 # kanidm puts the user id in `sub`. netbird only defaults this
                 # alongside its embedded IdP, so it too has to be explicit.
                 AuthUserIDClaim = "sub";
+
+                # Where the IdP sends the browser back after a bearer-auth
+                # login. Management serves this itself, on its own API and
+                # exempt from its own auth middleware, and the service the user
+                # was heading for rides along in the signed `state` — so it is
+                # one URL for every published domain, not one per domain.
+                #
+                # Left unset, the authorization request goes out with no
+                # `redirect_uri` at all and the IdP rejects it before the login
+                # form. netbird only fills this in alongside its embedded IdP,
+                # which is not in use here — the same gap as the two settings
+                # above. types.ProxyCallbackEndpointFull fixes the path.
+                AuthCallbackURL = "${authority}/api/reverse-proxy/callback";
               };
             };
           };
