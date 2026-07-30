@@ -384,8 +384,18 @@
 
         proxyPort = mkOption {
           type = port;
-          default = 8443;
-          description = "Loopback port netbird-proxy listens on, behind the SNI splitter.";
+          default = 9444;
+          description = ''
+            Loopback port netbird-proxy listens on, behind the SNI splitter.
+
+            NOT 8443: that is gerbil's proxy listener. netbird-proxy binds its
+            socket before it validates its token, so even while crash-looping it
+            held the port, gerbil could not start, and traefik — which has
+            Requires=gerbil — took every public domain down with it.
+
+            Also avoid 8080 and 8444, netbird-proxy's own health and debug
+            endpoints, and 9090, netbird management's metrics port.
+          '';
         };
 
         oidc = {
