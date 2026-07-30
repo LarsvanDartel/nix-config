@@ -257,7 +257,11 @@
               }
               // lib.optionalAttrs (t.path != null) {inherit (t) path;})
             s.targets;
-            bearer_auth = {
+            # Nested under `auth`, not alongside it. The API accepts an
+            # unknown top-level `bearer_auth` without complaint and drops it, so
+            # every service was published ungated while the reconciler reported
+            # success — visible only as `"auth": {}` on a GET.
+            auth.bearer_auth = {
               enabled = s.bearerAuth.enable;
               distribution_groups = s.bearerAuth.groups;
             };
@@ -308,7 +312,7 @@
 
             map(
               .targets |= map(.target_id = peer_id(.peer))
-              | .bearer_auth.distribution_groups |= map({name: ., id: group_id(.)})
+              | .auth.bearer_auth.distribution_groups |= map({name: ., id: group_id(.)})
             )' ${desiredFile})"
 
           # Anything still waiting on a peer or group is reported, not failed:
@@ -316,22 +320,22 @@
           jq -r '
             .[] | select(
               (any(.targets[]; .target_id == null))
-              or (any(.bearer_auth.distribution_groups[]; .id == null))
+              or (any(.auth.bearer_auth.distribution_groups[]; .id == null))
             )
             | "netbird: \(.name) waiting on " + (
                 [(.targets[] | select(.target_id == null) | "peer " + .peer),
-                 (.bearer_auth.distribution_groups[] | select(.id == null) | "group " + .name)]
+                 (.auth.bearer_auth.distribution_groups[] | select(.id == null) | "group " + .name)]
                 | join(", ")
               )' <<<"$annotated"
 
           desired="$(jq '
             [.[] | select(
               (all(.targets[]; .target_id != null))
-              and (all(.bearer_auth.distribution_groups[]; .id != null))
+              and (all(.auth.bearer_auth.distribution_groups[]; .id != null))
             )]
             | map(
               .targets |= map(del(.peer))
-              | .bearer_auth.distribution_groups |= map(.id)
+              | .auth.bearer_auth.distribution_groups |= map(.id)
             )' <<<"$annotated")"
 
           echo "$desired" | jq -c '.[]' | while read -r svc; do

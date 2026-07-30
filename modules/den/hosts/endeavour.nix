@@ -110,6 +110,15 @@
           8080 # suwayomi    suwayomi.lvdar.nl
           4055 # jellyseerr  seerr.lvdar.nl     (via the netns bridge)
           6336 # sabnzbd     sabnzbd.lvdar.nl   (via the netns bridge)
+
+          # The *arr suite. These run on the host rather than inside the VPN
+          # namespace — only the download clients are confined — so they are
+          # reached directly rather than through a bridge.
+          9696 # prowlarr    prowlarr.lvdar.nl
+          7878 # radarr      radarr.lvdar.nl
+          8989 # sonarr      sonarr.lvdar.nl
+          8686 # lidarr      lidarr.lvdar.nl
+          6767 # bazarr      bazarr.lvdar.nl
         ];
       };
 
