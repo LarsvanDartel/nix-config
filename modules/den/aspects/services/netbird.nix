@@ -57,23 +57,19 @@
 
       publicPort = mkOption {
         type = port;
-        # TRANSITIONAL. Every host has to agree on this, and den gives an aspect
-        # no way to read another host's config, so it is a shared default rather
-        # than a per-host setting: one line to flip at the cutover.
-        default = 9443;
+        # Every host has to agree on this, and den gives an aspect no way to
+        # read another host's config, so it is a shared default rather than a
+        # per-host setting.
+        default = 443;
         description = ''
           Public port the control plane answers on. Clients embed it in their
           management URL, so server and clients must agree — which is why it
           lives here rather than in the server-only options.
 
-          It exists because Pangolin's traefik already owns :443 on gaia, and
-          the two have to coexist until the cutover. Set it to a spare port
-          while both are running, then move it back to 443 when Pangolin goes.
-
-          netbird-proxy's ACME uses tls-alpn-01, which is only answerable on
-          443, so publishing services genuinely requires the default. During
-          the transition the mesh works and the dashboard is reachable on the
-          alternate port; only the reverse proxy has to wait.
+          It was 9443 while Pangolin's traefik still owned :443 on gaia. That
+          only ever bought the dashboard and the mesh: netbird-proxy's ACME
+          uses tls-alpn-01, which is answerable on 443 alone, so publishing
+          services at all requires this value.
         '';
       };
 
