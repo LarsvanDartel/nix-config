@@ -25,7 +25,17 @@
     options.cosmos.services.suwayomi = {
       ip = mkOption {
         type = str;
-        default = "127.0.0.1";
+        # Loopback is right only while a local nginx vhost fronts this. Under
+        # edge termination netbird-proxy dials `peer:8080` straight over the
+        # mesh, and a loopback-bound socket refuses that connection — the app
+        # has to answer on the netbird interface itself. Reach is still
+        # governed by the firewall, which opens this port on wt0 only (see
+        # cosmos.services.netbird.client.exposedPorts on endeavour).
+        default =
+          if config.cosmos.networking.edgeTerminated
+          then "0.0.0.0"
+          else "127.0.0.1";
+        defaultText = "127.0.0.1, or 0.0.0.0 when the edge terminates elsewhere";
       };
       port = mkOption {
         type = port;
