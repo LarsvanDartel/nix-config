@@ -137,10 +137,18 @@
           # Enrolls unattended with a setup key. Deliberately not the
           # interactive OIDC flow: that would need kanidm reachable *before*
           # the host is on the mesh, and kanidm is published through it.
+          # No `systemdDependencies`, despite nixpkgs' own example proposing
+          # `sops-install-secrets.service`: that unit does not exist here.
+          # sops-nix installs the secrets from the activation script, which
+          # stage 2 runs before it execs systemd, so /run/secrets is already
+          # populated by the time any unit starts and there is nothing to wait
+          # for. Naming it anyway put a `Requires=` on a not-found unit, which
+          # made systemd refuse the start job at every boot — silently, since a
+          # unit that never starts logs nothing. That is why gaia sat at
+          # `NeedsLogin` with a healthy control plane in front of it.
           login = {
             enable = true;
             setupKeyFile = config.sops.secrets."keys/netbird/setup-key".path;
-            systemdDependencies = ["sops-install-secrets.service"];
           };
 
           # The login unit runs a bare `netbird up`, so the self-hosted
