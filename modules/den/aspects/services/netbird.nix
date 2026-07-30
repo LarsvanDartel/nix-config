@@ -280,27 +280,55 @@
               "$@"
           }
 
-          peers="$(req "$api/peers")"
+          # Readiness gate. On a fresh control plane management is still coming
+          # up and the API token is a placeholder, and while the mesh is being
+          # built peers appear one at a time. None of that is an error, and
+          # exiting non-zero for it makes switch-to-configuration fail, which
+          # deploy-rs turns into a rollback — so this converges quietly and
+          # leaves the rest for the next timer tick.
+          if ! peers="$(req "$api/peers" 2>/dev/null)"; then
+            echo "netbird: management not reachable or API token not accepted yet; nothing to do"
+            exit 0
+          fi
+
           groups="$(req "$api/groups")"
           existing="$(req "$api/reverse-proxies/services")"
 
-          # Swap peer and group names for the ids the API wants. A name that
-          # matches nothing is fatal on purpose: posting a service with a null
-          # target would leave it published but broken.
-          desired="$(jq \
+          # Resolve peer and group names to ids, marking anything that has not
+          # appeared yet rather than failing the whole run.
+          annotated="$(jq \
             --argjson peers "$peers" \
             --argjson groups "$groups" '
-            def peer_id($n):
-              ([$peers[] | select(.name == $n) | .id] | first)
-              // error("no netbird peer named \($n) — has it enrolled yet?");
-            def group_id($n):
-              ([$groups[] | select(.name == $n) | .id] | first)
-              // error("no netbird group named \($n)");
+            def peer_id($n): ([$peers[] | select(.name == $n) | .id] | first);
+            def group_id($n): ([$groups[] | select(.name == $n) | .id] | first);
 
             map(
-              .targets |= map(.target_id = peer_id(.peer) | del(.peer))
-              | .bearer_auth.distribution_groups |= map(group_id(.))
+              .targets |= map(.target_id = peer_id(.peer))
+              | .bearer_auth.distribution_groups |= map({name: ., id: group_id(.)})
             )' ${desiredFile})"
+
+          # Anything still waiting on a peer or group is reported, not failed:
+          # a name that never resolves shows up as a recurring warning here.
+          jq -r '
+            .[] | select(
+              (any(.targets[]; .target_id == null))
+              or (any(.bearer_auth.distribution_groups[]; .id == null))
+            )
+            | "netbird: \(.name) waiting on " + (
+                [(.targets[] | select(.target_id == null) | "peer " + .peer),
+                 (.bearer_auth.distribution_groups[] | select(.id == null) | "group " + .name)]
+                | join(", ")
+              )' <<<"$annotated"
+
+          desired="$(jq '
+            [.[] | select(
+              (all(.targets[]; .target_id != null))
+              and (all(.bearer_auth.distribution_groups[]; .id != null))
+            )]
+            | map(
+              .targets |= map(del(.peer))
+              | .bearer_auth.distribution_groups |= map(.id)
+            )' <<<"$annotated")"
 
           echo "$desired" | jq -c '.[]' | while read -r svc; do
             name="$(jq -r .name <<<"$svc")"
@@ -317,8 +345,11 @@
           done
 
           # Prune only what we own: anything carrying the managed prefix that is
-          # no longer declared. Services made by hand are left alone.
-          jq -r --arg p '${managedPrefix}' --argjson d "$desired" '
+          # no longer declared. Services made by hand are left alone — and so
+          # are declared-but-not-yet-ready ones, hence $annotated rather than
+          # $desired: pruning against the ready set would delete a service the
+          # moment its peer went offline.
+          jq -r --arg p '${managedPrefix}' --argjson d "$annotated" '
             [$d[].name] as $declared
             | .[]
             | select(.name | startswith($p))
@@ -408,6 +439,17 @@
             mode = "0750";
           }
         ];
+
+        # netbird-mgmt fetches the OIDC discovery document at startup and exits
+        # if it cannot. kanidm is published through the very reverse proxy this
+        # host runs, so any blip there crash-loops management, systemd's default
+        # rate limiter parks it in `failed`, switch-to-configuration exits
+        # non-zero and deploy-rs rolls the whole deploy back — leaving the proxy
+        # still broken. Disabling the limiter keeps `Restart=always` retrying
+        # forever instead, so the host stays deployable and management recovers
+        # on its own once the IdP answers.
+        systemd.services.netbird-management.unitConfig.StartLimitIntervalSec = 0;
+        systemd.services.netbird-proxy.unitConfig.StartLimitIntervalSec = 0;
 
         services.netbird.server = {
           enable = true;
