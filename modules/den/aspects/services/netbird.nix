@@ -501,7 +501,7 @@
                 Audience = cfg.oidc.clientId;
                 ClientID = cfg.oidc.clientId;
                 RedirectURLs = [
-                  "${authority}/peers"
+                  "${authority}/callback"
                   "http://localhost:53000"
                 ];
               };
@@ -548,10 +548,25 @@
               # overrides for exactly this, and fixing it here rather than
               # disabling kanidm's strict validation keeps the check on.
               #
+              # These must be paths the dashboard has no page at. Its OIDC
+              # router matches on path alone — `eo(location.href) === eo(
+              # redirect_uri)` — with no test for a `code` parameter, so
+              # whatever path is named here stops being a page and becomes the
+              # callback handler forever. Pointing it at `/peers` (NetBird's
+              # own docs suggest that pair) therefore replaced the dashboard's
+              # landing page with a callback that had no code to redeem: login
+              # at kanidm succeeded, the real callback was consumed, and the
+              # app then navigated to a `/peers` that could only ever render
+              # the "authenticating" spinner.
+              #
+              # Nothing is exported at these two paths, so nginx serves the
+              # SPA shell for them below; the client-side router takes it from
+              # there.
+              #
               # Must stay in step with the netbird originUrl list in
               # services/kanidm.nix.
-              AUTH_REDIRECT_URI = "/peers";
-              AUTH_SILENT_REDIRECT_URI = "/add-peers";
+              AUTH_REDIRECT_URI = "/callback";
+              AUTH_SILENT_REDIRECT_URI = "/silent-callback";
             };
           };
         };
@@ -570,6 +585,15 @@
               proxyProtocol = true;
             }
           ];
+          # The OIDC callback paths are not exported routes, so the dashboard's
+          # `try_files` would 404 them. The static export's 404 page carries the
+          # same root layout — and so the same OidcProvider — as every other
+          # page, which is all the callback needs; this only serves it as a 200
+          # rather than relying on the vhost's error_page.
+          locations = lib.genAttrs ["= /callback" "= /silent-callback"] (_: {
+            extraConfig = "try_files /404.html =404;";
+          });
+
           extraConfig = ''
             set_real_ip_from 127.0.0.1;
             real_ip_header proxy_protocol;

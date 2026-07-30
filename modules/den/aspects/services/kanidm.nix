@@ -103,16 +103,18 @@
               # with NetBird specifically.
               #
               # The fix is on NetBird's side rather than relaxing kanidm, so
-              # strict redirect validation stays on.
+              # strict redirect validation stays on. The paths it redirects to
+              # are deliberately ones the dashboard has no page at — see the
+              # AUTH_REDIRECT_URI comment in services/netbird.nix.
               #
               # The :9443 pair is TRANSITIONAL: Pangolin holds :443 until the
               # cutover, and the dashboard derives the origin from
               # window.location, so both ports need registering until then.
               originUrl = [
-                "https://netbird.lvdar.nl:9443/peers"
-                "https://netbird.lvdar.nl:9443/add-peers"
-                "https://netbird.lvdar.nl/peers"
-                "https://netbird.lvdar.nl/add-peers"
+                "https://netbird.lvdar.nl:9443/callback"
+                "https://netbird.lvdar.nl:9443/silent-callback"
+                "https://netbird.lvdar.nl/callback"
+                "https://netbird.lvdar.nl/silent-callback"
                 # The CLI's device-login flow listens here. Peers enroll with
                 # setup keys so this is not on the critical path, but leaving it
                 # out would make an interactive `netbird up` fail confusingly.
