@@ -20,9 +20,6 @@
       roles.server
       core.boot
       core.impermanence
-      # Pangolin stays up alongside NetBird until the mesh is proven; gaia is
-      # the only public entry point, so there is no second way back in.
-      services.pangolin
       services.netbird
       services.typstnique
     ];
@@ -48,13 +45,15 @@
         impermanence.device = "/dev/disk/by-label/nixos";
       };
 
-      # The published surface. Targets are peer name + port: den has no way to
-      # read another host's config, so the ports are literals here and must
-      # track the aspects that own them (jellyfin.nix, traccar.nix, …).
+      # The published surface, and the only one: with Pangolin gone this list
+      # is what the internet can reach. Targets are peer name + port, because
+      # den has no way to read another host's config — so the ports are
+      # literals here and must track the aspects that own them (jellyfin.nix,
+      # traccar.nix, …).
       #
-      # INCOMPLETE until the Pangolin resource list is enumerated — `cloud`
-      # (opencloud) is published today but is not deployed from this repo at
-      # all, so there is nothing here to point at.
+      # `cloud.lvdar.nl` (opencloud) is NOT here and is therefore dark. It was
+      # published through Pangolin but is not deployed from this repo at all,
+      # so there is no peer or port to point at until it is brought in.
       cosmos.services.netbird.services = {
         # Not gated: NetBird's own dashboard authenticates against kanidm, so
         # putting a NetBird identity check in front of kanidm would lock

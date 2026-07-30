@@ -47,7 +47,6 @@
         home.freecad
         home.orca-slicer
         home.simplelogin
-        home.pangolin
         home.proton.mail-bridge
         home.proton.mail-desktop
         home.proton.pass-cli

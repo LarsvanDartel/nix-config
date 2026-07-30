@@ -1,4 +1,4 @@
-# services.kanidm — identity provider (OIDC for pangolin/immich/opencloud/traccar).
+# services.kanidm — identity provider (OIDC for netbird/immich/opencloud/traccar).
 {...}: {
   den.aspects.services.kanidm.nixos = {
     config,
@@ -30,7 +30,6 @@
       sops.secrets = {
         "keys/kanidm/admin-password".owner = "kanidm";
         "keys/kanidm/idm-admin-password".owner = "kanidm";
-        "keys/pangolin/oauth-client-secret".owner = "kanidm";
         "keys/immich/oauth-client-secret".owner = "kanidm";
       };
 
@@ -81,11 +80,6 @@
 
           groups = {
             users.members = ["lvdar"];
-            pangolin-users = {
-              overwriteMembers = false;
-              members = ["lvdar"];
-            };
-            pangolin-admin.members = ["lvdar"];
             immich-users = {
               overwriteMembers = false;
               members = ["lvdar"];
@@ -146,20 +140,6 @@
               };
             };
 
-            pangolin = {
-              displayName = "Pangolin";
-              basicSecretFile = config.sops.secrets."keys/pangolin/oauth-client-secret".path;
-              originUrl = "https://pangolin.lvdar.nl/auth/idp/1/oidc/callback";
-              originLanding = "https://pangolin.lvdar.nl";
-              scopeMaps.pangolin-users = ["openid" "profile" "email"];
-              claimMaps.groups = {
-                joinType = "array";
-                valuesByGroup = {
-                  pangolin-users = ["cosmos"];
-                  pangolin-admin = ["admin"];
-                };
-              };
-            };
             opencloud = {
               displayName = "Opencloud";
               public = true;
