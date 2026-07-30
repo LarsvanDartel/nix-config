@@ -75,10 +75,16 @@
         ./_hw/endeavour/disko.nix
       ];
 
-      cosmos.system.boot = {
-        legacy = true;
-        grub-device = "/dev/sda";
-      };
+      # UEFI, not legacy BIOS. The scaffold commit copied gaia's settings here,
+      # but gaia is a QEMU VM that really does boot BIOS off /dev/sda — this
+      # host does not. disko gives `main` a 512M EF00 ESP mounted at /boot and
+      # no bios_grub partition, so a BIOS grub-install has nowhere to embed
+      # core.img and refuses ("will not proceed with blocklists"). /dev/sda is
+      # also the wrong disk: with nine drives attached that is a SAS member of
+      # the tank pool, not the Samsung M.2 the system lives on.
+      #
+      # Defaults are what this host wants: legacy = false gives efiSupport and
+      # canTouchEfiVariables, and grub-device = null becomes device = "nodev".
 
       networking.hostId = "b8433556";
 
