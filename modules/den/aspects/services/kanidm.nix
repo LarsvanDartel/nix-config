@@ -89,15 +89,20 @@
             netbird = {
               displayName = "NetBird";
               public = true;
+              # The dashboard is a hash-routed SPA: it redirects to
+              # `/#callback` and `/#silent-callback`, built from
+              # window.location.origin. kanidm matches redirect URIs exactly, so
+              # every origin the dashboard can be reached on needs both.
+              #
+              # The :9443 pair is TRANSITIONAL and load-bearing for the
+              # bootstrap — Pangolin holds :443 until the cutover, and logging
+              # in is the only way to create the NetBird account that setup keys
+              # and PATs hang off. Drop them along with the port.
               originUrl = [
-                "https://netbird.lvdar.nl/peers"
-                # TRANSITIONAL, and load-bearing for the bootstrap. Pangolin
-                # holds :443 until the cutover, so the dashboard answers on
-                # cosmos.services.netbird.publicPort until then. Logging in is
-                # the only way to create the account, and the account is what a
-                # setup key and a PAT hang off — so without this redirect there
-                # is no way to enroll the first peer. Drop it with the port.
-                "https://netbird.lvdar.nl:9443/peers"
+                "https://netbird.lvdar.nl:9443/#callback"
+                "https://netbird.lvdar.nl:9443/#silent-callback"
+                "https://netbird.lvdar.nl/#callback"
+                "https://netbird.lvdar.nl/#silent-callback"
                 # The CLI's device-login flow listens here. Peers enroll with
                 # setup keys so this is not on the critical path, but leaving it
                 # out would make an interactive `netbird up` fail confusingly.
