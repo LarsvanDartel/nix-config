@@ -7,15 +7,29 @@
   lib,
   ...
 }: let
-  # Where each host actually answers. The bare config name is not usable: no
-  # resolver knows these names yet — which is the whole reason for the NetBird
-  # migration, and it bites hardest here, since deploying the control plane is
-  # what makes the names work in the first place.
+  # Where each host actually answers. The bare config name resolves nowhere, so
+  # every host needs an entry or deploy-rs tries the name as a hostname.
   #
-  # Once the mesh is up these become <host>.nb.lvdar.nl and this map can go.
+  # The mesh supplies the rest: peers are addressable by name from anywhere, so
+  # a roaming voyager deploys to endeavour exactly as it does from the LAN, with
+  # no per-network addresses to keep straight. That is the whole point of the
+  # migration, and this is where it shows.
+  #
+  # gaia stays on its public name deliberately. It runs the control plane, so
+  # if the mesh is what needs fixing, the mesh is not how to reach it.
+  #
+  # `--hostname <ip>` overrides any of these when a host is off the mesh.
   addresses = {
     gaia = "lvdar.nl";
+    endeavour = "endeavour.${dnsDomain}";
+    voyager = "voyager.${dnsDomain}";
+    pioneer = "pioneer.${dnsDomain}";
   };
+
+  # Matches cosmos.services.netbird.dnsDomain. Not read from a host config:
+  # this is flake-level, and reaching into a nixosConfiguration from here to
+  # pull one string would make every deploy evaluate a host to find its address.
+  dnsDomain = "nb.lvdar.nl";
 in {
   flake-file.inputs.deploy-rs = {
     url = "github:serokell/deploy-rs";
