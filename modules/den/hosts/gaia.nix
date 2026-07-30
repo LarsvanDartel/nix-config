@@ -54,21 +54,17 @@
       # `cloud.lvdar.nl` (opencloud) is NOT here and is therefore dark. It was
       # published through Pangolin but is not deployed from this repo at all,
       # so there is no peer or port to point at until it is brought in.
-      cosmos.services.netbird.services = {
-        # Not gated: NetBird's own dashboard authenticates against kanidm, so
-        # putting a NetBird identity check in front of kanidm would lock
-        # everyone out of the thing that grants the identity.
-        auth = {
-          bearerAuth.enable = false;
-          targets = [
-            {
-              peer = "endeavour";
-              port = 8443;
-              protocol = "https";
-            }
-          ];
-        };
+      # kanidm is served by nginx here rather than by netbird-proxy, because
+      # management cannot start without it and the proxy cannot route without
+      # management. The mesh address is a literal for the same reason the ports
+      # below are: den cannot read another host's config. NetBird assigns it at
+      # enrollment and keeps it, so it only changes if endeavour is re-enrolled.
+      cosmos.services.netbird.oidc.idp = {
+        domain = "auth.lvdar.nl";
+        upstream = "https://100.68.151.172:8443";
+      };
 
+      cosmos.services.netbird.services = {
         jellyfin.targets = [
           {
             peer = "endeavour";
