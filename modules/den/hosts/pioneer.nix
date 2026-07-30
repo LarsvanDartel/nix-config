@@ -32,10 +32,36 @@
         # recursion this host used to work around by avoiding facter entirely.
         # Inside `imports` the value is an opaque module to den, and is only
         # ever forced by the NixOS module system, at the right time.
-        ({lib, ...}: {
+        ({
+          lib,
+          pkgs,
+          ...
+        }: {
           # roles.server's default is too aggressive for the Pi 3: the SD card
           # can stall long enough under IO for the watchdog to reset the board.
           systemd.settings.Manager.RuntimeWatchdogSec = lib.mkForce "60s";
+
+          # nixos-hardware defaults this host to the Raspberry Pi Foundation's
+          # vendor kernel, which nothing caches — so every deploy meant
+          # compiling a kernel, either on a 1 GB Pi 3 or here under qemu. The
+          # mainline aarch64 kernel is in cache.nixos.org and supports bcm2837
+          # fine for a headless server; the vendor tree's advantage is
+          # VideoCore, camera and other bits this host does not use.
+          boot.kernelPackages = lib.mkForce pkgs.linuxPackages;
+
+          # Device-tree handling is deliberately left exactly as it was.
+          #
+          # Both kernels are plain buildLinux calls, so on aarch64 both file
+          # their DTBs under dtbs/broadcom/. u-boot's FDTDIR lookup builds
+          # "$fdtdir/$fdtfile" and does not descend, so it has never matched
+          # anything here — this board already boots on the DTB the Pi firmware
+          # hands up, which start.elf patches at runtime with the memory size,
+          # the MAC address and any config.txt overlays.
+          #
+          # Pinning hardware.deviceTree.name would make extlinux emit an
+          # explicit FDT line and load a static DTB from the store instead,
+          # losing those fixups. That is a change to a working boot path, so it
+          # is not made: only the kernel package differs.
         })
       ];
 
