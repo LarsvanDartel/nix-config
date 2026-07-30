@@ -106,6 +106,11 @@ in {
 
       # -- integrations -------------------------------------------------------
       protonvpn = official "protonvpn";
+      # Mesh status, peer list and up/down. Shells out to the `netbird` CLI,
+      # which services.netbird already puts on PATH, and reads the daemon over
+      # its socket — which the client module leaves readable unprivileged, so
+      # the widget works without a polkit prompt.
+      netbird = official "netbird";
       ssh-sessions = official "ssh-sessions";
       model-usage = official "model-usage";
       # Not in the monorepo — its own repo, so its own pin.
