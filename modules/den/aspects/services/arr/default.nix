@@ -68,6 +68,7 @@ in {
       inherit (lib.modules) mkIf;
       inherit (lib.types) nullOr path listOf str port;
       inherit (lib.lists) optional;
+      inherit (lib.meta) getExe;
 
       cfg = config.cosmos.services.arr.vpn;
     in {
@@ -132,6 +133,53 @@ in {
         };
 
         systemd.services.arr.postStart = cfg.postUp;
+
+        # VPN-Confinement pings the WireGuard endpoint before configuring the
+        # tunnel and gives up after five attempts, one second apart. That is
+        # not enough at boot: network-online.target is reached when dhcpcd has
+        # a lease, which is a while before the WAN actually carries traffic, so
+        # arr-up ran into a dead network, failed, and took sabnzbd and
+        # transmission — both BindsTo it — down with it until someone noticed.
+        #
+        # Type=oneshot forbids Restart=, so the unit cannot simply try again.
+        # Waiting for the same precondition it does, with a budget measured in
+        # minutes rather than seconds, means its own check then passes first
+        # try. Parsing the endpoint out of the config here rather than pinging
+        # something well-known keeps this honest: the thing waited for is
+        # exactly the thing needed next.
+        systemd.services.arr.serviceConfig.ExecStartPre = [
+          (getExe (pkgs.writeShellApplication {
+            name = "arr-wait-for-endpoint";
+            runtimeInputs = with pkgs; [gnugrep gnused iputils];
+            text = ''
+              endpoint="$(grep -iE '^[[:space:]]*Endpoint[[:space:]]*=' ${cfg.configFile} \
+                | head -n1 | sed -E 's/.*=[[:space:]]*//; s/[[:space:]]*$//')"
+              # Strip the port; bracketed for IPv6, bare otherwise.
+              host="$(sed -E 's/^\[(.*)\]:[0-9]+$/\1/; s/^([^]]*):[0-9]+$/\1/' <<<"$endpoint")"
+
+              if [ -z "$host" ]; then
+                echo "arr: no Endpoint in the wireguard config; leaving the wait to vpn-up" >&2
+                exit 0
+              fi
+
+              echo -n "arr: waiting for wireguard endpoint '$host'"
+              for _ in $(seq 1 120); do
+                if ping -c 1 -W 1 "$host" >/dev/null 2>&1; then
+                  echo " reachable"
+                  exit 0
+                fi
+                echo -n .
+                sleep 1
+              done
+
+              # Not fatal on its own: the network may be up while ICMP is
+              # dropped, and vpn-up's own check is still to come. Failing here
+              # would turn a slow boot into the very outage this prevents.
+              echo
+              echo "arr: endpoint '$host' still unreachable after 120s; continuing anyway" >&2
+            '';
+          }))
+        ];
 
         systemd.services.vpn-test-service = mkIf cfg.vpnTestService.enable {
           enable = true;
