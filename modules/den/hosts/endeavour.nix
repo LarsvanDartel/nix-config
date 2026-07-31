@@ -32,6 +32,7 @@
       services.netbird.client
       services.suwayomi
       services.opencloud
+      services.typstnique
       services.cdrom
       hardware.ipmi-fancontrol
       services.arr.vpn
@@ -126,6 +127,8 @@
           9200 # opencloud   cloud.lvdar.nl
           9300 # wopi host   wopi.lvdar.nl   (server-to-server, from Collabora)
           9980 # collabora   docs.lvdar.nl
+
+          3030 # typstnique  typstnique.lvdar.nl
         ];
       };
 
