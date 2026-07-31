@@ -11,7 +11,13 @@
 # cannot answer an interactive login.
 #
 # This replaces an earlier attempt where OpenCloud worked but editing did not.
-# The difference is proof keys — see the collaboration block below.
+# Two things had to be true for that, and neither was: the collaboration service
+# needs AF_NETLINK to pass its own startup probe, and the Content-Security-Policy
+# must not name `form-action` at all. Both are below, with the evidence.
+#
+# The reference for the policy is OpenCloud's own csp.yaml from opencloud-compose;
+# it is worth diffing against on upgrade rather than reasoning from first
+# principles, which is how the form-action mistake got made in the first place.
 {...}: {
   den.aspects.services.opencloud.nixos = {
     config,
@@ -168,6 +174,9 @@
               "blob:"
               "https://auth.lvdar.nl/"
               "https://raw.githubusercontent.com/opencloud-eu/awesome-apps/"
+              # Fetched, not just displayed — the file-details map asks for
+              # tiles over XHR, so it needs to be here as well as in img-src.
+              "https://tile.openstreetmap.org/"
             ];
             default-src = ["'none'"];
             font-src = ["'self'"];
@@ -177,6 +186,11 @@
               "blob:"
               "https://embed.diagrams.net/"
               "https://${docsDomain}/"
+              # The IdP, because silent token renewal runs the authorization
+              # request in a hidden iframe. Without it the session dies at the
+              # first renewal instead of at login, which is a far more annoying
+              # way to find out.
+              "https://auth.lvdar.nl/"
             ];
             img-src = [
               "'self'"
@@ -187,15 +201,23 @@
               "https://raw.githubusercontent.com/opencloud-eu/awesome-apps/"
             ];
             manifest-src = ["'self'"];
-            # Both were absent, so they fell through to `default-src 'none'`
-            # and Firefox blocked same-origin resources: the module chunks the
-            # web UI loads in a worker, and the navigation to /web-oidc-callback
-            # at the end of a login.
-            worker-src = ["'self'" "blob:"];
-            form-action = ["'self'"];
             media-src = ["'self'"];
+
+            # Present in OpenCloud's own reference policy, and absent here,
+            # which is why Firefox fell back to `default-src 'none'` for the
+            # module chunks the web UI loads in a worker.
+            worker-src = ["'self'" "blob:"];
+
+            # NO form-action. It is a navigation directive, so unlike the fetch
+            # directives above it does *not* inherit from default-src — leaving
+            # it out means unrestricted, which is what OpenCloud's reference
+            # policy does and what WOPI needs: an editing session starts by
+            # POSTing a form at Collabora, access token in the body, and naming
+            # only 'self' here blocked that POST and left the editor a black
+            # rectangle. Listing the Collabora domain would fix this one case
+            # and break the next form target that gets added.
             object-src = ["'self'" "blob:"];
-            script-src = ["'self'" "'unsafe-inline'"];
+            script-src = ["'self'" "'unsafe-inline'" "https://auth.lvdar.nl/"];
             style-src = ["'self'" "'unsafe-inline'"];
           };
 
