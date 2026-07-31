@@ -56,6 +56,10 @@
       # management. The mesh address is a literal for the same reason the ports
       # below are: den cannot read another host's config. NetBird assigns it at
       # enrollment and keeps it, so it only changes if endeavour is re-enrolled.
+      # typstnique runs here rather than on a peer, but is published the same
+      # way, so the proxy still has to be able to reach it over the mesh.
+      cosmos.services.netbird.client.exposedPorts = [3030];
+
       cosmos.services.netbird.oidc.idp = {
         domain = "auth.lvdar.nl";
         upstream = "https://100.68.151.172:8443";
@@ -88,6 +92,17 @@
           targets = endeavour port;
         };
       in {
+        # Public, and on this host rather than endeavour.
+        typstnique = {
+          bearerAuth.enable = false;
+          targets = [
+            {
+              peer = "gaia";
+              port = 3030;
+            }
+          ];
+        };
+
         jellyfin = shared 8096;
         immich = shared 2283;
         seerr = shared 4055;
