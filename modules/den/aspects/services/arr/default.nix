@@ -856,8 +856,21 @@ in {
           settings =
             recursiveUpdate
             {
-              inet_exposure = 4;
               misc = {
+                # Inside `misc`, where sabnzbd reads it. At the top level it
+                # lands above the first section header and is silently ignored,
+                # leaving sabnzbd's own `[misc] inet_exposure = 0` in force —
+                # so this had never once taken effect.
+                #
+                # 4 is "web UI reachable from outside", which is what a service
+                # published through the edge needs. Anything lower makes
+                # check_access fall through to inspecting X-Forwarded-For, and
+                # netbird-proxy quite correctly puts the visitor's public
+                # address there, so sabnzbd denied every request that had
+                # actually come from a browser. The gate in front is SSO and
+                # CrowdSec, not sabnzbd's opinion of the client address.
+                inet_exposure = 4;
+
                 host =
                   if cfg.openFirewall
                   then "0.0.0.0"
