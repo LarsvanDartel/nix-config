@@ -110,6 +110,12 @@
             # way. Its own `idp` service would otherwise claim the OIDC routes.
             OC_EXCLUDE_RUN_SERVICES = "idp";
             OC_OIDC_ISSUER = "https://auth.lvdar.nl/oauth2/openid/opencloud";
+            # Set globally, not just under `web`, because OpenCloud defaults it
+            # to "web" in more than one place and only one of them has to fall
+            # back for kanidm to answer `invalid_client_id` — the client is
+            # registered as `opencloud`, which is also the name kanidm builds
+            # the issuer path from, so the two cannot be allowed to disagree.
+            OC_OIDC_CLIENT_ID = "opencloud";
           }
           // lib.optionalAttrs cfg.collabora.enable {
             OC_ADD_RUN_SERVICES = "collaboration";
