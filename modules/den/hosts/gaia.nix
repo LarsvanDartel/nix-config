@@ -117,6 +117,23 @@
         seerr = shared 4055;
 
         traccar.targets = endeavour 8082;
+
+        # The port trackers actually report to. Traccar runs a decoder per
+        # protocol across 5001-5263 and this host publishes exactly the one in
+        # use — `cosmos.services.traccar.protocols` on endeavour picks it, and
+        # the two have to agree.
+        #
+        # L4, not HTTP: a tracker opens a socket and speaks its own protocol,
+        # so there is nothing to terminate TLS for or apply a CrowdSec verdict
+        # to. The domain below routes nothing — the listen port does — so a
+        # device pointed at traccar.lvdar.nl:5055 arrives here regardless.
+        traccar-osmand = {
+          domain = "traccar-osmand.lvdar.nl";
+          mode = "tcp";
+          listenPort = 5055;
+          bearerAuth.enable = false;
+          targets = endeavour 5055;
+        };
         suwayomi.targets = endeavour 8080;
         sabnzbd.targets = endeavour 6336;
 

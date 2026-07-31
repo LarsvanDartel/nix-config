@@ -220,6 +220,28 @@
           mode = mkOption {
             type = enum ["http" "tcp" "udp" "tls"];
             default = "http";
+            description = ''
+              "http" reverse-proxies at L7, which is what a browser wants and
+              what gets a certificate and a CrowdSec check. The others are L4
+              passthrough for things that do not speak HTTP — a GPS tracker
+              opening a socket, say — and need `listenPort` instead of a name,
+              since there is no SNI in a raw connection to route on.
+            '';
+          };
+
+          listenPort = mkOption {
+            type = nullOr port;
+            default = null;
+            description = ''
+              Public port the proxy accepts this on, for the L4 modes.
+
+              The domain is still required and must be unique, but it does not
+              route anything here: a raw connection carries no hostname, so the
+              port alone decides. A client may therefore reach an L4 service on
+              any name pointing at the edge, which is how a device configured
+              for `traccar.lvdar.nl:5055` lands on a service declared under a
+              different name entirely.
+            '';
           };
           enabled = mkOption {
             type = bool;
@@ -276,6 +298,7 @@
           lib.mapAttrsToList (name: s: {
             name = "${managedPrefix}${name}";
             inherit (s) domain mode enabled;
+            listen_port = s.listenPort;
             targets = map (t:
               {
                 inherit (t) peer port protocol;
@@ -817,7 +840,16 @@
           }
         '';
 
-        networking.firewall.allowedTCPPorts = [cfg.publicPort];
+        # The public port, plus a port for each L4 service — those bypass the
+        # SNI split entirely and are accepted by netbird-proxy directly.
+        networking.firewall = let
+          l4 = lib.filter (p: p != null) (lib.mapAttrsToList (_: s: s.listenPort) cfg.services);
+        in {
+          allowedTCPPorts = [cfg.publicPort] ++ l4;
+          allowedUDPPorts =
+            lib.mapAttrsToList (_: s: s.listenPort)
+            (lib.filterAttrs (_: s: s.mode == "udp" && s.listenPort != null) cfg.services);
+        };
 
         # Mints the proxy's bouncer key on first start and registers it. Both
         # halves are idempotent: the key is generated only when the file is
