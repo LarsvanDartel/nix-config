@@ -250,26 +250,40 @@
             # anything able to reach it directly could claim to be anyone.
             additional_policies = lib.mkIf cfg.radicale.enable [
               {
-                name = "radicale";
+                # "default", not "radicale": these are appended to the policy
+                # the selector actually chooses, and it only ever chooses that
+                # one. A policy under any other name is well-formed, loads
+                # without complaint, and is never consulted — which looks
+                # exactly like the routes being ignored.
+                name = "default";
                 routes = let
-                  route = endpoint: {
+                  # `prefix` is where Radicale is mounted as far as the outside
+                  # world is concerned. It has to be told, because it builds
+                  # redirects and hrefs from it and otherwise assumes it is at
+                  # the root — and the web UI decides whether a calendar exists
+                  # at all by asking `.well-known/caldav` and checking that the
+                  # URL it ends up at contains `/caldav`. Radicale answers that
+                  # with a 301 to `base_prefix + "/"`, so without the header the
+                  # redirect points at `/`, the check fails, and OpenCloud says
+                  # the calendar is not configured on this system.
+                  route = prefix: endpoint: {
                     inherit endpoint;
                     backend = "http://127.0.0.1:${toString cfg.radicale.port}";
                     remote_user_header = "X-Remote-User";
                     # Otherwise the proxy also forwards OpenCloud's access
                     # token, which Radicale has no idea what to do with.
                     skip_x_access_token = true;
+                    additional_headers."X-Script-Name" = prefix;
                   };
-                in
-                  map route [
-                    "/caldav/"
-                    "/carddav/"
-                    # Clients are given the bare domain and discover the rest
-                    # from here, which is what makes "add account" work with
-                    # nothing but a URL and a username.
-                    "/.well-known/caldav"
-                    "/.well-known/carddav"
-                  ];
+                in [
+                  (route "/caldav" "/caldav/")
+                  (route "/carddav" "/carddav/")
+                  # Clients are given the bare domain and discover the rest
+                  # from here, which is what makes "add account" work with
+                  # nothing but a URL and a username.
+                  (route "/caldav" "/.well-known/caldav")
+                  (route "/carddav" "/.well-known/carddav")
+                ];
               }
             ];
           };
