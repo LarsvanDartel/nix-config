@@ -21,6 +21,7 @@
       core.boot
       core.impermanence
       services.netbird
+      services.crowdsec
       services.typstnique
     ];
 
@@ -44,6 +45,11 @@
         };
         impermanence.device = "/dev/disk/by-label/nixos";
       };
+
+      # The home connection, so a bad afternoon of poking at these services
+      # cannot lock the only administrator out of the only way in. Dynamic, so
+      # it will drift; the lvdar.nl entry in whitelistFqdns is the durable half.
+      cosmos.services.crowdsec.whitelistIps = ["86.86.217.11"];
 
       # kanidm is served by nginx here rather than by netbird-proxy, because
       # management cannot start without it and the proxy cannot route without

@@ -226,6 +226,20 @@
             default = true;
           };
           targets = mkOption {type = listOf target;};
+          crowdsec = mkOption {
+            type = enum ["off" "observe" "enforce"];
+            default = "enforce";
+            description = ''
+              Whether netbird-proxy checks each request's source against
+              CrowdSec's local API before forwarding it. "observe" logs the
+              verdict without acting on it, which is how to find out what a
+              new scenario would have blocked.
+
+              Only meaningful where services.crowdsec is on the same host; with
+              no LAPI to ask, the proxy fails open.
+            '';
+          };
+
           bearerAuth = {
             enable =
               mkEnableOption "a NetBird identity check in front of this service"
@@ -261,6 +275,7 @@
             # unknown top-level `bearer_auth` without complaint and drops it, so
             # every service was published ungated while the reconciler reported
             # success — visible only as `"auth": {}` on a GET.
+            access_restrictions.crowdsec_mode = s.crowdsec;
             auth.bearer_auth = {
               enabled = s.bearerAuth.enable;
               distribution_groups = s.bearerAuth.groups;
@@ -269,6 +284,12 @@
           cfg.services
         )
       );
+
+      # netbird-proxy authenticates to the LAPI as a bouncer, and a bouncer key
+      # is minted by cscli at runtime — there is no way to know it at build
+      # time, and putting one in sops would mean a secret whose only consumer
+      # is a service on the same host that could just as well generate it.
+      crowdsecKeyFile = "/var/lib/netbird-proxy/crowdsec-bouncer.key";
 
       reconcile = pkgs.writeShellApplication {
         name = "netbird-reconcile-services";
@@ -343,12 +364,18 @@
             id="$(jq -r --arg n "$name" \
               '.[] | select(.name == $n) | .id' <<<"$existing" | head -n1)"
 
+            # One service must not take the run down with it. A 409 means its
+            # domain belongs to a service made outside nix — which the prefix
+            # rule deliberately refuses to touch — and aborting there would
+            # leave every service after it in the list unreconciled, silently.
             if [ -n "$id" ]; then
               echo "netbird: updating $name"
-              req -X PUT -d "$svc" "$api/reverse-proxies/services/$id" >/dev/null
+              req -X PUT -d "$svc" "$api/reverse-proxies/services/$id" >/dev/null \
+                || echo "netbird: WARNING $name not updated"
             else
               echo "netbird: creating $name"
-              req -X POST -d "$svc" "$api/reverse-proxies/services" >/dev/null
+              req -X POST -d "$svc" "$api/reverse-proxies/services" >/dev/null \
+                || echo "netbird: WARNING $name not created — is its domain taken by a service not managed here?"
             fi
           done
 
@@ -737,6 +764,40 @@
 
         networking.firewall.allowedTCPPorts = [cfg.publicPort];
 
+        # Mints the proxy's bouncer key on first start and registers it. Both
+        # halves are idempotent: the key is generated only when the file is
+        # missing, and a re-register of the same name is tolerated so a
+        # crowdsec database that has been wiped can be re-populated without
+        # invalidating the key the proxy already holds.
+        systemd.services.netbird-proxy-crowdsec = lib.mkIf config.services.crowdsec.enable {
+          description = "Register netbird-proxy as a CrowdSec bouncer";
+          after = ["crowdsec.service"];
+          requires = ["crowdsec.service"];
+          before = ["netbird-proxy.service"];
+          wantedBy = ["netbird-proxy.service"];
+
+          serviceConfig = {
+            Type = "oneshot";
+            RemainAfterExit = true;
+            StateDirectory = "netbird-proxy";
+            StateDirectoryMode = "0750";
+          };
+
+          path = [config.services.crowdsec.package pkgs.openssl];
+
+          script = ''
+            key_file=${lib.escapeShellArg crowdsecKeyFile}
+
+            if [ ! -s "$key_file" ]; then
+              umask 077
+              openssl rand -base64 32 | tr -d '\n' > "$key_file"
+            fi
+
+            cscli bouncers add netbird-proxy --key "$(cat "$key_file")" 2>/dev/null \
+              || echo "netbird-proxy: bouncer already registered"
+          '';
+        };
+
         # nixpkgs packages netbird-proxy but ships no module for it, so this is
         # ours. It brings up its own WireGuard tunnel to the peers it forwards
         # to (hence NET_ADMIN), and reaches management over loopback so gRPC
@@ -749,27 +810,34 @@
           wants = ["netbird-management.service"];
           wantedBy = ["multi-user.target"];
 
-          environment = {
-            NB_PROXY_DOMAIN = cfg.baseDomain;
-            NB_PROXY_ADDRESS = ":${toString cfg.proxyPort}";
-            NB_PROXY_MANAGEMENT_ADDRESS = "http://127.0.0.1:${toString mgmtPort}";
-            NB_PROXY_ALLOW_INSECURE = "true";
-            NB_PROXY_ACME_CERTIFICATES = "true";
-            NB_PROXY_ACME_CHALLENGE_TYPE = "tls-alpn-01";
-            NB_PROXY_CERTIFICATE_DIRECTORY = "/var/lib/netbird-proxy/certs";
-            NB_PROXY_GEO_DATA_DIR = "/var/lib/netbird-proxy/geolocation";
-            # Client IPs would otherwise all read as 127.0.0.1, which would make
-            # any CIDR or country restriction meaningless.
-            NB_PROXY_PROXY_PROTOCOL = "true";
-            NB_PROXY_TRUSTED_PROXIES = "127.0.0.1/32,::1/128";
-            # Services live at <name>.lvdar.nl, never at the bare domain.
-            NB_PROXY_REQUIRE_SUBDOMAIN = "true";
-          };
+          environment =
+            {
+              NB_PROXY_DOMAIN = cfg.baseDomain;
+              NB_PROXY_ADDRESS = ":${toString cfg.proxyPort}";
+              NB_PROXY_MANAGEMENT_ADDRESS = "http://127.0.0.1:${toString mgmtPort}";
+              NB_PROXY_ALLOW_INSECURE = "true";
+              NB_PROXY_ACME_CERTIFICATES = "true";
+              NB_PROXY_ACME_CHALLENGE_TYPE = "tls-alpn-01";
+              NB_PROXY_CERTIFICATE_DIRECTORY = "/var/lib/netbird-proxy/certs";
+              NB_PROXY_GEO_DATA_DIR = "/var/lib/netbird-proxy/geolocation";
+              # Client IPs would otherwise all read as 127.0.0.1, which would make
+              # any CIDR or country restriction meaningless.
+              NB_PROXY_PROXY_PROTOCOL = "true";
+              NB_PROXY_TRUSTED_PROXIES = "127.0.0.1/32,::1/128";
+              # Services live at <name>.lvdar.nl, never at the bare domain.
+              NB_PROXY_REQUIRE_SUBDOMAIN = "true";
+            }
+            // lib.optionalAttrs config.services.crowdsec.enable {
+              NB_PROXY_CROWDSEC_API_URL = "http://127.0.0.1:${toString config.cosmos.services.crowdsec.lapiPort}";
+            };
 
           serviceConfig = {
-            LoadCredential = [
-              "token:${config.sops.secrets."keys/netbird/proxy-token".path}"
-            ];
+            LoadCredential =
+              [
+                "token:${config.sops.secrets."keys/netbird/proxy-token".path}"
+              ]
+              ++ lib.optional config.services.crowdsec.enable
+              "crowdsec-key:${crowdsecKeyFile}";
             Restart = "always";
             RestartSec = "5s";
             StateDirectory = "netbird-proxy";
@@ -789,6 +857,9 @@
           # the store; export it just for the exec.
           script = ''
             export NB_PROXY_TOKEN="$(cat "$CREDENTIALS_DIRECTORY/token")"
+            ${lib.optionalString config.services.crowdsec.enable ''
+              export NB_PROXY_CROWDSEC_API_KEY="$(cat "$CREDENTIALS_DIRECTORY/crowdsec-key")"
+            ''}
             exec ${lib.getExe pkgs.netbird-proxy}
           '';
         };
