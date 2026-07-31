@@ -122,11 +122,24 @@ in {
             port = cfg.vpnTestService.port;
             protocol = "tcp";
           };
+          # Every entry becomes a route inside the namespace, back out through
+          # the bridge. Anything not listed is answered via the namespace's
+          # default route — which is the tunnel — so the reply leaves through
+          # the VPN and is never seen again.
+          #
+          # That is what made sabnzbd and transmission unreachable from the
+          # mesh while working locally: their ports are DNAT'd into the
+          # namespace in prerouting, so a request from gaia arrived fine and
+          # the SYN/ACK went out of ProtonVPN. It presented as a plain timeout
+          # with the packet absent from both hosts' filter chains, because
+          # prerouting had already redirected it and the reply never came back.
           accessibleFrom =
             [
               "192.168.1.0/24"
               "192.168.0.0/24"
               "127.0.0.1"
+              # NetBird's peer range, so the edge can reach these at all.
+              "100.64.0.0/10"
             ]
             ++ cfg.accessibleFrom;
           wireguardConfigFile = cfg.configFile;
