@@ -76,6 +76,49 @@
       };
 
       collabora.enable = mkEnableOption "Collabora Online" // {default = true;};
+
+      radicale = {
+        enable = mkEnableOption "CalDAV and CardDAV via Radicale" // {default = true;};
+        port = mkOption {
+          type = port;
+          # Not Radicale's own 5232: traccar listens on 241 ports covering
+          # 5001-5263, one per GPS tracker protocol, and quietly owns that one.
+          # Nor anything in the 9000s, where OpenCloud's own services sprawl
+          # across some seventy ports. Loopback either way, so the number only
+          # has to be free.
+          default = 8231;
+        };
+      };
+
+      tika.enable =
+        mkEnableOption "full-text search inside documents, via Apache Tika"
+        // {default = true;};
+
+      smtp = {
+        enable = mkEnableOption ''
+          outgoing mail, so sharing with someone actually tells them.
+
+          Off until `keys/opencloud/smtp` exists in nix-secrets: the sops
+          secret is referenced only when this is on, so that a host without it
+          still evaluates and deploys
+        '';
+        host = mkOption {
+          type = str;
+          default = "";
+        };
+        port = mkOption {
+          type = port;
+          default = 587;
+        };
+        sender = mkOption {
+          type = str;
+          default = "OpenCloud <cloud@lvdar.nl>";
+        };
+        username = mkOption {
+          type = str;
+          default = "";
+        };
+      };
     };
 
     config = {
@@ -85,14 +128,26 @@
         # and then load-bearing: lose this and every account and blob under
         # dataDir is orphaned.
         files = ["/etc/opencloud/opencloud.yaml"];
-        directories = [
-          {
-            directory = "/var/lib/cool";
-            user = "cool";
-            group = "cool";
+        directories =
+          [
+            {
+              directory = "/var/lib/cool";
+              user = "cool";
+              group = "cool";
+              mode = "0750";
+            }
+          ]
+          # The calendars and contacts themselves: one tree of .ics and .vcf
+          # per user, and the only thing here that is irreplaceable. Safe to
+          # bind-mount because the unit has a static user — Tika's state is
+          # scratch and runs under DynamicUser, which would fight the mount, so
+          # it is deliberately left alone.
+          ++ lib.optional cfg.radicale.enable {
+            directory = "/var/lib/radicale";
+            user = config.services.radicale.user;
+            group = config.services.radicale.group;
             mode = "0750";
-          }
-        ];
+          };
       };
 
       services.opencloud = {
@@ -104,6 +159,10 @@
         # Reached from the mesh rather than a local vhost, like every other
         # published service on this host.
         address = "0.0.0.0";
+
+        environmentFile =
+          lib.mkIf cfg.smtp.enable
+          config.sops.secrets."keys/opencloud/smtp".path;
 
         environment =
           {
@@ -122,6 +181,23 @@
             # registered as `opencloud`, which is also the name kanidm builds
             # the issuer path from, so the two cannot be allowed to disagree.
             OC_OIDC_CLIENT_ID = "opencloud";
+          }
+          // lib.optionalAttrs cfg.tika.enable {
+            # Search reads what is inside a document rather than only its name.
+            # Tika does the extraction; without it a PDF is just a filename.
+            SEARCH_EXTRACTOR_TYPE = "tika";
+            SEARCH_EXTRACTOR_TIKA_TIKA_URL = "http://127.0.0.1:${toString config.services.tika.port}";
+          }
+          // lib.optionalAttrs cfg.smtp.enable {
+            NOTIFICATIONS_SMTP_HOST = cfg.smtp.host;
+            NOTIFICATIONS_SMTP_PORT = toString cfg.smtp.port;
+            NOTIFICATIONS_SMTP_SENDER = cfg.smtp.sender;
+            NOTIFICATIONS_SMTP_USERNAME = cfg.smtp.username;
+            NOTIFICATIONS_SMTP_AUTHENTICATION = "login";
+            NOTIFICATIONS_SMTP_ENCRYPTION = "starttls";
+            # NOTIFICATIONS_SMTP_PASSWORD arrives through the environment file
+            # below, never from here: this attrset lands in the unit file, in
+            # the store, world-readable.
           }
           // lib.optionalAttrs cfg.collabora.enable {
             OC_ADD_RUN_SERVICES = "collaboration";
@@ -161,6 +237,41 @@
               };
             };
             csp_config_file_location = "/etc/opencloud/csp.yaml";
+
+            # `additional_policies`, not `policies`: this appends to
+            # OpenCloud's own routing rather than replacing it, so the default
+            # policy set does not have to be restated here to keep working.
+            #
+            # Radicale is reached through OpenCloud's proxy and nowhere else,
+            # which is what makes single sign-on work: the proxy authenticates
+            # the request and names the user in X-Remote-User, and Radicale is
+            # configured to believe it. That belief is unconditional, which is
+            # why Radicale binds loopback and stays out of exposedPorts —
+            # anything able to reach it directly could claim to be anyone.
+            additional_policies = lib.mkIf cfg.radicale.enable [
+              {
+                name = "radicale";
+                routes = let
+                  route = endpoint: {
+                    inherit endpoint;
+                    backend = "http://127.0.0.1:${toString cfg.radicale.port}";
+                    remote_user_header = "X-Remote-User";
+                    # Otherwise the proxy also forwards OpenCloud's access
+                    # token, which Radicale has no idea what to do with.
+                    skip_x_access_token = true;
+                  };
+                in
+                  map route [
+                    "/caldav/"
+                    "/carddav/"
+                    # Clients are given the bare domain and discover the rest
+                    # from here, which is what makes "add account" work with
+                    # nothing but a URL and a username.
+                    "/.well-known/caldav"
+                    "/.well-known/carddav"
+                  ];
+              }
+            ];
           };
 
           # OpenCloud ships a default CSP that knows nothing about Collabora.
@@ -346,6 +457,41 @@
           chown ${config.services.opencloud.user}:${config.services.opencloud.group} ${target}
           chmod 0600 ${target}
         '';
+      };
+
+      sops.secrets = lib.mkIf cfg.smtp.enable {
+        "keys/opencloud/smtp".owner = config.services.opencloud.user;
+      };
+
+      # CalDAV and CardDAV, served under OpenCloud's own domain at /caldav/ and
+      # /carddav/ rather than a host of its own — the proxy routes above are
+      # what put it there, and what let a client authenticate with the same
+      # account rather than a second password.
+      services.radicale = mkIf cfg.radicale.enable {
+        enable = true;
+        settings = {
+          server.hosts = "127.0.0.1:${toString cfg.radicale.port}";
+
+          # Trusts the proxy's word for who the user is, and does no
+          # authentication of its own. That is only safe while nothing else can
+          # reach the port, which is why `hosts` is loopback and the port is
+          # absent from netbird.client.exposedPorts.
+          auth.type = "http_x_remote_user";
+
+          # Default, stated because it is the thing worth backing up: one
+          # directory tree of .ics and .vcf files, per user.
+          storage.filesystem_folder = "/var/lib/radicale/collections";
+        };
+      };
+
+      # Extracts text from documents so search can look inside them. Local and
+      # loopback-only: it is a JVM that will read anything it is handed.
+      services.tika = mkIf cfg.tika.enable {
+        enable = true;
+        listenAddress = "127.0.0.1";
+        # Scanned images become searchable too, at the cost of tesseract in the
+        # closure and rather more CPU per upload.
+        enableOcr = true;
       };
 
       # Collabora renders documents server-side, so the fonts a document asks
