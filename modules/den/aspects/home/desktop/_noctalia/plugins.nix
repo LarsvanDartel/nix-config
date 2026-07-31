@@ -24,7 +24,7 @@
   ...
 }: let
   inherit (lib.options) mkOption;
-  inherit (lib.types) attrsOf submodule str path;
+  inherit (lib.types) attrsOf raw submodule str path;
 
   cfg = config.cosmos.desktops.noctalia.plugins;
 
@@ -81,6 +81,20 @@ in {
             plugin manager can check it for updates.
           '';
         };
+        settings = mkOption {
+          type = attrsOf raw;
+          default = {};
+          description = ''
+            Plugin settings, merged into ~/.config/noctalia/plugins/<id>/
+            settings.json with these winning. Merged rather than written whole,
+            so a value set in the plugin's own panel survives unless nix has an
+            opinion about that same key.
+
+            Only worth using for settings that have to hold: a plugin whose bar
+            widget is too wide by default, say. Everything else is better left
+            to the panel, which is still writable.
+          '';
+        };
       };
     });
     description = "Plugins installed into ~/.config/noctalia/plugins and enabled.";
@@ -110,7 +124,16 @@ in {
       # which services.netbird already puts on PATH, and reads the daemon over
       # its socket — which the client module leaves readable unprivileged, so
       # the widget works without a polkit prompt.
-      netbird = official "netbird";
+      netbird =
+        official "netbird"
+        // {
+          # The widget puts the full NetBird address on the bar by default,
+          # which is fifteen characters next to a right side that already
+          # carries four permanently-shown readings — enough to push the bar
+          # past its width. Off, both text fields are hidden and it draws as
+          # the icon alone, the same as every other status widget up there.
+          settings.showIpAddress = false;
+        };
       ssh-sessions = official "ssh-sessions";
       model-usage = official "model-usage";
       # Not in the monorepo — its own repo, so its own pin.
@@ -188,6 +211,12 @@ in {
           if [ -f "$_pdir/${id}/settings.json" ]; then
             run cp "$_pdir/${id}/settings.json" "$_pdir/${id}.tmp/settings.json"
           fi
+          ${lib.optionalString (p.settings != {}) ''
+            run ${jqBin} -n --argjson nix ${lib.escapeShellArg (builtins.toJSON p.settings)} \
+              --slurpfile old <(cat "$_pdir/${id}.tmp/settings.json" 2>/dev/null || echo '{}') \
+              '($old[0] // {}) * $nix' > "$_pdir/${id}.tmp/settings.json.new" \
+              && run mv "$_pdir/${id}.tmp/settings.json.new" "$_pdir/${id}.tmp/settings.json"
+          ''}
           run rm -rf "$_pdir/${id}"
           run mv "$_pdir/${id}.tmp" "$_pdir/${id}"
         '')
