@@ -64,18 +64,36 @@
         enableExclusionZoneInset = true;
         rightClickAction = "controlCenter";
 
+        # Three sides, and until recently fourteen widgets were on one of them
+        # while the left held two. Split by what a thing tells you about rather
+        # than by what kind of thing it is:
+        #
+        #   left    what you are looking at — workspace, window, what it is
+        #           playing, whether it is watching you
+        #   center  the clock, alone, because it is the one thing that has to
+        #           sit still
+        #   right   the machine's own state, and the ways into it
         widgets = {
-          left = map widget ["Workspace" "ActiveWindow"];
-          center = map widget ["Clock"];
-          right =
-            [
+          left =
+            map widget ["Workspace" "ActiveWindow"]
+            ++ [
+              # The widest widget on the bar by a distance: it carries a track
+              # title. It belongs next to the window it is playing from, and
+              # moving it here is most of what bought the room.
               (widget "MediaMini")
               # Only draws itself while the mic, camera or a screencast is
               # actually live, so it costs nothing at rest.
               (pluginWidget "privacy-indicator")
-            ]
-            # Readings stay on screen instead of appearing on hover.
-            ++ map valueWidget ["Volume" "Brightness" "Network" "Bluetooth"]
+            ];
+          center = map widget ["Clock"];
+          right =
+            # Percentages are two or three characters and worth having at a
+            # glance, so they stay on screen.
+            map valueWidget ["Volume" "Brightness"]
+            # An SSID and a paired device name are not: both run to twenty-odd
+            # characters for something that changes a few times a week. Icon
+            # here, reading on hover.
+            ++ map widget ["Network" "Bluetooth"]
             ++ [
               # Replaces kdeconnect-indicator's tray icon, which plugins.nix
               # turns off.
