@@ -492,9 +492,31 @@
           # absent from netbird.client.exposedPorts.
           auth.type = "http_x_remote_user";
 
-          # Default, stated because it is the thing worth backing up: one
-          # directory tree of .ics and .vcf files, per user.
-          storage.filesystem_folder = "/var/lib/radicale/collections";
+          storage = {
+            # Default, stated because it is the thing worth backing up: one
+            # directory tree of .ics and .vcf files, per user.
+            filesystem_folder = "/var/lib/radicale/collections";
+
+            # What a new user is given. Radicale creates a principal on first
+            # login and nothing inside it, so without this a client connects,
+            # authenticates, finds no collections and reports that there are no
+            # calendars at this address — which is true, and reads like a
+            # configuration error.
+            #
+            # Created once, with the principal. Adding an entry here does not
+            # reach users who have already logged in.
+            predefined_collections = builtins.toJSON {
+              def-calendar = {
+                "D:displayname" = "Personal Calendar";
+                "C:supported-calendar-component-set" = "VEVENT,VJOURNAL,VTODO";
+                tag = "VCALENDAR";
+              };
+              def-addressbook = {
+                "D:displayname" = "Personal Address Book";
+                tag = "VADDRESSBOOK";
+              };
+            };
+          };
         };
       };
 
