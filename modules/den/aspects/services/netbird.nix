@@ -246,11 +246,24 @@
               // {default = true;};
             groups = mkOption {
               type = listOf str;
-              default = ["All"];
+              default = ["netbird-${name}"];
+              defaultText = "[\"netbird-<name>\"]";
               description = ''
                 NetBird group names allowed through. Resolved to ids at
-                activation time, same as peers. "All" is created by NetBird
-                itself, so the default gates on "any authenticated user".
+                activation time, same as peers.
+
+                One group per service by default, because these are the groups
+                a *user* is in, and NetBird fills them from the `groups` claim
+                in the IdP's token — so kanidm decides who reaches what, and
+                granting somebody sonarr and nothing else takes one group
+                membership there.
+
+                Not "All": that group holds peers, not users, so gating on it
+                let nobody in at all — every published service answered with a
+                login that could never succeed.
+
+                A name here must exist as a kanidm group whose claim map emits
+                it (services/kanidm.nix), or the check can never pass.
               '';
             };
           };
@@ -320,7 +333,47 @@
             exit 0
           fi
 
+          # Group membership is only meaningful if NetBird is actually reading
+          # the IdP's claim, and that is an account setting rather than
+          # anything in management.json — off by default, with the claim name
+          # empty. Left alone, every bearer check fails closed for everyone.
+          #
+          # Merged into the current settings rather than PUT wholesale: the
+          # object carries the network ranges and expiry policy too, and a
+          # partial replace would quietly reset them.
+          account="$(req "$api/accounts" | jq -r '.[0]')"
+          account_id="$(jq -r .id <<<"$account")"
+          settings="$(jq '.settings
+            | .jwt_groups_enabled = true
+            | .jwt_groups_claim_name = "groups"' <<<"$account")"
+
+          if [ "$(jq -r '.jwt_groups_enabled, .jwt_groups_claim_name' <<<"$settings" | tr '\n' ' ')" \
+               != "$(jq -r '.settings.jwt_groups_enabled, .settings.jwt_groups_claim_name' <<<"$account" | tr '\n' ' ')" ]; then
+            echo "netbird: enabling JWT group sync on the account"
+            req -X PUT -d "$(jq -n --argjson s "$settings" '{settings: $s}')" \
+              "$api/accounts/$account_id" >/dev/null \
+              || echo "netbird: WARNING could not enable JWT group sync"
+          fi
+
+          # NetBird creates a group the first time a token carries its name, so
+          # a freshly declared one does not exist until somebody happens to log
+          # in — and until then every service gated on it is skipped. Create
+          # them here instead, so the declared state converges on its own. JWT
+          # sync then matches these by name rather than making duplicates.
           groups="$(req "$api/groups")"
+          missing="$(jq -r --argjson have "$groups" '
+            [.[] | select(.auth.bearer_auth.enabled) | .auth.bearer_auth.distribution_groups[]]
+            | unique - [$have[].name] | .[]' ${desiredFile})"
+
+          if [ -n "$missing" ]; then
+            while read -r name; do
+              echo "netbird: creating group $name"
+              req -X POST -d "$(jq -n --arg n "$name" '{name: $n}')" \
+                "$api/groups" >/dev/null || echo "netbird: WARNING group $name not created"
+            done <<<"$missing"
+            groups="$(req "$api/groups")"
+          fi
+
           existing="$(req "$api/reverse-proxies/services")"
 
           # Resolve peer and group names to ids, marking anything that has not
@@ -341,7 +394,8 @@
           jq -r '
             .[] | select(
               (any(.targets[]; .target_id == null))
-              or (any(.auth.bearer_auth.distribution_groups[]; .id == null))
+              or (.auth.bearer_auth.enabled
+                  and any(.auth.bearer_auth.distribution_groups[]; .id == null))
             )
             | "netbird: \(.name) waiting on " + (
                 [(.targets[] | select(.target_id == null) | "peer " + .peer),
@@ -352,7 +406,8 @@
           desired="$(jq '
             [.[] | select(
               (all(.targets[]; .target_id != null))
-              and (all(.auth.bearer_auth.distribution_groups[]; .id != null))
+              and ((.auth.bearer_auth.enabled | not)
+                   or all(.auth.bearer_auth.distribution_groups[]; .id != null))
             )]
             | map(
               .targets |= map(del(.peer))

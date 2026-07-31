@@ -11,6 +11,31 @@
     inherit (lib.modules) mkIf;
 
     cfg = config.cosmos.services.kanidm;
+    # The gated services published by netbird-proxy, from
+    # cosmos.services.netbird.services in hosts/gaia.nix. Literals, because den
+    # cannot read another host's config — the same reason the ports over there
+    # are literals. A name missing here is a service nobody can reach; a name
+    # here that no service uses is a harmless empty group.
+    #
+    # Each becomes a kanidm group AND a value in the `groups` claim, which is
+    # what NetBird turns into a group of its own and matches against the
+    # service's distribution list.
+    gatedServices = [
+      "traccar"
+      "suwayomi"
+      "sabnzbd"
+      "prowlarr"
+      "radarr"
+      "sonarr"
+      "lidarr"
+      "bazarr"
+    ];
+
+    # Baseline: mesh access at all. Kept in the claim because NetBird replaces
+    # a user's auto-groups wholesale with whatever the token says — anything
+    # omitted here is taken away from them on their next login, including the
+    # group the setup key enrols peers into.
+    netbirdGroups = ["netbird-users"] ++ map (s: "netbird-${s}") gatedServices;
   in {
     options.cosmos.services.kanidm.expose = mkOption {
       type = bool;
@@ -78,24 +103,28 @@
             mailAddresses = ["lars@lvdar.nl"];
           };
 
-          groups = {
-            users.members = ["lvdar"];
-            immich-users = {
+          groups =
+            {
+              users.members = ["lvdar"];
+              immich-users = {
+                overwriteMembers = false;
+                members = ["lvdar"];
+              };
+              immich-admin.members = ["lvdar"];
+              opencloud-users = {
+                overwriteMembers = false;
+                members = ["lvdar"];
+              };
+              opencloud-admin.members = ["lvdar"];
+              netbird-admin.members = ["lvdar"];
+            }
+            # One group per gated service, plus the baseline. overwriteMembers is
+            # off so members added by hand in kanidm survive a redeploy — these
+            # exist precisely to be handed out to other people.
+            // lib.genAttrs netbirdGroups (_: {
               overwriteMembers = false;
               members = ["lvdar"];
-            };
-            immich-admin.members = ["lvdar"];
-            opencloud-users = {
-              overwriteMembers = false;
-              members = ["lvdar"];
-            };
-            opencloud-admin.members = ["lvdar"];
-            netbird-users = {
-              overwriteMembers = false;
-              members = ["lvdar"];
-            };
-            netbird-admin.members = ["lvdar"];
-          };
+            });
           systems.oauth2 = {
             # The NetBird dashboard is a browser app, so it authenticates with
             # PKCE and holds no client secret — hence `public`. The client name
@@ -135,12 +164,17 @@
               ];
               originLanding = "https://netbird.lvdar.nl";
               scopeMaps.netbird-users = ["openid" "profile" "email"];
+
+              # Each group contributes its own name to the claim. NetBird
+              # creates a group per value it has not seen and sets the user's
+              # auto-groups to exactly this set, so the mapping is one-to-one
+              # on purpose: no translation layer to get wrong, and the group
+              # named in a service's bearerAuth is the group granted here.
               claimMaps.groups = {
                 joinType = "array";
-                valuesByGroup = {
-                  netbird-users = ["user"];
-                  netbird-admin = ["admin"];
-                };
+                valuesByGroup =
+                  {netbird-admin = ["netbird-admin"];}
+                  // lib.genAttrs netbirdGroups (g: [g]);
               };
             };
 
