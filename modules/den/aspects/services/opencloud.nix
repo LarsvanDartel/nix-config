@@ -187,6 +187,12 @@
               "https://raw.githubusercontent.com/opencloud-eu/awesome-apps/"
             ];
             manifest-src = ["'self'"];
+            # Both were absent, so they fell through to `default-src 'none'`
+            # and Firefox blocked same-origin resources: the module chunks the
+            # web UI loads in a worker, and the navigation to /web-oidc-callback
+            # at the end of a login.
+            worker-src = ["'self'" "blob:"];
+            form-action = ["'self'"];
             media-src = ["'self'"];
             object-src = ["'self'" "blob:"];
             script-src = ["'self'" "'unsafe-inline'"];
@@ -235,6 +241,24 @@
           };
         };
       };
+
+      # The collaboration service will not start without netlink. Its startup
+      # health check is a "web reachability" probe, and Go's route lookup opens
+      # an AF_NETLINK socket to enumerate interfaces; nixpkgs' sandbox allows
+      # only AF_UNIX, AF_INET and AF_INET6, so the call fails with "netlinkrib:
+      # address family not supported by protocol". The check then never passes,
+      # the service never registers, and every attempt to open a document ends
+      # at `GetAppProviderClient: eu.opencloud.api.collaboration: service not
+      # found` — which the browser renders as "Error contacting the requested
+      # application" over a black screen.
+      #
+      # This, not proof keys, is why editing never worked.
+      systemd.services.opencloud.serviceConfig.RestrictAddressFamilies = lib.mkForce [
+        "AF_UNIX"
+        "AF_INET"
+        "AF_INET6"
+        "AF_NETLINK"
+      ];
 
       # OpenCloud's own provisioning writes that file into /etc/opencloud, and
       # here it cannot: the path is an impermanence bind mount, and the unit
