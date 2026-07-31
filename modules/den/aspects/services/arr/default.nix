@@ -802,7 +802,22 @@ in {
         };
         whitelistRanges = mkOption {
           type = listOf str;
-          default = [];
+          # sabnzbd's `local_ranges`. Left empty it falls back to RFC1918, and
+          # NetBird hands peers addresses out of the CGNAT range instead — so
+          # once the edge started reaching this over the mesh, every request
+          # was "External internet access denied" from sabnzbd itself, well
+          # past the point where the network was working.
+          #
+          # Setting this replaces that fallback rather than extending it, so
+          # the private ranges have to be repeated here or the LAN loses
+          # access in exchange.
+          default = [
+            "127.0.0.0/8"
+            "10.0.0.0/8"
+            "172.16.0.0/12"
+            "192.168.0.0/16"
+            "100.64.0.0/10"
+          ];
         };
         vpn.enable = mkOption {
           type = bool;
