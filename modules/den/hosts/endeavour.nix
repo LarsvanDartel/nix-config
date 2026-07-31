@@ -31,6 +31,7 @@
       services.traccar
       services.netbird.client
       services.suwayomi
+      services.opencloud
       services.cdrom
       hardware.ipmi-fancontrol
       services.arr.vpn
@@ -119,6 +120,11 @@
           8989 # sonarr      sonarr.lvdar.nl
           8686 # lidarr      lidarr.lvdar.nl
           6767 # bazarr      bazarr.lvdar.nl
+
+          # OpenCloud and the two legs Collabora needs.
+          9200 # opencloud   cloud.lvdar.nl
+          9300 # wopi host   wopi.lvdar.nl   (server-to-server, from Collabora)
+          9980 # collabora   docs.lvdar.nl
         ];
       };
 
@@ -194,6 +200,12 @@
           merged = concatStringsSep "\n" (uniqueStrings bigLines ++ nsfwLines);
           file = pkgs.writeText "unbound-blocklist" merged;
         in "${file}";
+
+        # On the array rather than the system disk: this is the one service
+        # here whose data is expected to grow without limit. /tank is a ZFS
+        # pool outside the persist layer, so it is left out of impermanence on
+        # purpose — the pool is the durable thing.
+        opencloud.dataDir = "/tank/opencloud";
 
         jellyfin.openFirewall = true;
         immich.mediaDir = "/tank/media/library/images";

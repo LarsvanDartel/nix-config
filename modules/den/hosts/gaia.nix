@@ -92,6 +92,15 @@
           targets = endeavour port;
         };
       in {
+        # OpenCloud runs its own OIDC against kanidm, so a second identity
+        # check in front would ask for the same login twice. `docs` and `wopi`
+        # cannot be gated at all: they are the browser's editor iframe and
+        # Collabora's server-to-server fetch, neither of which can complete an
+        # interactive login.
+        cloud = shared 9200;
+        docs = shared 9980;
+        wopi = shared 9300;
+
         # Public, and on this host rather than endeavour.
         typstnique = {
           bearerAuth.enable = false;
