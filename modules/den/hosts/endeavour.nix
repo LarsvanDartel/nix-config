@@ -293,7 +293,13 @@
         # Each tag needs a Traccar device whose identifier is the tag's UUID —
         # the feeder logs the UUID it is reporting for, which is where to read
         # them off.
-        tile-traccar.email = "larsvandartel73@gmail.com";
+        tile-traccar = {
+          email = "larsvandartel73@gmail.com";
+          # The phone the tags are discovered by. It carries the Tile app
+          # rather than being a tag, so its "position" is just wherever the
+          # phone is — which Traccar already gets from the OsmAnd client.
+          ignoredTiles = ["p!fb79d495c0cb30211d73a246a5cc3c13"];
+        };
       };
 
       cosmos.hardware.ipmi-fancontrol = {

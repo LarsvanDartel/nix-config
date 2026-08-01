@@ -48,6 +48,7 @@
         import logging
         import os
         import sys
+        import time
         import uuid as uuidlib
         from datetime import timezone
         from pathlib import Path
@@ -67,6 +68,7 @@
         INTERVAL = float(os.environ["POLL_INTERVAL"])
         DISCOVERY_INTERVAL = float(os.environ["DISCOVERY_INTERVAL"])
         IGNORED = set(json.loads(os.environ["IGNORED_TILES"]))
+        MAX_AGE = float(os.environ["MAX_AGE"])
         CLIENT_UUID_FILE = Path(os.environ["CLIENT_UUID_FILE"])
 
         logging.basicConfig(format="%(message)s", level=logging.INFO, stream=sys.stdout)
@@ -132,6 +134,8 @@
                 since_discovery = DISCOVERY_INTERVAL
                 # uuid -> the timestamp last forwarded, so a fix is written once.
                 reported: dict[str, int] = {}
+                # uuid -> whether it was last seen as stale, to say so once.
+                stale: dict[str, bool] = {}
 
                 while True:
                     if since_discovery >= DISCOVERY_INTERVAL:
@@ -153,6 +157,29 @@
                         if tile.latitude is None or tile.longitude is None:
                             continue
                         stamp = int(tile.last_timestamp.replace(tzinfo=timezone.utc).timestamp())
+
+                        # A tag has no clock and no radio of its own: the fix
+                        # stands until some phone running the Tile app walks
+                        # past it again. So an old timestamp does not mean the
+                        # tag moved away — it means nobody has looked. Past
+                        # MAX_AGE, take the position as no longer evidence of
+                        # where the thing is now and stop restating it; Traccar
+                        # keeps the last one it was given, so the map still
+                        # shows where it was last actually seen.
+                        age = time.time() - stamp
+                        if MAX_AGE and age > MAX_AGE:
+                            if not stale.get(uuid):
+                                LOGGER.info(
+                                    "%s (%s) last seen %.0f min ago; holding off",
+                                    tile.name,
+                                    tile.uuid,
+                                    age / 60,
+                                )
+                                stale[uuid] = True
+                            continue
+                        if stale.pop(uuid, False):
+                            LOGGER.info("%s (%s) is being seen again", tile.name, tile.uuid)
+
                         if reported.get(uuid) == stamp:
                             continue
                         try:
@@ -210,6 +237,28 @@
           '';
         };
 
+        maxAge = mkOption {
+          type = ints.unsigned;
+          default = 3600;
+          description = ''
+            Ignore a fix older than this many seconds, so that only a position
+            something has actually been seen at recently is forwarded.
+
+            A tag is passive: its last position persists in Tile's cloud until
+            a phone running the app comes near it again, so a week-old fix
+            reads exactly like a current one. That mostly matters on startup,
+            when there is no record of what was already sent and the oldest
+            fix on the account would otherwise be posted as news.
+
+            Tile's own `is_lost` is deliberately not used for this. It marks a
+            tag the account has given up on rather than one nobody has walked
+            past, and a lost tag that someone finally does walk past is the
+            one position worth having.
+
+            0 disables the check.
+          '';
+        };
+
         ignoredTiles = mkOption {
           type = listOf str;
           default = [];
@@ -251,6 +300,7 @@
             POLL_INTERVAL = toString cfg.interval;
             DISCOVERY_INTERVAL = toString cfg.discoveryInterval;
             IGNORED_TILES = builtins.toJSON cfg.ignoredTiles;
+            MAX_AGE = toString cfg.maxAge;
             CLIENT_UUID_FILE = "${stateDir}/client-uuid";
             PYTHONUNBUFFERED = "1";
           };
