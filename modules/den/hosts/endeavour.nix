@@ -29,6 +29,7 @@
       services.jellyfin
       services.immich
       services.traccar
+      services.tile-traccar
       services.netbird.client
       services.suwayomi
       services.opencloud
@@ -288,6 +289,11 @@
           protocols = ["osmand"];
           openFirewall = false;
         };
+
+        # Each tag needs a Traccar device whose identifier is the tag's UUID —
+        # the feeder logs the UUID it is reporting for, which is where to read
+        # them off.
+        tile-traccar.email = "larsvandartel73@gmail.com";
       };
 
       cosmos.hardware.ipmi-fancontrol = {
