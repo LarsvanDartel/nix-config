@@ -106,7 +106,13 @@
         immich = shared 2283;
         seerr = shared 4055;
 
-        traccar.targets = endeavour 8082;
+        # Ungated for the same reason as the rest of `shared`, plus one of its
+        # own: the web UI is an SPA that talks to /api over XHR, and the
+        # Traccar Manager app talks to the same API with no browser at all.
+        # When the gate's session lapses those requests get a redirect to the
+        # IdP rather than a 401 — which the app cannot follow and the browser
+        # reports as a bare NetworkError. Traccar has its own accounts.
+        traccar = shared 8082;
 
         # The port trackers actually report to. Traccar runs a decoder per
         # protocol across 5001-5263 and this host publishes exactly the one in

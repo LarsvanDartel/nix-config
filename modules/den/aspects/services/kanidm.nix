@@ -21,7 +21,6 @@
     # what NetBird turns into a group of its own and matches against the
     # service's distribution list.
     gatedServices = [
-      "traccar"
       "suwayomi"
       "sabnzbd"
       "prowlarr"
