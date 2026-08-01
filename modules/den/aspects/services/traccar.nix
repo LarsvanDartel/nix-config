@@ -7,7 +7,7 @@
     ...
   }: let
     inherit (lib.options) mkOption;
-    inherit (lib.types) bool port listOf enum;
+    inherit (lib.types) attrsOf bool port listOf enum;
     inherit (lib.modules) mkIf;
     inherit (lib.strings) concatMapStringsSep concatStringsSep toUpper;
     inherit (lib.attrsets) mapAttrsToListRecursive mapAttrsRecursive recursiveUpdate;
@@ -117,6 +117,14 @@
       protocols = mkOption {
         type = listOf (enum (builtins.attrNames protocolPorts));
         default = [];
+      };
+      # Read-only, so that something feeding positions in from the same host
+      # can look the decoder port up rather than repeat the number and drift.
+      protocolPorts = mkOption {
+        type = attrsOf port;
+        readOnly = true;
+        internal = true;
+        default = protocolPorts;
       };
     };
 
