@@ -60,6 +60,16 @@
         upstream = "https://100.68.151.172:8443";
       };
 
+      # Peers reachable with `netbird ssh <peer>`. Names, not ids, resolved by
+      # the reconciler like everything else here. panther is somebody's phone,
+      # which has no shell to offer.
+      cosmos.services.netbird.sshPeers = [
+        "endeavour"
+        "gaia"
+        "pioneer"
+        "voyager"
+      ];
+
       # The published surface, and the only one: with Pangolin gone this list
       # is what the internet can reach. Targets are peer name + port, because
       # den has no way to read another host's config — so the ports are
