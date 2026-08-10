@@ -51,6 +51,27 @@ in {
           identityFile = map (key: "~/${ssh-file key}") keys;
           UpdateHostKeys = "no";
         };
+
+        # The servers' primary account is `nixos`, not `lvdar` — only voyager
+        # names its user after its owner. ssh defaults to the *local* username,
+        # so `ssh endeavour.nb.lvdar.nl` from voyager asks for an account that
+        # does not exist there and is refused with a bare "Permission denied
+        # (publickey)", which reads like a key problem rather than a name one.
+        #
+        # A literal, because den cannot read another host's `cosmos.user.name`
+        # any more than it can read its ports.
+        matchBlocks = {
+          mesh = {
+            host = "*.nb.lvdar.nl";
+            user = "nixos";
+          };
+          # So the short name works too, from anywhere on the mesh.
+          servers = {
+            host = "endeavour gaia pioneer";
+            hostname = "%h.nb.lvdar.nl";
+            user = "nixos";
+          };
+        };
       };
 
       home.file = mergeAttrsList (
