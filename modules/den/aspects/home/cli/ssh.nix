@@ -48,14 +48,20 @@ in {
         #
         # `settings` is a DAG, and ssh takes the first value it is given for a
         # keyword, so these have to be ordered ahead of the catch-all below.
+        # Port 2222 for the same reason: NetBird's agent redirects the mesh
+        # address's :22 to its own SSH server, which does not want these keys.
+        # `netbird ssh <peer>` is how to reach that one deliberately; plain ssh
+        # should keep meaning OpenSSH. See core/ssh.nix.
         settings."*.nb.lvdar.nl" = entryBefore ["*"] {
           User = "nixos";
+          Port = 2222;
         };
 
         # So the short name works too: the qualified one is all that resolves.
         settings."endeavour gaia pioneer" = entryBefore ["*"] {
           HostName = "%h.nb.lvdar.nl";
           User = "nixos";
+          Port = 2222;
         };
 
         settings."*" = {

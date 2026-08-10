@@ -21,6 +21,23 @@ in {
     programs.ssh.startAgent = true;
     services.openssh = {
       enable = true;
+
+      # 2222 exists because NetBird's own SSH server takes 22 away on the mesh.
+      # Its agent redirects <netbird-ip>:22 to its embedded server on :22022
+      # (client/internal/engine_ssh.go), so once a peer has ssh_enabled every
+      # connection to <host>.nb.lvdar.nl:22 reaches that server instead of this
+      # one — a different host key, and no interest in the keys below, since it
+      # authenticates through NetBird. It presents as "Permission denied
+      # (password)" and, for anything that had connected before, a host key
+      # warning.
+      #
+      # That server is wanted (`netbird ssh <peer>` is the point of it), but it
+      # cannot be the only way in: deploy-rs reaches these hosts by their mesh
+      # name and authenticates as root with a key, and OpenSSH is what has to
+      # answer that. The redirect is specific to :22, so a second port is
+      # enough, and both servers coexist — netbird's on the mesh's :22, this
+      # one everywhere else and on :2222 throughout.
+      ports = [22 2222];
       hostKeys = [
         {
           comment = "${config.networking.hostName}.local";
