@@ -741,9 +741,22 @@
               PKCEAuthorizationFlow.ProviderConfig = {
                 Audience = cfg.oidc.clientId;
                 ClientID = cfg.oidc.clientId;
+
+                # Loopback only. This flow belongs to the CLI, which completes
+                # it on a listener it opens itself — the dashboard has its own
+                # OIDC config and never reads this. The dashboard's callback
+                # was listed here first, and NewPKCEAuthorizationFlow takes the
+                # first URL whose port it cannot already connect to: with no
+                # port to parse it dialled "netbird.lvdar.nl:", failed, called
+                # that free, and sent the browser to the dashboard carrying a
+                # code meant for the CLI. kanidm allowed the redirect and the
+                # dashboard then answered "there was an error logging you in".
+                #
+                # Two ports so a busy 53000 is not the end of it; both are in
+                # the client's originUrl in services/kanidm.nix.
                 RedirectURLs = [
-                  "${authority}/callback"
                   "http://localhost:53000"
+                  "http://localhost:54000"
                 ];
               };
 
