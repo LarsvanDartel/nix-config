@@ -15,6 +15,7 @@ in {
     inherit (lib.strings) optionalString;
     inherit (lib.options) mkOption;
     inherit (lib.types) listOf enum;
+    inherit (lib.hm.dag) entryBefore;
 
     cfg = config.cosmos.cli.programs.ssh;
 
@@ -36,6 +37,27 @@ in {
         enable = true;
         enableDefaultConfig = false;
 
+        # The servers' primary account is `nixos`, not `lvdar` — only voyager
+        # names its user after its owner. ssh defaults to the *local* username,
+        # so `ssh endeavour.nb.lvdar.nl` from voyager asks for an account that
+        # does not exist there and is refused with a bare "Permission denied
+        # (publickey)", which reads like a key problem rather than a name one.
+        #
+        # A literal, because den cannot read another host's `cosmos.user.name`
+        # any more than it can read its ports.
+        #
+        # `settings` is a DAG, and ssh takes the first value it is given for a
+        # keyword, so these have to be ordered ahead of the catch-all below.
+        settings."*.nb.lvdar.nl" = entryBefore ["*"] {
+          User = "nixos";
+        };
+
+        # So the short name works too: the qualified one is all that resolves.
+        settings."endeavour gaia pioneer" = entryBefore ["*"] {
+          HostName = "%h.nb.lvdar.nl";
+          User = "nixos";
+        };
+
         settings."*" = {
           addKeysToAgent = "yes";
           forwardAgent = true;
@@ -50,27 +72,6 @@ in {
           identitiesOnly = true;
           identityFile = map (key: "~/${ssh-file key}") keys;
           UpdateHostKeys = "no";
-        };
-
-        # The servers' primary account is `nixos`, not `lvdar` — only voyager
-        # names its user after its owner. ssh defaults to the *local* username,
-        # so `ssh endeavour.nb.lvdar.nl` from voyager asks for an account that
-        # does not exist there and is refused with a bare "Permission denied
-        # (publickey)", which reads like a key problem rather than a name one.
-        #
-        # A literal, because den cannot read another host's `cosmos.user.name`
-        # any more than it can read its ports.
-        matchBlocks = {
-          mesh = {
-            host = "*.nb.lvdar.nl";
-            user = "nixos";
-          };
-          # So the short name works too, from anywhere on the mesh.
-          servers = {
-            host = "endeavour gaia pioneer";
-            hostname = "%h.nb.lvdar.nl";
-            user = "nixos";
-          };
         };
       };
 
