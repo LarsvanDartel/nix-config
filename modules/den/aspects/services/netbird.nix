@@ -130,6 +130,13 @@
         clients.default = {
           inherit (cfg.client) port;
 
+          # The peer's half of the SSH switch: it is willing to run NetBird's
+          # SSH server if management asks (cosmos.services.netbird.sshPeers on
+          # gaia). Current NetBird defaults this on, so this states what is
+          # already true rather than changing it — but the config file is
+          # rewritten by the agent, and nothing else here would keep it.
+          config.ServerSSHAllowed = true;
+
           # Enrolls unattended with a setup key. Deliberately not the
           # interactive OIDC flow: that would need kanidm reachable *before*
           # the host is on the mesh, and kanidm is published through it.
@@ -397,6 +404,37 @@
             groups="$(req "$api/groups")"
           fi
 
+          # NetBird's own SSH server, which is what `netbird ssh <peer>` talks
+          # to — not the OpenSSH on the same port. Its client offers no SSH
+          # auth method at all (it authenticates through the mesh), so against
+          # OpenSSH it can only ever fail with "attempted methods [none]".
+          #
+          # `ssh_enabled` is management's half of the switch and defaults false,
+          # so this stays off until asked for. The PUT carries the expiry and
+          # approval fields as they are: the endpoint replaces the peer rather
+          # than patching it, and omitting them resets them.
+          for peer_name in ${lib.escapeShellArgs cfg.sshPeers}; do
+            peer="$(jq -c --arg n "$peer_name" '.[] | select(.name == $n)' <<<"$peers")"
+
+            if [ -z "$peer" ]; then
+              echo "netbird: WARNING no peer named $peer_name to enable ssh on"
+              continue
+            fi
+
+            [ "$(jq -r .ssh_enabled <<<"$peer")" = "true" ] && continue
+
+            echo "netbird: enabling the ssh server on $peer_name"
+            req -X PUT -d "$(jq -c '{
+                name,
+                ssh_enabled: true,
+                login_expiration_enabled,
+                inactivity_expiration_enabled,
+                approval_required,
+              }' <<<"$peer")" \
+              "$api/peers/$(jq -r .id <<<"$peer")" >/dev/null \
+              || echo "netbird: WARNING could not enable ssh on $peer_name"
+          done
+
           existing="$(req "$api/reverse-proxies/services")"
 
           # Resolve peer and group names to ids, marking anything that has not
@@ -569,6 +607,37 @@
           description = ''
             Reverse-proxy services, reconciled against the management API on
             activation. Peers and groups are given by name, not id.
+          '';
+        };
+
+        sshPeers = mkOption {
+          type = listOf str;
+          default = [];
+          example = ["endeavour" "gaia" "pioneer"];
+          description = ''
+            Peers to turn NetBird's own SSH server on for, by name, so that
+            `netbird ssh <peer>` works against them.
+
+            Two switches have to agree and only one of them lives on the peer.
+            `ServerSSHAllowed` in the client's config.json is the peer saying it
+            is willing (services/netbird.nix sets it, and current NetBird
+            defaults it on anyway); `ssh_enabled` on the peer object is
+            management saying so, defaults false, and is settable only through
+            the API — hence here. A peer with the first and not the second
+            reports "SSH Server: Disabled" while its config plainly says
+            otherwise, which is a confusing place to end up.
+
+            This is a shell on the peer, reachable from the mesh, authorised by
+            the IdP token rather than by anything in _ssh-keys — access is a
+            group membership to grant or revoke rather than a key to
+            distribute. OpenSSH keeps running alongside it; the two answer on
+            the same port on different addresses.
+
+            Note that NetBird 0.74's API exposes only `ssh_enabled`. The
+            further per-peer flags the agent understands — root login, SFTP,
+            port forwarding — exist on the management-to-peer protobuf but
+            have no REST or environment surface, so they cannot be set from
+            here and stay at whatever management defaults them to.
           '';
         };
       };
