@@ -122,7 +122,23 @@ in {
           enable = true;
           inherit (cfg) package user secretFiles;
           configFile = null;
-          allowConfigWrite = false;
+
+          # Without this nixpkgs installs sabnzbd.ini mode 0400, and sabnzbd
+          # wants to write its own config constantly — server tuning, quota
+          # counters, anything changed in the web UI. Every attempt fails with
+          # "Cannot write to INI file", which it reports as an error rather
+          # than a warning; nixpkgs' own comment says as much and settles for
+          # living with it.
+          #
+          # Declarative config survives anyway, because the pre-start merge
+          # feeds it the live ini *first* and the generated settings second,
+          # and later files win. So nix stays authoritative for everything it
+          # states, and sabnzbd keeps whatever it wrote that nix does not.
+          #
+          # The one thing to know: a key nix stops declaring keeps its last
+          # runtime value rather than returning to the default, since the ini
+          # it is merged onto is now its own previous output.
+          allowConfigWrite = true;
           group = "media";
           stateDir = removePrefix "/var/lib/" cfg.stateDir;
           settings =
