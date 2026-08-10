@@ -11,7 +11,7 @@ in {
       ...
     }: let
       inherit (lib.options) mkOption mkPackageOption;
-      inherit (lib.types) str path bool port listOf attrs;
+      inherit (lib.types) str path bool port listOf attrs enum;
       inherit (lib.modules) mkIf;
       inherit (lib.strings) optionalString concatStringsSep removePrefix;
       inherit (lib.attrsets) recursiveUpdate;
@@ -22,6 +22,15 @@ in {
 
       concatStringsCommaIfExists = stringList:
         optionalString (builtins.length stringList > 0) (concatStringsSep "," stringList);
+
+      # sabnzbd's `pp`, which it stores per category as a number.
+      ppValues = {
+        none = 0;
+        repair = 1;
+        unpack = 2;
+        delete = 3;
+      };
+      pp = toString ppValues.${cfg.postProcessing};
     in {
       options.cosmos.services.arr.sabnzbd = {
         stateDir = mkOption {
@@ -40,6 +49,24 @@ in {
         user = mkOption {
           type = str;
           default = "sabnzbd";
+        };
+        postProcessing = mkOption {
+          type = enum (builtins.attrNames ppValues);
+          default = "delete";
+          description = ''
+            What to do with a download once it has arrived: nothing, repair it
+            with par2, also unpack it, or also delete the archives afterwards.
+
+            This has to be said out loud for every category, including the
+            default one. sabnzbd leaves a category's `pp` empty to mean "use
+            the default category's", and only ever fills the default in when
+            it writes the categories section itself — which it never does here,
+            because this config is generated. An empty `pp` then goes through
+            `int_conv("")` → 0 → `pp_to_opts(0)` → (repair, unpack, delete) all
+            false, so a generated config with categories in it silently turns
+            post-processing off altogether. That is why downloads arrived as
+            unopened rar sets.
+          '';
         };
         whitelistHostnames = mkOption {
           type = listOf str;
@@ -129,20 +156,33 @@ in {
                 host_whitelist = concatStringsCommaIfExists cfg.whitelistHostnames;
                 local_ranges = concatStringsCommaIfExists cfg.whitelistRanges;
                 permissions = "775";
+
+                # The unpackers themselves. sabnzbd defaults these on, but the
+                # whole point here is that unpacking not happening is hard to
+                # see from the outside — an unpacked download and a paused one
+                # both just look like a directory that is not what you wanted.
+                enable_unrar = 1;
+                enable_7zip = 1;
+                enable_filejoin = 1;
+                enable_tsjoin = 1;
+                enable_par_cleanup = 1;
               };
               categories =
                 {
+                  # The default category, which every other one falls back to
+                  # for anything it leaves unset — hence `pp` here above all.
                   "*" = {
                     name = "*";
                     order = 0;
                     dir = "";
                     priority = 0;
+                    inherit pp;
                   };
                 }
                 // builtins.listToAttrs (imap0 (index: name: {
                   inherit name;
                   value = {
-                    inherit name;
+                    inherit name pp;
                     order = index + 1;
                     dir = "${cfg-arr.mediaDir}/usenet/${name}";
                     priority = -100;
