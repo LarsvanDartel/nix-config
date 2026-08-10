@@ -112,6 +112,28 @@
         allowedTCPPorts = cfg.client.exposedPorts;
       };
 
+      # Which OAuth flow the daemon picks when it needs a user token — for
+      # `netbird ssh`, which asks the IdP who you are before it dials.
+      #
+      # NewOAuthFlow only tries PKCE when it believes a browser can be opened,
+      # and on Linux it decides that by reading DESKTOP_SESSION and
+      # XDG_CURRENT_DESKTOP out of *its own* environment (client/cmd/login.go,
+      # isUnixRunningDesktop). The daemon is a system service, so both are
+      # empty however graphical the machine is, and it goes straight to the
+      # device code flow instead — which management answers with NotFound,
+      # because DeviceAuthorizationFlow.Provider is "none" and kanidm does not
+      # advertise a device_authorization_endpoint to point it at anyway. The
+      # user sees "no SSO provider returned from management", naming the one
+      # flow that is configured and working.
+      #
+      # So tell it the truth about this host: on a machine with a display
+      # manager there is a browser to send the login to, and PKCE — which
+      # management fills from the discovery document at startup — is the flow
+      # that actually works.
+      systemd.services.${config.services.netbird.clients.default.suffixedName}.environment =
+        lib.mkIf config.services.displayManager.enable
+        {XDG_CURRENT_DESKTOP = "netbird-has-a-browser";};
+
       cosmos.system.impermanence.persist.directories = [
         {
           # `name = "netbird"` means suffixedName is bare, so the state dir is
