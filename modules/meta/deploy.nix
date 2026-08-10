@@ -41,6 +41,15 @@ in {
       system = nixos.config.nixpkgs.hostPlatform.system;
     in {
       hostname = addresses.${name} or name;
+
+      # Not :22. NetBird's agent redirects the mesh address's :22 to its own
+      # embedded SSH server, which authenticates through NetBird rather than by
+      # key — so a deploy to <host>.nb.lvdar.nl:22 is refused as
+      # "Permission denied (password)". core.ssh gives OpenSSH :2222 as well
+      # for exactly this, and using it everywhere keeps gaia (reached by its
+      # public name, where the redirect does not apply) on the same rule.
+      sshOpts = ["-p" "2222"];
+
       profiles.system = {
         user = "root";
         # Without this deploy-rs uses the *local* username, which only exists on
