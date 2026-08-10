@@ -156,10 +156,13 @@
                 # management handles centrally for every published domain
                 # (HttpConfig.AuthCallbackURL in services/netbird.nix).
                 "https://netbird.lvdar.nl/api/reverse-proxy/callback"
-                # The CLI's device-login flow listens here. Peers enroll with
-                # setup keys so this is not on the critical path, but leaving it
-                # out would make an interactive `netbird up` fail confusingly.
+                # Where the CLI's PKCE flow listens — `netbird up` and, since
+                # the SSH server went on, `netbird ssh`, which asks for a user
+                # token before it dials. It takes the first of these two ports
+                # it can open (PKCEAuthorizationFlow in services/netbird.nix),
+                # so both have to be allowed here.
                 "http://localhost:53000/"
+                "http://localhost:54000/"
               ];
               originLanding = "https://netbird.lvdar.nl";
               scopeMaps.netbird-users = ["openid" "profile" "email"];
