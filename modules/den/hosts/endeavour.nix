@@ -54,10 +54,7 @@
       lib,
       pkgs,
       ...
-    }: let
-      inherit (lib.strings) splitString concatStringsSep;
-      inherit (lib.lists) filter uniqueStrings;
-    in {
+    }: {
       imports = [
         inputs.nixos-facter-modules.nixosModules.facter
         {
@@ -214,13 +211,10 @@
         # resolver gives every peer ad-blocking DNS as a side effect.
         unbound.mesh.enable = true;
 
-        unbound.blocklist = let
-          lines = str: filter (x: x != "") (splitString "\n" str);
-          bigLines = lines (builtins.readFile inputs.oisd-big-unbound);
-          nsfwLines = lines (builtins.readFile inputs.oisd-nsfw-unbound);
-          merged = concatStringsSep "\n" (uniqueStrings bigLines ++ nsfwLines);
-          file = pkgs.writeText "unbound-blocklist" merged;
-        in "${file}";
+        unbound.oisd = {
+          enable = true;
+          nsfw = true;
+        };
 
         # On the array rather than the system disk: this is the one service
         # here whose data is expected to grow without limit. /tank is a ZFS
