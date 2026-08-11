@@ -232,6 +232,13 @@
           homeLink = "/home/${config.cosmos.user.name}/manga";
         };
 
+        # Staged deliberately: this replaces originals and there is no undo.
+        # One file per run until a few have been checked by eye, then raise it.
+        transcode = {
+          dryRun = false;
+          maxPerRun = 1;
+        };
+
         arr = {
           stateDir = "/var/lib/arr";
           mediaDir = "/tank/media";
