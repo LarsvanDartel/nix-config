@@ -35,10 +35,11 @@
       ...
     }: let
       inherit (lib.options) mkOption;
-      inherit (lib.types) port str attrsOf;
+      inherit (lib.types) port str listOf;
 
       cfg = config.cosmos.services.prometheus;
       nodePort = config.cosmos.services.node-exporter.port;
+      dnsDomain = config.cosmos.services.netbird.dnsDomain;
     in {
       options.cosmos.services.prometheus = {
         port = mkOption {
@@ -69,26 +70,17 @@
         };
 
         targets = mkOption {
-          type = attrsOf str;
-          default = {};
-          example = {gaia = "100.68.38.155";};
+          type = listOf str;
+          default = ["endeavour" "gaia" "pioneer"];
           description = ''
-            Peer name -> address to scrape. The name becomes the `instance`
-            label; the address is what is dialled.
+            Peer names, dialled as `<name>.${dnsDomain}` over the mesh.
 
-            Addresses rather than `<peer>.<dnsDomain>` names, because mesh
-            names do not resolve on this host. unbound holds :53 here, so the
-            NetBird client could not install itself as the system resolver and
-            fell back to an ephemeral port — leaving unbound to answer
-            `*.lvdar.nl` from public DNS. A scrape of `gaia.nb.lvdar.nl` there
-            resolves to gaia's *public* address and quietly leaves the mesh.
-
-            So these are literals, for the same reason
-            `cosmos.services.netbird.oidc.idp.upstream` in hosts/gaia.nix is a
-            literal: NetBird assigns the address at enrollment and nothing here
-            can read another host's config. They only change if a peer is
-            re-enrolled. Fixing the resolver would remove the need for this and
-            is the better long-term answer.
+            Names work here only because services/unbound.nix forwards the mesh
+            domain to the NetBird agent's resolver. Before that, unbound
+            answered *.lvdar.nl from public DNS and every one of these
+            resolved to the edge's public address — the scrapes left the mesh
+            and timed out. If these ever start timing out again, check mesh DNS
+            on this host before suspecting the exporters.
 
             Not voyager: a laptop that sleeps would sit permanently "down".
           '';
@@ -134,12 +126,12 @@
           scrapeConfigs = [
             {
               job_name = "node";
-              # One static_config per peer, so `instance` is the peer's name
-              # rather than an IP nobody can read off a graph.
+              # One static_config per peer, so `instance` is the bare peer name
+              # rather than a host:port nobody can read off a graph.
               static_configs =
-                lib.mapAttrsToList (name: addr: {
-                  targets = ["${addr}:${toString nodePort}"];
-                  labels.instance = name;
+                map (h: {
+                  targets = ["${h}.${dnsDomain}:${toString nodePort}"];
+                  labels.instance = h;
                 })
                 cfg.targets;
             }
@@ -150,7 +142,7 @@
               job_name = "netbird";
               static_configs = [
                 {
-                  targets = ["${cfg.targets.gaia or "127.0.0.1"}:9090"];
+                  targets = ["gaia.${dnsDomain}:9090"];
                   labels.instance = "gaia";
                 }
               ];

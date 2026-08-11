@@ -247,20 +247,6 @@
           homeLink = "/home/${config.cosmos.user.name}/manga";
         };
 
-        # Mesh addresses, not names. Mesh DNS does not work on this host:
-        # unbound owns :53, so the NetBird client fell back to an ephemeral
-        # resolver port and unbound answers *.lvdar.nl from public DNS — a
-        # scrape of gaia.nb.lvdar.nl would resolve to gaia's public address and
-        # leave the mesh entirely. Literals for the same reason
-        # netbird.oidc.idp.upstream is one over in gaia.nix; NetBird assigns
-        # these at enrollment and they survive everything short of re-enrolling
-        # a peer.
-        prometheus.targets = {
-          endeavour = "100.68.151.172";
-          gaia = "100.68.38.155";
-          pioneer = "100.68.78.148";
-        };
-
         # Sized to the nightly window rather than to the backlog. The first
         # file took 24 min for 27 GiB, so eight is roughly 03:00 to 06:00 —
         # done before anyone watches anything, and the GPU is shared with

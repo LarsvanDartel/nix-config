@@ -512,6 +512,61 @@
               || echo "netbird: WARNING could not enable ssh on $peer_name"
           done
 
+          # Point every peer at the fleet resolver. A "primary" nameserver
+          # group in NetBird means "use this for all domains", which is why it
+          # carries no domain list — the two are mutually exclusive in the API.
+          #
+          # The address is looked up rather than configured: NetBird assigns it
+          # at enrollment, so a re-enrolled peer would otherwise leave the whole
+          # mesh pointing at an address nothing answers on.
+          ${lib.optionalString (cfg.dnsPeer != null) ''
+            dns_ip="$(jq -r --arg n "${cfg.dnsPeer}" \
+              '.[] | select(.name == $n) | .ip' <<<"$peers" | head -n1)"
+            all_group="$(jq -r '.[] | select(.name == "All") | .id' <<<"$groups" | head -n1)"
+
+            if [ -z "$dns_ip" ] || [ -z "$all_group" ]; then
+              echo "netbird: waiting on peer ${cfg.dnsPeer} / group All before setting DNS"
+            else
+              ns_name="${managedPrefix}resolver"
+              desired_ns="$(jq -n \
+                --arg name "$ns_name" \
+                --arg ip "$dns_ip" \
+                --arg group "$all_group" \
+                --arg peer "${cfg.dnsPeer}" '{
+                  name: $name,
+                  description: ("unbound on " + $peer),
+                  nameservers: [{ip: $ip, ns_type: "udp", port: 53}],
+                  enabled: true,
+                  groups: [$group],
+                  primary: true,
+                  domains: [],
+                  search_domains_enabled: false,
+                }')"
+
+              existing_ns="$(req "$api/dns/nameservers")"
+              ns_id="$(jq -r --arg n "$ns_name" \
+                '.[] | select(.name == $n) | .id' <<<"$existing_ns" | head -n1)"
+
+              if [ -n "$ns_id" ]; then
+                # Only PUT on a real change: this runs every five minutes and each
+                # write pushes a new network map to every peer.
+                current="$(jq -c --arg n "$ns_name" \
+                  '.[] | select(.name == $n)
+                   | {name, description, nameservers, enabled, groups, primary,
+                      domains, search_domains_enabled}' <<<"$existing_ns")"
+                if [ "$(jq -cS . <<<"$current")" != "$(jq -cS . <<<"$desired_ns")" ]; then
+                  echo "netbird: updating the fleet resolver -> $dns_ip"
+                  req -X PUT -d "$desired_ns" "$api/dns/nameservers/$ns_id" >/dev/null \
+                    || echo "netbird: WARNING resolver not updated"
+                fi
+              else
+                echo "netbird: pointing every peer at $dns_ip for DNS"
+                req -X POST -d "$desired_ns" "$api/dns/nameservers" >/dev/null \
+                  || echo "netbird: WARNING resolver not created"
+              fi
+            fi
+          ''}
+
           existing="$(req "$api/reverse-proxies/services")"
 
           # Resolve peer and group names to ids, marking anything that has not
@@ -684,6 +739,32 @@
           description = ''
             Reverse-proxy services, reconciled against the management API on
             activation. Peers and groups are given by name, not id.
+          '';
+        };
+
+        dnsPeer = mkOption {
+          type = nullOr str;
+          default = null;
+          example = "endeavour";
+          description = ''
+            Peer whose resolver every other peer should use, by name.
+
+            NetBird pushes this to peers as a primary nameserver group, so it
+            answers for *all* domains — which is the point: that peer already
+            runs unbound with the oisd blocklist, so making it the fleet
+            resolver gives every device ad-blocking DNS wherever it roams,
+            rather than only at home.
+
+            The peer's mesh address is resolved from the API at reconcile time
+            rather than written here, so it survives a re-enrollment that
+            changes the address. That peer must be able to answer on the mesh:
+            see cosmos.services.unbound.mesh, which opens access-control to the
+            CGNAT range and forwards the mesh domain back to the local agent.
+
+            Note the dependency this creates — if that peer is down, peers
+            elsewhere lose DNS. It is the same host everything else already
+            depends on, so this adds no new single point of failure, but it
+            does widen the blast radius of that one.
           '';
         };
 
