@@ -23,6 +23,7 @@
       services.netbird
       services.crowdsec
       services.ntfy
+      services.unbound
     ];
 
     nixos = {...}: {
@@ -51,6 +52,23 @@
       # it will drift; the lvdar.nl entry in whitelistFqdns is the durable half.
       cosmos.services.crowdsec.whitelistIps = ["86.86.217.11"];
 
+      # The backup resolver for the mesh. unbound with the oisd list costs
+      # ~330 MB here, against ~2.9 GB free — affordable, and the alternative
+      # (a public resolver as fallback) would leak queries and silently drop
+      # ad-blocking exactly when something is already wrong.
+      cosmos.services.unbound = {
+        oisd = {
+          enable = true;
+          nsfw = true;
+        };
+        mesh.enable = true;
+      };
+
+      # NetBird's client owns :53 on the mesh address here, so unbound could
+      # not bind. Same pattern as endeavour: give the agent a fixed high port
+      # and let unbound have 53.
+      cosmos.services.netbird.client.dnsResolverAddress = "127.0.0.1:15353";
+
       # 38G disk, and the journal had grown to 3.7G of it under the default
       # "10% of the filesystem" rule. A tenth of the disk is not a sensible
       # price for logs on the smallest host in the fleet.
@@ -66,11 +84,16 @@
         upstream = "https://100.68.151.172:8443";
       };
 
-      # Every peer resolves through endeavour's unbound, which already carries
-      # the oisd blocklist — so ad-blocking DNS follows a roaming laptop or
-      # phone around instead of stopping at the front door. Its mesh address is
-      # looked up at reconcile time, not written here.
-      cosmos.services.netbird.dnsPeer = "endeavour";
+      # Every peer resolves through endeavour's unbound, which carries the oisd
+      # blocklist — so ad-blocking DNS follows a roaming laptop or phone around
+      # instead of stopping at the front door. Addresses are looked up at
+      # reconcile time, not written here.
+      #
+      # This host is the fallback, with the same blocklist, so losing endeavour
+      # costs name resolution nothing and does not quietly turn the ads back
+      # on. It is a reasonable second: if *it* is down the mesh is down anyway,
+      # so it adds no failure mode that was not already fatal.
+      cosmos.services.netbird.dnsPeers = ["endeavour" "gaia"];
 
       # Peers reachable with `netbird ssh <peer>`. Names, not ids, resolved by
       # the reconciler like everything else here. panther is somebody's phone,

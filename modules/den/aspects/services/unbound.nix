@@ -1,6 +1,6 @@
 # services.unbound — recursive DNS + oisd blocklist. Owns the oisd inputs
 # (referenced by hosts that build a blocklist, e.g. endeavour).
-{...}: {
+{inputs, ...}: {
   flake-file.inputs = {
     oisd-big-unbound = {
       url = "https://big.oisd.nl/unbound";
@@ -15,12 +15,15 @@
   den.aspects.services.unbound.nixos = {
     config,
     lib,
+    pkgs,
     ...
   }: let
     inherit (lib.options) mkEnableOption mkOption;
     inherit (lib.modules) mkIf mkMerge;
-    inherit (lib.types) port str nullOr;
+    inherit (lib.types) port str nullOr bool;
     inherit (lib.lists) optional;
+    inherit (lib.strings) splitString concatStringsSep;
+    inherit (lib.lists) filter uniqueStrings;
 
     cfg = config.cosmos.services.unbound;
     netbird = config.cosmos.services.netbird;
@@ -33,6 +36,20 @@
       blocklist = mkOption {
         type = nullOr str;
         default = null;
+        description = "Path to an unbound-format blocklist to include.";
+      };
+
+      # Lifted out of hosts/endeavour.nix so a second resolver can carry the
+      # same list. A backup that answers but stops blocking ads is a confusing
+      # failure mode — the whole point of a fallback is that you cannot tell
+      # which one served you.
+      oisd = {
+        enable = mkEnableOption "the oisd blocklist";
+        nsfw = mkOption {
+          type = bool;
+          default = false;
+          description = "Also include the nsfw list on top of the big one.";
+        };
       };
       mesh = {
         enable = mkEnableOption ''
@@ -87,6 +104,18 @@
           mode = "0750";
         }
       ];
+      cosmos.services.unbound.blocklist = mkIf cfg.oisd.enable (
+        let
+          lines = str: filter (x: x != "") (splitString "\n" str);
+          bigLines = lines (builtins.readFile inputs.oisd-big-unbound);
+          nsfwLines = lines (builtins.readFile inputs.oisd-nsfw-unbound);
+          merged =
+            concatStringsSep "\n"
+            (uniqueStrings bigLines ++ optional cfg.oisd.nsfw (concatStringsSep "\n" nsfwLines));
+        in
+          toString (pkgs.writeText "unbound-blocklist" merged)
+      );
+
       services.unbound = {
         enable = true;
         resolveLocalQueries = true;

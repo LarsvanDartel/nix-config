@@ -519,23 +519,24 @@
           # The address is looked up rather than configured: NetBird assigns it
           # at enrollment, so a re-enrolled peer would otherwise leave the whole
           # mesh pointing at an address nothing answers on.
-          ${lib.optionalString (cfg.dnsPeer != null) ''
-            dns_ip="$(jq -r --arg n "${cfg.dnsPeer}" \
-              '.[] | select(.name == $n) | .ip' <<<"$peers" | head -n1)"
+          ${lib.optionalString (cfg.dnsPeers != []) ''
+            want=${lib.escapeShellArg (builtins.toJSON cfg.dnsPeers)}
+            dns_ips="$(jq -c --argjson want "$want" \
+              '[$want[] as $n | .[] | select(.name == $n) | .ip]' <<<"$peers")"
             all_group="$(jq -r '.[] | select(.name == "All") | .id' <<<"$groups" | head -n1)"
 
-            if [ -z "$dns_ip" ] || [ -z "$all_group" ]; then
-              echo "netbird: waiting on peer ${cfg.dnsPeer} / group All before setting DNS"
+            if [ "$(jq length <<<"$dns_ips")" != "$(jq length <<<"$want")" ] || [ -z "$all_group" ]; then
+              echo "netbird: waiting on peers/group All before setting DNS"
             else
               ns_name="${managedPrefix}resolver"
               desired_ns="$(jq -n \
                 --arg name "$ns_name" \
-                --arg ip "$dns_ip" \
+                --argjson ips "$dns_ips" \
                 --arg group "$all_group" \
-                --arg peer "${cfg.dnsPeer}" '{
+                --arg peers "${lib.concatStringsSep ", " cfg.dnsPeers}" '{
                   name: $name,
-                  description: ("unbound on " + $peer),
-                  nameservers: [{ip: $ip, ns_type: "udp", port: 53}],
+                  description: ("unbound on " + $peers),
+                  nameservers: [$ips[] | {ip: ., ns_type: "udp", port: 53}],
                   enabled: true,
                   groups: [$group],
                   primary: true,
@@ -548,19 +549,19 @@
                 '.[] | select(.name == $n) | .id' <<<"$existing_ns" | head -n1)"
 
               if [ -n "$ns_id" ]; then
-                # Only PUT on a real change: this runs every five minutes and each
-                # write pushes a new network map to every peer.
+                # Only PUT on a real change: this runs every five minutes and
+                # each write pushes a new network map to every peer.
                 current="$(jq -c --arg n "$ns_name" \
                   '.[] | select(.name == $n)
                    | {name, description, nameservers, enabled, groups, primary,
                       domains, search_domains_enabled}' <<<"$existing_ns")"
                 if [ "$(jq -cS . <<<"$current")" != "$(jq -cS . <<<"$desired_ns")" ]; then
-                  echo "netbird: updating the fleet resolver -> $dns_ip"
+                  echo "netbird: updating the fleet resolvers"
                   req -X PUT -d "$desired_ns" "$api/dns/nameservers/$ns_id" >/dev/null \
                     || echo "netbird: WARNING resolver not updated"
                 fi
               else
-                echo "netbird: pointing every peer at $dns_ip for DNS"
+                echo "netbird: pointing every peer at $(jq -r 'join(", ")' <<<"$dns_ips") for DNS"
                 req -X POST -d "$desired_ns" "$api/dns/nameservers" >/dev/null \
                   || echo "netbird: WARNING resolver not created"
               fi
@@ -742,12 +743,19 @@
           '';
         };
 
-        dnsPeer = mkOption {
-          type = nullOr str;
-          default = null;
-          example = "endeavour";
+        dnsPeers = mkOption {
+          type = listOf str;
+          default = [];
+          example = ["endeavour" "gaia"];
           description = ''
-            Peer whose resolver every other peer should use, by name.
+            Peers whose resolvers every other peer should use, in order.
+
+            More than one is worth having: a single entry makes DNS for the
+            whole mesh depend on one host. Clients fall through to the next on
+            failure, so order by preference — and every entry should carry the
+            *same* blocklist, since a fallback that answers but stops blocking
+            ads is a confusing failure mode when you cannot tell which one
+            served you.
 
             NetBird pushes this to peers as a primary nameserver group, so it
             answers for *all* domains — which is the point: that peer already
@@ -761,10 +769,8 @@
             see cosmos.services.unbound.mesh, which opens access-control to the
             CGNAT range and forwards the mesh domain back to the local agent.
 
-            Note the dependency this creates — if that peer is down, peers
-            elsewhere lose DNS. It is the same host everything else already
-            depends on, so this adds no new single point of failure, but it
-            does widen the blast radius of that one.
+            Every peer listed must be able to answer on the mesh: see
+            cosmos.services.unbound.mesh.
           '';
         };
 

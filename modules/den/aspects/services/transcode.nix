@@ -224,6 +224,11 @@
         systemd.services.transcode = {
           description = "Re-encode library video to AV1";
           after = ["network-online.target" "radarr.service" "sonarr.service"];
+          # Ordering after network-online.target without wanting it is an
+          # eval warning, and `abort-on-warn` makes that a hard build failure
+          # on a machine that trusts this flake's config — so it built here and
+          # would not have built for anyone else.
+          wants = ["network-online.target"];
 
           environment = {
             FFMPEG = "${ffmpeg}/bin/ffmpeg";
