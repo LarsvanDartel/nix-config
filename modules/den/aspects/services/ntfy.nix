@@ -43,6 +43,9 @@
         name = "ntfy-provision";
         runtimeInputs = [config.services.ntfy-sh.package pkgs.gnugrep];
         text = ''
+          # Same file the server was configured with; ExecStartPost runs
+          # inside the unit, so /var/lib/ntfy-sh resolves to the same place.
+          export NTFY_AUTH_FILE=/var/lib/ntfy-sh/user.db
           export NTFY_PASSWORD
           NTFY_PASSWORD="$(cat "$CREDENTIALS_DIRECTORY/password")"
 
@@ -95,14 +98,23 @@
         sops.secrets."keys/ntfy/password".sopsFile =
           builtins.toString inputs.nix-secrets + "/hosts/common/secrets.yaml";
 
-        cosmos.system.impermanence.persist.directories = [
-          {
-            directory = "/var/lib/ntfy-sh";
-            user = "ntfy-sh";
-            group = "ntfy-sh";
-            mode = "0750";
-          }
-        ];
+        # Deliberately NOT persisted, which is unusual here and worth the
+        # explanation.
+        #
+        # nixpkgs runs ntfy under DynamicUser with a StateDirectory, and that
+        # pair relocates state to /var/lib/private/ntfy-sh. An impermanence
+        # entry for /var/lib/ntfy-sh bind-mounts the path systemd wants to
+        # manage as a symlink, and the unit dies at STATE_DIRECTORY with
+        # "Device or resource busy" — the same EBUSY that has already bitten
+        # crowdsec and tile-traccar in this repo.
+        #
+        # The usual fix is to turn DynamicUser off. Not needed here, because
+        # none of this state is worth keeping: the auth database holds one
+        # account which is reconciled from sops on every start, and the cache
+        # is undelivered messages for a push-alert topic, which are stale by
+        # the time anything reboots. Reproducible state does not need
+        # persisting, and not persisting it removes the conflict rather than
+        # working around it.
 
         # netbird-proxy reaches it over the mesh like any other target, so the
         # port opens on wt0 and nowhere else.
@@ -125,22 +137,13 @@
           };
         };
 
-        systemd.services.ntfy-sh.serviceConfig.LoadCredential = "password:${passwordFile}";
-
-        systemd.services.ntfy-provision = {
-          description = "Reconcile the ntfy account from sops";
-          after = ["ntfy-sh.service"];
-          requires = ["ntfy-sh.service"];
-          wantedBy = ["multi-user.target"];
-          serviceConfig = {
-            Type = "oneshot";
-            User = "ntfy-sh";
-            Group = "ntfy-sh";
-            ExecStart = lib.getExe provision;
-            LoadCredential = "password:${passwordFile}";
-            StateDirectory = "ntfy-sh";
-          };
-          environment.NTFY_AUTH_FILE = "/var/lib/ntfy-sh/user.db";
+        # Provisioning rides on ntfy's own unit rather than living in one of
+        # its own. Under DynamicUser the uid is allocated per-start, so a
+        # separate unit cannot reliably be the same user or see the same
+        # StateDirectory; ExecStartPost inherits both, plus the credential.
+        systemd.services.ntfy-sh.serviceConfig = {
+          LoadCredential = "password:${passwordFile}";
+          ExecStartPost = lib.getExe provision;
         };
       };
     };
