@@ -22,6 +22,7 @@
       core.impermanence
       services.netbird
       services.crowdsec
+      services.ntfy
     ];
 
     nixos = {...}: {
@@ -49,6 +50,11 @@
       # cannot lock the only administrator out of the only way in. Dynamic, so
       # it will drift; the lvdar.nl entry in whitelistFqdns is the durable half.
       cosmos.services.crowdsec.whitelistIps = ["86.86.217.11"];
+
+      # 38G disk, and the journal had grown to 3.7G of it under the default
+      # "10% of the filesystem" rule. A tenth of the disk is not a sensible
+      # price for logs on the smallest host in the fleet.
+      cosmos.system.journald.maxUse = "512M";
 
       # kanidm is served by nginx here rather than by netbird-proxy, because
       # management cannot start without it and the proxy cannot route without
@@ -105,6 +111,21 @@
         cloud = shared 9200;
         docs = shared 9980;
         wopi = shared 9300;
+
+        # The alert sink. Ungated deliberately: the ntfy app authenticates
+        # with a username and password and cannot complete an interactive
+        # browser login, and gating it would also make the one service you
+        # need during an outage depend on kanidm, which lives on the host
+        # most likely to be the outage.
+        ntfy = {
+          bearerAuth.enable = false;
+          targets = [
+            {
+              port = 8095;
+              peer = "gaia";
+            }
+          ];
+        };
 
         # Public, and unauthenticated by design.
         typstnique = {

@@ -40,6 +40,11 @@
           # can stall long enough under IO for the watchdog to reset the board.
           systemd.settings.Manager.RuntimeWatchdogSec = lib.mkForce "60s";
 
+          # 16G SD card sitting at 89% full, of which the journal was 575M. The
+          # default 10% rule is doubly wrong here: the card is small, and every
+          # write shortens its life.
+          cosmos.system.journald.maxUse = "128M";
+
           # nixos-hardware defaults this host to the Raspberry Pi Foundation's
           # vendor kernel, which nothing caches — so every deploy meant
           # compiling a kernel, either on a 1 GB Pi 3 or here under qemu. The
