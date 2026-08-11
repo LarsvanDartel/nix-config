@@ -45,6 +45,25 @@
           # write shortens its life.
           cosmos.system.journald.maxUse = "128M";
 
+          # The fleet default min-free of 1 GiB is most of this host's 2.1 GiB
+          # of free space, and max-free of 5 GiB is more free space than the
+          # card has ever had — together they would mean the daemon collects
+          # continuously and never reaches its target, which is the failure
+          # mode core/nix.nix's option description warns about. Scaled to the
+          # card instead.
+          #
+          # The store is 9.3G of the 12G in use here across only 11
+          # generations, so unlike endeavour this host is not full *because* of
+          # uncollected history — a Pi's closure is simply large relative to
+          # its card. GC buys less here than the numbers suggest, and every
+          # deletion is a write on flash, so the horizon is shortened rather
+          # than the cadence raised.
+          cosmos.system.nix = {
+            gcOlderThan = "14d";
+            minFree = 256 * 1024 * 1024;
+            maxFree = 1024 * 1024 * 1024;
+          };
+
           # nixos-hardware defaults this host to the Raspberry Pi Foundation's
           # vendor kernel, which nothing caches — so every deploy meant
           # compiling a kernel, either on a 1 GB Pi 3 or here under qemu. The
