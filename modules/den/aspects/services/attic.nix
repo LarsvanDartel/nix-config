@@ -63,21 +63,34 @@
 
       publicKey = mkOption {
         type = nullOr str;
-        default = null;
+        default = "lvdar:BgBRpHKR8srVXZHj5NRzLcDR6szD6SCpMPC9gTZE7LU=";
         example = "lvdar:abc123...=";
         description = ''
-          The cache's signing public key. Until this is set, no substituter is
+          The cache's signing public key. With this null, no substituter is
           configured at all — Nix refuses paths it cannot verify, so a
           substituter without its key is worse than none.
+
+          Minted by attic when the cache was created and safe to keep in the
+          repo: it verifies signatures, it does not make them. The private
+          half never leaves keys/attic/token-secret.
+
+          The cache is also marked `public`, which here means "no token needed
+          to pull" rather than "reachable by anyone" — it only listens on the
+          mesh. That is the same trust boundary loki, prometheus and
+          node-exporter already sit behind on this host, and it is what lets
+          every peer substitute without a netrc file to distribute and rotate.
         '';
       };
     };
 
     config = lib.mkIf (cfg.publicKey != null) {
       nix.settings = {
-        # Appended, not replacing: these merge with cache.nixos.org rather
-        # than displacing it. Order matters only for which is tried first, and
-        # upstream should stay first for everything it already has.
+        # Merged with cache.nixos.org rather than displacing it. List order is
+        # not what decides precedence — Nix sorts by the `priority` each cache
+        # advertises in its nix-cache-info, and attic serves 41 against
+        # upstream's 40, so cache.nixos.org is still tried first for everything
+        # it already has. This one answers for what it does not: the aarch64
+        # closures built under emulation, and anything from an overlay here.
         substituters = [cfg.endpoint];
         trusted-public-keys = [cfg.publicKey];
 

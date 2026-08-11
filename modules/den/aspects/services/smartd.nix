@@ -125,6 +125,12 @@
       sops.secrets."keys/ntfy/password".sopsFile =
         builtins.toString inputs.nix-secrets + "/hosts/common/secrets.yaml";
 
+      # The nixpkgs module runs the daemon from the store and stops there, so
+      # `smartctl` is not on PATH. That is precisely backwards: the moment this
+      # aspect earns its keep is when a push notification arrives and you want
+      # to look at the disk yourself, and the tool for that would not exist.
+      environment.systemPackages = [pkgs.smartmontools];
+
       services.smartd = {
         enable = true;
 
