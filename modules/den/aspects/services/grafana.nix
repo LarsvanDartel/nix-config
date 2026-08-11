@@ -15,7 +15,7 @@
 # dashboard you cannot open at precisely the moment you want to look at it.
 {den, ...}: {
   den.aspects.services.grafana = {
-    includes = with den.aspects.services; [netbird.client prometheus];
+    includes = with den.aspects.services; [netbird.client prometheus loki];
 
     nixos = {
       config,
@@ -28,6 +28,7 @@
 
       cfg = config.cosmos.services.grafana;
       prom = config.cosmos.services.prometheus;
+      loki = config.cosmos.services.loki;
 
       # Hand-written rather than imported from grafana.com: a dashboard pulled
       # by id is a JSON blob nobody in this repo can review, pinned to nothing,
@@ -233,6 +234,15 @@
                 access = "proxy";
                 url = "http://127.0.0.1:${toString prom.port}";
                 isDefault = true;
+              }
+              # Without this the logs are collected and stored and simply
+              # cannot be read: Explore has nothing to query them with.
+              {
+                name = "Loki";
+                uid = "loki";
+                type = "loki";
+                access = "proxy";
+                url = "http://127.0.0.1:${toString loki.port}";
               }
             ];
 
