@@ -103,7 +103,10 @@
         # forward the mesh domain to. Without it the agent picks an ephemeral
         # port, unbound answers *.lvdar.nl from public DNS, and every mesh name
         # on this host resolves to the edge's public address.
-        dnsResolverAddress = "127.0.0.1:5053";
+        #
+        # 15353 rather than the conventional 5053, which traccar already owns
+        # here as part of its 5001-5263 decoder range.
+        dnsResolverAddress = "127.0.0.1:15353";
 
         # Publishes 192.168.2.0/24 into the mesh, so a roaming voyager reaches
         # the whole home network and not just the peers. Turns on IP
