@@ -104,6 +104,9 @@
           '';
         };
 
+        # netbird-proxy dials this over the mesh like any other target.
+        cosmos.services.netbird.client.exposedPorts = [cfg.port];
+
         services.gatus = {
           enable = true;
           settings = {
