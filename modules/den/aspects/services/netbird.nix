@@ -629,6 +629,25 @@
             # rule deliberately refuses to touch — and aborting there would
             # leave every service after it in the list unreconciled, silently.
             if [ -n "$id" ]; then
+              # Only PUT on a real difference. Every PUT makes management
+              # re-provision the service — reissuing its certificate and
+              # re-reading the IdP's discovery document — so an unconditional
+              # write here meant ~19 of those every five minutes, forever, for
+              # a config that had not changed. It showed up as kanidm being
+              # hammered on /.well-known/openid-configuration, which is a long
+              # way from the thing that caused it.
+              #
+              # Compared against the same projection that was sent, so fields
+              # the API adds (id, meta, proxy_cluster, port_auto_assigned) do
+              # not read as drift and cause a write every run.
+              current="$(jq -c --arg n "$name" --argjson want "$svc" \
+                '.[] | select(.name == $n) | with_entries(select(.key | IN($want | keys[])))' \
+                <<<"$existing")"
+
+              if [ "$(jq -cS . <<<"$current")" = "$(jq -cS . <<<"$svc")" ]; then
+                continue
+              fi
+
               echo "netbird: updating $name"
               req -X PUT -d "$svc" "$api/reverse-proxies/services/$id" >/dev/null \
                 || echo "netbird: WARNING $name not updated"
