@@ -116,6 +116,15 @@
           toString (pkgs.writeText "unbound-blocklist" merged)
       );
 
+      # Ordering only, not a dependency: on a host where the agent had taken
+      # :53 as the system resolver, it has to be moved aside before unbound can
+      # bind. Without this the deploy fails with "address already in use" and
+      # rolls back, which is unrecoverable without a manual restart — the new
+      # config that moves the agent is the very thing being rolled back.
+      systemd.services.unbound.after =
+        optional cfg.mesh.enable
+        "${config.services.netbird.clients.default.suffixedName}.service";
+
       services.unbound = {
         enable = true;
         resolveLocalQueries = true;
