@@ -215,6 +215,24 @@
                       };
                     }
                     {
+                      # core.notify-failure catches a backup that *fails*.
+                      # Nothing catches one that stops being attempted — a
+                      # masked unit, a timer that never fires again after a
+                      # bad deploy, a repository that has quietly gone away.
+                      # That failure mode is silent by construction and is
+                      # exactly the one you discover when you need a restore.
+                      alert = "ResticStale";
+                      expr = ''
+                        time() - node_systemd_timer_last_trigger_seconds{name="restic-backups-stardust.timer"} > 172800
+                      '';
+                      for = "1h";
+                      labels.severity = "critical";
+                      annotations = {
+                        summary = "{{ $labels.instance }}: no backup in over 48h";
+                        description = "The stardust timer has not fired since {{ $value | humanizeTimestamp }}.";
+                      };
+                    }
+                    {
                       alert = "MemoryPressure";
                       expr = ''
                         node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes * 100 < 10
