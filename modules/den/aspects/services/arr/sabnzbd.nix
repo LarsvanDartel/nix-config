@@ -224,7 +224,28 @@ in {
           ];
         };
 
-        services.nginx.virtualHosts = mkIf cfg.vpn.enable (vpnVhost cfg.uiPort);
+        # The vhost, plus room for an NZB.
+        #
+        # nixpkgs sets client_max_body_size to 10m globally, and radarr hands an
+        # NZB over by POSTing the file to `/api?mode=addfile` — through this
+        # vhost, because sabnzbd is in the namespace. A UHD remux is thousands
+        # of articles and its NZB runs well past 10m, so nginx answered 413 and
+        # radarr logged "Couldn't add release ... to download queue" for exactly
+        # the largest releases while small ones went through. The queue then
+        # fell through to whatever cheap re-post was left, which is how a
+        # 2160p remux search ends up grabbing a 1080p one.
+        #
+        # Finite rather than 0: this vhost listens on 0.0.0.0 and the port is
+        # published (sabnzbd.lvdar.nl), and nginx spools request bodies to disk.
+        # 256m is well beyond any real NZB.
+        services.nginx.virtualHosts = mkIf cfg.vpn.enable (lib.mkMerge [
+          (vpnVhost cfg.uiPort)
+          {
+            "127.0.0.1:${toString cfg.uiPort}".extraConfig = ''
+              client_max_body_size 256m;
+            '';
+          }
+        ]);
       };
     };
   };
