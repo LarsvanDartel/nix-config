@@ -45,6 +45,7 @@
       services.arr.lidarr
       services.arr.bazarr
       services.arr.jellyseerr
+      services.transcode
     ];
 
     nixos = {
