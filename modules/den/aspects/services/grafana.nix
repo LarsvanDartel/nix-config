@@ -147,6 +147,11 @@
           # this, and no longer ships a default. Losing it means those secrets
           # cannot be decrypted, so it is generated once and kept, not derived.
           "keys/grafana/secret-key".owner = "grafana";
+          # Grafana ships admin/admin, and this instance is published — so the
+          # break-glass local login below was a login anyone on the internet
+          # had. Applied at every start, so rotating the sops value rotates
+          # the account.
+          "keys/grafana/admin-password".owner = "grafana";
         };
 
         cosmos.system.impermanence.persist.directories = [
@@ -177,7 +182,10 @@
 
             analytics.reporting_enabled = false;
 
-            security.secret_key = "$__file{${config.sops.secrets."keys/grafana/secret-key".path}}";
+            security = {
+              secret_key = "$__file{${config.sops.secrets."keys/grafana/secret-key".path}}";
+              admin_password = "$__file{${config.sops.secrets."keys/grafana/admin-password".path}}";
+            };
 
             "auth.generic_oauth" = {
               enabled = true;
@@ -202,7 +210,9 @@
 
             # Kept, deliberately — see the header. kanidm lives on this host
             # and behind the same edge, so OIDC-only would make a Grafana
-            # outage and a kanidm outage the same event.
+            # outage and a kanidm outage the same event. Only defensible
+            # because the admin password above is a real one; with the shipped
+            # default this was an open door on a published service.
             auth.disable_login_form = false;
           };
 
