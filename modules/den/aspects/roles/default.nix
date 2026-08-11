@@ -16,5 +16,10 @@
     # four gigabytes of it than a Pi does. Failure *notifications* are not here
     # but in roles.server: see the note there.
     core.journald
+    # Pull side of the binary cache only. Reading from a cache is universally
+    # useful — voyager is the host that most wants it, since it builds
+    # pioneer's aarch64 closure under emulation. Serving one is not, so
+    # services.attic itself stays on endeavour.
+    services.attic.client
   ];
 }
