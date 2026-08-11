@@ -239,7 +239,11 @@
         };
       };
 
-      service = submodule ({name, ...}: {
+      service = submodule ({
+        name,
+        config,
+        ...
+      }: {
         options = {
           domain = mkOption {
             type = str;
@@ -276,6 +280,33 @@
             type = bool;
             default = true;
           };
+
+          passHostHeader =
+            mkEnableOption ''
+              forwarding the client's Host header to the target instead of the
+              target's own address.
+
+              Off is netbird-proxy's default and it is the wrong one here. With
+              it off the backend is dialled with `Host: <peer-ip>:<port>`, and
+              anything that builds an absolute URL from the request builds it
+              out of that — so an unauthenticated hit on radarr.lvdar.nl
+              answers `Location: http://100.68.151.172:7878/login`, sending the
+              browser off the public name and onto a mesh address that only
+              resolves for someone already on the VPN. Cookie domains and
+              absolute asset URLs go the same way.
+
+              On by default because none of these targets does name-based
+              virtual hosting — each is one application owning one port, which
+              serves whatever Host it is given. A target that did would need
+              this off, and its own hostname sent instead
+            ''
+            // {
+              # There is no Host header in a raw connection, so this only means
+              # anything at L7.
+              default = config.mode == "http";
+              defaultText = "mode == \"http\"";
+            };
+
           targets = mkOption {type = listOf target;};
           crowdsec = mkOption {
             type = enum ["off" "observe" "enforce"];
@@ -328,6 +359,7 @@
             name = "${managedPrefix}${name}";
             inherit (s) domain mode enabled;
             listen_port = s.listenPort;
+            pass_host_header = s.passHostHeader;
             targets = map (t:
               {
                 inherit (t) peer port protocol;
