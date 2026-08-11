@@ -149,8 +149,14 @@
           "keys/grafana/secret-key".owner = "grafana";
           # Grafana ships admin/admin, and this instance is published — so the
           # break-glass local login below was a login anyone on the internet
-          # had. Applied at every start, so rotating the sops value rotates
-          # the account.
+          # had, verified working before this existed.
+          #
+          # Caveat worth knowing: grafana only reads this when it *creates* the
+          # admin account. Setting it on an instance that already started once
+          # changes nothing, silently — the fix then is to remove
+          # /var/lib/grafana/data/grafana.db (provisioned datasources and
+          # dashboards come back from nix) or run
+          # `grafana cli admin reset-admin-password`.
           "keys/grafana/admin-password".owner = "grafana";
         };
 
