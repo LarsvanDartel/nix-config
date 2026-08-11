@@ -99,6 +99,12 @@
       cosmos.networking.edgeTerminated = true;
 
       cosmos.services.netbird.client = {
+        # A stable port for the agent's resolver, so unbound has something to
+        # forward the mesh domain to. Without it the agent picks an ephemeral
+        # port, unbound answers *.lvdar.nl from public DNS, and every mesh name
+        # on this host resolves to the edge's public address.
+        dnsResolverAddress = "127.0.0.1:5053";
+
         # Publishes 192.168.2.0/24 into the mesh, so a roaming voyager reaches
         # the whole home network and not just the peers. Turns on IP
         # forwarding, which is why it is opt-in per host.
@@ -200,6 +206,11 @@
       };
 
       cosmos.services = {
+        # Answer for the mesh, and resolve mesh names locally. This host's
+        # unbound already carries the oisd blocklist, so making it the fleet
+        # resolver gives every peer ad-blocking DNS as a side effect.
+        unbound.mesh.enable = true;
+
         unbound.blocklist = let
           lines = str: filter (x: x != "") (splitString "\n" str);
           bigLines = lines (builtins.readFile inputs.oisd-big-unbound);
@@ -231,6 +242,20 @@
           # persisting an explicitly-placed downloadsDir first.
           downloadsDir = "/var/lib/suwayomi-downloads";
           homeLink = "/home/${config.cosmos.user.name}/manga";
+        };
+
+        # Mesh addresses, not names. Mesh DNS does not work on this host:
+        # unbound owns :53, so the NetBird client fell back to an ephemeral
+        # resolver port and unbound answers *.lvdar.nl from public DNS — a
+        # scrape of gaia.nb.lvdar.nl would resolve to gaia's public address and
+        # leave the mesh entirely. Literals for the same reason
+        # netbird.oidc.idp.upstream is one over in gaia.nix; NetBird assigns
+        # these at enrollment and they survive everything short of re-enrolling
+        # a peer.
+        prometheus.targets = {
+          endeavour = "100.68.151.172";
+          gaia = "100.68.38.155";
+          pioneer = "100.68.78.148";
         };
 
         # Sized to the nightly window rather than to the backlog. The first

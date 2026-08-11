@@ -89,6 +89,24 @@
           '';
         };
 
+        dnsResolverAddress = mkOption {
+          type = str;
+          default = "";
+          example = "127.0.0.1:5053";
+          description = ''
+            Pin the agent's local DNS resolver to this address instead of
+            letting it discover one.
+
+            It normally binds an ephemeral port, which is fine when it is also
+            the system resolver — it rewrites resolv.conf to point at itself.
+            On a host already running a resolver on :53 it cannot do that, so
+            mesh names end up being answered by whatever *is* on :53, from
+            public DNS, with the edge's address. Pinning the port gives that
+            resolver something stable to forward the mesh domain to. See
+            cosmos.services.unbound.mesh.
+          '';
+        };
+
         exposedPorts = mkOption {
           type = listOf port;
           default = [];
@@ -179,9 +197,14 @@
           # The login unit runs a bare `netbird up`, so the self-hosted
           # management URL has to already be in config.json. That is what the
           # module's `config` drop-in is for.
+          #
+          # Kept a literal attrset: nix merges `config.ServerSSHAllowed` above
+          # with this only while both are literals, and an `//` here turns it
+          # into an expression and collides.
           config = {
             ManagementURL = urlValue cfg.domain;
             AdminURL = urlValue cfg.domain;
+            CustomDNSAddress = cfg.client.dnsResolverAddress;
           };
         };
       };
