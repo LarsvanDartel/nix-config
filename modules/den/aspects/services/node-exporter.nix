@@ -25,8 +25,22 @@
       options.cosmos.services.node-exporter = {
         port = mkOption {
           type = port;
-          default = 9100;
-          description = "The conventional node_exporter port.";
+          default = 9500;
+          description = ''
+            Not 9100, which is node_exporter's conventional port and would be
+            the obvious choice.
+
+            OpenCloud on endeavour is not one service on one port: it is a
+            constellation of internal services occupying most of 9091-9304,
+            including 9100 on loopback. node_exporter binds 0.0.0.0, so the
+            two collide and the exporter dies with "address already in use" —
+            on that host only, which makes it exactly the sort of thing that
+            passes review and fails on deploy.
+
+            9500 is clear on every host: endeavour has nothing between 9304
+            and 9696, gaia holds 9090/9091/9100/9444, pioneer holds nothing.
+            Uniform across the fleet so the scrape config stays one line.
+          '';
         };
 
         collectors = mkOption {
