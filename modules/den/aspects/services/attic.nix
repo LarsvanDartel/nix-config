@@ -1,0 +1,257 @@
+# services.attic — a binary cache the whole fleet pulls from.
+#
+# Four hosts currently build everything independently, and one of them builds
+# for another: pioneer is aarch64 and is assembled on voyager under binfmt
+# emulation, because a Pi 3 with 866 MiB cannot build its own closure. Every
+# `nix run .#pioneer` therefore re-emulates whatever cache.nixos.org does not
+# already have, from scratch, on a laptop. This makes that happen once.
+#
+# On endeavour because it is the host with the array and the uptime, and
+# mesh-only because a binary cache is a machine-to-machine protocol: a Nix
+# client cannot complete the browser OIDC redirect that gaia's gate answers
+# with, so publishing it would mean turning bearerAuth off and leaning on
+# attic's own tokens as the only lock. There is no reason to take that trade
+# when every host that wants the cache is already on the mesh.
+#
+# Two nixpkgs-module traps are worked around here, both previously documented
+# elsewhere in this repo:
+#
+#   * `services.atticd` sets DynamicUser = true AND StateDirectory = "atticd",
+#     which is the /var/lib/private EBUSY case that broke ntfy and gatus — an
+#     impermanence entry bind-mounts the path systemd wants to manage and the
+#     unit dies at STATE_DIRECTORY. Worse here than there: a dynamic UID also
+#     means the ownership of persistent data changes under it across boots.
+#     Forced off in favour of a static user, the shape services/prometheus.nix
+#     already uses and explains.
+#   * the cache contents go on /tank and are deliberately NOT added to
+#     cosmos.system.impermanence.persist — /tank is a ZFS pool outside the
+#     persist layer, so an entry there bind-mounts /persist over the top and
+#     silently puts a growing binary cache on the 250 GB system SSD. The small
+#     sqlite index is the opposite case and does get a persist entry.
+{den, ...}: {
+  # The pull side, in roles.default so every host benefits — including
+  # endeavour, which costs nothing there since it is the server.
+  #
+  # Inert until `publicKey` is set, and that is a sequencing fact rather than
+  # an oversight: attic mints the cache's signing keypair when the cache is
+  # *created*, at runtime, after the server is first deployed. There is no key
+  # to write down until then. Deploy the server, run `atticd-atticadm` to make
+  # the cache, then paste the public key into the option default below and
+  # deploy the clients.
+  den.aspects.services.attic.client.nixos = {
+    config,
+    lib,
+    ...
+  }: let
+    inherit (lib.options) mkOption;
+    inherit (lib.types) nullOr str;
+
+    cfg = config.cosmos.services.attic.client;
+  in {
+    options.cosmos.services.attic.client = {
+      endpoint = mkOption {
+        type = str;
+        default = "http://endeavour.nb.lvdar.nl:8090/lvdar";
+        description = ''
+          The cache to pull from, as a mesh URL.
+
+          A literal rather than a reference to the server aspect's options: den
+          cannot read another host's config, which is the same reason
+          gaia.nix hardcodes endeavour's service ports.
+        '';
+      };
+
+      publicKey = mkOption {
+        type = nullOr str;
+        default = null;
+        example = "lvdar:abc123...=";
+        description = ''
+          The cache's signing public key. Until this is set, no substituter is
+          configured at all — Nix refuses paths it cannot verify, so a
+          substituter without its key is worse than none.
+        '';
+      };
+    };
+
+    config = lib.mkIf (cfg.publicKey != null) {
+      nix.settings = {
+        # Appended, not replacing: these merge with cache.nixos.org rather
+        # than displacing it. Order matters only for which is tried first, and
+        # upstream should stay first for everything it already has.
+        substituters = [cfg.endpoint];
+        trusted-public-keys = [cfg.publicKey];
+
+        # The cache is mesh-only, so voyager is regularly somewhere it cannot
+        # be reached. Both of these are about that: fail over to building or
+        # to cache.nixos.org quickly instead of hanging on a dead route.
+        connect-timeout = 5;
+        fallback = true;
+      };
+    };
+  };
+
+  den.aspects.services.attic = {
+    includes = [den.aspects.services.netbird.client];
+
+    nixos = {
+      config,
+      lib,
+      ...
+    }: let
+      inherit (lib.options) mkOption;
+      inherit (lib.types) port str path;
+
+      cfg = config.cosmos.services.attic;
+      dnsDomain = config.cosmos.services.netbird.dnsDomain;
+
+      user = "atticd";
+    in {
+      options.cosmos.services.attic = {
+        port = mkOption {
+          type = port;
+          default = 8090;
+          description = ''
+            Free on this host. Not 8080 or 8443, which the netbird proxy and
+            kanidm hold, and clear of the 9091-9304 block opencloud sprawls
+            across — the range that already forced node_exporter off its
+            conventional 9100.
+          '';
+        };
+
+        dataDir = mkOption {
+          type = path;
+          default = "/tank/atticd";
+          description = ''
+            NAR storage, on the array. See the header for why it is not
+            persisted.
+
+            This is the one thing here that grows without a bound anyone chose:
+            it holds every path every host has ever pushed, until garbage
+            collection expires it. That is the whole argument for /tank over
+            the SSD.
+          '';
+        };
+
+        cacheName = mkOption {
+          type = str;
+          default = "lvdar";
+          description = "The cache clients pull from, as <endpoint>/<name>.";
+        };
+
+        retention = mkOption {
+          type = str;
+          default = "3 months";
+          description = ''
+            How long an unreferenced path survives, as attic's
+            `default-retention-period`.
+
+            Matched roughly to core/nix.nix's 30-day GC horizon plus slack: a
+            cache that expires paths sooner than clients stop asking for them
+            is a cache that misses, and the array has room.
+          '';
+        };
+      };
+
+      config = {
+        # Per-host, so no explicit sopsFile: core/sops.nix points
+        # defaultSopsFile at hosts/<hostname>/secrets.yaml. Only the common
+        # file needs naming, and this secret is used by exactly one host —
+        # unlike keys/ntfy/password, which every host publishes with.
+        #
+        # A template rather than a bare secret because atticd wants an
+        # EnvironmentFile, not a value: the same shape gatus.nix uses. systemd
+        # opens it as root before dropping privileges, so no owner is needed.
+        sops = {
+          secrets."keys/attic/token-secret" = {};
+          templates."attic.env".content = ''
+            ATTIC_SERVER_TOKEN_RS256_SECRET_BASE64=${config.sops.placeholder."keys/attic/token-secret"}
+          '';
+        };
+
+        users = {
+          users.${user} = {
+            isSystemUser = true;
+            group = user;
+            home = "/var/lib/atticd";
+          };
+          groups.${user} = {};
+        };
+
+        systemd.tmpfiles.rules = [
+          "d ${cfg.dataDir} 0750 ${user} ${user} - -"
+        ];
+
+        cosmos.system.impermanence.persist.directories = [
+          {
+            directory = "/var/lib/atticd";
+            inherit user;
+            group = user;
+            mode = "0750";
+          }
+        ];
+
+        services.atticd = {
+          enable = true;
+          inherit user;
+          group = user;
+          environmentFile = config.sops.templates."attic.env".path;
+
+          settings = {
+            # Bound to every interface and firewalled to the mesh, the shape
+            # kanidm and the arrs use here. NetBird assigns this host's mesh
+            # address at enrollment, so it is not knowable at eval time.
+            listen = "[::]:${toString cfg.port}";
+
+            # Attic builds the URLs it hands to clients from this, so it must
+            # be the name clients actually resolve — the mesh name, not
+            # localhost. Mesh names work on this host only because
+            # services/unbound.nix forwards the mesh domain to the NetBird
+            # agent's resolver.
+            api-endpoint = "http://${config.networking.hostName}.${dnsDomain}:${toString cfg.port}/";
+
+            database.url = "sqlite:///var/lib/atticd/server.db?mode=rwc";
+
+            storage = {
+              type = "local";
+              path = cfg.dataDir;
+            };
+
+            # Content-defined chunking is what makes this worth running over a
+            # plain `nix copy` target: two closures that differ by one
+            # derivation share the chunks of everything else, which matters
+            # most for exactly the case this exists for — rebuilding pioneer's
+            # aarch64 system closure over and over.
+            chunking = {
+              nar-size-threshold = 65536;
+              min-size = 16384;
+              avg-size = 65536;
+              max-size = 262144;
+            };
+
+            compression.type = "zstd";
+
+            garbage-collection = {
+              interval = "12 hours";
+              default-retention-period = cfg.retention;
+            };
+          };
+        };
+
+        # The header explains why. Nested inside serviceConfig rather than at
+        # the top of the aspect body on purpose — den unwraps priority wrappers
+        # to classify aspect content, and a mkForce sitting at the top level
+        # recurses infinitely alongside facter (see hosts/pioneer.nix).
+        systemd.services.atticd.serviceConfig = {
+          DynamicUser = lib.mkForce false;
+
+          # PrivateUsers maps the service into its own user namespace, which is
+          # harmless with a dynamic UID but hides the static one from the files
+          # it owns on /tank.
+          PrivateUsers = lib.mkForce false;
+        };
+
+        cosmos.services.netbird.client.exposedPorts = [cfg.port];
+      };
+    };
+  };
+}
