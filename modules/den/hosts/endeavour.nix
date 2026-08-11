@@ -232,11 +232,14 @@
           homeLink = "/home/${config.cosmos.user.name}/manga";
         };
 
-        # Staged deliberately: this replaces originals and there is no undo.
-        # One file per run until a few have been checked by eye, then raise it.
+        # Sized to the nightly window rather than to the backlog. The first
+        # file took 24 min for 27 GiB, so eight is roughly 03:00 to 06:00 —
+        # done before anyone watches anything, and the GPU is shared with
+        # jellyfin's transcoder. Raising this does not make the job finish
+        # sooner so much as make it run later into the morning.
         transcode = {
           dryRun = false;
-          maxPerRun = 1;
+          maxPerRun = 8;
         };
 
         arr = {
