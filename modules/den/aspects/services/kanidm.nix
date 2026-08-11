@@ -116,6 +116,15 @@
               };
               opencloud-admin.members = ["lvdar"];
               netbird-admin.members = ["lvdar"];
+
+              # Grafana authenticates against kanidm directly rather than
+              # sitting behind the netbird gate, so its access lives here
+              # rather than in the netbird-* family above.
+              grafana-users = {
+                overwriteMembers = false;
+                members = ["lvdar"];
+              };
+              grafana-admin.members = ["lvdar"];
             }
             # One group per gated service, plus the baseline. overwriteMembers is
             # off so members added by hand in kanidm survive a redeploy — these
@@ -177,6 +186,30 @@
                 valuesByGroup =
                   {netbird-admin = ["netbird-admin"];}
                   // lib.genAttrs netbirdGroups (g: [g]);
+              };
+            };
+
+            # Confidential, not public: grafana runs on a server and can keep
+            # a secret, and its OIDC flow is server-to-server for the token
+            # exchange. `public` here would force PKCE-without-secret, which
+            # is for browser apps like the netbird dashboard.
+            grafana = {
+              displayName = "Grafana";
+              # Exactly what grafana derives from its root_url. kanidm matches
+              # redirect URIs strictly — the netbird dashboard needed its
+              # callbacks moved off hash routes for this same reason.
+              originUrl = ["https://grafana.lvdar.nl/login/generic_oauth"];
+              originLanding = "https://grafana.lvdar.nl";
+              basicSecretFile = config.sops.secrets."keys/grafana/oauth-client-secret".path;
+              # Grafana looks up the account by preferred_username.
+              preferShortUsername = true;
+              scopeMaps.grafana-users = ["openid" "profile" "email"];
+              claimMaps.grafana_role = {
+                joinType = "array";
+                valuesByGroup = {
+                  grafana-users = ["Viewer"];
+                  grafana-admin = ["Admin"];
+                };
               };
             };
 
