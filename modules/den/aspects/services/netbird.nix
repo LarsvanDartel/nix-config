@@ -26,12 +26,45 @@
   den.aspects.services.netbird.client.nixos = {
     config,
     lib,
+    pkgs,
     ...
   }: let
-    inherit (lib.options) mkOption;
+    inherit (lib.options) mkOption mkEnableOption;
     inherit (lib.types) enum listOf port str;
 
     cfg = config.cosmos.services.netbird;
+
+    # See the long comment at the unit for what this is defending against.
+    aclWatchdog = pkgs.writeShellApplication {
+      name = "netbird-acl-watchdog";
+      runtimeInputs = with pkgs; [nftables systemd gnugrep];
+      text = ''
+        chain="netbird-acl-input-rules"
+
+        # If the table is absent entirely the agent is not up yet — starting,
+        # stopped, or mid-restart. That is not the decay this is looking for,
+        # and restarting into it would just fight whatever is already
+        # happening.
+        if ! rules="$(nft list chain ip netbird "$chain" 2>/dev/null)"; then
+          echo "netbird-acl-watchdog: no $chain yet, nothing to judge"
+          exit 0
+        fi
+
+        # The two rules the management policy contributes. Per-service rules
+        # always carry a dport, so testing for an accept *without* one is what
+        # distinguishes "the Default policy is applied" from "only the reverse
+        # proxy's rules survived".
+        if grep -q 'ct state established,related.*accept' <<<"$rules" \
+          && grep -qE 'ip saddr @nb[0-9]+ accept$' <<<"$rules"; then
+          exit 0
+        fi
+
+        echo "netbird-acl-watchdog: mesh ACLs have decayed to per-service rules only; restarting the agent"
+        echo "--- ruleset before restart ---"
+        echo "$rules"
+        systemctl restart ${config.services.netbird.clients.default.suffixedName}.service
+      '';
+    };
 
     # `url.URL` carries no custom JSON marshalling, so netbird's config.json
     # stores it as the expanded Go struct rather than a string. Absent fields
@@ -120,6 +153,8 @@
             edge then targets each app's own port instead of a local vhost.
           '';
         };
+
+        aclWatchdog = mkEnableOption "restarting the agent when its mesh ACLs decay" // {default = true;};
       };
     };
 
@@ -161,6 +196,58 @@
         environment =
           lib.mkIf config.services.displayManager.enable
           {XDG_CURRENT_DESKTOP = "netbird-has-a-browser";};
+      };
+
+      # Watchdog for an agent bug that has now cost two outages, both on gaia,
+      # both at ~12 days of uptime.
+      #
+      # The agent programs its own nftables table (`ip netbird`), whose input
+      # path is a jump into netbird-acl-input-rules followed by a catch-all
+      # `iifname "wt0" drop`. A healthy ruleset starts with two entries that
+      # come from the management policy rather than from any published service:
+      #
+      #   ct state established,related accept
+      #   ip saddr @nb0000001 accept          <- the "All -> All" Default policy
+      #
+      # Both silently disappear over time. What is left is only the per-service
+      # rules the reverse proxy generated, so the host keeps answering the two
+      # published ports and drops everything else — ICMP, SSH, Prometheus
+      # scrapes. It presents as "the host is up and serving the internet but is
+      # not on the mesh", and `netbird status` still cheerfully reports
+      # Connected/P2P because the WireGuard session really is fine.
+      #
+      # The management policy is not at fault: the API returns the Default
+      # policy enabled, bidirectional, all protocols, All -> All, throughout.
+      # Only the local translation of it rots, and restarting the agent
+      # reinstates it immediately. netbird 0.74.3, which is what nixpkgs has.
+      #
+      # So this restarts the agent when, and only when, the symptom is present.
+      # Deliberately not a periodic preemptive restart: that would hide how
+      # often this happens, and the journal line below is the only evidence
+      # anyone will ever have of the real frequency.
+      systemd.services.netbird-acl-watchdog = lib.mkIf cfg.client.aclWatchdog {
+        description = "Restart the NetBird agent if its mesh ACLs have decayed";
+        # No wantedBy: timer-driven only. A oneshot that fails during
+        # activation makes switch-to-configuration fail, which deploy-rs turns
+        # into a rollback.
+        serviceConfig = {
+          Type = "oneshot";
+          ExecStart = lib.getExe aclWatchdog;
+        };
+      };
+
+      systemd.timers.netbird-acl-watchdog = lib.mkIf cfg.client.aclWatchdog {
+        description = "Periodic NetBird mesh ACL check";
+        wantedBy = ["timers.target"];
+        timerConfig = {
+          # Fifteen minutes bounds the blackout at something shorter than the
+          # 5m HostDown alert plus the time it takes to read a phone. Cheap:
+          # one nft invocation that touches no network.
+          OnBootSec = "5m";
+          OnUnitActiveSec = "15m";
+          RandomizedDelaySec = "2m";
+          Unit = "netbird-acl-watchdog.service";
+        };
       };
 
       cosmos.system.impermanence.persist.directories = [
