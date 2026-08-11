@@ -143,6 +143,25 @@
         docs = shared 9980;
         wopi = shared 9300;
 
+        # The status page, ungated for the same reason as ntfy and then some.
+        # Gating it would put kanidm in front — and kanidm runs on endeavour,
+        # so a page whose entire job is to tell you endeavour is down would
+        # itself be unreachable exactly then. A status page that shares a
+        # failure domain with the things it watches is decoration.
+        #
+        # The disclosure is small and already public: it names services whose
+        # domains resolve in public DNS anyway, and says up or down. It does
+        # not expose the services themselves — the gated ones stay gated.
+        status = {
+          bearerAuth.enable = false;
+          targets = [
+            {
+              port = 8085;
+              peer = "gaia";
+            }
+          ];
+        };
+
         # The alert sink. Ungated deliberately: the ntfy app authenticates
         # with a username and password and cannot complete an interactive
         # browser login, and gating it would also make the one service you
