@@ -648,7 +648,16 @@
                   pass_host_header: (.pass_host_header // false),
                   crowdsec: (.access_restrictions.crowdsec_mode // "off"),
                   bearer_enabled: (.auth.bearer_auth.enabled // false),
-                  bearer_groups: ((.auth.bearer_auth.distribution_groups // []) | sort),
+                  # Only meaningful when the check is on. With bearer auth off
+                  # the API stores [""] while we send the resolved id, so
+                  # comparing them made every ungated service look changed
+                  # forever — which was eleven of nineteen.
+                  bearer_groups: (
+                    if (.auth.bearer_auth.enabled // false)
+                    then ((.auth.bearer_auth.distribution_groups // [])
+                          | map(select(. != null and . != "")) | sort)
+                    else [] end
+                  ),
                   targets: ([.targets[] | {port, protocol, target_type, target_id}]
                             | sort_by(.target_id, .port))
                 }; n'
