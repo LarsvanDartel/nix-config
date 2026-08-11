@@ -156,6 +156,15 @@
           ];
         };
 
+        # Ungated, because grafana does its own kanidm OIDC. Gating it as
+        # well would mean logging in twice, and worse: the gate answers a
+        # lapsed session with a 302 to the IdP, which grafana's XHR calls
+        # cannot follow — the NetworkError that took traccar down.
+        grafana = {
+          bearerAuth.enable = false;
+          targets = endeavour 3000;
+        };
+
         # Public, and unauthenticated by design.
         typstnique = {
           bearerAuth.enable = false;
