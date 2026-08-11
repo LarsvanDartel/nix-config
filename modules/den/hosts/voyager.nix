@@ -25,6 +25,10 @@
       desktop.keyd
       services.containers
       services.netbird.client
+      # Ships its journal to loki. Not node-exporter: a laptop that sleeps
+      # would sit permanently "target down". Logs have no such problem —
+      # they simply stop and resume.
+      services.alloy
       hardware.fingerprint
       hardware.thinkpad
       hardware.v4l2loopback

@@ -48,6 +48,8 @@
       services.transcode
       services.prometheus
       services.grafana
+      services.loki
+      services.alloy
     ];
 
     nixos = {
