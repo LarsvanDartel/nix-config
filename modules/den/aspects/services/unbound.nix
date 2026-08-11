@@ -60,7 +60,7 @@
 
         resolver = mkOption {
           type = str;
-          default = "127.0.0.1@5053";
+          default = "127.0.0.1@15353";
           description = ''
             Where the local NetBird client answers mesh queries, in unbound's
             IP@port form. Must match cosmos.services.netbird.client
