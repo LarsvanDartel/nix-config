@@ -12,5 +12,10 @@
     core.yubikey
     core.ssh
     core.sops
+    # Observability floor. Both are cheap enough for the Pi and useful on a
+    # laptop, so they sit here rather than in roles.server: a bounded journal
+    # is wanted everywhere, and a unit failing unnoticed is bad everywhere.
+    core.journald
+    core.notify-failure
   ];
 }
