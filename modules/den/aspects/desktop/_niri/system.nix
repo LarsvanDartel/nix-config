@@ -179,6 +179,29 @@
           "Mod+Ctrl+K".set-window-height = "-10%";
           "Mod+Ctrl+J".set-window-height = "+10%";
 
+          # Put more than one window in a column — niri's answer to both
+          # "split vertically" and "stack", which are the same thing here:
+          # a column holding several windows, drawn either shared or tabbed.
+          # Nothing above can create that state, so without these the
+          # focus-window-up/down and move-window-up/down binds are
+          # unreachable in practice.
+          #
+          # Not Mod+BracketLeft/Right as upstream niri binds them. On
+          # Programmer Dvorak the brackets sit on the number row — [ at the
+          # physical 2 key, ] at the physical 0 — where the workspace binds
+          # below already live, so those would collide.
+          #
+          # Comma and Period are adjacent on dvp's top letter row (";,.pyf"),
+          # left hand, and free. They are also what the niri docs use for this
+          # action, so what is written there matches what is bound here.
+          "Mod+Comma".consume-or-expel-window-left = _: {};
+          "Mod+Period".consume-or-expel-window-right = _: {};
+
+          # Flip that column between tabbed and shared. `default-column-display`
+          # above is "tabbed", so a new column stacks; this is how to get an
+          # actual vertical split for the one column that wants it.
+          "Mod+W".toggle-column-tabbed-display = _: {};
+
           # Power menu / lock
           "Mod+Escape".spawn-sh = noctalia "sessionMenu" "toggle";
           "Mod+Shift+Escape".spawn-sh = noctalia "lockScreen" "lock";
