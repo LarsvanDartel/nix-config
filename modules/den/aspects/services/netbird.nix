@@ -148,9 +148,20 @@
       # manager there is a browser to send the login to, and PKCE — which
       # management fills from the discovery document at startup — is the flow
       # that actually works.
-      systemd.services.${config.services.netbird.clients.default.suffixedName}.environment =
-        lib.mkIf config.services.displayManager.enable
-        {XDG_CURRENT_DESKTOP = "netbird-has-a-browser";};
+      # One block, because a dynamic attribute path cannot be split across
+      # several definitions the way a static one can.
+      systemd.services.${config.services.netbird.clients.default.suffixedName} = {
+        # Move the agent when its resolver address changes. That address lives
+        # in config.json, written by a pre-start script, so the unit itself is
+        # identical either way and switch-to-configuration would leave the old
+        # process running — still holding :53, which is exactly the port
+        # unbound is about to want.
+        restartTriggers = [cfg.client.dnsResolverAddress];
+
+        environment =
+          lib.mkIf config.services.displayManager.enable
+          {XDG_CURRENT_DESKTOP = "netbird-has-a-browser";};
+      };
 
       cosmos.system.impermanence.persist.directories = [
         {
