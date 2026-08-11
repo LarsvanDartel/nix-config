@@ -130,7 +130,17 @@
             # validator rejects every forwarded answer as bogus and the whole
             # zone SERVFAILs — which looks exactly like the resolver being
             # down.
-            server.domain-insecure = netbird.dnsDomain;
+            server = {
+              domain-insecure = netbird.dnsDomain;
+
+              # Unbound refuses to send queries to loopback by default
+              # (do-not-query-localhost defaults to yes), so the forward-zone
+              # below is silently skipped and the whole mesh zone SERVFAILs
+              # while the target answers perfectly when queried by hand. The
+              # protection is against resolving via a local recursor by
+              # accident; here loopback is exactly where the answer lives.
+              do-not-query-localhost = "no";
+            };
 
             forward-zone = [
               {
