@@ -637,14 +637,26 @@
               # hammered on /.well-known/openid-configuration, which is a long
               # way from the thing that caused it.
               #
-              # Compared against the same projection that was sent, so fields
-              # the API adds (id, meta, proxy_cluster, port_auto_assigned) do
-              # not read as drift and cause a write every run.
-              current="$(jq -c --arg n "$name" --argjson want "$svc" \
-                '.[] | select(.name == $n) | with_entries(select(.key | IN($want | keys[])))' \
-                <<<"$existing")"
+              # Both sides through the same normaliser. A projection of the
+              # top-level keys alone is not enough: the API also decorates
+              # each *target* with `host` and `options`, and reports an unset
+              # listen_port as 0 rather than null — so a naive compare finds
+              # drift in everything and writes every run anyway.
+              norm='def n: {
+                  name, domain, mode, enabled,
+                  listen_port: (.listen_port // 0),
+                  pass_host_header: (.pass_host_header // false),
+                  crowdsec: (.access_restrictions.crowdsec_mode // "off"),
+                  bearer_enabled: (.auth.bearer_auth.enabled // false),
+                  bearer_groups: ((.auth.bearer_auth.distribution_groups // []) | sort),
+                  targets: ([.targets[] | {port, protocol, target_type, target_id}]
+                            | sort_by(.target_id, .port))
+                }; n'
 
-              if [ "$(jq -cS . <<<"$current")" = "$(jq -cS . <<<"$svc")" ]; then
+              current="$(jq -cS --arg n "$name" "[.[] | select(.name == \$n)][0] | $norm" <<<"$existing")"
+              wanted="$(jq -cS "$norm" <<<"$svc")"
+
+              if [ "$current" = "$wanted" ]; then
                 continue
               fi
 
