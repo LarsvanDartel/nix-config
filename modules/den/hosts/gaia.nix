@@ -66,6 +66,12 @@
         upstream = "https://100.68.151.172:8443";
       };
 
+      # Every peer resolves through endeavour's unbound, which already carries
+      # the oisd blocklist — so ad-blocking DNS follows a roaming laptop or
+      # phone around instead of stopping at the front door. Its mesh address is
+      # looked up at reconcile time, not written here.
+      cosmos.services.netbird.dnsPeer = "endeavour";
+
       # Peers reachable with `netbird ssh <peer>`. Names, not ids, resolved by
       # the reconciler like everything else here. panther is somebody's phone,
       # which has no shell to offer.
