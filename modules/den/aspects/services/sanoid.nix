@@ -26,6 +26,14 @@
 # Cheap on copy-on-write: a snapshot costs nothing at creation and grows only
 # as the live data diverges. On a mostly-append media library that is close to
 # free, which is why the retention here is generous.
+#
+# On the delegation, because it looks broken twice over and is not. The nixpkgs
+# module runs the service as a DynamicUser named `sanoid`, grants it
+# snapshot,mount,destroy in ExecStartPre and revokes it in ExecStopPost. So
+# `zfs allow tank/media` prints nothing once the run has finished — that is the
+# revoke, not a failure — and `zfs allow sanoid ...` typed by hand fails with
+# "invalid user/group sanoid", because the user only exists while the unit is
+# active. Inside the unit it resolves and both ExecStartPre commands exit 0.
 {...}: {
   den.aspects.services.sanoid = {
     nixos = {
@@ -60,7 +68,19 @@
             };
           };
           description = ''
-            Datasets to snapshot, mapped to their retention counts.
+            Datasets to snapshot, mapped to how long each period is kept.
+
+            These are **durations, not counts**, which is the single easiest
+            thing to misread here. sanoid prunes on a snapshot's real ctime
+            against `now - value * period` (sanoid line 354), so `hourly = 24`
+            means "keep hourly snapshots for 24 hours", not "keep 24 of them".
+            The two coincide only while snapshots are actually taken once per
+            period; take them more often and you keep more than the number
+            suggests, less often and you keep fewer.
+
+            The practical consequence is that nothing is pruned until a
+            snapshot is genuinely older than its window — a fresh deploy looks
+            like pruning is broken for the first `hourly` hours, and is not.
 
             Deliberately not `tank` itself. Snapshotting the pool root with
             `recursive` would also snapshot tank/media, and every file would be
