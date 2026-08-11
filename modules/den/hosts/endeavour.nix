@@ -50,6 +50,10 @@
       services.grafana
       services.loki
       services.alloy
+      services.sanoid
+      services.smartd
+      services.zed
+      services.attic
     ];
 
     nixos = {
