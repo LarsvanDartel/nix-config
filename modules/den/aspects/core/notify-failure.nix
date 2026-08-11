@@ -40,7 +40,13 @@
         # The last few lines are what makes the notification actionable rather
         # than just alarming. Trimmed hard: ntfy renders a message, not a log
         # viewer, and the full journal of a crash loop is unreadable on a phone.
-        body="$(systemctl status --no-pager --lines=15 "$unit" 2>&1 | head -c 3000)"
+        #
+        # `|| true` is load-bearing. `systemctl status` exits 3 for a unit that
+        # is dead or failed — which is every unit this will ever be called for
+        # — and writeShellApplication runs under `set -euo pipefail`, so
+        # without it the notifier aborts before sending and the alert is lost.
+        # It passed a hand test only because the unit under test was running.
+        body="$( { systemctl status --no-pager --lines=15 "$unit" || true; } 2>&1 | head -c 3000 )"
 
         # --max-time so a hung edge cannot wedge the unit, and no --fail-early
         # retry storm: one attempt, and the failure itself lands in the journal.

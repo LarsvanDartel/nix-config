@@ -1,6 +1,12 @@
 # roles.server — headless baseline (was flake.modules.nixos.server in
 # modules/nixos/profiles/server.nix). Included by server hosts.
-{...}: {
+{den, ...}: {
+  # Server-only, deliberately not in roles.default. A push notification per
+  # failed unit is what you want for a machine nobody is sitting at; on a
+  # laptop the failures are mostly yours, you are already looking at the
+  # screen, and suspend/resume churn would make it noise.
+  den.aspects.roles.server.includes = [den.aspects.core.notify-failure];
+
   den.aspects.roles.server.nixos = {lib, ...}: {
     cosmos.user.name = "nixos";
 
