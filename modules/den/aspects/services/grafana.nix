@@ -34,7 +34,7 @@
       # and it breaks silently when the metric names it assumes change. This is
       # small enough to read, and covers what the alert rules alert on — so
       # when a notification arrives there is a graph for it.
-      fleetDashboard = pkgs.writeText "fleet.json" (builtins.toJSON {
+      fleetJson = pkgs.writeText "fleet.json" (builtins.toJSON {
         title = "Fleet";
         uid = "fleet";
         timezone = "browser";
@@ -102,6 +102,11 @@
             })
         ];
       });
+
+      dashboardDir = pkgs.runCommand "grafana-dashboards" {} ''
+        mkdir -p $out
+        cp ${fleetJson} $out/fleet.json
+      '';
     in {
       options.cosmos.services.grafana = {
         port = mkOption {
@@ -218,7 +223,10 @@
             dashboards.settings.providers = [
               {
                 name = "fleet";
-                options.path = fleetDashboard;
+                # A directory, not the .json itself. Grafana's file provider
+                # watches a folder; handed a file it logs "error watching
+                # folder" and the dashboard silently never appears.
+                options.path = dashboardDir;
                 # Provisioned dashboards are read-only in the UI, which is the
                 # point: an edit made in the browser would be silently reverted
                 # on the next deploy, so better it cannot be made.
