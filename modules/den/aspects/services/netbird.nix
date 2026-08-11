@@ -914,6 +914,27 @@
               DataStoreEncryptionKey._secret =
                 config.sops.secrets."keys/netbird/datastore-encryption-key".path;
 
+              # Cache the IdP's signing keys instead of re-fetching them.
+              #
+              # nixpkgs hardcodes this true, which makes management re-read
+              # kanidm's discovery document on *every* token validation rather
+              # than once. netbird-proxy calls management about twice a second,
+              # so that was ~170k pointless HTTPS round trips a day — each one
+              # leaving gaia, resolving auth.lvdar.nl to gaia's own public
+              # address, coming back through the edge and over the mesh to
+              # kanidm on endeavour, which logged two lines for each.
+              #
+              # It presented as "kanidm is being spammed", three components
+              # away from the cause: the fetcher was netbird-mgmt, the trigger
+              # was netbird-proxy, and the reason was this flag.
+              #
+              # The setting exists for IdPs that rotate signing keys often.
+              # kanidm does not, and management re-reads them on restart —
+              # which a deploy does. The residual risk is a kanidm key
+              # rotation between restarts; that would show up as token
+              # validation failing, not as anything silent.
+              HttpConfig.IdpSignKeyRefreshEnabled = false;
+
               # Signs time-based TURN credentials. The module's default is a
               # literal placeholder, which lands world-readable in the store and
               # (rightly) warns — and this flake builds with abort-on-warn.
