@@ -24,6 +24,8 @@
       services.crowdsec
       services.ntfy
       services.unbound
+      services.gatus
+      services.alloy
     ];
 
     nixos = {...}: {
