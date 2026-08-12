@@ -314,6 +314,12 @@
         # against ATProto identity.
         knot = shared 5555;
 
+        # The knot's CI runner. Ungated for the same reason as the knot: the
+        # appview has to reach it to register it and dispatch work, and a
+        # NetBird identity check answers a lapsed session with a redirect to
+        # kanidm, which no service-to-service caller can follow.
+        spindle = shared 6555;
+
         # The ATProto PDS. Ungated for the reason every app-facing service here
         # is: XRPC clients carry their own tokens and a 302 to kanidm is a bare
         # network error to them.
