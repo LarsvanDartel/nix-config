@@ -20,12 +20,18 @@ in {
   den.aspects.core.impermanence.nixos = {
     config,
     lib,
+    utils,
     ...
   }: let
     inherit (lib.attrsets) mapAttrsToList filterAttrs;
     inherit (lib.strings) concatLines escapeShellArg;
 
     cfg = config.cosmos.system.impermanence;
+
+    # The systemd .device unit for the root device, e.g.
+    # dev-disk-by\x2dlabel-nixos.device. escapeSystemdPath lives in NixOS's
+    # `utils`, not in lib.
+    rootDeviceUnit = "${utils.escapeSystemdPath cfg.device}.device";
   in {
     imports = [inputs.impermanence.nixosModules.impermanence];
 
@@ -37,7 +43,24 @@ in {
       boot.initrd.systemd.services.rollback = {
         description = "Roll back BTRFS root subvolume to a blank snapshot";
         wantedBy = ["initrd.target"];
-        after = ["systemd-cryptsetup@${builtins.baseNameOf cfg.device}.service"];
+        # Wait for the device to actually exist, not merely for cryptsetup to
+        # have run. The cryptsetup ordering alone is enough on a LUKS host,
+        # where the mapper node appears with the service — but it names a unit
+        # that does not exist at all on gaia, whose root is a plain partition.
+        # There the script raced udev and lost:
+        #
+        #   mount: /btrfs_tmp: special device /dev/disk/by-label/nixos does not
+        #   exist.
+        #
+        # which is the *second* failure this unit produced, uncovered only once
+        # `-t btrfs` let it get far enough to try. Requiring the .device unit
+        # covers both shapes: a by-label symlink appears when udev settles, a
+        # mapper node when cryptsetup opens it.
+        after = [
+          "systemd-cryptsetup@${builtins.baseNameOf cfg.device}.service"
+          rootDeviceUnit
+        ];
+        requires = [rootDeviceUnit];
         before = ["sysroot.mount"];
         unitConfig.DefaultDependencies = "no";
         serviceConfig = {
