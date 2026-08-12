@@ -47,7 +47,14 @@ in {
         };
         script = ''
           mkdir -p /btrfs_tmp
-          mount -o subvol=/ ${cfg.device} /btrfs_tmp
+          # -t btrfs is load-bearing. Without it the initrd cannot probe the
+          # type (no blkid in this environment), the mount fails, and because
+          # DefaultDependencies=no means nothing orders itself after this unit,
+          # the boot carries on happily *without* wiping the root subvolume.
+          # This silently disabled impermanence on every host in the fleet
+          # between March and August 2026: a machine that fails to wipe itself
+          # looks exactly like one that works.
+          mount -t btrfs -o subvol=/ ${cfg.device} /btrfs_tmp
           if [[ -e /btrfs_tmp/root ]]; then
               mkdir -p /btrfs_tmp/old_roots
               timestamp=$(date --date="@$(stat -c %Y /btrfs_tmp/root)" "+%Y-%m-%d_%H:%M:%S")
@@ -60,10 +67,38 @@ in {
               done
               btrfs subvolume delete "$1"
           }
-          for i in $(find /btrfs_tmp/old_roots/ -maxdepth 1 -mtime +30); do
+          # -mindepth 1 is equally load-bearing: find reports its own starting
+          # point at depth 0, so without it a stale old_roots/ matches itself
+          # once its own mtime passes 30 days. The recursion would then delete
+          # every old root and finally call `btrfs subvolume delete` on
+          # old_roots/, which is a plain directory — that fails, and it fails
+          # *after* root has been moved aside and *before* the replacement is
+          # created, leaving nothing for sysroot.mount to find.
+          #
+          # Harmless while this ran every boot, because each boot refreshed
+          # old_roots' mtime. Repairing the mount above without also fixing
+          # this would have turned the first successful rollback into an
+          # unbootable machine on precisely the hosts that needed it most.
+          for i in $(find /btrfs_tmp/old_roots/ -mindepth 1 -maxdepth 1 -mtime +30); do
               delete_subvolumes_recursively "$i"
           done
           btrfs subvolume create /btrfs_tmp/root
+
+          # Carry the machine identity across the wipe. systemd generates a
+          # fresh machine-id when /etc/machine-id is missing, and journald keys
+          # its storage on it — so without this every boot would start a new
+          # /var/log/journal/<id>/, leaving the previous logs on the persisted
+          # disk but invisible to journalctl, forever.
+          #
+          # Seeded here rather than through impermanence's `files`, which
+          # refuses to bind-mount over the machine-id systemd has already
+          # created and fails activation outright. persist is a top-level
+          # subvolume, so it is readable from here without a second mount.
+          if [[ -f /btrfs_tmp/persist/etc/machine-id ]]; then
+              mkdir -p /btrfs_tmp/root/etc
+              cp /btrfs_tmp/persist/etc/machine-id /btrfs_tmp/root/etc/machine-id
+          fi
+
           umount /btrfs_tmp
         '';
       };
