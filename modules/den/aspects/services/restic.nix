@@ -145,7 +145,12 @@
 
         quiesceServices = mkOption {
           type = listOf str;
-          default = ["traccar.service" "knot.service" "minecraft-server-smp.service"];
+          default = [
+            "traccar.service"
+            "knot.service"
+            "minecraft-server-smp.service"
+            "minecraft-server-hardcore.service"
+          ];
           description = ''
             Units stopped for the duration of the run and started again after.
 

@@ -381,6 +381,19 @@
           targets = endeavour 25565;
         };
 
+        # The second world. Its own listen port because L4 routes by port and
+        # nothing else — the domain here is inert, so both Minecraft services
+        # would be indistinguishable on 25565. Players reach this one as
+        # minecraft.lvdar.nl:25566 unless an SRV record is added; see the
+        # comment on the server in hosts/endeavour.nix.
+        minecraft-hardcore = {
+          domain = "minecraft-hardcore.lvdar.nl";
+          mode = "tcp";
+          listenPort = 25566;
+          bearerAuth.enable = false;
+          targets = endeavour 25566;
+        };
+
         suwayomi.targets = endeavour 8080;
         sabnzbd.targets = endeavour 6336;
 
