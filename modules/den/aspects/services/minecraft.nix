@@ -255,6 +255,35 @@
           '';
           type = attrsOf (submodule {
             options = {
+              deferRestart = mkOption {
+                type = bool;
+                default = false;
+                description = ''
+                  Stage configuration changes instead of applying them: deploy
+                  writes the new unit, and the running server keeps its old
+                  settings until it next stops on its own.
+
+                  For changing settings while people are playing. Most of
+                  server.properties is only read at startup, so there is no way
+                  to apply it live — but there is a difference between "takes
+                  effect at the next restart" and "disconnects everyone now",
+                  and on a hardcore world that difference can be someone's run.
+                  The next restart is usually the 02:00 restic quiesce, which
+                  was going to happen anyway.
+
+                  Upstream's `enableReload` looks like the option for this and
+                  is not: its ExecReload runs ExecStopPost then ExecStartPre,
+                  which deletes and recreates the managed files — including the
+                  mods symlink — underneath a live JVM, and still would not
+                  apply a startup-only property.
+
+                  Turn it back off once the change has landed. Left on, it
+                  makes every future edit to this server silently not take
+                  effect, which is exactly the kind of quiet divergence between
+                  the repo and reality this fleet is built to avoid.
+                '';
+              };
+
               port = mkOption {
                 type = port;
                 default = 25565;
@@ -456,11 +485,18 @@
             cfg.servers;
         };
 
-        systemd.services = mapAttrs' (name: _:
+        systemd.services = mapAttrs' (name: s:
           nameValuePair "minecraft-server-${name}" {
             serviceConfig.ExecStartPre =
               lib.mkIf cfg.requireMountedDataDir
               [(lib.getExe mountGuard)];
+
+            # mkForce because upstream already defines this as
+            # `!conf.enableReload`, and two plain definitions of the same
+            # option conflict. Nested inside an attribute rather than at the
+            # top of the aspect body, which is where a mkForce recurses under
+            # facter — see the comment in hosts/pioneer.nix.
+            restartIfChanged = lib.mkForce (!s.deferRestart);
           })
         cfg.servers;
 
