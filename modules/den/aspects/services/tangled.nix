@@ -95,7 +95,12 @@
       };
 
       config = {
-        sops.secrets."keys/tangled/knot-env" = {};
+        # No sops secret and no environmentFile. The module sets every KNOT_*
+        # variable from its own options, and this version has no
+        # KNOT_SERVER_SECRET — registration is proved by the owner DID plus the
+        # `verify` button on tangled.org/settings/knots, not by a shared secret.
+        # An env file was planned here and dropped once that turned out to be
+        # true; if a future release reintroduces one, this is where it goes.
 
         # The module points the git user's home at stateDir and creates it, but
         # the parent has to exist on the pool first — same shape as loki.nix.
@@ -112,9 +117,6 @@
             hostname = cfg.hostname;
             listenAddr = "0.0.0.0:${toString cfg.port}";
           };
-
-          # KNOT_SERVER_SECRET lives here rather than in the store.
-          environmentFile = config.sops.secrets."keys/tangled/knot-env".path;
 
           # sshd already opens 22 and 2222 for the whole fleet, and the mesh
           # exposure below is what actually matters. Letting this module also

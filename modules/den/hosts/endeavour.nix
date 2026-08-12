@@ -55,6 +55,7 @@
       services.zed
       services.attic
       services.restic
+      services.tangled
       services.pds
     ];
 
@@ -95,6 +96,11 @@
       #
       # Defaults are what this host wants: legacy = false gives efiSupport and
       # canTouchEfiVariables, and grub-device = null becomes device = "nodev".
+
+      # The DID of @lvdar.nl, the account on this host's own PDS. The knot is
+      # owned by an identity we host rather than one Bluesky hosts, which is
+      # the whole reason the PDS went in first.
+      cosmos.services.tangled.owner = "did:plc:wj6rsizbzc7fruoopsxg2k2a";
 
       networking.hostId = "b8433556";
 

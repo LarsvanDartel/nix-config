@@ -40,6 +40,20 @@
         }
         inputs.disko.nixosModules.disko
         ./_hw/gaia/disko.nix
+        ({lib, ...}: {
+          # Public :22 belongs to the knot on endeavour now (netbird.services
+          # knot-ssh, below), and netbird-proxy cannot bind a port sshd is
+          # already holding. Administration moves to :2222, which core/ssh.nix
+          # has provided on every host from the start and which deploy-rs has
+          # used for every deploy today — so this removes a second door rather
+          # than the only one.
+          #
+          # Inside `imports` rather than the aspect body: a mkForce at the top
+          # level recurses when combined with facter, because den unwraps
+          # priority wrappers to classify content and forces the definition too
+          # early. hosts/pioneer.nix documents the same trap.
+          services.openssh.ports = lib.mkForce [2222];
+        })
       ];
 
       cosmos.system = {
@@ -244,6 +258,13 @@
         immich = shared 2283;
         seerr = shared 4055;
 
+        # The tangled knot's HTTP half. Ungated: git clients send basic auth or
+        # nothing at all and cannot complete an interactive IdP redirect, the
+        # same constraint that keeps the *arr suite's API consumers working.
+        # Public read is public by intent; writes are authenticated by the knot
+        # against ATProto identity.
+        knot = shared 5555;
+
         # The ATProto PDS. Ungated for the reason every app-facing service here
         # is: XRPC clients carry their own tokens and a 302 to kanidm is a bare
         # network error to them.
@@ -272,6 +293,28 @@
           listenPort = 5055;
           bearerAuth.enable = false;
           targets = endeavour 5055;
+        };
+
+        # git over SSH for the knot. L4 for the same reason as traccar-osmand:
+        # this is the SSH wire protocol, so there is no TLS to terminate and no
+        # HTTP for CrowdSec to judge.
+        #
+        # Two things here are load-bearing and neither is obvious:
+        #
+        #   listenPort 22  because `git@knot.lvdar.nl:owner/repo` has nowhere to
+        #     put a port. Freeing :22 on this host is what the sshd override
+        #     above is for.
+        #   targets :2222  and NOT :22. NetBird's agent redirects <mesh-ip>:22
+        #     to its own embedded SSH server, so forwarding to :22 would hand
+        #     every git push to that instead of endeavour's OpenSSH — a
+        #     different host key and "Permission denied (password)".
+        #     core/ssh.nix explains why :2222 exists; this is what it is for.
+        knot-ssh = {
+          domain = "knot.lvdar.nl";
+          mode = "tcp";
+          listenPort = 22;
+          bearerAuth.enable = false;
+          targets = endeavour 2222;
         };
 
         suwayomi.targets = endeavour 8080;
