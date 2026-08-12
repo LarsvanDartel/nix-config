@@ -1291,6 +1291,18 @@
               NB_PROXY_ACME_CHALLENGE_TYPE = "tls-alpn-01";
               NB_PROXY_CERTIFICATE_DIRECTORY = "/var/lib/netbird-proxy/certs";
               NB_PROXY_GEO_DATA_DIR = "/var/lib/netbird-proxy/geolocation";
+              # The embedded NetBird client writes its firewall and DNS state
+              # here. It defaults to /var/lib/netbird, which this service cannot
+              # write to — ProtectSystem=strict makes everything outside its own
+              # StateDirectory read-only — so it logged a failure every ten
+              # seconds (109k of them since 30 July) and re-derived that state on
+              # every restart instead of resuming it.
+              #
+              # Its own StateDirectory rather than granting write access to
+              # /var/lib/netbird: that one belongs to the netbird agent running
+              # alongside this, and pointing two daemons at one state.json would
+              # trade a loud failure for a quiet one.
+              NB_STATE_DIR = "/var/lib/netbird-proxy";
               # Client IPs would otherwise all read as 127.0.0.1, which would make
               # any CIDR or country restriction meaningless.
               NB_PROXY_PROXY_PROTOCOL = "true";
