@@ -21,6 +21,12 @@
 # That split is the whole reason this is affordable: ~42 GB on a 1 TB box
 # instead of 715 GB.
 #
+# This aspect is included by endeavour and gaia both. The option defaults below
+# describe **endeavour**, because it holds essentially every irreplaceable byte
+# in the fleet and the reasoning above only makes sense next to its values;
+# gaia overrides repository, paths, exclude and quiesceServices in gaia.nix,
+# where the ~146 MB it actually needs is enumerated with its own reasoning.
+#
 # Named for the NASA sample-return craft — it flew through comet Wild 2's coma,
 # caught the grains in aerogel and dropped the capsule in Utah in 2006, which
 # is a backup described as a spacecraft. Genesis had the same job two years
@@ -39,10 +45,14 @@
 #     `command="rclone serve restic --append-only"` trick that would otherwise
 #     give real ransomware protection. Worth revisiting if Hetzner ever opens
 #     23 here.
-{den, ...}: {
+{...}: {
   den.aspects.services.restic = {
-    includes = [den.aspects.services.prometheus];
-
+    # Deliberately no `includes = [services.prometheus]`, though the ResticStale
+    # alert lives there. endeavour includes prometheus in its own right, and
+    # pulling it in from here would land the whole metrics stack on gaia — a
+    # 3.7 GiB VPS that services/prometheus.nix explicitly rules out as a host.
+    # The alert has no instance filter, so it covers whichever hosts export the
+    # timer; the dependency runs alert → backup, not backup → alert.
     nixos = {
       config,
       lib,
@@ -50,7 +60,7 @@
       ...
     }: let
       inherit (lib.options) mkOption;
-      inherit (lib.types) listOf str path;
+      inherit (lib.types) bool listOf str path;
 
       cfg = config.cosmos.services.restic;
 
@@ -121,6 +131,38 @@
           description = "Patterns excluded from every path above.";
         };
 
+        quiesceServices = mkOption {
+          type = listOf str;
+          default = ["traccar.service"];
+          description = ''
+            Units stopped for the duration of the run and started again after.
+
+            For embedded databases with no dump tool. traccar is an H2 store and
+            netbird management a live SQLite one; a file-level copy of either
+            while it is being written is not guaranteed to be a database, it is
+            a database-shaped set of files that may or may not open. Postgres is
+            absent from this list on purpose — it gets a real dump instead, and
+            never has to stop.
+
+            The cost is bounded and paid at 02:00: on gaia this pauses new
+            enrollments and ACL pushes for a few seconds, and pauses nothing
+            else, because the mesh data plane is peer-to-peer WireGuard that
+            does not route through management.
+          '';
+        };
+
+        postgresDump = mkOption {
+          type = bool;
+          default = config.services.postgresql.enable;
+          description = ''
+            Whether to run pg_dumpall before the backup and copy the dump.
+
+            Defaults to whether this host runs postgres at all, so gaia — which
+            does not — gets neither the dump timer nor the persist entry for a
+            directory that would stay empty forever.
+          '';
+        };
+
         schedule = mkOption {
           type = str;
           default = "02:00";
@@ -168,7 +210,7 @@
         # the only real user of this postgres, and its database is the index
         # for the 40 GB of photos backed up alongside it — restoring the blobs
         # without it gives you files nothing can find.
-        services.postgresqlBackup = {
+        services.postgresqlBackup = lib.mkIf cfg.postgresDump {
           enable = true;
           backupAll = true;
           location = pgBackupDir;
@@ -177,23 +219,24 @@
           startAt = "01:30";
         };
 
-        cosmos.system.impermanence.persist.directories = [
-          {
+        cosmos.system.impermanence.persist.directories =
+          lib.optional cfg.postgresDump {
             directory = pgBackupDir;
             user = "postgres";
             group = "postgres";
             mode = "0700";
           }
-          {
-            # restic's cache. Not strictly required — it rebuilds — but
-            # rebuilding it means re-reading index files from the far end, and
-            # on a nightly job that is a slow first run every single night.
-            directory = "/var/cache/restic-backups-stardust";
-            user = "root";
-            group = "root";
-            mode = "0700";
-          }
-        ];
+          ++ [
+            {
+              # restic's cache. Not strictly required — it rebuilds — but
+              # rebuilding it means re-reading index files from the far end, and
+              # on a nightly job that is a slow first run every single night.
+              directory = "/var/cache/restic-backups-stardust";
+              user = "root";
+              group = "root";
+              mode = "0700";
+            }
+          ];
 
         services.restic.backups.stardust = {
           inherit (cfg) repository paths exclude;
@@ -225,16 +268,17 @@
           checkOpts = ["--read-data-subset=5%"];
           runCheck = true;
 
-          # traccar is an embedded H2 database. A file-level copy of a live
-          # .mv.db is not guaranteed consistent, and unlike postgres there is
-          # no dump tool wired up here — so it stops for the few seconds the
-          # copy takes. At 02:00, on a GPS tracker, that is a better trade than
-          # a backup that restores into a corrupt database.
-          backupPrepareCommand = ''
-            ${pkgs.systemd}/bin/systemctl stop traccar.service
+          # See quiesceServices. Cleanup runs whether the backup succeeded or
+          # not, which is the whole reason the stop lives here rather than in a
+          # wrapper — a failed run must not leave the unit down until morning.
+          # null rather than "" when the list is empty: the option is nullOr str
+          # and an empty string still counts as "set", which would have the
+          # module write out a no-op script and wire an ExecStopPost for it.
+          backupPrepareCommand = lib.mkIf (cfg.quiesceServices != []) ''
+            ${pkgs.systemd}/bin/systemctl stop ${lib.escapeShellArgs cfg.quiesceServices}
           '';
-          backupCleanupCommand = ''
-            ${pkgs.systemd}/bin/systemctl start traccar.service
+          backupCleanupCommand = lib.mkIf (cfg.quiesceServices != []) ''
+            ${pkgs.systemd}/bin/systemctl start ${lib.escapeShellArgs cfg.quiesceServices}
           '';
         };
       };
