@@ -128,6 +128,47 @@
         operators = {};
       };
 
+      # The second server, and the thing the comment above warned about: two
+      # servers cannot both have the default port. Upstream's duplicate-port
+      # assertion only inspects servers with openFirewall set, and this aspect
+      # turns that off, so nothing would have caught it at eval — the first
+      # server to start would take 25565 and the second would fail to bind,
+      # trigger its OnFailure notification, and roll the deploy back.
+      #
+      # 25566 is published from gaia as its own L4 service, so the address is
+      # minecraft.lvdar.nl:25566. To drop the port suffix, add a Cloudflare SRV
+      # record `_minecraft._tcp.hardcore.lvdar.nl` → 25566; the Java client
+      # follows SRV, so players would type `hardcore.lvdar.nl`.
+      cosmos.services.minecraft.servers.hardcore = {
+        port = 25566;
+        motd = "lvdar.nl — hardcore";
+        whitelist = {
+          DutchRD = "7239bc30-af4e-482c-9434-7ce3005cb917";
+          PittyPfert = "f2bfe527-e914-4d2b-b72b-3f1708452082";
+        };
+        operators = {};
+
+        serverProperties = {
+          # What actually makes it hardcore. The server locks difficulty to
+          # hard and puts a player who dies into spectator mode rather than
+          # respawning them — on a multiplayer world that is the whole game.
+          hardcore = true;
+
+          # Redundant while hardcore is true, which forces hard regardless, and
+          # set anyway: it is the line that keeps meaning what it says if
+          # hardcore is ever turned off, instead of silently dropping the world
+          # back to normal difficulty.
+          difficulty = "hard";
+
+          # A death is permanent here, so the two settings that quietly undo
+          # that are worth pinning rather than inheriting. Both are already the
+          # vanilla defaults; the point is that a future edit has to be
+          # deliberate.
+          pvp = true;
+          spawn-monsters = true;
+        };
+      };
+
       networking.hostId = "b8433556";
 
       # network-online.target was firing about four seconds before this host
