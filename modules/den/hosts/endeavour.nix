@@ -166,6 +166,13 @@
           # deliberate.
           pvp = true;
           spawn-monsters = true;
+
+          # Off. The default 16-block radius stops anyone who is not an
+          # operator from building near spawn, which is a defence against
+          # strangers griefing the spawn point on a public server — and this
+          # server has an enforced whitelist of two, so it protects nobody and
+          # only gets in the way of the first shelter.
+          spawn-protection = 0;
         };
       };
 
