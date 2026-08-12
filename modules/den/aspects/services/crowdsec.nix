@@ -269,6 +269,32 @@
       systemd.services.crowdsec-firewall-bouncer-register.serviceConfig.DynamicUser =
         lib.mkForce false;
 
+      # Upstream's registration script hard-exits with "Bouncer registered but
+      # API key is not present" whenever crowdsec's database still lists the
+      # bouncer while the key file it refers to has gone. Those two live in
+      # different places — the database under /var/lib/crowdsec/state, the key
+      # under /var/lib/crowdsec-firewall-bouncer-register — so anything that
+      # loses one but not the other wedges the unit permanently, and there is no
+      # branch in the script that recovers.
+      #
+      # Which is exactly what the first working impermanence rollback did on
+      # gaia (2026-08-12): the database survived on /persist, the key did not,
+      # and the firewall bouncer stayed down through every subsequent restart.
+      # Dropping the stale registration lets the script take its "not
+      # registered" branch and mint a fresh key.
+      systemd.services.crowdsec-firewall-bouncer-register.serviceConfig.ExecStartPre = [
+        "-${pkgs.writeShellScript "crowdsec-drop-stale-bouncer" ''
+          key=/var/lib/crowdsec-firewall-bouncer-register/api-key.cred
+          cscli=${config.services.crowdsec.package}/bin/cscli
+          if [[ ! -f "$key" ]] \
+            && "$cscli" bouncers list --output json \
+              | ${lib.getExe pkgs.jq} -e -- 'any(.[]; .name == "crowdsec-firewall-bouncer")' >/dev/null; then
+            echo "registration without a key; dropping it so one can be reissued"
+            "$cscli" bouncers delete crowdsec-firewall-bouncer || true
+          fi
+        ''}"
+      ];
+
       # nixpkgs gives the bouncer `Requires=` on that registration service but
       # no `After=`, which is no ordering at all — systemd starts both at once.
       # On the very first boot the bouncer therefore reaches LoadCredential
