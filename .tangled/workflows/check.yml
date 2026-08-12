@@ -1,0 +1,57 @@
+# The gate that matters: does every host still build?
+#
+# `abort-on-warn = true` turns any nixpkgs or home-manager eval warning into a
+# hard failure, so an upstream deprecation does not degrade this fleet, it
+# breaks it — and without CI the place that happens is a deploy. This moves it
+# to the push.
+#
+# Three hosts, not four. pioneer is aarch64 and endeavour has no binfmt, so
+# neither this host nor the guest can emulate it; see check-pioneer.yml, which
+# tries anyway and is allowed to be red on its own.
+#
+# See lint.yml for what --accept-flake-config and --override-input are doing;
+# both are load-bearing and neither is obvious from reading the command.
+when:
+  - event: ["push", "pull_request"]
+    branch: main
+
+engine: microvm
+image: nixos
+
+dependencies:
+  - git
+
+steps:
+  # Built one at a time rather than in a single invocation: a `nix build` of all
+  # three reports the first failure and abandons the rest, and when the question
+  # is "which host did this break" the answer should not require a second run.
+  #
+  # Substitution comes from attic via the spindle's host-side cache proxy
+  # (services/tangled.nix), so most of this is a download of what voyager
+  # already built rather than a rebuild.
+  - name: build voyager
+    command: |
+      nix build \
+        --accept-flake-config \
+        --no-write-lock-file \
+        --override-input nix-secrets ./.tangled/nix-secrets-stub \
+        --print-build-logs \
+        .#nixosConfigurations.voyager.config.system.build.toplevel
+
+  - name: build endeavour
+    command: |
+      nix build \
+        --accept-flake-config \
+        --no-write-lock-file \
+        --override-input nix-secrets ./.tangled/nix-secrets-stub \
+        --print-build-logs \
+        .#nixosConfigurations.endeavour.config.system.build.toplevel
+
+  - name: build gaia
+    command: |
+      nix build \
+        --accept-flake-config \
+        --no-write-lock-file \
+        --override-input nix-secrets ./.tangled/nix-secrets-stub \
+        --print-build-logs \
+        .#nixosConfigurations.gaia.config.system.build.toplevel
