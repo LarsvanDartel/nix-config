@@ -145,7 +145,14 @@
   # is declared there, and a spindle with no knot to serve is not a
   # configuration this fleet has a use for.
   den.aspects.services.tangled.spindle = {
-    includes = [den.aspects.services.tangled];
+    includes = [
+      den.aspects.services.tangled
+      # For the binary cache below. roles.default already pulls this in on
+      # every host, so this is belt and braces — but the spindle reads the
+      # client's options directly, and a dependency you read should be a
+      # dependency you declare.
+      den.aspects.services.attic.client
+    ];
 
     nixos = {
       config,
@@ -203,6 +210,22 @@
             build misbehaves.
           '';
         };
+
+        workflowTimeout = mkOption {
+          type = str;
+          default = "60m";
+          description = ''
+            Wall clock a single workflow gets, covering the wait for a
+            concurrency slot, image setup and every step in it.
+
+            The module's default is 5 minutes, which is fine for the `go test`
+            pipelines tangled itself runs and is not remotely enough here — a
+            cold `nix build` of this fleet's NixOS systems is tens of minutes
+            even with the cache below. The failure is also an unhelpful one:
+            the workflow is marked `timeout` mid-build, with nothing in the log
+            pointing at configuration.
+          '';
+        };
       };
 
       config = {
@@ -239,6 +262,39 @@
             # discards them at every boot. For scratch that is exactly right;
             # the only reason not to would be space, which diskLimitMiB bounds.
             limits.total.diskMiB = sCfg.diskLimitMiB;
+          };
+
+          pipelines.workflowTimeout = sCfg.workflowTimeout;
+
+          # Let pipelines read from the fleet's own binary cache.
+          #
+          # This looks like it should be impossible: the microVM sandbox
+          # blackholes every RFC 6890 special-use range, which includes the
+          # 100.64.0.0/10 the mesh lives on, precisely so a workflow cannot
+          # reach the host or anything private. It works because the guest does
+          # not connect to the cache at all — the spindle proxies substituter
+          # reads host-side over vsock, and endeavour is where atticd runs.
+          #
+          # Worth having rather than a nicety: a NixOS closure built entirely
+          # from cache.nixos.org is tens of minutes of downloading, and most of
+          # what CI needs has already been built by voyager and pushed here.
+          #
+          # Read from the client aspect's options rather than repeating the URL
+          # and key, which is a rule this repo has broken before — the values
+          # in services/attic.nix are already literals kept in sync by hand
+          # because den cannot read another host's config, and a third copy
+          # would be a third thing to forget.
+          pipelines.nixCache = {
+            readUrls = [config.cosmos.services.attic.client.endpoint];
+            trustedPublicKeys =
+              lib.lists.optional
+              (config.cosmos.services.attic.client.publicKey != null)
+              config.cosmos.services.attic.client.publicKey;
+
+            # uploadUrl deliberately unset. Pushing CI output back into attic
+            # would make the next deploy instant, but it needs a write token,
+            # and a cache that CI can write to is a cache that a bad pipeline
+            # can poison. Worth revisiting once the read path has proven itself.
           };
         };
 
