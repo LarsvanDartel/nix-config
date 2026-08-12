@@ -1,0 +1,45 @@
+# Fast feedback: everything that does not need a host closure built.
+#
+# Split from check.yml deliberately. Workflows in a pipeline run in parallel,
+# so this lands in a couple of minutes while the full build is still going —
+# and a formatting mistake shouldn't take a forty-minute build to report.
+#
+# `deploy-schema` and `deploy-activate` are NOT here, though they look cheap.
+# Both embed the four `activatable-nixos-system-*` store paths with context, so
+# either one drags in every host including aarch64 pioneer. That is also why
+# this file does not simply run `nix flake check`.
+when:
+  - event: ["push", "pull_request"]
+    branch: main
+
+engine: microvm
+image: nixos
+
+dependencies:
+  - git
+
+steps:
+  # Two flags carry all the weight here.
+  #
+  # --accept-flake-config is not boilerplate. `abort-on-warn` lives in the
+  # flake's nixConfig, and a fresh CI user is not trusted to apply it, so
+  # without this flag CI is *laxer* than a developer's machine and silently
+  # stops catching the deprecation-warning failures that are the whole reason
+  # this repo builds the way it does.
+  #
+  # --override-input points the private nix-secrets input at an empty in-repo
+  # flake. Every evaluation forces that input into the store, but sops-nix runs
+  # with validateSopsFiles = false, so nothing ever reads it and a stub
+  # satisfies every check and every build. That is what lets CI hold no
+  # credential at all — see .tangled/nix-secrets-stub/flake.nix.
+  - name: lint and format
+    command: |
+      nix build \
+        --accept-flake-config \
+        --no-write-lock-file \
+        --override-input nix-secrets ./.tangled/nix-secrets-stub \
+        --print-build-logs \
+        .#checks.x86_64-linux.treefmt \
+        .#checks.x86_64-linux.pre-commit \
+        .#checks.x86_64-linux.check-flake-file \
+        .#checks.x86_64-linux.default-shell
