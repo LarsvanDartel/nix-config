@@ -52,14 +52,15 @@
           # `ntfy user list` prints "user alerts (role: user, tier: none)", not
           # a bare name, so anchoring on '^user <name>$' never matched and this
           # always took the `add` branch. That only worked once: every restart
-          # after the account existed died on "user alerts already exists",
-          # which fails ExecStartPost and therefore the unit — and a unit that
-          # fails during activation makes deploy-rs roll the whole deploy back.
+          # after the account existed died on "user alerts already exists".
           # Latent until something restarted ntfy, which a reboot finally did.
           if ntfy user list 2>/dev/null | grep -qE '^user ${cfg.user}( |$)'; then
             ntfy user change-pass ${cfg.user}
           else
-            ntfy user add ${cfg.user}
+            # Still tolerated on failure: if the detection above is ever wrong
+            # again, the account already existing is the harmless case and must
+            # not be what takes the server down.
+            ntfy user add ${cfg.user} || true
           fi
 
           # Read as well as write: the same account is what the phone
@@ -150,7 +151,15 @@
         # StateDirectory; ExecStartPost inherits both, plus the credential.
         systemd.services.ntfy-sh.serviceConfig = {
           LoadCredential = "password:${passwordFile}";
-          ExecStartPost = lib.getExe provision;
+          # The `-` prefix makes systemd ignore this step's exit status. That
+          # is deliberate and worth more than it looks: without it, provisioning
+          # is allowed to kill the notification server, and the notification
+          # server is what every other host reports its failures to. It also
+          # takes the whole host down with it, because a unit that fails during
+          # activation makes deploy-rs roll the entire deploy back — which is
+          # exactly what happened here, leaving gaia undeployable until the
+          # provisioning script was fixed. Alerting must degrade, not cascade.
+          ExecStartPost = "-${lib.getExe provision}";
         };
       };
     };
