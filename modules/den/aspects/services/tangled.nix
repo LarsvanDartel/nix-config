@@ -334,6 +334,34 @@
           };
         };
 
+        # The host half of vsock, which is how the spindle talks to the agent
+        # inside each microVM — and how the binary cache proxy above reaches
+        # the guest without giving it network access to this host.
+        #
+        # Not loaded by default here. The modules that *were* loaded are all
+        # guest-side transports (vsock_loopback, vmw_vsock_*), which is exactly
+        # the sort of thing that makes `lsmod | grep vsock` look reassuring
+        # while the host cannot listen at all. Without this every workflow dies
+        # in setup with
+        #
+        #   listen vsock host(2):10240: bind: cannot assign requested address
+        #
+        # /dev/vhost-vsock existing is not evidence to the contrary; the device
+        # node is there regardless.
+        boot.kernelModules = ["vhost_vsock"];
+
+        # Send finished workflow logs to the local disk store instead of S3.
+        #
+        # The module hardcodes SPINDLE_MILL_ARTIFACT_STORE=s3 with no option to
+        # change it, while also exposing artifactStores.disk.dir — so archiving
+        # always fails here with an AWS credential error, and the appview loses
+        # the logs of any workflow that has finished, because that is exactly
+        # when it switches from tailing the file to reading the artifact store.
+        # mkAfter to land after the module's own list; systemd takes the last
+        # assignment of a repeated Environment= variable.
+        systemd.services.spindle.serviceConfig.Environment =
+          lib.mkAfter ["SPINDLE_MILL_ARTIFACT_STORE=disk"];
+
         # The job database and the tap state. Small, and worth keeping across a
         # rollback so a reboot does not lose the record of what ran.
         cosmos.system.impermanence.persist.directories = [
