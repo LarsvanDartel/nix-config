@@ -30,7 +30,7 @@
     ...
   }: let
     inherit (lib.options) mkOption mkEnableOption;
-    inherit (lib.types) enum listOf port str;
+    inherit (lib.types) enum ints listOf port str;
 
     cfg = config.cosmos.services.netbird;
 
@@ -48,6 +48,21 @@
         if ! rules="$(nft list chain ip netbird "$chain" 2>/dev/null)"; then
           echo "netbird-acl-watchdog: no $chain yet, nothing to judge"
           exit 0
+        fi
+
+        # The chain is legitimately incomplete for a few seconds after the agent
+        # starts, while it re-syncs policy from management. Restarting into that
+        # window would fight the startup it is watching — and because the remedy
+        # here *is* a restart, doing so could loop. Anything under the grace
+        # period is left alone; the timer comes back shortly.
+        active_us="$(systemctl show ${config.services.netbird.clients.default.suffixedName}.service \
+          -p ActiveEnterTimestampMonotonic --value)"
+        if [[ -n "$active_us" && "$active_us" != "0" ]]; then
+          now_us="$(( $(cut -d' ' -f1 /proc/uptime | tr -d '.') * 10000 ))"
+          if (( now_us - active_us < ${toString cfg.client.aclWatchdogGrace} * 1000000 )); then
+            echo "netbird-acl-watchdog: agent started under ${toString cfg.client.aclWatchdogGrace}s ago, still converging"
+            exit 0
+          fi
         fi
 
         # The two rules the management policy contributes. Per-service rules
@@ -155,6 +170,36 @@
         };
 
         aclWatchdog = mkEnableOption "restarting the agent when its mesh ACLs decay" // {default = true;};
+
+        aclWatchdogInterval = mkOption {
+          type = str;
+          default = "2min";
+          description = ''
+            How often to check the ACL chain.
+
+            Was 15 minutes on the theory that decay was rare. It is not: on
+            2026-08-12 the chain decayed on *every* agent restart — three in one
+            afternoon — and each time the mesh was unreachable until this ran.
+            Since the check is one `nft list` that touches no network, the
+            interval is really just a bound on how long the mesh stays down, so
+            it is set to the smallest value that is still obviously free.
+          '';
+        };
+
+        aclWatchdogGrace = mkOption {
+          type = ints.unsigned;
+          default = 90;
+          description = ''
+            Seconds after the agent becomes active during which a decayed chain
+            is tolerated rather than acted on.
+
+            The chain is genuinely incomplete for a few seconds at startup while
+            policy is fetched from management. Without this grace the tighter
+            interval above would catch that window and restart the agent into
+            its own startup — and since the remedy is a restart, that could
+            loop rather than converge.
+          '';
+        };
       };
     };
 
@@ -240,12 +285,15 @@
         description = "Periodic NetBird mesh ACL check";
         wantedBy = ["timers.target"];
         timerConfig = {
-          # Fifteen minutes bounds the blackout at something shorter than the
-          # 5m HostDown alert plus the time it takes to read a phone. Cheap:
-          # one nft invocation that touches no network.
-          OnBootSec = "5m";
-          OnUnitActiveSec = "15m";
-          RandomizedDelaySec = "2m";
+          # The interval is really a bound on how long the mesh stays down after
+          # a decay, so it is short — see aclWatchdogInterval for why 15m turned
+          # out to be far too generous. OnBootSec is smaller than it was for the
+          # same reason: a decay at boot is exactly the case nobody is watching.
+          OnBootSec = "90s";
+          OnUnitActiveSec = cfg.client.aclWatchdogInterval;
+          # No RandomizedDelaySec: there is nothing to spread here — a single
+          # nft read on one host — and the jitter only widened the blackout it
+          # is supposed to bound.
           Unit = "netbird-acl-watchdog.service";
         };
       };
@@ -508,6 +556,17 @@
       # time, and putting one in sops would mean a secret whose only consumer
       # is a service on the same host that could just as well generate it.
       crowdsecKeyFile = "/var/lib/netbird-proxy/crowdsec-bouncer.key";
+
+      # Path component of the OIDC discovery URL, so the bootstrap cache below
+      # can match the one request management makes before it will start. Null if
+      # configEndpoint is not a URL this can parse, which simply leaves the
+      # fallback out rather than generating a broken location.
+      oidcPath = let
+        m = builtins.match "https?://[^/]+(/.*)" cfg.oidc.configEndpoint;
+      in
+        if m == null
+        then null
+        else builtins.head m;
 
       reconcile = pkgs.writeShellApplication {
         name = "netbird-reconcile-services";
@@ -956,20 +1015,29 @@
           "keys/netbird/api-token" = {};
         };
 
-        cosmos.system.impermanence.persist.directories = [
-          {
-            directory = "/var/lib/netbird-mgmt";
-            user = "root";
-            group = "root";
-            mode = "0750";
-          }
-          {
-            directory = "/var/lib/netbird-proxy";
-            user = "root";
-            group = "root";
-            mode = "0750";
-          }
-        ];
+        cosmos.system.impermanence.persist.directories =
+          [
+            {
+              directory = "/var/lib/netbird-mgmt";
+              user = "root";
+              group = "root";
+              mode = "0750";
+            }
+            {
+              directory = "/var/lib/netbird-proxy";
+              user = "root";
+              group = "root";
+              mode = "0750";
+            }
+          ]
+          # The bootstrap cache has to survive the root-subvolume wipe, or
+          # impermanence would discard it on exactly the boots that need it.
+          ++ lib.optional (cfg.oidc.idp.domain != null && oidcPath != null) {
+            directory = "/var/cache/nginx";
+            user = "nginx";
+            group = "nginx";
+            mode = "0700";
+          };
 
         # netbird-mgmt fetches the OIDC discovery document at startup and exits
         # if it cannot. kanidm is published through the very reverse proxy this
@@ -1195,7 +1263,47 @@
                   proxyProtocol = true;
                 }
               ];
-              locations."/".proxyPass = cfg.oidc.idp.upstream;
+              locations =
+                {"/".proxyPass = cfg.oidc.idp.upstream;}
+                // lib.optionalAttrs (oidcPath != null) {
+                  # Breaks a hard bootstrap deadlock that takes the whole ingress
+                  # down on every cold boot:
+                  #
+                  #   netbird-management exits unless it can fetch this document
+                  #     -> the document is served here, proxied to the IdP peer
+                  #       -> that peer is only reachable over the mesh
+                  #         -> the mesh is brought up by netbird-management
+                  #
+                  # Nothing in that loop retries its way out — management hard-
+                  # exits, and `StartLimitIntervalSec = 0` only means it retries
+                  # forever against a dependency that can never appear. On
+                  # 2026-08-12 recovering from it needed a reverse SSH tunnel and
+                  # a hand-written DNAT rule.
+                  #
+                  # `proxy_cache_use_stale` answers from the last successful
+                  # fetch while the peer is unreachable, which is exactly long
+                  # enough for management to start and bring the mesh up; the
+                  # entry then refreshes from the live document. A cached copy
+                  # rather than a checked-in one on purpose — a static file would
+                  # silently drift from whatever kanidm actually serves, and this
+                  # cannot, because it *is* what kanidm last served.
+                  "= ${oidcPath}" = {
+                    proxyPass = "${cfg.oidc.idp.upstream}${oidcPath}";
+                    extraConfig = ''
+                      proxy_ssl_verify off;
+                      proxy_cache oidc_bootstrap;
+                      proxy_cache_valid 200 10m;
+                      proxy_cache_use_stale error timeout
+                        http_500 http_502 http_503 http_504;
+                      proxy_cache_background_update on;
+                      proxy_cache_lock on;
+                      # Bounded so a dead peer fails over to the cache quickly
+                      # instead of sitting in management's startup timeout.
+                      proxy_connect_timeout 3s;
+                      proxy_read_timeout 5s;
+                    '';
+                  };
+                };
               extraConfig = ''
                 set_real_ip_from 127.0.0.1;
                 real_ip_header proxy_protocol;
@@ -1203,6 +1311,17 @@
               '';
             };
           };
+
+        # Backing store for the bootstrap cache above. inactive is a year
+        # because the entry has to still be there after an outage of arbitrary
+        # length — the one moment it is needed is a cold boot with the IdP
+        # unreachable, and an entry expired for inactivity would put the deadlock
+        # right back. It holds a single small JSON document.
+        services.nginx.appendHttpConfig = lib.mkIf (cfg.oidc.idp.domain != null && oidcPath != null) ''
+          proxy_cache_path /var/cache/nginx/oidc-bootstrap
+            levels=1:2 keys_zone=oidc_bootstrap:1m max_size=1m
+            inactive=365d use_temp_path=off;
+        '';
 
         # Split the public port by SNI without terminating. netbird-proxy
         # answers ACME tls-alpn-01 challenges on this socket, so decrypting
