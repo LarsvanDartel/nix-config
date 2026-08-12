@@ -142,6 +142,15 @@
       cosmos.services.minecraft.servers.hardcore = {
         port = 25566;
         motd = "lvdar.nl — hardcore";
+
+        # TEMPORARY. Two people were mid-run when view-distance was raised, and
+        # view-distance is only read at startup — so this stages the change
+        # rather than disconnecting them for it. It lands at the next restart,
+        # which is the 02:00 restic quiesce.
+        #
+        # Remove this once that has happened. Left on, every later edit to this
+        # server silently fails to take effect.
+        deferRestart = true;
         whitelist = {
           DutchRD = "7239bc30-af4e-482c-9434-7ce3005cb917";
           PittyPfert = "f2bfe527-e914-4d2b-b72b-3f1708452082";
@@ -173,6 +182,23 @@
           # server has an enforced whitelist of two, so it protects nobody and
           # only gets in the way of the first shelter.
           spawn-protection = 0;
+
+          # How far the server *sends* chunks, and therefore the ceiling on
+          # what any client can render however high it sets its own slider.
+          # 10 is the vanilla default; chunks scale with the square of this, so
+          # 16 is about 2.5x the load per player.
+          #
+          # Affordable here for reasons specific to this setup: 36 cores, 35
+          # GiB free, two players — and the pack carries C2ME, which
+          # parallelises chunk loading, and VMP, which optimises chunk sending.
+          # Chunk sending is precisely the view-distance bottleneck, so this is
+          # the one place those two mods pay for themselves.
+          #
+          # simulation-distance is deliberately left at 10. It governs where
+          # entities tick, redstone runs and mobs spawn — raising it changes
+          # gameplay and costs CPU every tick, which is a different decision
+          # from "can I see further".
+          view-distance = 16;
         };
       };
 
