@@ -125,7 +125,14 @@
         };
 
         # Reachable from gaia over WireGuard, and from nowhere else.
-        cosmos.services.netbird.client.exposedPorts = [cfg.port];
+        #
+        # 2222 as well as the HTTP port, because the knot's *other* half arrives
+        # that way: gaia publishes public :22 as an L4 service and forwards it
+        # here, to OpenSSH on 2222 rather than 22 (see the header). Without this
+        # the forward connects to gaia and then hangs with no banner — the mesh
+        # is up, the knot answers on 5555, and only the SSH hop is filtered.
+        # sshd already listens on 2222 fleet-wide; this is purely the mesh ACL.
+        cosmos.services.netbird.client.exposedPorts = [cfg.port 2222];
       };
     };
   };
