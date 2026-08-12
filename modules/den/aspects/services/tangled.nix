@@ -124,7 +124,10 @@
           openFirewall = false;
         };
 
-        # Reachable from gaia over WireGuard, and from nowhere else.
+        # Reachable from gaia over WireGuard, and from nowhere else. Note the
+        # public :22 half does NOT come through here — netbird-proxy's L4 mode
+        # would not forward to this target, so gaia DNATs it in the kernel
+        # instead (hosts/gaia.nix).
         #
         # 2222 as well as the HTTP port, because the knot's *other* half arrives
         # that way: gaia publishes public :22 as an L4 service and forwards it
@@ -133,6 +136,124 @@
         # is up, the knot answers on 5555, and only the SSH hop is filtered.
         # sshd already listens on 2222 fleet-wide; this is purely the mesh ACL.
         cosmos.services.netbird.client.exposedPorts = [cfg.port 2222];
+      };
+    };
+  };
+
+  # The CI runner. Separate aspect so a host can carry repositories without
+  # also volunteering to build them, but it `includes` the knot: the owner DID
+  # is declared there, and a spindle with no knot to serve is not a
+  # configuration this fleet has a use for.
+  den.aspects.services.tangled.spindle = {
+    includes = [den.aspects.services.tangled];
+
+    nixos = {
+      config,
+      lib,
+      ...
+    }: let
+      inherit (lib.options) mkOption;
+      inherit (lib.types) ints port str;
+
+      cfg = config.cosmos.services.tangled;
+      sCfg = cfg.spindle;
+    in {
+      imports = [inputs.tangled.nixosModules.spindle];
+
+      options.cosmos.services.tangled.spindle = {
+        hostname = mkOption {
+          type = str;
+          default = "spindle.lvdar.nl";
+          description = "Public name, covered by the existing *.lvdar.nl wildcard.";
+        };
+
+        port = mkOption {
+          type = port;
+          default = 6555;
+          description = "Free on this host; reached over the mesh by netbird-proxy.";
+        };
+
+        stateDir = mkOption {
+          type = str;
+          default = "/tank/spindle";
+          description = ''
+            Repository checkouts only. The VM images and overlays deliberately
+            do NOT live here — see below.
+
+            Checkouts are bulk and mostly sequential, which is what the array is
+            good at, and they are the part that grows without a bound anyone
+            chose.
+
+            Not added to persist.directories: /tank is outside the persist layer
+            and an entry would bind-mount /persist over it. See the knot above.
+          '';
+        };
+
+        diskLimitMiB = mkOption {
+          type = ints.unsigned;
+          default = 61440;
+          description = ''
+            Ceiling on total microVM disk usage, in MiB (60 GiB).
+
+            The module's default is 0, meaning unlimited. That is tolerable when
+            the images sit on a 1.4 TB array and genuinely is not when they sit
+            on the 233 GB system SSD: a runaway build filling the root
+            filesystem takes the host down, not just the job. 60 GiB against
+            ~187 GB free leaves room for the system to keep working while a
+            build misbehaves.
+          '';
+        };
+      };
+
+      config = {
+        # Enough for the pool; the module creates the leaf directories itself.
+        systemd.tmpfiles.rules = [
+          "d ${sCfg.stateDir} 0750 root root - -"
+        ];
+
+        services.tangled.spindle = {
+          enable = true;
+
+          server = {
+            owner = cfg.owner;
+            hostname = sCfg.hostname;
+            listenAddr = "0.0.0.0:${toString sCfg.port}";
+            repoDir = "${sCfg.stateDir}/repos";
+          };
+
+          pipelines.microvm = {
+            # Images and overlays stay on the SSD, and this is the one place in
+            # this repo where that is the *performance* answer rather than the
+            # convenient one. The array is six SAS spindles in two raidz1 vdevs:
+            # good at sequential bulk, poor at the random reads a VM boot does
+            # and the small random writes a copy-on-write overlay does. A SATA
+            # SSD wins that profile by an order of magnitude on latency.
+            #
+            # Persisted, unlike the overlays: an image is expensive to fetch or
+            # build, and now that the rollback actually works an unpersisted
+            # cache would be re-fetched after every reboot.
+            imageDir = "/var/lib/spindle/images";
+
+            # Left at the module's default of /tmp, which on this host is the
+            # root subvolume — so overlays are on the SSD *and* impermanence
+            # discards them at every boot. For scratch that is exactly right;
+            # the only reason not to would be space, which diskLimitMiB bounds.
+            limits.total.diskMiB = sCfg.diskLimitMiB;
+          };
+        };
+
+        # The job database and the tap state. Small, and worth keeping across a
+        # rollback so a reboot does not lose the record of what ran.
+        cosmos.system.impermanence.persist.directories = [
+          {
+            directory = "/var/lib/spindle";
+            user = "root";
+            group = "root";
+            mode = "0750";
+          }
+        ];
+
+        cosmos.services.netbird.client.exposedPorts = [sCfg.port];
       };
     };
   };

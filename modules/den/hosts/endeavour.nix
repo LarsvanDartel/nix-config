@@ -56,6 +56,7 @@
       services.attic
       services.restic
       services.tangled
+      services.tangled.spindle
       services.pds
     ];
 
