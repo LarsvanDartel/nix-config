@@ -26,6 +26,7 @@
       services.unbound
       services.gatus
       services.alloy
+      services.restic
     ];
 
     nixos = {...}: {
@@ -70,6 +71,53 @@
       # not bind. Same pattern as endeavour: give the agent a fixed high port
       # and let unbound have 53.
       cosmos.services.netbird.client.dnsResolverAddress = "127.0.0.1:15353";
+
+      # The offsite copy of the edge. Small — ~146 MB against endeavour's
+      # 42 GB — but this is the host whose loss is hardest to undo by hand:
+      # netbird-mgmt's store.db *is* the mesh. Rebuilding it means re-enrolling
+      # every peer on every device, including the phones, and re-issuing the
+      # setup keys, while the mesh those devices are enrolled in is down.
+      #
+      # Deliberately out:
+      #   * pangolin (254 MB) — decommissioned, see the netbird.services comment
+      #     below. Dead state on disk, not something to keep a year of copies of.
+      #   * crowdsec's state/ — a 246 MB SQLite of bans plus 72 MB of GeoLite
+      #     databases, all of it re-derived within hours of a fresh start and
+      #     all of it churning nightly. What is worth keeping is the two 4 KB
+      #     credential files that register this machine with the local and
+      #     online APIs, which is what stays in.
+      #   * netbird-proxy/geolocation and netbird-mgmt's own *.mmdb/geonames —
+      #     138 MB of downloadable lookup tables.
+      cosmos.services.restic = {
+        repository = "sftp:u649268@u649268.your-storagebox.de:/gaia";
+
+        paths = [
+          "/persist/var/lib/netbird-mgmt"
+          "/persist/var/lib/netbird"
+          "/persist/var/lib/netbird-proxy"
+          "/persist/var/lib/crowdsec"
+          "/persist/var/lib/acme"
+          "/persist/var/lib/typstnique"
+          "/persist/var/lib/unbound"
+          # The uid/gid map. Small, and without it a rebuilt host hands out
+          # different numeric owners than the files being restored expect.
+          "/persist/var/lib/nixos"
+          # SSH host keys, which are also what sops-nix decrypts with — restore
+          # a host without them and it cannot read any of its own secrets.
+          "/persist/etc"
+        ];
+
+        exclude = [
+          "/persist/var/lib/crowdsec/state"
+          "/persist/var/lib/netbird-proxy/geolocation"
+          "**/*.mmdb"
+          "**/geonames_*.db"
+        ];
+
+        # netbird management keeps a live SQLite store; see quiesceServices in
+        # services/restic.nix for why a running one is not copied in place.
+        quiesceServices = ["netbird-management.service"];
+      };
 
       # 38G disk, and the journal had grown to 3.7G of it under the default
       # "10% of the filesystem" rule. A tenth of the disk is not a sensible
