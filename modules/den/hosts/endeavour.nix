@@ -55,6 +55,7 @@
       services.zed
       services.attic
       services.restic
+      services.pds
     ];
 
     nixos = {
