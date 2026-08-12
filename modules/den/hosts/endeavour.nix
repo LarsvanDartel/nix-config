@@ -110,14 +110,21 @@
       # entry in gaia.nix, and either an SRV record or a Velocity proxy in
       # front to stay typeable.
       #
-      # The whitelist is enforced and starts empty, which means nobody can join
-      # yet. That is deliberate for a port open to the internet: the failure
-      # mode of an empty list is "my friend cannot get in", and the failure
-      # mode of a forgotten list is the entire internet. Names map to Minecraft
-      # account UUIDs; a malformed one fails the build.
+      # The whitelist is enforced, so this list is exactly who can join and the
+      # internet is everyone else. Taken from the restored world itself —
+      # world/players/data/<uuid>.dat is the record of who has actually played
+      # — and resolved to names through Mojang's session server, rather than
+      # typed from memory. The UUID is the identity; the name is a label that
+      # its owner can change without telling anyone, and Minecraft will follow
+      # the UUID when they do.
       cosmos.services.minecraft.servers.smp = {
         motd = "lvdar.nl";
-        whitelist = {};
+        whitelist = {
+          Svenie23 = "1fd240dc-faa7-4a34-a12b-5465dec604d1";
+          DeProGamer2015 = "584d73d3-c9e5-4d75-9fba-9c35d41531e7";
+          DutchRD = "7239bc30-af4e-482c-9434-7ce3005cb917";
+          Netwerk2009 = "88392a55-9cbc-4311-9fe1-9945a16abf72";
+        };
         operators = {};
       };
 

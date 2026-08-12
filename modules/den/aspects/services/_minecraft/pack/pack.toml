@@ -1,0 +1,13 @@
+name = "lvdar-smp"
+author = "lvdar"
+version = "1.0.0"
+pack-format = "packwiz:1.1.0"
+
+[index]
+file = "index.toml"
+hash-format = "sha256"
+hash = "e64e9fd5260ee23f5a1bf8f681ba736bf07951e025e7bd30f9e6d7d13809ea88"
+
+[versions]
+fabric = "0.19.3"
+minecraft = "26.2"
