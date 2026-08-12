@@ -1460,8 +1460,20 @@
             StateDirectory = "netbird-proxy";
             StateDirectoryMode = "0750";
             WorkingDirectory = "/var/lib/netbird-proxy";
-            AmbientCapabilities = ["CAP_NET_ADMIN"];
-            CapabilityBoundingSet = ["CAP_NET_ADMIN"];
+            # NET_ADMIN for the WireGuard tunnel it brings up; NET_BIND_SERVICE
+            # so an L4 service can publish a port below 1024.
+            #
+            # The second one is not hypothetical tidiness. Publishing the
+            # tangled knot's git-over-SSH on :22 failed with
+            #
+            #   router for TCP port 22: listen tcp :22: bind: permission denied
+            #
+            # and the proxy logs it, ignores that one mapping and carries on —
+            # so the service looks created, every other mapping keeps working,
+            # and the port is simply never bound. Nothing needed this before
+            # because the only other L4 publish is traccar-osmand on 5055.
+            AmbientCapabilities = ["CAP_NET_ADMIN" "CAP_NET_BIND_SERVICE"];
+            CapabilityBoundingSet = ["CAP_NET_ADMIN" "CAP_NET_BIND_SERVICE"];
 
             NoNewPrivileges = true;
             PrivateTmp = true;
