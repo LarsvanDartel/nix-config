@@ -12,6 +12,9 @@
     core.yubikey
     core.ssh
     core.sops
+    # Every host should be able to say which commit it is running, including
+    # pioneer — the one most likely to be quietly out of date.
+    core.revision
     # A bounded journal is wanted on every host — a laptop has no more use for
     # four gigabytes of it than a Pi does. Failure *notifications* are not here
     # but in roles.server: see the note there.
