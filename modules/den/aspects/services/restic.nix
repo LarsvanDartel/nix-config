@@ -107,6 +107,9 @@
             # the code actually lives, this is the only copy that survives the
             # array.
             "/tank/git"
+            # Minecraft worlds. Same argument as the knot: sanoid covers the
+            # accidents, this covers the array.
+            "/tank/minecraft"
           ];
           description = ''
             What to copy. Read through /persist rather than /var/lib on
@@ -142,7 +145,7 @@
 
         quiesceServices = mkOption {
           type = listOf str;
-          default = ["traccar.service" "knot.service"];
+          default = ["traccar.service" "knot.service" "minecraft-server-smp.service"];
           description = ''
             Units stopped for the duration of the run and started again after.
 
@@ -153,6 +156,20 @@
             a database-shaped set of files that may or may not open. Postgres is
             absent from this list on purpose — it gets a real dump instead, and
             never has to stop.
+
+            Minecraft is here for the same reason and is the one entry whose
+            cost players notice: region files are written continuously and have
+            no dump tool, so a live copy can capture a half-written chunk. The
+            server is therefore down for the length of the 02:00 run. That is a
+            nightly restart, which most Minecraft operators schedule on purpose
+            anyway — but it is a real interruption rather than the few seconds
+            the others cost, and it is named here so it is not a surprise.
+
+            Named units, not a glob, which means a server renamed in
+            hosts/endeavour.nix must be renamed here too or its worlds are
+            backed up live. The option shape gives no way to append from the
+            aspect that owns the server — a definition elsewhere would replace
+            this default rather than extend it — so hand-sync is the price.
 
             The cost is bounded and paid at 02:00: on gaia this pauses new
             enrollments and ACL pushes for a few seconds, and pauses nothing

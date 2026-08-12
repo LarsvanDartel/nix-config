@@ -58,6 +58,7 @@
       services.tangled
       services.tangled.spindle
       services.pds
+      services.minecraft
     ];
 
     nixos = {
@@ -102,6 +103,23 @@
       # owned by an identity we host rather than one Bluesky hosts, which is
       # the whole reason the PDS went in first.
       cosmos.services.tangled.owner = "did:plc:wj6rsizbzc7fruoopsxg2k2a";
+
+      # The survival server. One instance on the default port, which is what
+      # keeps the address a bare `minecraft.lvdar.nl` with no port suffix for
+      # anyone joining — a second server would need its own port here, its own
+      # entry in gaia.nix, and either an SRV record or a Velocity proxy in
+      # front to stay typeable.
+      #
+      # The whitelist is enforced and starts empty, which means nobody can join
+      # yet. That is deliberate for a port open to the internet: the failure
+      # mode of an empty list is "my friend cannot get in", and the failure
+      # mode of a forgotten list is the entire internet. Names map to Minecraft
+      # account UUIDs; a malformed one fails the build.
+      cosmos.services.minecraft.servers.smp = {
+        motd = "lvdar.nl";
+        whitelist = {};
+        operators = {};
+      };
 
       networking.hostId = "b8433556";
 

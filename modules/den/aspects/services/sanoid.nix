@@ -71,6 +71,18 @@
               daily = 30;
               monthly = 6;
             };
+            # Minecraft worlds. The shortest hourly tail of the three and the
+            # one that will actually get used: the losses here are a creeper in
+            # spawn, a bad WorldEdit or a griefer who was inside the whitelist,
+            # all of which are noticed within the hour and all of which a
+            # rollback undoes completely. Same retention as the knot because
+            # the argument is the same — also in restic, so this is the fast
+            # path rather than the last copy.
+            "tank/minecraft" = {
+              hourly = 48;
+              daily = 30;
+              monthly = 6;
+            };
             # Empty today, but it is the encrypted dataset — whatever ends up
             # here is by definition the stuff that was worth encrypting, so it
             # gets the longer tail.
