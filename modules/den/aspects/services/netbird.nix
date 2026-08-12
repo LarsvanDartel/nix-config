@@ -1292,6 +1292,21 @@
                     extraConfig = ''
                       proxy_ssl_verify off;
                       proxy_cache oidc_bootstrap;
+                      # kanidm answers this with
+                      #   cache-control: no-store, no-cache, max-age=0
+                      #   pragma: no-cache
+                      # which nginx honours by storing nothing — so without
+                      # this the cache is empty at exactly the moment the
+                      # fallback is needed, and the deadlock is untouched. That
+                      # is not hypothetical: the first version of this fix was
+                      # deployed, looked correct, and cached nothing.
+                      #
+                      # Overriding it is safe *here* and only here: the location
+                      # is an exact match on the discovery document, which is
+                      # public, non-personalised metadata carrying no session or
+                      # token material. The directive does not apply to the rest
+                      # of the IdP, which keeps its no-store semantics.
+                      proxy_ignore_headers Cache-Control Expires Set-Cookie;
                       proxy_cache_valid 200 10m;
                       proxy_cache_use_stale error timeout
                         http_500 http_502 http_503 http_504;
