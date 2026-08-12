@@ -37,6 +37,7 @@
     import-tree.url = "github:vic/import-tree";
     jellarr.url = "github:venkyr77/jellarr";
     make-shell.url = "github:nicknovitski/make-shell";
+    nix-minecraft.url = "github:Infinidoge/nix-minecraft";
     nix-secrets.url = "git+ssh://git@github.com/LarsvanDartel/nix-secrets.git?shallow=1";
     nix-wrapper-modules = {
       url = "github:BirdeeHub/nix-wrapper-modules/f318ea7274683aa1af36cff22f7b40420807324a";

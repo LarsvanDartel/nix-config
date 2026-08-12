@@ -350,6 +350,37 @@
           targets = endeavour 5055;
         };
 
+        # Minecraft. L4 for the same reason as traccar-osmand: the client
+        # opens a socket and speaks Mojang's own protocol, so there is no TLS
+        # to terminate and no HTTP for CrowdSec to read. The domain routes
+        # nothing — the listen port does — but it still has to be unique and it
+        # still has to resolve to this host, because that is the address a
+        # player types.
+        #
+        # bearerAuth off is not a preference. A game client cannot follow a
+        # browser redirect to an IdP; gating this would publish a port that
+        # every Minecraft client fails to connect to. The whitelist on
+        # endeavour is the access control, and it is enforced there.
+        #
+        # If this connects but never completes a handshake, it is the same
+        # unexplained L4 failure the knot's :22 hit — see the DNAT above, which
+        # is the proven way around it.
+        #
+        # Note the target inherits `protocol = "http"` from the helper, which
+        # reads like a bug in an L4 service and is deliberately left alone:
+        # traccar-osmand renders identically and works, so it is the known-good
+        # shape and this is not the place to deviate from it. Setting the
+        # target protocol to "tcp" is the first thing to try if this does not
+        # forward — it would also be the first new lead on the knot's :22 in a
+        # while, since that service had this same shape.
+        minecraft = {
+          domain = "minecraft.lvdar.nl";
+          mode = "tcp";
+          listenPort = 25565;
+          bearerAuth.enable = false;
+          targets = endeavour 25565;
+        };
+
         suwayomi.targets = endeavour 8080;
         sabnzbd.targets = endeavour 6336;
 
