@@ -157,6 +157,7 @@
     nixos = {
       config,
       lib,
+      pkgs,
       ...
     }: let
       inherit (lib.options) mkOption;
@@ -172,6 +173,20 @@
           type = str;
           default = "spindle.lvdar.nl";
           description = "Public name, covered by the existing *.lvdar.nl wildcard.";
+        };
+
+        imageDir = mkOption {
+          type = str;
+          default = "/var/lib/spindle/images";
+          description = ''
+            Where the microVM guest images live, and where the tmpfiles rule
+            below links the NixOS one into.
+
+            On the SSD and persisted, unlike the overlays: an image is
+            expensive to build — a whole NixOS guest, kernel and store disk —
+            and re-fetching one after every reboot would be a slow first
+            pipeline for no benefit.
+          '';
         };
 
         port = mkOption {
@@ -229,9 +244,30 @@
       };
 
       config = {
-        # Enough for the pool; the module creates the leaf directories itself.
         systemd.tmpfiles.rules = [
+          # Enough for the pool; the module creates the leaf directories itself.
           "d ${sCfg.stateDir} 0750 root root - -"
+
+          # The microVM guest image, and nothing provides it by default — the
+          # NixOS module exposes `imageDir` as "directory containing microVM
+          # image spec JSONs" and then leaves filling it to the operator. An
+          # empty directory is not a loud failure: the spindle starts happily,
+          # accepts pushes, creates pipelines, and fails every workflow in the
+          # same second with
+          #
+          #   init workflow: microVM image "nixos" was not found;
+          #   looked in: /var/lib/spindle/images/nixos, …/nixos.json
+          #
+          # which is only visible in the pipeline status record, not the
+          # journal. Discovered by reading the spindle's own database after the
+          # first real push produced three instant failures and no logs.
+          #
+          # `L+` replaces whatever is there, so a version bump of the tangled
+          # input relinks rather than colliding. Interpolating the derivation
+          # here also puts it in this host's system closure, which is what
+          # keeps `nix-collect-garbage` from deleting a live CI image — a bare
+          # symlink under /var/lib would not be a GC root.
+          "L+ ${sCfg.imageDir}/nixos - - - - ${inputs.tangled.packages.${pkgs.stdenv.hostPlatform.system}.spindle-nixos-image}"
         ];
 
         services.tangled.spindle = {
@@ -255,7 +291,7 @@
             # Persisted, unlike the overlays: an image is expensive to fetch or
             # build, and now that the rollback actually works an unpersisted
             # cache would be re-fetched after every reboot.
-            imageDir = "/var/lib/spindle/images";
+            inherit (sCfg) imageDir;
 
             # Left at the module's default of /tmp, which on this host is the
             # root subvolume — so overlays are on the SSD *and* impermanence
