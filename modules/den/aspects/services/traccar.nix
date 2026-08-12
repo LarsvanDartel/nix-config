@@ -68,7 +68,7 @@
       };
       logger = {
         console = "true";
-        level = "all";
+        level = "info";
       };
       web = {
         port = toString cfg.port;
