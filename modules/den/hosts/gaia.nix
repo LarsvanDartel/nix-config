@@ -310,7 +310,15 @@
         #     different host key and "Permission denied (password)".
         #     core/ssh.nix explains why :2222 exists; this is what it is for.
         knot-ssh = {
-          domain = "knot.lvdar.nl";
+          # A domain of its own, and not knot.lvdar.nl: management rejects a
+          # second service on a domain that already has one, so reusing it
+          # returned 409 and the L4 listener was never created. Exactly the
+          # reason traccar-osmand carries its own name.
+          #
+          # Nothing resolves or connects to this name — an L4 service routes by
+          # listen port alone — so `git@knot.lvdar.nl:owner/repo` still arrives
+          # here. It exists only to be a unique key.
+          domain = "knot-ssh.lvdar.nl";
           mode = "tcp";
           listenPort = 22;
           bearerAuth.enable = false;
