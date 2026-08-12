@@ -97,6 +97,41 @@
 
       networking.hostId = "b8433556";
 
+      # network-online.target was firing about four seconds before this host
+      # actually had a usable address, and services that need one to advertise
+      # themselves died in that window:
+      #
+      #   25.621  idrac: leased 169.254.0.2      <- satisfies wait = "any"
+      #   25.716  Reached target Network is Online
+      #   25.761  loki          "no useable address found for interfaces"
+      #   25.910  alertmanager  "no private IP found"
+      #   29.895  eno1: leased 192.168.2.101     <- the address they needed
+      #
+      # Both then burned their restart budget in seconds and stayed in
+      # start-limit-hit, so the host booted with no log ingestion and no alert
+      # delivery — the second of which means the failure could not report
+      # itself. Ordering them after network-online.target fixes nothing, since
+      # they already are: the target was simply lying.
+      #
+      # The liar is the iDRAC's out-of-band management NIC, which self-assigns a
+      # link-local 169.254 address almost immediately. dhcpcd counts that as
+      # "an address" and declares the network up. It is a BMC that the host has
+      # no business configuring, so it is denied outright, and the wait is
+      # narrowed to a real IPv4 lease.
+      #
+      # Only surfaced now because this host had been up since 10 June; the
+      # impermanence work is what made anyone reboot it.
+      networking.dhcpcd = {
+        wait = "ipv4";
+        denyInterfaces = [
+          "idrac"
+          # dhcpcd was also soliciting leases on the *arr container's veth and
+          # bridge, which have their own static addressing.
+          "veth-*"
+          "arr-br"
+        ];
+      };
+
       # TLS for every published service now terminates on gaia, at
       # netbird-proxy, which forwards to each app's own port over the mesh.
       # Drops the local `<name>.lvdar.nl` vhosts — nothing reaches this host
