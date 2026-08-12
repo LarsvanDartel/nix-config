@@ -49,7 +49,14 @@
           export NTFY_PASSWORD
           NTFY_PASSWORD="$(cat "$CREDENTIALS_DIRECTORY/password")"
 
-          if ntfy user list 2>/dev/null | grep -q '^user ${cfg.user}$'; then
+          # `ntfy user list` prints "user alerts (role: user, tier: none)", not
+          # a bare name, so anchoring on '^user <name>$' never matched and this
+          # always took the `add` branch. That only worked once: every restart
+          # after the account existed died on "user alerts already exists",
+          # which fails ExecStartPost and therefore the unit — and a unit that
+          # fails during activation makes deploy-rs roll the whole deploy back.
+          # Latent until something restarted ntfy, which a reboot finally did.
+          if ntfy user list 2>/dev/null | grep -qE '^user ${cfg.user}( |$)'; then
             ntfy user change-pass ${cfg.user}
           else
             ntfy user add ${cfg.user}
