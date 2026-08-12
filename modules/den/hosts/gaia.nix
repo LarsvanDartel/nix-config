@@ -41,12 +41,11 @@
         inputs.disko.nixosModules.disko
         ./_hw/gaia/disko.nix
         ({lib, ...}: {
-          # Public :22 belongs to the knot on endeavour now (netbird.services
-          # knot-ssh, below), and netbird-proxy cannot bind a port sshd is
-          # already holding. Administration moves to :2222, which core/ssh.nix
+          # Public :22 belongs to the tangled knot on endeavour now, forwarded
+          # by the DNAT below. Administration moves to :2222, which core/ssh.nix
           # has provided on every host from the start and which deploy-rs has
-          # used for every deploy today — so this removes a second door rather
-          # than the only one.
+          # used for every deploy — so this removes a second door rather than
+          # the only one.
           #
           # Inside `imports` rather than the aspect body: a mkForce at the top
           # level recurses when combined with facter, because den unwraps
@@ -132,6 +131,56 @@
         # services/restic.nix for why a running one is not copied in place.
         quiesceServices = ["netbird-management.service"];
       };
+
+      # git over SSH for the tangled knot: public :22 here to OpenSSH on
+      # endeavour, over the mesh.
+      #
+      # Kernel NAT rather than a netbird.services entry, because the L4
+      # (`mode = "tcp"`) service for this specific target never forwarded:
+      # netbird-proxy bound :22, accepted connections, and endeavour's sshd
+      # never saw them. A second L4 service on an unprivileged port behaved the
+      # same, so it was not about privileged ports.
+      #
+      # Note this is *not* a general failure of L4 mode — traccar-osmand below
+      # demonstrably works, and a packet capture shows its traffic arriving on
+      # endeavour from 100.68.151.231, netbird-proxy's own embedded client peer
+      # (distinct from gaia's agent at 100.68.38.155). Why that peer could
+      # reach :5055 and not :2222 was never established. The DNAT sidesteps the
+      # question entirely by not involving the proxy.
+      #
+      # :2222 and not :22 on the far side. NetBird's agent redirects
+      # <mesh-ip>:22 to its own embedded SSH server — proven here, it answers
+      # `SSH-2.0-NetBird-SSH-Server … JWT-Required` — so aiming at :22 would
+      # hand every git push to the wrong daemon. core/ssh.nix explains why the
+      # second port exists; this is what it is for.
+      #
+      # The masquerade is not optional. Without it endeavour would reply
+      # straight to the client's public address, which never routes back, and
+      # the connection would hang exactly like the proxy did.
+      networking.nat = {
+        enable = true;
+        externalInterface = "enp1s0";
+        forwardPorts = [
+          {
+            sourcePort = 22;
+            destination = "100.68.151.172:2222";
+            proto = "tcp";
+          }
+        ];
+        extraCommands = ''
+          iptables -t nat -A POSTROUTING -d 100.68.151.172 -p tcp --dport 2222 -j MASQUERADE
+          iptables -A FORWARD -d 100.68.151.172 -p tcp --dport 2222 -j ACCEPT
+        '';
+        extraStopCommands = ''
+          iptables -t nat -D POSTROUTING -d 100.68.151.172 -p tcp --dport 2222 -j MASQUERADE || true
+          iptables -D FORWARD -d 100.68.151.172 -p tcp --dport 2222 -j ACCEPT || true
+        '';
+      };
+
+      # DNAT happens in PREROUTING, so this never reaches the INPUT chain the
+      # firewall guards — but the port still has to be open for the packet to
+      # get that far.
+      networking.firewall.allowedTCPPorts = [22];
 
       # 38G disk, and the journal had grown to 3.7G of it under the default
       # "10% of the filesystem" rule. A tenth of the disk is not a sensible
@@ -293,36 +342,6 @@
           listenPort = 5055;
           bearerAuth.enable = false;
           targets = endeavour 5055;
-        };
-
-        # git over SSH for the knot. L4 for the same reason as traccar-osmand:
-        # this is the SSH wire protocol, so there is no TLS to terminate and no
-        # HTTP for CrowdSec to judge.
-        #
-        # Two things here are load-bearing and neither is obvious:
-        #
-        #   listenPort 22  because `git@knot.lvdar.nl:owner/repo` has nowhere to
-        #     put a port. Freeing :22 on this host is what the sshd override
-        #     above is for.
-        #   targets :2222  and NOT :22. NetBird's agent redirects <mesh-ip>:22
-        #     to its own embedded SSH server, so forwarding to :22 would hand
-        #     every git push to that instead of endeavour's OpenSSH — a
-        #     different host key and "Permission denied (password)".
-        #     core/ssh.nix explains why :2222 exists; this is what it is for.
-        knot-ssh = {
-          # A domain of its own, and not knot.lvdar.nl: management rejects a
-          # second service on a domain that already has one, so reusing it
-          # returned 409 and the L4 listener was never created. Exactly the
-          # reason traccar-osmand carries its own name.
-          #
-          # Nothing resolves or connects to this name — an L4 service routes by
-          # listen port alone — so `git@knot.lvdar.nl:owner/repo` still arrives
-          # here. It exists only to be a unique key.
-          domain = "knot-ssh.lvdar.nl";
-          mode = "tcp";
-          listenPort = 22;
-          bearerAuth.enable = false;
-          targets = endeavour 2222;
         };
 
         suwayomi.targets = endeavour 8080;
