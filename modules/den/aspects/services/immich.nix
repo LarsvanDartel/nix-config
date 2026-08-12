@@ -25,7 +25,16 @@
           mode = "0750";
         }
         {
-          directory = "/var/lib/postgres";
+          # postgresql, not postgres. The directory read this way for months
+          # and it never mattered, because the initrd rollback was also broken
+          # (see core/impermanence.nix) — so nothing was wiping the root
+          # subvolume that the real PGDATA was sitting on. The two bugs cancelled
+          # out, and fixing the rollback first would have destroyed the immich
+          # database on the next boot.
+          #
+          # Lives here rather than in a postgres aspect because immich is the
+          # only thing on this host that uses postgres at all.
+          directory = "/var/lib/postgresql";
           user = "postgres";
           group = "postgres";
           mode = "0750";
