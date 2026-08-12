@@ -58,6 +58,19 @@
               daily = 14;
               monthly = 3;
             };
+            # The tangled knot's repositories. Its own dataset rather than a
+            # directory in the pool root, precisely so it can appear here —
+            # `tank` itself is deliberately not snapshotted (see below), so a
+            # plain directory would get no coverage at all.
+            #
+            # Shorter tail than the media library despite mattering more: these
+            # are also in restic, and a force-push someone regrets is noticed in
+            # minutes rather than months.
+            "tank/git" = {
+              hourly = 48;
+              daily = 30;
+              monthly = 6;
+            };
             # Empty today, but it is the encrypted dataset — whatever ends up
             # here is by definition the stuff that was worth encrypting, so it
             # gets the longer tail.

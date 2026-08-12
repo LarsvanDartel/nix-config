@@ -102,6 +102,11 @@
             "/persist/etc/opencloud"
             "/tank/opencloud"
             "/tank/media/library/images"
+            # The tangled knot's repositories. sanoid snapshots these too, but
+            # snapshots live inside the pool they protect — if the knot is where
+            # the code actually lives, this is the only copy that survives the
+            # array.
+            "/tank/git"
           ];
           description = ''
             What to copy. Read through /persist rather than /var/lib on
@@ -137,12 +142,13 @@
 
         quiesceServices = mkOption {
           type = listOf str;
-          default = ["traccar.service"];
+          default = ["traccar.service" "knot.service"];
           description = ''
             Units stopped for the duration of the run and started again after.
 
             For embedded databases with no dump tool. traccar is an H2 store and
-            netbird management a live SQLite one; a file-level copy of either
+            netbird management a live SQLite one, and the tangled knot keeps its
+            own SQLite beside the repositories; a file-level copy of any of them
             while it is being written is not guaranteed to be a database, it is
             a database-shaped set of files that may or may not open. Postgres is
             absent from this list on purpose — it gets a real dump instead, and
