@@ -93,6 +93,10 @@
             "/persist/var/lib/traccar"
             "/persist/var/lib/arr"
             "/persist/var/lib/grafana"
+            # The ATProto identity. Small, and the highest-value path in this
+            # list per byte: the PLC rotation key in here is what proves control
+            # of the DID, and no amount of the rest reconstructs it.
+            "/persist/var/lib/pds"
             "/persist/var/lib/opencloud"
             "/persist/home"
             "/persist/etc/opencloud"

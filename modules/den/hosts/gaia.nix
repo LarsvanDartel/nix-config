@@ -244,6 +244,11 @@
         immich = shared 2283;
         seerr = shared 4055;
 
+        # The ATProto PDS. Ungated for the reason every app-facing service here
+        # is: XRPC clients carry their own tokens and a 302 to kanidm is a bare
+        # network error to them.
+        pds = shared 3001;
+
         # Ungated for the same reason as the rest of `shared`, plus one of its
         # own: the web UI is an SPA that talks to /api over XHR, and the
         # Traccar Manager app talks to the same API with no browser at all.
@@ -268,6 +273,7 @@
           bearerAuth.enable = false;
           targets = endeavour 5055;
         };
+
         suwayomi.targets = endeavour 8080;
         sabnzbd.targets = endeavour 6336;
 
