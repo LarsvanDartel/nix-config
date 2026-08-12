@@ -72,14 +72,45 @@ in {
 
       fileSystems."/persist".neededForBoot = true;
       environment.persistence."/persist" = {
-        inherit (cfg.persist) files;
         hideMounts = true;
+
+        inherit (cfg.persist) files;
+
+        # NOTE — a prerequisite for repairing the initrd rollback above.
+        # /etc/machine-id is deliberately NOT persisted here, and has to be
+        # before that repair lands.
+        #
+        # Once the rollback works, systemd gets a blank machine-id every boot
+        # and generates a fresh one. journald keys its storage on that id, so
+        # every boot would start a new /var/log/journal/<id>/: the old logs stay
+        # on the persisted disk forever while journalctl stops being able to see
+        # them. The machine looks like it has no history and quietly fills up.
+        #
+        # Adding it to `files` is the trap, and it was tried: impermanence's
+        # mount-file bails with "A file already exists at /etc/machine-id!" and
+        # exits 1, which fails activation outright. The module assumes a rollback
+        # has already emptied /etc, and on these hosts that has never once
+        # happened — so machine-id is a real file on the root subvolume.
+        # Pre-creating the bind mount by hand gets activation through, but leaves
+        # the same unit failing on every subsequent boot.
+        #
+        # The fix belongs in the rollback script itself: seed machine-id from
+        # /persist into the freshly created subvolume before sysroot is mounted.
+        # That is the same script that needs `-t btrfs`, so both land together
+        # under a deliberate reboot rather than separately.
+
         directories =
           cfg.persist.directories
           ++ [
             "/var/log"
             "/var/lib/nixos"
             "/var/lib/systemd/coredump"
+            # Where systemd records when each Persistent=true timer last ran.
+            # Lose it and every such timer treats the next boot as a missed
+            # run and fires immediately — which for this fleet means a reboot
+            # kicks off a full restic backup and a GC at once, competing with
+            # the boot it is already in the middle of.
+            "/var/lib/systemd/timers"
           ];
       };
 
