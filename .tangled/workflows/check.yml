@@ -1,13 +1,23 @@
-# The gate that matters: does every host still build?
+# The gate that matters: do the servers still build?
 #
 # `abort-on-warn = true` turns any nixpkgs or home-manager eval warning into a
 # hard failure, so an upstream deprecation does not degrade this fleet, it
 # breaks it — and without CI the place that happens is a deploy. This moves it
 # to the push.
 #
-# Three hosts, not four. pioneer is aarch64 and endeavour has no binfmt, so
-# neither this host nor the guest can emulate it; see check-pioneer.yml, which
-# tries anyway and is allowed to be red on its own.
+# Two hosts, not four, and both omissions are deliberate:
+#
+#   voyager  — the desktop, and by a wide margin the largest closure here
+#              (nvidia, Steam, OBS, FreeCAD, Zotero). The first real run spent
+#              38 minutes on it and then OOMed the guest, without ever reaching
+#              the two hosts anyone deploys remotely. It is also the host you
+#              always build locally before switching, so CI was re-proving
+#              something you find out about immediately anyway.
+#   pioneer  — aarch64, and endeavour has no binfmt. See check-pioneer.yml.
+#
+# Cheapest first. gaia is a small VPS closure and endeavour a large server one,
+# so if something breaks broadly the failure arrives in a couple of minutes
+# instead of twenty.
 #
 # See lint.yml for what --accept-flake-config and --override-input are doing;
 # both are load-bearing and neither is obvious from reading the command.
@@ -22,21 +32,21 @@ dependencies:
   - git
 
 steps:
-  # Built one at a time rather than in a single invocation: a `nix build` of all
-  # three reports the first failure and abandons the rest, and when the question
+  # Built one at a time rather than in a single invocation: a `nix build` of
+  # both reports the first failure and abandons the rest, and when the question
   # is "which host did this break" the answer should not require a second run.
   #
   # Substitution comes from attic via the spindle's host-side cache proxy
-  # (services/tangled.nix), so most of this is a download of what voyager
+  # (services/tangled.nix), so much of this is a download of what voyager
   # already built rather than a rebuild.
-  - name: build voyager
+  - name: build gaia
     command: |
       nix build \
         --accept-flake-config \
         --no-write-lock-file \
         --override-input nix-secrets ./.tangled/nix-secrets-stub \
         --print-build-logs \
-        .#nixosConfigurations.voyager.config.system.build.toplevel
+        .#nixosConfigurations.gaia.config.system.build.toplevel
 
   - name: build endeavour
     command: |
@@ -46,12 +56,3 @@ steps:
         --override-input nix-secrets ./.tangled/nix-secrets-stub \
         --print-build-logs \
         .#nixosConfigurations.endeavour.config.system.build.toplevel
-
-  - name: build gaia
-    command: |
-      nix build \
-        --accept-flake-config \
-        --no-write-lock-file \
-        --override-input nix-secrets ./.tangled/nix-secrets-stub \
-        --print-build-logs \
-        .#nixosConfigurations.gaia.config.system.build.toplevel
