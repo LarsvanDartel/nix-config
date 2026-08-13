@@ -31,6 +31,7 @@
       services.traccar
       services.tile-traccar
       services.netbird.client
+      services.comin
       services.suwayomi
       services.opencloud
       services.typstnique
@@ -142,15 +143,6 @@
       cosmos.services.minecraft.servers.hardcore = {
         port = 25566;
         motd = "lvdar.nl — hardcore";
-
-        # TEMPORARY. Two people were mid-run when view-distance was raised, and
-        # view-distance is only read at startup — so this stages the change
-        # rather than disconnecting them for it. It lands at the next restart,
-        # which is the 02:00 restic quiesce.
-        #
-        # Remove this once that has happened. Left on, every later edit to this
-        # server silently fails to take effect.
-        deferRestart = true;
         whitelist = {
           DutchRD = "7239bc30-af4e-482c-9434-7ce3005cb917";
           PittyPfert = "f2bfe527-e914-4d2b-b72b-3f1708452082";

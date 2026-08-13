@@ -27,6 +27,12 @@
       services.gatus
       services.alloy
       services.restic
+      # GitOps. Safe to automate here: remote, the most tedious host to deploy
+      # by hand, and the smallest closure in the fleet. Note it now pulls the
+      # knot through its own netbird-proxy — so a change that breaks the proxy
+      # takes this host's own update path with it, and the recovery is
+      # deploy-rs over :2222, which still works and is why that stays.
+      services.comin
     ];
 
     nixos = {...}: {
