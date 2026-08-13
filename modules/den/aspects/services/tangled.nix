@@ -165,6 +165,33 @@
 
       cfg = config.cosmos.services.tangled;
       sCfg = cfg.spindle;
+
+      # The guest image, resized.
+      #
+      # Upstream's image declares 4096 MiB and 2 vCPUs in its spec.json, which
+      # is enough for the `go test` pipelines tangled runs on it and is not
+      # enough to evaluate a NixOS closure: the first real run spent 38 minutes
+      # on voyager and then died with
+      #
+      #   guest out of memory (process 'nix' killed by guest kernel OOM)
+      #
+      # Only the spec is rewritten, not the image. memoryMiB and vcpus are
+      # arguments QEMU is launched with, so the kernel, initrd and store disk
+      # are reused verbatim by symlink — this is a few kilobytes of jq rather
+      # than a second NixOS guest build, and it stays correct across an input
+      # bump because it patches whatever upstream produced.
+      guestImage =
+        pkgs.runCommand "spindle-nixos-image-${toString sCfg.guestMemoryMiB}mib" {
+          nativeBuildInputs = [pkgs.jq];
+        } ''
+          base=${inputs.tangled.packages.${pkgs.stdenv.hostPlatform.system}.spindle-nixos-image}
+          mkdir -p "$out"
+          jq '.memoryMiB = ${toString sCfg.guestMemoryMiB} | .vcpus = ${toString sCfg.guestVcpus}' \
+            "$base/spec.json" > "$out/spec.json"
+          ln -s "$base/kernel"     "$out/kernel"
+          ln -s "$base/initrd"     "$out/initrd"
+          ln -s "$base/store-disk" "$out/store-disk"
+        '';
     in {
       imports = [inputs.tangled.nixosModules.spindle];
 
@@ -173,6 +200,33 @@
           type = str;
           default = "spindle.lvdar.nl";
           description = "Public name, covered by the existing *.lvdar.nl wildcard.";
+        };
+
+        guestMemoryMiB = mkOption {
+          type = ints.positive;
+          default = 12288;
+          description = ''
+            RAM given to each pipeline microVM, in MiB (12 GiB).
+
+            Upstream ships 4 GiB, which OOMs partway through evaluating a NixOS
+            system. 12 GiB is sized against what actually has to fit — a nix
+            evaluation of a full host closure — and against what this host can
+            spare: two concurrent workflows is 24 GiB of the 62 here, alongside
+            two Minecraft servers holding 6 GiB heaps each. limits.total below
+            is what stops that arithmetic from being merely optimistic.
+          '';
+        };
+
+        guestVcpus = mkOption {
+          type = ints.positive;
+          default = 8;
+          description = ''
+            vCPUs per pipeline microVM.
+
+            Upstream ships 2. This host has 72 threads and a nix build is the
+            most parallel workload it runs, so 2 is leaving most of the machine
+            idle while CI is the thing you are waiting on.
+          '';
         };
 
         imageDir = mkOption {
@@ -267,7 +321,7 @@
           # here also puts it in this host's system closure, which is what
           # keeps `nix-collect-garbage` from deleting a live CI image — a bare
           # symlink under /var/lib would not be a GC root.
-          "L+ ${sCfg.imageDir}/nixos - - - - ${inputs.tangled.packages.${pkgs.stdenv.hostPlatform.system}.spindle-nixos-image}"
+          "L+ ${sCfg.imageDir}/nixos - - - - ${guestImage}"
         ];
 
         services.tangled.spindle = {
@@ -297,7 +351,19 @@
             # root subvolume — so overlays are on the SSD *and* impermanence
             # discards them at every boot. For scratch that is exactly right;
             # the only reason not to would be space, which diskLimitMiB bounds.
-            limits.total.diskMiB = sCfg.diskLimitMiB;
+            limits.total = {
+              diskMiB = sCfg.diskLimitMiB;
+
+              # Ceilings on what the scheduler may have in flight at once, so
+              # raising the per-guest figures above cannot quietly become an
+              # overcommit of the host. Both are exactly two guests' worth,
+              # matching maxJobCount — the scheduler queues a third workflow
+              # rather than starting it, which is the behaviour you want when
+              # the alternative is the host swapping while two Minecraft
+              # servers are live on it.
+              memoryMiB = 2 * sCfg.guestMemoryMiB;
+              vcpus = 2 * sCfg.guestVcpus;
+            };
           };
 
           pipelines.workflowTimeout = sCfg.workflowTimeout;
