@@ -5,19 +5,18 @@
 # breaks it — and without CI the place that happens is a deploy. This moves it
 # to the push.
 #
-# Two hosts, not four, and both omissions are deliberate:
+# Three hosts, not four. pioneer is left out because it is aarch64 and
+# endeavour has no binfmt — neither this host nor the guest can emulate it, so
+# a workflow could only ever substitute its closure from attic, and would go
+# red whenever voyager had not built it yet. `nix eval` of pioneer still
+# happens implicitly wherever the flake is evaluated; what is missing is a
+# build, and the machine that can do that build is voyager.
 #
-#   voyager  — the desktop, and by a wide margin the largest closure here
-#              (nvidia, Steam, OBS, FreeCAD, Zotero). The first real run spent
-#              38 minutes on it and then OOMed the guest, without ever reaching
-#              the two hosts anyone deploys remotely. It is also the host you
-#              always build locally before switching, so CI was re-proving
-#              something you find out about immediately anyway.
-#   pioneer  — aarch64, and endeavour has no binfmt. See check-pioneer.yml.
-#
-# Cheapest first. gaia is a small VPS closure and endeavour a large server one,
-# so if something breaks broadly the failure arrives in a couple of minutes
-# instead of twenty.
+# Cheapest first, which matters because a `nix build` reports the first failure
+# and abandons the rest: gaia is a small VPS closure, endeavour a large server
+# one, and voyager the desktop with nvidia, Steam, OBS and FreeCAD in it. A
+# breakage that affects everything now surfaces in minutes rather than after
+# the biggest host has finished.
 #
 # See lint.yml for what --accept-flake-config and --override-input are doing;
 # both are load-bearing and neither is obvious from reading the command.
@@ -56,3 +55,12 @@ steps:
         --override-input nix-secrets ./.tangled/nix-secrets-stub \
         --print-build-logs \
         .#nixosConfigurations.endeavour.config.system.build.toplevel
+
+  - name: build voyager
+    command: |
+      nix build \
+        --accept-flake-config \
+        --no-write-lock-file \
+        --override-input nix-secrets ./.tangled/nix-secrets-stub \
+        --print-build-logs \
+        .#nixosConfigurations.voyager.config.system.build.toplevel

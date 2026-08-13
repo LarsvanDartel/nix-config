@@ -1,0 +1,58 @@
+# Bump flake.lock and prove the fleet still builds.
+#
+# Manual, not scheduled, because **tangled has no cron**: the only trigger
+# kinds are push, pull_request and manual (workflow/def.go). "Periodically" is
+# therefore not something a workflow can be — the timer that fires this lives
+# in services/flake-bump.nix on endeavour, and this file is the same work in a
+# form you can also run by hand from the appview when you want it now.
+#
+# Deliberately does not commit or push anything. A workflow has no credential
+# to the knot and should not get one just for this — the timer does the commit,
+# having verified the same three builds. What this gives you is the answer to
+# "would updating break anything?" on demand, without touching your tree.
+when:
+  - event: manual
+
+engine: microvm
+image: nixos
+
+dependencies:
+  - git
+
+steps:
+  # --recreate-lock-file rather than --update-input: the point is to find out
+  # what a full bump does, including the transitive inputs that `nix flake
+  # update` alone would leave pinned.
+  - name: update the lock
+    command: |
+      nix flake update \
+        --accept-flake-config \
+        --override-input nix-secrets ./.tangled/nix-secrets-stub
+      git --no-pager diff --stat flake.lock
+
+  # The same three hosts as check.yml, cheapest first, and for the same reason:
+  # abort-on-warn means a deprecation introduced upstream is a build failure,
+  # and a lock bump is exactly when one arrives.
+  - name: build gaia
+    command: |
+      nix build \
+        --accept-flake-config \
+        --override-input nix-secrets ./.tangled/nix-secrets-stub \
+        --print-build-logs \
+        .#nixosConfigurations.gaia.config.system.build.toplevel
+
+  - name: build endeavour
+    command: |
+      nix build \
+        --accept-flake-config \
+        --override-input nix-secrets ./.tangled/nix-secrets-stub \
+        --print-build-logs \
+        .#nixosConfigurations.endeavour.config.system.build.toplevel
+
+  - name: build voyager
+    command: |
+      nix build \
+        --accept-flake-config \
+        --override-input nix-secrets ./.tangled/nix-secrets-stub \
+        --print-build-logs \
+        .#nixosConfigurations.voyager.config.system.build.toplevel
