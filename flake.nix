@@ -10,6 +10,10 @@
   };
 
   inputs = {
+    comin = {
+      url = "github:nlewo/comin";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
     den.url = "github:denful/den";
     deploy-rs = {
       url = "github:serokell/deploy-rs";
@@ -55,14 +59,6 @@
     nur = {
       url = "github:nix-community/NUR";
       inputs.nixpkgs.follows = "nixpkgs";
-    };
-    oisd-big-unbound = {
-      url = "https://big.oisd.nl/unbound";
-      flake = false;
-    };
-    oisd-nsfw-unbound = {
-      url = "https://nsfw.oisd.nl/unbound";
-      flake = false;
     };
     pre-commit-hooks = {
       url = "github:cachix/git-hooks.nix";

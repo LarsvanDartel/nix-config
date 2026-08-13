@@ -1,17 +1,28 @@
-# services.unbound — recursive DNS + oisd blocklist. Owns the oisd inputs
-# (referenced by hosts that build a blocklist, e.g. endeavour).
-{inputs, ...}: {
-  flake-file.inputs = {
-    oisd-big-unbound = {
-      url = "https://big.oisd.nl/unbound";
-      flake = false;
-    };
-    oisd-nsfw-unbound = {
-      url = "https://nsfw.oisd.nl/unbound";
-      flake = false;
-    };
-  };
-
+# services.unbound — recursive DNS + oisd blocklist.
+#
+# The blocklists are **vendored** in ./_unbound rather than fetched as flake
+# inputs, and that is a correctness fix, not tidying.
+#
+# They used to be `flake = false` inputs pointing at https://big.oisd.nl/unbound
+# and its nsfw sibling. oisd regenerates those files continuously — the header
+# of each snapshot carries a `# Version: YYYYMMDDHHMM` line — so the narHash in
+# flake.lock describes a file that no longer exists at that URL within a day or
+# so. Every machine here kept working anyway, because the fetched copy was
+# already in its store and eval cache. The first environment with a genuinely
+# cold store was CI, and it failed immediately:
+#
+#   error: mismatch in field 'narHash' of input
+#          {"type":"file","url":"https://big.oisd.nl/unbound"}
+#
+# which means the same failure was waiting for any fresh machine, or for any
+# rebuild after a garbage collection deep enough to drop those paths. A DNS
+# blocklist is not something to discover you cannot rebuild during a recovery.
+#
+# The cost is 12 MB + 22 MB of sorted domains in git, ~4.8 MB compressed, and
+# an explicit act to update — `nix run .#update-blocklists`. That is the right
+# trade for the fleet's resolver: updates become a reviewable commit instead of
+# a silent change in what the network can reach.
+{...}: {
   den.aspects.services.unbound.nixos = {
     config,
     lib,
@@ -107,8 +118,8 @@
       cosmos.services.unbound.blocklist = mkIf cfg.oisd.enable (
         let
           lines = str: filter (x: x != "") (splitString "\n" str);
-          bigLines = lines (builtins.readFile inputs.oisd-big-unbound);
-          nsfwLines = lines (builtins.readFile inputs.oisd-nsfw-unbound);
+          bigLines = lines (builtins.readFile ./_unbound/oisd-big.unbound);
+          nsfwLines = lines (builtins.readFile ./_unbound/oisd-nsfw.unbound);
           merged =
             concatStringsSep "\n"
             (uniqueStrings bigLines ++ optional cfg.oisd.nsfw (concatStringsSep "\n" nsfwLines));
