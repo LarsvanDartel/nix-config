@@ -38,7 +38,10 @@
   };
 
   den.aspects.services.comin = {
-    includes = [den.aspects.services.netbird.client];
+    includes = [
+      den.aspects.services.netbird.client
+      den.aspects.core.sops
+    ];
 
     nixos = {
       config,
@@ -79,6 +82,32 @@
           '';
         };
 
+        secretsKeyFile = mkOption {
+          type = str;
+          default = config.sops.secrets."keys/comin/nix-secrets-key".path;
+          defaultText = "the comin nix-secrets sops secret";
+          description = ''
+            Read-only deploy key for the private nix-secrets repository.
+
+            This is the thing that made comin look like it worked on endeavour
+            and not on gaia, and the distinction is worth writing down. comin
+            evaluates the flake *on the host*, so it fetches every input
+            itself — unlike deploy-rs, which builds elsewhere and copies a
+            finished closure over. nix-secrets is a `git+ssh` input that
+            core/sops.nix forces at eval time, so every poll needs it.
+            endeavour happened to have that exact revision in its store
+            already, so the fetch was a cache hit and never touched the
+            network; gaia never had it and failed every poll it ever made
+            with "Host key verification failed". The moment nix-secrets is
+            bumped, endeavour hits the same wall — this fixes both.
+
+            Read-only and scoped to that one repository as a GitHub deploy
+            key, not an account key. What it grants is sight of the
+            *ciphertext*: sops age keys are per-host, so a host with this key
+            still cannot decrypt another host's secrets.
+          '';
+        };
+
         exporterPort = mkOption {
           type = ints.positive;
           default = 4243;
@@ -91,6 +120,44 @@
       };
 
       config = {
+        sops.secrets."keys/comin/nix-secrets-key" = {
+          sopsFile = builtins.toString inputs.nix-secrets + "/hosts/common/secrets.yaml";
+          mode = "0400";
+        };
+
+        # github.com's host key, pinned rather than accepted on first use.
+        # Taken from api.github.com/meta, which is where GitHub publishes it.
+        #
+        # StrictHostKeyChecking below is `yes`, not `accept-new`: with the key
+        # pinned here there is no first use left to accept, so anything that
+        # does not match this is a failure rather than a new entry written to
+        # a file nobody reads. That is the whole reason to pin it — a fetch
+        # that silently trusts whatever answers is not meaningfully
+        # authenticated.
+        programs.ssh.knownHosts."github.com" = {
+          hostNames = ["github.com"];
+          publicKey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl";
+        };
+
+        # Scoped to this unit rather than dropped into /root/.ssh/config: the
+        # key exists for comin's flake fetches and nothing else on the host has
+        # any business using it.
+        systemd.services.comin.environment.GIT_SSH_COMMAND = "ssh -i ${cfg.secretsKeyFile} -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes";
+
+        # gcroots is the part that matters: it pins the last generation comin
+        # built so a GC between build and switch cannot delete it out from
+        # under the deployer. store.json (deployment history) and the working
+        # clone are merely expensive to lose — without this, every boot on an
+        # impermanent host is a fresh clone of the whole repository.
+        cosmos.system.impermanence.persist.directories = [
+          {
+            directory = "/var/lib/comin";
+            user = "root";
+            group = "root";
+            mode = "0700";
+          }
+        ];
+
         services.comin = {
           enable = true;
 
