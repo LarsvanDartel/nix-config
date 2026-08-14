@@ -166,27 +166,38 @@
       cfg = config.cosmos.services.tangled;
       sCfg = cfg.spindle;
 
-      # The guest image, resized.
+      # The guest image, resized — memory, vCPUs and disk.
       #
-      # Upstream's image declares 4096 MiB and 2 vCPUs in its spec.json, which
-      # is enough for the `go test` pipelines tangled runs on it and is not
-      # enough to evaluate a NixOS closure: the first real run spent 38 minutes
-      # on voyager and then died with
+      # Upstream's image declares 4096 MiB, 2 vCPUs and a 24 GiB writable
+      # volume in its spec.json. Those suit the `go test` pipelines tangled
+      # runs on it and none of them survive a NixOS closure; both failures were
+      # found by running it, one after the other:
       #
       #   guest out of memory (process 'nix' killed by guest kernel OOM)
+      #   mkdir: cannot create directory '…-unit-loki.service':
+      #     No space left on device
       #
-      # Only the spec is rewritten, not the image. memoryMiB and vcpus are
-      # arguments QEMU is launched with, so the kernel, initrd and store disk
-      # are reused verbatim by symlink — this is a few kilobytes of jq rather
-      # than a second NixOS guest build, and it stays correct across an input
-      # bump because it patches whatever upstream produced.
+      # The second one is the subtler of the two. That 24 GiB volume is the
+      # *whole* writable surface of the build — nix store, eval cache and
+      # workspace together — so gaia's closure fits and endeavour's does not.
+      # `limits.total.diskMiB` below looks like it governs this and does not:
+      # it is a scheduler budget across concurrent workflows and never resizes
+      # a guest.
+      #
+      # Only the spec is rewritten, not the image. All three are arguments QEMU
+      # is launched with, so the kernel, initrd and store disk are reused
+      # verbatim by symlink — a few kilobytes of jq rather than a second NixOS
+      # guest build, and it stays correct across an input bump because it
+      # patches whatever upstream produced rather than reimplementing it.
       guestImage =
         pkgs.runCommand "spindle-nixos-image-${toString sCfg.guestMemoryMiB}mib" {
           nativeBuildInputs = [pkgs.jq];
         } ''
           base=${inputs.tangled.packages.${pkgs.stdenv.hostPlatform.system}.spindle-nixos-image}
           mkdir -p "$out"
-          jq '.memoryMiB = ${toString sCfg.guestMemoryMiB} | .vcpus = ${toString sCfg.guestVcpus}' \
+          jq '.memoryMiB = ${toString sCfg.guestMemoryMiB}
+              | .vcpus = ${toString sCfg.guestVcpus}
+              | .volumes |= map(.sizeMiB = ${toString sCfg.guestDiskMiB})' \
             "$base/spec.json" > "$out/spec.json"
           ln -s "$base/kernel"     "$out/kernel"
           ln -s "$base/initrd"     "$out/initrd"
@@ -214,6 +225,27 @@
             spare: two concurrent workflows is 24 GiB of the 62 here, alongside
             two Minecraft servers holding 6 GiB heaps each. limits.total below
             is what stops that arithmetic from being merely optimistic.
+          '';
+        };
+
+        guestDiskMiB = mkOption {
+          type = ints.positive;
+          default = 65536;
+          description = ''
+            Writable volume inside each pipeline microVM, in MiB (64 GiB).
+
+            Upstream ships 24 GiB, which holds gaia's closure and not
+            endeavour's. This is the nix store, the eval cache and the
+            workspace combined, so it has to fit a whole NixOS system with the
+            build's intermediates on top.
+
+            64 GiB is deliberately generous against ~25 GiB of real usage: the
+            overlay is sparse and thrown away per run, so the declared size
+            costs nothing until it is used. What it does cost is a ceiling —
+            two guests could in principle want 128 GiB against the ~186 GB free
+            on this SSD. If that ever becomes real rather than theoretical, the
+            move is to point pipelines.microvm.overlayDir at /tank, which has a
+            terabyte spare and trades latency for room.
           '';
         };
 
@@ -262,21 +294,6 @@
 
             Not added to persist.directories: /tank is outside the persist layer
             and an entry would bind-mount /persist over it. See the knot above.
-          '';
-        };
-
-        diskLimitMiB = mkOption {
-          type = ints.unsigned;
-          default = 61440;
-          description = ''
-            Ceiling on total microVM disk usage, in MiB (60 GiB).
-
-            The module's default is 0, meaning unlimited. That is tolerable when
-            the images sit on a 1.4 TB array and genuinely is not when they sit
-            on the 233 GB system SSD: a runaway build filling the root
-            filesystem takes the host down, not just the job. 60 GiB against
-            ~187 GB free leaves room for the system to keep working while a
-            build misbehaves.
           '';
         };
 
@@ -347,22 +364,23 @@
             # cache would be re-fetched after every reboot.
             inherit (sCfg) imageDir;
 
-            # Left at the module's default of /tmp, which on this host is the
-            # root subvolume — so overlays are on the SSD *and* impermanence
-            # discards them at every boot. For scratch that is exactly right;
-            # the only reason not to would be space, which diskLimitMiB bounds.
+            # overlayDir is left at the module's default of /tmp, which on this
+            # host is the root subvolume — so overlays are on the SSD *and*
+            # impermanence discards them at every boot. For scratch that is
+            # exactly right; the only reason to move it to /tank would be
+            # space, and limits.total below is what keeps that from arising.
+            #
+            # Ceilings on what the scheduler may have in flight at once, so
+            # raising the per-guest figures above cannot quietly become an
+            # overcommit of the host. All three are exactly two guests' worth,
+            # matching maxJobCount — the scheduler queues a third workflow
+            # rather than starting it, which is the behaviour you want when the
+            # alternative is the host swapping, or filling its root filesystem,
+            # while two Minecraft servers are live on it.
             limits.total = {
-              diskMiB = sCfg.diskLimitMiB;
-
-              # Ceilings on what the scheduler may have in flight at once, so
-              # raising the per-guest figures above cannot quietly become an
-              # overcommit of the host. Both are exactly two guests' worth,
-              # matching maxJobCount — the scheduler queues a third workflow
-              # rather than starting it, which is the behaviour you want when
-              # the alternative is the host swapping while two Minecraft
-              # servers are live on it.
               memoryMiB = 2 * sCfg.guestMemoryMiB;
               vcpus = 2 * sCfg.guestVcpus;
+              diskMiB = 2 * sCfg.guestDiskMiB;
             };
           };
 
