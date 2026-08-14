@@ -156,6 +156,9 @@
         whitelist = {
           DutchRD = "7239bc30-af4e-482c-9434-7ce3005cb917";
           PittyPfert = "f2bfe527-e914-4d2b-b72b-3f1708452082";
+          # Same UUID as on smp above — the account is the identity, the name
+          # is a label its owner can change.
+          Svenie23 = "1fd240dc-faa7-4a34-a12b-5465dec604d1";
         };
         operators = {};
 
