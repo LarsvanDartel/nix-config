@@ -215,16 +215,21 @@
 
         guestMemoryMiB = mkOption {
           type = ints.positive;
-          default = 12288;
+          default = 16384;
           description = ''
-            RAM given to each pipeline microVM, in MiB (12 GiB).
+            RAM given to each pipeline microVM, in MiB (16 GiB).
 
             Upstream ships 4 GiB, which OOMs partway through evaluating a NixOS
-            system. 12 GiB is sized against what actually has to fit — a nix
+            system. This is sized against what actually has to fit — a nix
             evaluation of a full host closure — and against what this host can
-            spare: two concurrent workflows is 24 GiB of the 62 here, alongside
+            spare: two concurrent workflows is 32 GiB of the 62 here, alongside
             two Minecraft servers holding 6 GiB heaps each. limits.total below
             is what stops that arithmetic from being merely optimistic.
+
+            Raised from 12 GiB together with guestVcpus: nix defaults max-jobs
+            to the core count, so quadrupling the vCPUs quadruples how many
+            builders can be resident at once, and memory has to follow or the
+            first thing the extra parallelism buys is an OOM.
           '';
         };
 
@@ -251,13 +256,19 @@
 
         guestVcpus = mkOption {
           type = ints.positive;
-          default = 8;
+          default = 32;
           description = ''
             vCPUs per pipeline microVM.
 
             Upstream ships 2. This host has 72 threads and a nix build is the
             most parallel workload it runs, so 2 is leaving most of the machine
             idle while CI is the thing you are waiting on.
+
+            32 rather than 8, which was itself a conservative first guess made
+            before anything had run: two guests at this size is 64 of 72
+            threads, leaving the host eight for jellyfin, immich and two live
+            Minecraft servers. The ceiling that keeps that true is
+            limits.total below, not this.
           '';
         };
 
@@ -418,10 +429,29 @@
               (config.cosmos.services.attic.client.publicKey != null)
               config.cosmos.services.attic.client.publicKey;
 
-            # uploadUrl deliberately unset. Pushing CI output back into attic
-            # would make the next deploy instant, but it needs a write token,
-            # and a cache that CI can write to is a cache that a bad pipeline
-            # can poison. Worth revisiting once the read path has proven itself.
+            # "daemon" means the host's own Nix store, and that is the only
+            # shape that works here — not a shortcut. Spindle's upload backend
+            # accepts http(s) (a writable cache such as ncps), ssh/ssh-ng, or
+            # daemon/local; attic's API is none of those, so attic cannot be an
+            # upload target at all. Pointing at the store instead costs one hop
+            # and no new component: services/attic.nix runs watch-store on this
+            # host, so anything a guest builds lands here and is published from
+            # here.
+            #
+            # What this buys is the thing the read path could not: before it,
+            # every run threw away everything it built with the guest, so a
+            # cold closure was rebuilt from source on every push. Now the second
+            # run of anything is a download.
+            #
+            # The cost, stated plainly: a pipeline can now put paths into this
+            # host's store, and watch-store will publish them to the cache the
+            # whole fleet substitutes from. For a push by someone who can
+            # already write to main that changes nothing. For a pull_request
+            # from a fork it does — that is an untrusted build whose output
+            # becomes a signed path the fleet trusts. The mitigation if this
+            # repo ever takes outside contributions is to drop pull_request
+            # from check.yml's triggers, not to keep this off.
+            uploadUrl = "daemon";
           };
         };
 
