@@ -20,6 +20,17 @@
 #
 # See lint.yml for what --accept-flake-config and --override-input are doing;
 # both are load-bearing and neither is obvious from reading the command.
+#
+# No --print-build-logs here, unlike lint.yml. Every line a step emits crosses
+# the host↔guest vsock, and streaming every builder's full output killed that
+# channel 23 minutes into `build endeavour`:
+#
+#   read agent message: read vsock host(2):10240->vm(23921): no buffer space
+#
+# The build had not failed — the transport carrying its output had, with the
+# guest agent writing faster than the host drained it. Little is lost: nix
+# still prints the tail of a *failing* builder's log without -L, which is the
+# part anyone reads. lint.yml keeps it because its output is kilobytes.
 when:
   - event: ["push", "pull_request"]
     branch: main
@@ -44,7 +55,6 @@ steps:
         --accept-flake-config \
         --no-write-lock-file \
         --override-input nix-secrets ./.tangled/nix-secrets-stub \
-        --print-build-logs \
         .#nixosConfigurations.gaia.config.system.build.toplevel
 
   - name: build endeavour
@@ -53,7 +63,6 @@ steps:
         --accept-flake-config \
         --no-write-lock-file \
         --override-input nix-secrets ./.tangled/nix-secrets-stub \
-        --print-build-logs \
         .#nixosConfigurations.endeavour.config.system.build.toplevel
 
   - name: build voyager
@@ -62,5 +71,4 @@ steps:
         --accept-flake-config \
         --no-write-lock-file \
         --override-input nix-secrets ./.tangled/nix-secrets-stub \
-        --print-build-logs \
         .#nixosConfigurations.voyager.config.system.build.toplevel
