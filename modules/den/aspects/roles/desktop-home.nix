@@ -10,13 +10,14 @@
       firefox
       mpv
       spotify
-      # discord — disabled, not deleted. Its package fetches `full.distro`
-      # from a version-pinned stable.dl2.discordapp.net URL that Discord
-      # deletes when it ships the next build, so any machine without that
-      # path already in its store cannot build this closure at all. It ran
-      # here only because voyager fetched it while the URL still worked; CI
-      # in a clean guest went red on it. The aspect and its persist entry are
-      # untouched — re-add this line once nixpkgs points at a live URL.
+      # Fetches `full.distro` from a version-pinned stable.dl2.discordapp.net
+      # URL that Discord deletes when it ships the next build, so a machine
+      # without that path already in its store cannot build this closure —
+      # voyager can only because it fetched it while the URL still worked. It
+      # was dropped for a while because CI in a clean guest went red on it;
+      # with that gate gone it is voyager's problem alone, and voyager has the
+      # path. Expect it to bite on a fresh install or after a store GC.
+      discord
       signal
       kde-connect
       bluetuith
