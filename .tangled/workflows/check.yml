@@ -25,8 +25,18 @@
 # guest agent writing faster than the host drained it. Little is lost: nix
 # still prints the tail of a *failing* builder's log without -L, which is the
 # part anyone reads. lint.yml keeps it because its output is kilobytes.
+# push only, deliberately. Since services/tangled.nix set uploadUrl = "daemon",
+# anything a guest builds lands in endeavour's store and watch-store publishes
+# it to the cache the whole fleet substitutes from. A push comes from someone
+# who can already write to main, so that grants nothing new. A pull_request
+# from a fork would be an untrusted build whose output becomes a path the fleet
+# trusts — so that trigger is gone rather than the upload.
+#
+# The consequence to know: a PR gets no CI. If this repo ever takes outside
+# contributions, the way back is to unset uploadUrl and restore the trigger,
+# not to restore the trigger alone.
 when:
-  - event: ["push", "pull_request"]
+  - event: ["push"]
     branch: main
 
 engine: microvm
