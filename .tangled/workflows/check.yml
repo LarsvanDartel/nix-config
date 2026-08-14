@@ -12,18 +12,12 @@
 # happens implicitly wherever the flake is evaluated; what is missing is a
 # build, and the machine that can do that build is voyager.
 #
-# Cheapest first, which matters because a `nix build` reports the first failure
-# and abandons the rest: gaia is a small VPS closure, endeavour a large server
-# one, and voyager the desktop with nvidia, Steam, OBS and FreeCAD in it. A
-# breakage that affects everything now surfaces in minutes rather than after
-# the biggest host has finished.
-#
 # See lint.yml for what --accept-flake-config and --override-input are doing;
 # both are load-bearing and neither is obvious from reading the command.
 #
-# No --print-build-logs here, unlike lint.yml. Every line a step emits crosses
-# the host↔guest vsock, and streaming every builder's full output killed that
-# channel 23 minutes into `build endeavour`:
+# No --print-build-logs, unlike lint.yml. Every line a step emits crosses the
+# host↔guest vsock, and streaming every builder's full output killed that
+# channel 23 minutes into a build:
 #
 #   read agent message: read vsock host(2):10240->vm(23921): no buffer space
 #
@@ -42,33 +36,31 @@ dependencies:
   - git
 
 steps:
-  # Built one at a time rather than in a single invocation: a `nix build` of
-  # both reports the first failure and abandons the rest, and when the question
-  # is "which host did this break" the answer should not require a second run.
+  # One invocation for all three, not one step each.
   #
-  # Substitution comes from attic via the spindle's host-side cache proxy
-  # (services/tangled.nix), so much of this is a download of what voyager
-  # already built rather than a rebuild.
-  - name: build gaia
+  # It was three steps so that a red mark named the host that broke. That cost
+  # more than it was worth: each step re-evaluated the whole flake from
+  # scratch — a minute of pure eval, three times — and nothing overlapped, so
+  # three hosts that share almost their entire closure were built strictly one
+  # after another. A cold run took 46 minutes just to *reach* the third.
+  #
+  # --keep-going is what makes this an equal trade rather than a worse one: a
+  # nix build without it reports the first failure and abandons the rest, which
+  # is precisely the "which host did this break" problem in a new place. With
+  # it, every host that fails is reported in one run. What is lost is only that
+  # the failures arrive as one red step instead of three.
+  #
+  # Substitution comes from attic via the spindle's host-side cache proxy, and
+  # what the guest builds is uploaded back into endeavour's store, where
+  # watch-store publishes it (services/tangled.nix). So the second run of
+  # anything is a download rather than a rebuild.
+  - name: build all three x86_64 hosts
     command: |
       nix build \
         --accept-flake-config \
         --no-write-lock-file \
         --override-input nix-secrets ./.tangled/nix-secrets-stub \
-        .#nixosConfigurations.gaia.config.system.build.toplevel
-
-  - name: build endeavour
-    command: |
-      nix build \
-        --accept-flake-config \
-        --no-write-lock-file \
-        --override-input nix-secrets ./.tangled/nix-secrets-stub \
-        .#nixosConfigurations.endeavour.config.system.build.toplevel
-
-  - name: build voyager
-    command: |
-      nix build \
-        --accept-flake-config \
-        --no-write-lock-file \
-        --override-input nix-secrets ./.tangled/nix-secrets-stub \
+        --keep-going \
+        .#nixosConfigurations.gaia.config.system.build.toplevel \
+        .#nixosConfigurations.endeavour.config.system.build.toplevel \
         .#nixosConfigurations.voyager.config.system.build.toplevel
