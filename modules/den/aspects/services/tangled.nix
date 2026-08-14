@@ -429,29 +429,18 @@
               (config.cosmos.services.attic.client.publicKey != null)
               config.cosmos.services.attic.client.publicKey;
 
-            # "daemon" means the host's own Nix store, and that is the only
-            # shape that works here — not a shortcut. Spindle's upload backend
-            # accepts http(s) (a writable cache such as ncps), ssh/ssh-ng, or
-            # daemon/local; attic's API is none of those, so attic cannot be an
-            # upload target at all. Pointing at the store instead costs one hop
-            # and no new component: services/attic.nix runs watch-store on this
-            # host, so anything a guest builds lands here and is published from
-            # here.
+            # uploadUrl deliberately unset. It was briefly "daemon" — the
+            # host's own store, which is the only shape that works, since
+            # spindle's upload backend takes http(s), ssh or daemon/local and
+            # attic's API is none of those. Paths a guest built would land here
+            # and watch-store would publish them.
             #
-            # What this buys is the thing the read path could not: before it,
-            # every run threw away everything it built with the guest, so a
-            # cold closure was rebuilt from source on every push. Now the second
-            # run of anything is a download.
-            #
-            # The cost, stated plainly: a pipeline can now put paths into this
-            # host's store, and watch-store will publish them to the cache the
-            # whole fleet substitutes from. For a push by someone who can
-            # already write to main that changes nothing. For a pull_request
-            # from a fork it does — that is an untrusted build whose output
-            # becomes a signed path the fleet trusts. The mitigation if this
-            # repo ever takes outside contributions is to drop pull_request
-            # from check.yml's triggers, not to keep this off.
-            uploadUrl = "daemon";
+            # Off again because it forced pull_request out of every workflow's
+            # triggers: a fork's pipeline could otherwise put paths into this
+            # host's store and from there into the cache the whole fleet
+            # substitutes from. With the per-push build gate gone that trade
+            # stopped being worth it — what remains to upload is lint output,
+            # which nothing is waiting on.
           };
         };
 

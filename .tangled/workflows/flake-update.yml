@@ -30,15 +30,22 @@ steps:
         --override-input nix-secrets ./.tangled/nix-secrets-stub
       git --no-pager diff --stat flake.lock
 
-  # The same three hosts as check.yml, cheapest first, and for the same reason:
-  # abort-on-warn means a deprecation introduced upstream is a build failure,
-  # and a lock bump is exactly when one arrives.
+  # Three hosts, cheapest first: abort-on-warn means a deprecation introduced
+  # upstream is a build failure, and a lock bump is exactly when one arrives.
+  #
+  # No --print-build-logs. Every line a step emits crosses the host<->guest
+  # vsock, and streaming every builder's output killed that channel 23 minutes
+  # into a build of endeavour:
+  #
+  #   read agent message: read vsock host(2):10240->vm(23921): no buffer space
+  #
+  # The build had not failed; the transport carrying its output had. nix still
+  # prints the tail of a failing builder's log without -L.
   - name: build gaia
     command: |
       nix build \
         --accept-flake-config \
         --override-input nix-secrets ./.tangled/nix-secrets-stub \
-        --print-build-logs \
         .#nixosConfigurations.gaia.config.system.build.toplevel
 
   - name: build endeavour
@@ -46,7 +53,6 @@ steps:
       nix build \
         --accept-flake-config \
         --override-input nix-secrets ./.tangled/nix-secrets-stub \
-        --print-build-logs \
         .#nixosConfigurations.endeavour.config.system.build.toplevel
 
   - name: build voyager
@@ -54,5 +60,4 @@ steps:
       nix build \
         --accept-flake-config \
         --override-input nix-secrets ./.tangled/nix-secrets-stub \
-        --print-build-logs \
         .#nixosConfigurations.voyager.config.system.build.toplevel

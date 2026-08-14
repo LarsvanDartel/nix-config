@@ -8,12 +8,8 @@
 # Both embed the four `activatable-nixos-system-*` store paths with context, so
 # either one drags in every host including aarch64 pioneer. That is also why
 # this file does not simply run `nix flake check`.
-# push only. Not because linting is dangerous, but because uploadUrl is a
-# property of the microvm engine rather than of one workflow: this builds
-# derivations too, and they land in endeavour's store the same way check.yml's
-# do. See the longer note in check.yml.
 when:
-  - event: ["push"]
+  - event: ["push", "pull_request"]
     branch: main
 
 engine: microvm
