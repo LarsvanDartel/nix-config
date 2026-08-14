@@ -35,6 +35,7 @@
       # The scheduled lock bump. On this host because it has the build
       # capacity and the knot; nowhere else because it pushes to main.
       services.flake-bump
+      services.build-gate
       services.suwayomi
       services.opencloud
       services.typstnique

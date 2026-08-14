@@ -60,7 +60,7 @@
       users.users.kanidm.extraGroups = ["acme"];
 
       services.kanidm = {
-        package = pkgs.kanidmWithSecretProvisioning_1_10;
+        package = pkgs.kanidmWithSecretProvisioning_1_11;
         server = {
           enable = true;
           settings = {
