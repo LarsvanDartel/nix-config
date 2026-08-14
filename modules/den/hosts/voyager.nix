@@ -243,6 +243,13 @@
       # as a remote builder.
       boot.binfmt.emulatedSystems = ["aarch64-linux"];
 
+      # Push what this machine builds to the cache, which is most of what the
+      # fleet builds: the desktop closure, everything from the overlays, and
+      # the emulated aarch64 toplevel above — the expensive one this exists
+      # for. Until now nothing anywhere pushed, so the cache was empty and CI
+      # rebuilt from source what this laptop had already emulated.
+      cosmos.services.attic.client.watchStore.enable = true;
+
       system.stateVersion = "24.11";
     };
   };
