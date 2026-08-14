@@ -108,6 +108,12 @@
       # the whole reason the PDS went in first.
       cosmos.services.tangled.owner = "did:plc:wj6rsizbzc7fruoopsxg2k2a";
 
+      # This host both serves the cache and pushes to it. Not redundant: the
+      # nightly lock bump builds all three x86_64 closures here, and without
+      # this they would exist only in the local store — CI would still fetch
+      # nothing and rebuild them inside the microVM the next morning.
+      cosmos.services.attic.client.watchStore.enable = true;
+
       # The survival server. One instance on the default port, which is what
       # keeps the address a bare `minecraft.lvdar.nl` with no port suffix for
       # anyone joining — a second server would need its own port here, its own

@@ -28,7 +28,11 @@
 #     persist layer, so an entry there bind-mounts /persist over the top and
 #     silently puts a growing binary cache on the 250 GB system SSD. The small
 #     sqlite index is the opposite case and does get a persist entry.
-{den, ...}: {
+{
+  den,
+  inputs,
+  ...
+}: {
   # The pull side, in roles.default so every host benefits — including
   # endeavour, which costs nothing there since it is the server.
   #
@@ -38,68 +42,168 @@
   # to write down until then. Deploy the server, run `atticd-atticadm` to make
   # the cache, then paste the public key into the option default below and
   # deploy the clients.
-  den.aspects.services.attic.client.nixos = {
-    config,
-    lib,
-    ...
-  }: let
-    inherit (lib.options) mkOption;
-    inherit (lib.types) nullOr str;
+  den.aspects.services.attic.client = {
+    includes = [den.aspects.core.sops];
 
-    cfg = config.cosmos.services.attic.client;
-  in {
-    options.cosmos.services.attic.client = {
-      endpoint = mkOption {
-        type = str;
-        default = "http://endeavour.nb.lvdar.nl:8090/lvdar";
-        description = ''
-          The cache to pull from, as a mesh URL.
+    nixos = {
+      config,
+      lib,
+      pkgs,
+      ...
+    }: let
+      inherit (lib.options) mkOption mkEnableOption;
+      inherit (lib.types) nullOr str;
 
-          A literal rather than a reference to the server aspect's options: den
-          cannot read another host's config, which is the same reason
-          gaia.nix hardcodes endeavour's service ports.
+      cfg = config.cosmos.services.attic.client;
+
+      # attic's CLI has no --config; it reads $XDG_CONFIG_HOME/attic/config.toml
+      # and nothing else. Hence the runtime directory below with a symlink into
+      # the rendered secret, rather than a path passed on the command line.
+      configHome = "/run/attic-client";
+    in {
+      options.cosmos.services.attic.client = {
+        serverUrl = mkOption {
+          type = str;
+          default = "http://endeavour.nb.lvdar.nl:8090";
+          description = ''
+            The attic server, without a cache name.
+
+            A literal rather than a reference to the server aspect's options:
+            den cannot read another host's config, which is the same reason
+            gaia.nix hardcodes endeavour's service ports.
+          '';
+        };
+
+        cacheName = mkOption {
+          type = str;
+          default = "lvdar";
+          description = "The cache on that server. Must match the server aspect's own cacheName.";
+        };
+
+        endpoint = mkOption {
+          type = str;
+          default = "${cfg.serverUrl}/${cfg.cacheName}";
+          defaultText = "\${serverUrl}/\${cacheName}";
+          description = ''
+            The cache to pull from, as a mesh URL. This is the substituter;
+            watch-store below wants serverUrl instead, because the CLI takes
+            the cache as an argument rather than in the URL.
+          '';
+        };
+
+        publicKey = mkOption {
+          type = nullOr str;
+          default = "lvdar:BgBRpHKR8srVXZHj5NRzLcDR6szD6SCpMPC9gTZE7LU=";
+          example = "lvdar:abc123...=";
+          description = ''
+            The cache's signing public key. With this null, no substituter is
+            configured at all — Nix refuses paths it cannot verify, so a
+            substituter without its key is worse than none.
+
+            Minted by attic when the cache was created and safe to keep in the
+            repo: it verifies signatures, it does not make them. The private
+            half never leaves keys/attic/token-secret.
+
+            The cache is also marked `public`, which here means "no token needed
+            to pull" rather than "reachable by anyone" — it only listens on the
+            mesh. That is the same trust boundary loki, prometheus and
+            node-exporter already sit behind on this host, and it is what lets
+            every peer substitute without a netrc file to distribute and rotate.
+          '';
+        };
+
+        watchStore.enable = mkEnableOption ''
+          uploading every new store path to the cache.
+
+          The half that was missing. Reads were configured on every host from
+          the start and writes were configured nowhere, so the cache answered
+          404 for every closure this fleet has ever built — CI read it,
+          got nothing, and compiled from source. `attic watch-store` closes
+          that by tailing the store and pushing what appears.
+
+          On the two hosts that actually build: voyager, which makes the
+          expensive closures and emulates pioneer's aarch64 one, and endeavour,
+          which runs the nightly lock bump for all three x86_64 systems.
+
+          Paths already on cache.nixos.org are skipped by attic's upstream
+          filter, so what lands here is what upstream does not have — overlays,
+          this repo's own packages, the emulated aarch64 build. That is also
+          the answer to "does this upload my whole store": no, only the part no
+          public cache can serve
         '';
       };
 
-      publicKey = mkOption {
-        type = nullOr str;
-        default = "lvdar:BgBRpHKR8srVXZHj5NRzLcDR6szD6SCpMPC9gTZE7LU=";
-        example = "lvdar:abc123...=";
-        description = ''
-          The cache's signing public key. With this null, no substituter is
-          configured at all — Nix refuses paths it cannot verify, so a
-          substituter without its key is worse than none.
+      config = lib.mkMerge [
+        (lib.mkIf (cfg.publicKey != null) {
+          nix.settings = {
+            # Merged with cache.nixos.org rather than displacing it. List order is
+            # not what decides precedence — Nix sorts by the `priority` each cache
+            # advertises in its nix-cache-info, and attic serves 41 against
+            # upstream's 40, so cache.nixos.org is still tried first for everything
+            # it already has. This one answers for what it does not: the aarch64
+            # closures built under emulation, and anything from an overlay here.
+            substituters = [cfg.endpoint];
+            trusted-public-keys = [cfg.publicKey];
 
-          Minted by attic when the cache was created and safe to keep in the
-          repo: it verifies signatures, it does not make them. The private
-          half never leaves keys/attic/token-secret.
+            # The cache is mesh-only, so voyager is regularly somewhere it cannot
+            # be reached. Both of these are about that: fail over to building or
+            # to cache.nixos.org quickly instead of hanging on a dead route.
+            connect-timeout = 5;
+            fallback = true;
+          };
+        })
 
-          The cache is also marked `public`, which here means "no token needed
-          to pull" rather than "reachable by anyone" — it only listens on the
-          mesh. That is the same trust boundary loki, prometheus and
-          node-exporter already sit behind on this host, and it is what lets
-          every peer substitute without a netrc file to distribute and rotate.
-        '';
-      };
-    };
+        (lib.mkIf cfg.watchStore.enable {
+          sops = {
+            secrets."keys/attic/push-token" = {
+              sopsFile = builtins.toString inputs.nix-secrets + "/hosts/common/secrets.yaml";
+              mode = "0400";
+            };
 
-    config = lib.mkIf (cfg.publicKey != null) {
-      nix.settings = {
-        # Merged with cache.nixos.org rather than displacing it. List order is
-        # not what decides precedence — Nix sorts by the `priority` each cache
-        # advertises in its nix-cache-info, and attic serves 41 against
-        # upstream's 40, so cache.nixos.org is still tried first for everything
-        # it already has. This one answers for what it does not: the aarch64
-        # closures built under emulation, and anything from an overlay here.
-        substituters = [cfg.endpoint];
-        trusted-public-keys = [cfg.publicKey];
+            # A whole config file rather than a bare secret, because the CLI has
+            # no flag for either the endpoint or the token — it reads both from
+            # config.toml and nothing else.
+            templates."attic-client.toml".content = ''
+              default-server = "${cfg.cacheName}"
 
-        # The cache is mesh-only, so voyager is regularly somewhere it cannot
-        # be reached. Both of these are about that: fail over to building or
-        # to cache.nixos.org quickly instead of hanging on a dead route.
-        connect-timeout = 5;
-        fallback = true;
-      };
+              [servers.${cfg.cacheName}]
+              endpoint = "${cfg.serverUrl}/"
+              token = "${config.sops.placeholder."keys/attic/push-token"}"
+            '';
+          };
+
+          systemd.tmpfiles.rules = [
+            "d ${configHome} 0700 root root - -"
+            "d ${configHome}/attic 0700 root root - -"
+            "L+ ${configHome}/attic/config.toml - - - - ${config.sops.templates."attic-client.toml".path}"
+          ];
+
+          systemd.services.attic-watch-store = {
+            description = "Upload new store paths to the attic cache";
+            wantedBy = ["multi-user.target"];
+            after = ["network-online.target" "netbird.service"];
+            wants = ["network-online.target"];
+
+            environment.XDG_CONFIG_HOME = configHome;
+
+            serviceConfig = {
+              ExecStart = "${lib.getExe pkgs.attic-client} watch-store ${cfg.cacheName}";
+
+              # The cache is mesh-only and voyager is often off the mesh, so this
+              # unit failing is normal rather than exceptional. Restart forever
+              # and quietly; do not let it reach the type-wide OnFailure ntfy
+              # route in core/notify-failure.nix, which exists for things that
+              # are actually wrong.
+              Restart = "always";
+              RestartSec = 30;
+
+              # Uploading is not what this host is for.
+              Nice = 15;
+              IOSchedulingClass = "idle";
+            };
+          };
+        })
+      ];
     };
   };
 
