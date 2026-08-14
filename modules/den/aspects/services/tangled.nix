@@ -299,7 +299,7 @@
 
         workflowTimeout = mkOption {
           type = str;
-          default = "60m";
+          default = "120m";
           description = ''
             Wall clock a single workflow gets, covering the wait for a
             concurrency slot, image setup and every step in it.
@@ -310,6 +310,13 @@
             even with the cache below. The failure is also an unhelpful one:
             the workflow is marked `timeout` mid-build, with nothing in the log
             pointing at configuration.
+
+            Two hours rather than one because a run measured 46 minutes just to
+            *reach* the third host with a cold cache, which left voyager — the
+            largest of the three — nowhere near enough room. This is a ceiling
+            and not a cost: a workflow that finishes in eight minutes is
+            unaffected, and the number only matters on the runs that would
+            otherwise be killed with no useful diagnostic.
           '';
         };
       };
