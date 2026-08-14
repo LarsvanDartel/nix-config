@@ -166,6 +166,24 @@
 
             Needed once `cosmos.networking.edgeTerminated` is on, because the
             edge then targets each app's own port instead of a local vhost.
+
+            TCP only. See exposedUdpPorts below for the other half.
+          '';
+        };
+
+        exposedUdpPorts = mkOption {
+          type = listOf port;
+          default = [];
+          example = "[24454]";
+          description = ''
+            The same, for UDP.
+
+            Separate rather than a protocol field on exposedPorts because
+            almost everything here is TCP and the list reads as a table of
+            services; a per-entry protocol would make the common case noisier
+            to serve the rare one. The rare one so far is Simple Voice Chat on
+            the Minecraft server, which carries audio over its own UDP port
+            alongside the game's TCP.
           '';
         };
 
@@ -208,6 +226,7 @@
 
       networking.firewall.interfaces.${config.services.netbird.clients.default.interface} = {
         allowedTCPPorts = cfg.client.exposedPorts;
+        allowedUDPPorts = cfg.client.exposedUdpPorts;
       };
 
       # Which OAuth flow the daemon picks when it needs a user token — for

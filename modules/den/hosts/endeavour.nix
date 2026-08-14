@@ -159,6 +159,20 @@
         };
         operators = {};
 
+        # Proximity voice chat, on this world only — hence extraMods rather
+        # than the shared packwiz pack, which every server gets.
+        #
+        # It listens on UDP 24454 of its own, separate from the game's TCP
+        # 25566, so it needs its own hole in the mesh firewall below and its own
+        # L4 service on gaia. A server whose voice port is unreachable does not
+        # fail: players connect, hear nothing, and see "voice chat unavailable",
+        # which is a much quieter symptom than it deserves.
+        #
+        # The client mod is optional. Vanilla clients still join and play, they
+        # just cannot talk; anyone who wants voice installs the same major
+        # version from Modrinth.
+        extraMods = [pkgs.simple-voice-chat];
+
         serverProperties = {
           # What actually makes it hardcore. The server locks difficulty to
           # hard and puts a player who dies into spectator mode rather than
@@ -291,6 +305,12 @@
 
           3030 # typstnique  typstnique.lvdar.nl
         ];
+
+        # Simple Voice Chat on the hardcore server. UDP because it carries
+        # audio, and on its own port rather than multiplexed onto the game's
+        # TCP 25566 — the two are unrelated sockets and gaia publishes them as
+        # two separate L4 services.
+        exposedUdpPorts = [24454];
       };
 
       hardware = {

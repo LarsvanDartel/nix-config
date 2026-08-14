@@ -400,6 +400,27 @@
           targets = endeavour 25566;
         };
 
+        # Simple Voice Chat's audio, for the hardcore server only. UDP and a
+        # separate service because voice is a second socket, not part of the
+        # game's TCP stream — a client joins over 25566 and is then told to
+        # speak to this port.
+        #
+        # 24454 is the mod's default and it is deliberately unchanged: the
+        # client discovers the port from the server, so the number matters only
+        # to whoever is reading firewall rules. Only the hardcore world runs the
+        # mod, so nothing collides.
+        #
+        # If voice breaks while the game still works, this is the thing to
+        # check — an unreachable voice port is silent by design, showing
+        # players "voice chat unavailable" rather than failing the connection.
+        minecraft-hardcore-voice = {
+          domain = "minecraft-hardcore-voice.lvdar.nl";
+          mode = "udp";
+          listenPort = 24454;
+          bearerAuth.enable = false;
+          targets = endeavour 24454;
+        };
+
         suwayomi.targets = endeavour 8080;
         sabnzbd.targets = endeavour 6336;
 
