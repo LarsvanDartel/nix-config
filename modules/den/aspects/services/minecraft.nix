@@ -100,7 +100,7 @@
     }: let
       inherit (lib.attrsets) attrValues mapAttrs mapAttrs' nameValuePair;
       inherit (lib.options) mkOption;
-      inherit (lib.types) attrsOf bool ints nullOr oneOf package port str submodule;
+      inherit (lib.types) attrsOf bool ints listOf nullOr oneOf package port str submodule;
 
       cfg = config.cosmos.services.minecraft;
 
@@ -132,6 +132,42 @@
         src = ./_minecraft/pack;
         packHash = "sha256-x6VFhJvf9vAOh2dSow4cJ5GOwpu2IGdtSTTpSmEFrmE=";
       };
+
+      # The mods/ directory a given server gets: the shared packwiz pack, its
+      # own extraMods, or both merged.
+      #
+      # The loose jars are wrapped in a directory first because symlinkJoin
+      # joins *directories* — handed a bare file it would produce a store path
+      # that is not a mods/ folder at all. The basename is stripped of its store
+      # hash on the way in, so the server sees `voicechat-fabric-2.6.22.jar`
+      # rather than `ps28hlg…-voicechat-fabric-2.6.22.jar`; Fabric does not care
+      # about the filename, but anyone reading `ls mods/` on the host does.
+      modsDir = s: let
+        extraDir = pkgs.runCommand "minecraft-extra-mods" {} ''
+          mkdir -p "$out"
+          ${lib.concatMapStringsSep "\n" (m: ''
+              name=$(basename ${m} | cut -d- -f2-)
+              # Fabric loads *.jar and ignores anything else in silence, so a
+              # mod that lost its extension produces a server that starts
+              # cleanly and simply does not have the mod. Fail the build
+              # instead — this caught simple-voice-chat, whose store path was
+              # named from pname+version and had no suffix at all.
+              case "$name" in
+                *.jar) ;;
+                *) echo "extraMods entry ${m} does not end in .jar" >&2; exit 1 ;;
+              esac
+              ln -s ${m} "$out/$name"
+            '')
+            s.extraMods}
+        '';
+      in
+        if s.extraMods == []
+        then "${s.modpack}/mods"
+        else
+          pkgs.symlinkJoin {
+            name = "minecraft-mods";
+            paths = lib.optional (s.modpack != null) "${s.modpack}/mods" ++ [extraDir];
+          };
 
       # Aikar's flags — the G1GC tuning the Minecraft server community settled
       # on years ago and still the sane default. The point of them is pause
@@ -358,6 +394,31 @@
                 '';
               };
 
+              extraMods = mkOption {
+                type = listOf package;
+                default = [];
+                example = "[pkgs.simple-voice-chat]";
+                description = ''
+                  Jars to add to this server on top of `modpack`.
+
+                  The pack above is deliberately shared by every server, since
+                  it exists to carry the performance mods all of them want. This
+                  is the escape hatch for a mod that belongs to *one* world —
+                  voice chat on the hardcore server and not on the survival one.
+                  Adding it to the pack instead would install it everywhere.
+
+                  Each entry is a derivation producing a single .jar. They are
+                  merged with the pack's mods/ into one directory that is
+                  symlinked in, so the same read-only-store property holds:
+                  nothing here can be edited on the running host.
+
+                  Note this bypasses packwiz, so `packwiz update` will not see
+                  these and the Minecraft version compatibility is on you —
+                  which is why the pack remains the right home for anything
+                  every server should have.
+                '';
+              };
+
               motd = mkOption {
                 type = str;
                 default = "lvdar.nl";
@@ -449,8 +510,11 @@
 
               operators = mapAttrs (_: uuid: {inherit uuid;}) s.operators;
 
-              symlinks = lib.optionalAttrs (s.modpack != null) {
-                mods = "${s.modpack}/mods";
+              # One mods/ directory, whatever it is made of. symlinkJoin rather
+              # than two entries because upstream's `symlinks` is keyed by path
+              # — there is exactly one mods/ and it can only point at one place.
+              symlinks = lib.optionalAttrs (s.modpack != null || s.extraMods != []) {
+                mods = modsDir s;
               };
 
               serverProperties =
