@@ -74,7 +74,7 @@
     };
     tangled.url = "git+https://tangled.org/tangled.org/core";
     treefmt-nix = {
-      url = "github:numtide/treefmt-nix";
+      url = "github:qowoz/treefmt-nix/7859a27edf53b907acd6115efbc52e20ba79ddb5";
       inputs.nixpkgs.follows = "nixpkgs";
     };
     typstnique.url = "github:LarsvanDartel/typstnique";
