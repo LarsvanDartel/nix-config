@@ -69,6 +69,25 @@
           '';
         };
 
+        deployBranch = mkOption {
+          type = str;
+          default = "deploy";
+          description = ''
+            The branch comin switches to. Not `main`: services/build-gate.nix
+            builds every host at main and fast-forwards this only when all
+            three are green, so what a host deploys is by construction
+            something that built.
+
+            Must match cosmos.services.build-gate.deployBranch. They are
+            separate literals because the gate runs on one host and comin runs
+            on several, and den cannot read another host's config — the same
+            constraint that makes gaia.nix hardcode endeavour's ports.
+
+            Set this back to "main" on a host that should track HEAD directly,
+            accepting that nothing checks it first.
+          '';
+        };
+
         pollSeconds = mkOption {
           type = ints.positive;
           default = 300;
@@ -165,10 +184,22 @@
             {
               name = "origin";
               url = cfg.repository;
-              branches.main.name = "main";
+              # `deploy`, not `main` — this is the whole point of
+              # services/build-gate.nix. main is where work lands; deploy is
+              # where work that has built on all three hosts lands, advanced by
+              # the gate and by nothing else. comin has no magic rollback, so
+              # the difference is between a typo costing a git push and a typo
+              # costing two production hosts.
+              #
+              # comin calls this option `main` regardless of the branch's name:
+              # it means "the branch to switch to", as against `testing` below.
+              branches.main.name = cfg.deployBranch;
+
               # comin's own default, named here because it is a feature worth
               # remembering: this branch is `test`-activated, not switched, so
-              # it disappears on reboot.
+              # it disappears on reboot. Deliberately left ungated — pushing to
+              # `testing` is how you try something *without* waiting for the
+              # gate, and it cannot outlive a reboot.
               branches.testing.name = "testing";
               poller.period = cfg.pollSeconds;
             }
