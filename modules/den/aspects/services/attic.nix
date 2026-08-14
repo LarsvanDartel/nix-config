@@ -138,10 +138,19 @@
           nix.settings = {
             # Merged with cache.nixos.org rather than displacing it. List order is
             # not what decides precedence — Nix sorts by the `priority` each cache
-            # advertises in its nix-cache-info, and attic serves 41 against
-            # upstream's 40, so cache.nixos.org is still tried first for everything
-            # it already has. This one answers for what it does not: the aarch64
-            # closures built under emulation, and anything from an overlay here.
+            # advertises in its nix-cache-info, and that number lives on the
+            # server, not here: `attic cache configure lvdar --priority 39`.
+            #
+            # 39 against upstream's 40, so this one is tried *first* wherever it
+            # has the path, and 404s fall through. It was 41 (upstream first)
+            # until a CI run showed why that is the wrong way round on the mesh:
+            # attic is a LAN hop, cache.nixos.org an internet one, and inside a
+            # pipeline microVM the gap is wider still — attic arrives over the
+            # host-side vsock proxy while upstream goes through slirp4netns.
+            #
+            # The cost lands on voyager away from home, which now asks an
+            # unreachable cache first. connect-timeout and fallback below are
+            # what bound that to five seconds rather than a hang.
             substituters = [cfg.endpoint];
             trusted-public-keys = [cfg.publicKey];
 
