@@ -57,19 +57,26 @@
         runtimeInputs = with pkgs; [git openssh nix jq coreutils gnugrep];
         text = ''
           repo=${cfg.stateDir}/repo
+
+          # git writes transfer progress to stderr even with no tty, and the
+          # first run put ~400 lines of "Receiving objects: 43%" into the
+          # journal — which alloy then ships to loki. Every git call below is
+          # --quiet for that reason; the interesting output is what this script
+          # echoes itself.
+          export GIT_TERMINAL_PROMPT=0
           export GIT_SSH_COMMAND="ssh -i ${cfg.sshKeyFile} -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new"
 
           if [ ! -d "$repo/.git" ]; then
             echo "cloning ${cfg.repository}"
-            git clone --branch ${cfg.branch} ${cfg.repository} "$repo"
+            git clone --quiet --branch ${cfg.branch} ${cfg.repository} "$repo"
           fi
           cd "$repo"
 
           git remote set-url origin ${cfg.repository}
-          git fetch origin ${cfg.branch}
-          git checkout ${cfg.branch}
-          git reset --hard origin/${cfg.branch}
-          git clean -fdx -e result
+          git fetch --quiet origin ${cfg.branch}
+          git checkout --quiet ${cfg.branch}
+          git reset --quiet --hard origin/${cfg.branch}
+          git clean -qfdx -e result
 
           # Refuse to run on a tree that is not exactly upstream. The commit
           # below is `git commit flake.lock`, so anything else lying around
