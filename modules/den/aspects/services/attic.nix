@@ -172,6 +172,13 @@
             '';
           };
 
+          # So `attic push` is there for the cases watch-store cannot cover —
+          # seeding above all. watch-store only uploads paths that appear after
+          # it starts, so a store's existing contents reach the cache only by
+          # being pushed by hand, and that is not hypothetical: it is how the
+          # Discord blob whose upstream URL has since 404'd gets in.
+          environment.systemPackages = [pkgs.attic-client];
+
           systemd.tmpfiles.rules = [
             "d ${configHome} 0700 root root - -"
             "d ${configHome}/attic 0700 root root - -"
