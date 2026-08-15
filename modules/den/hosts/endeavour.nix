@@ -316,6 +316,31 @@
         exposedUdpPorts = [24454];
       };
 
+      # gaia's mesh address, exempted from OpenSSH's per-source penalties.
+      #
+      # gaia DNATs the public :22 to this host's :2222 and masquerades on the
+      # way (see the `networking.nat` block in gaia.nix, which explains why the
+      # masquerade is not optional). The consequence is that every SSH
+      # connection from the entire internet arrives here from one address —
+      # gaia's agent at 100.68.38.155 — and OpenSSH's srclimit, on by default
+      # since 9.8, assumes a source address identifies a client. Behind a NAT
+      # it does not.
+      #
+      # So an internet scanner failing auth against knot.lvdar.nl:22, which
+      # happens continuously on a public VPS, accrues penalty against gaia and
+      # sshd then resets *legitimate* git traffic over the same address: comin's
+      # pulls, build-gate's fetch, and a plain `git push`. It presents as an
+      # intermittent "kex_exchange_identification: Connection reset by peer"
+      # that clears on its own, which is why it read as flakiness rather than
+      # policy. build-gate failed exactly this way on 2026-08-15.
+      #
+      # Exempting the proxy loses little: that address is reachable only over
+      # the mesh, auth here stays publickey-only, and crowdsec on gaia is what
+      # actually sheds scanner traffic at the edge. The alternative — preserving
+      # the client address with TPROXY or proxy-protocol — is a great deal more
+      # machinery for the same result.
+      services.openssh.settings.PerSourcePenaltyExemptList = "100.68.38.155";
+
       hardware = {
         nvidia = {
           modesetting.enable = true;
