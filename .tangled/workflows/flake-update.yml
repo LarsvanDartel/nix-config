@@ -16,8 +16,9 @@ when:
 engine: microvm
 image: nixos
 
-dependencies:
-  - git
+# No `dependencies:` — see the long note in lint.yml. git (for the clone and
+# the diff below) and nix are both already in the base image, and naming either
+# here would add a guest-config activation step costing about a minute.
 
 steps:
   # --recreate-lock-file rather than --update-input: the point is to find out
