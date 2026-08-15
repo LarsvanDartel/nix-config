@@ -318,19 +318,31 @@
       # host to `degraded` and fires the OnFailure ntfy route, which is exactly
       # the kind of standing false alarm that teaches you to ignore the channel.
       #
-      # Granting the reload is narrower than the alternatives (dropping the
-      # ExecStartPost loses the reload; running the timer as root grants far
-      # more): one verb, on one unit, for the user crowdsec already runs as.
-      security.polkit.extraConfig = ''
-        polkit.addRule(function (action, subject) {
-          if (action.id == "org.freedesktop.systemd1.manage-units"
-              && action.lookup("unit") == "crowdsec.service"
-              && action.lookup("verb") == "reload"
-              && subject.user == "${config.services.crowdsec.user}") {
-            return polkit.Result.YES;
-          }
-        });
-      '';
+      # The obvious fix is a polkit rule granting that one verb on that one
+      # unit, and it does not work here: `security.polkit.enable` is false on
+      # these headless hosts, so `extraConfig` renders into a configuration
+      # nothing reads — /etc/polkit-1/rules.d does not even exist. It fails
+      # exactly as silently as it sounds, so this was verified on the host
+      # rather than by reading the option.
+      #
+      # Enabling polkitd on a public VPS to authorise one reload is a daemon
+      # and an attack surface for very little. Instead, drop the privileged
+      # call from the unprivileged unit and let systemd do the escalation it
+      # already knows how to do: `OnSuccess=` fires a root-owned oneshot when
+      # the update exits cleanly. The reload still happens, only when the
+      # update actually succeeded, and no permission is granted to crowdsec.
+      systemd.services.crowdsec-update-hub = {
+        serviceConfig.ExecStartPost = lib.mkForce [];
+        unitConfig.OnSuccess = ["crowdsec-reload.service"];
+      };
+
+      systemd.services.crowdsec-reload = {
+        description = "Reload crowdsec after a hub index update";
+        serviceConfig = {
+          Type = "oneshot";
+          ExecStart = "${getExe' pkgs.systemd "systemctl"} reload crowdsec.service";
+        };
+      };
     };
   };
 }
