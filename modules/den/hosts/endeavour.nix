@@ -64,6 +64,7 @@
       services.tangled.spindle
       services.pds
       services.minecraft
+      services.ollama.webui
     ];
 
     nixos = {
@@ -114,6 +115,20 @@
       # this they would exist only in the local store — CI would still fetch
       # nothing and rebuild them inside the microVM the next morning.
       cosmos.services.attic.client.watchStore.enable = true;
+
+      # The Tesla P100 finally has something to do. See services/ollama.nix for
+      # why the package is overridden — a stock ollama-cuda would run on the
+      # CPU here without saying so.
+      #
+      # Three models, ~23 G on /tank: a general one, a coding one, and a small
+      # fast one. All comfortably inside 16 G of VRAM at Q4, with room left for
+      # context — the 14B pair are ~9 G each, so only one is resident at a time
+      # and swapping between them costs a reload.
+      cosmos.services.ollama.models = [
+        "qwen3:14b"
+        "qwen2.5-coder:14b"
+        "llama3.1:8b"
+      ];
 
       # The survival server. One instance on the default port, which is what
       # keeps the address a bare `minecraft.lvdar.nl` with no port suffix for
@@ -307,6 +322,7 @@
           9980 # collabora   docs.lvdar.nl
 
           3030 # typstnique  typstnique.lvdar.nl
+          8084 # open-webui  chat.lvdar.nl
         ];
 
         # Simple Voice Chat on the hardcore server. UDP because it carries
