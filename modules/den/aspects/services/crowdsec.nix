@@ -331,6 +331,22 @@
       # already knows how to do: `OnSuccess=` fires a root-owned oneshot when
       # the update exits cleanly. The reload still happens, only when the
       # update actually succeeded, and no permission is granted to crowdsec.
+      # And with the permission problem out of the way the unit failed again,
+      # on the step underneath it:
+      #
+      #   Job type reload is not applicable for unit crowdsec.service.
+      #
+      # nixpkgs never gives crowdsec.service an `ExecReload`, so upstream's
+      # `systemctl reload` could not have worked even as root — the permission
+      # denial was hiding a second, independent bug. Upstream crowdsec's own
+      # unit file reloads on SIGHUP, which the engine handles by re-reading its
+      # configuration and the hub index, so that is what this restores.
+      #
+      # SIGHUP rather than a restart deliberately: this is the edge's LAPI, and
+      # the firewall bouncer queries it per decision. A restart would drop those
+      # queries for as long as it takes to come back, to refresh an index.
+      systemd.services.crowdsec.serviceConfig.ExecReload = "${getExe' pkgs.coreutils "kill"} -HUP $MAINPID";
+
       systemd.services.crowdsec-update-hub = {
         serviceConfig.ExecStartPost = lib.mkForce [];
         unitConfig.OnSuccess = ["crowdsec-reload.service"];
