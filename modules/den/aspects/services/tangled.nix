@@ -404,6 +404,22 @@
 
           pipelines.workflowTimeout = sCfg.workflowTimeout;
 
+          # No S3 artifact store. The module defaults the bucket to
+          # "tangled-logs", and a non-empty bucket is the *only* condition for
+          # registering the store (artifactstore.go:173) — credentials are
+          # never checked. So every finished workflow tries to PutObject, finds
+          # no AWS credentials, and falls back to querying the EC2 instance
+          # metadata service at 169.254.169.254, which on a machine that is not
+          # an EC2 instance can only time out. Three attempts of that is
+          # nineteen seconds of dead time bolted onto the end of every run:
+          #
+          #   ERRO archive workflow log err="s3: … no EC2 IMDS role found …"
+          #
+          # Emptying it leaves the disk store as the only one, which is where
+          # these logs were always going — see SPINDLE_MILL_ARTIFACT_STORE
+          # below, which was the other half of the same problem.
+          artifactStores.s3.bucket = "";
+
           # Let pipelines read from the fleet's own binary cache.
           #
           # This looks like it should be impossible: the microVM sandbox
