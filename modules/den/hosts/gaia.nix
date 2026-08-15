@@ -309,6 +309,14 @@
           targets = endeavour 3030;
         };
 
+        # Open WebUI. Ungated, and for the sharper of the two reasons already
+        # on this page: it is an SPA whose chat responses stream over SSE, so a
+        # lapsed gate session answers a long-lived streaming request with a 302
+        # the frontend cannot follow. That is the traccar NetworkError again,
+        # except it would strike mid-answer. It runs its own kanidm OIDC, so
+        # gating would also be a second login for the same identity.
+        chat = shared 8084;
+
         jellyfin = shared 8096;
         immich = shared 2283;
         seerr = shared 4055;
