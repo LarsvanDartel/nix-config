@@ -1,9 +1,20 @@
 # services.flake-bump — the scheduled half of "keep the lock fresh".
 #
 # tangled has exactly three trigger kinds — push, pull_request, manual — so
-# "periodically" cannot be a workflow. `.tangled/workflows/flake-update.yml` is
-# the same work in a form you can fire by hand; this is the timer, and it is
-# the one that commits.
+# "periodically" cannot be a workflow at all; this timer is the whole of it.
+#
+# There was briefly a manual `.tangled/workflows/flake-update.yml` beside it,
+# meant as "the same work you can fire by hand from the appview". It was never
+# once triggered, and keeping a second copy of the three build commands only
+# bought a way for the two to disagree — which they already had: it updated
+# nix-secrets where this excludes it, and it dropped the --no-write-lock-file
+# and --no-link this uses. Removed. To get the same answer on demand, run this
+# unit: `systemctl start flake-bump`.
+#
+# That does commit and push when green, where the workflow deliberately did
+# not. The distinction is thinner than it looks — nothing is committed unless
+# all three hosts build, and when they do the commit is what you wanted. If a
+# true dry run is ever needed, it belongs here as a flag, not as a second file.
 #
 # What it does, once a day: update every flake input, build the three x86_64
 # hosts, and push the new lock to main only if all three are green. comin then
