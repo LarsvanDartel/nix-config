@@ -304,6 +304,33 @@
       systemd.services.crowdsec-firewall-bouncer.after = [
         "crowdsec-firewall-bouncer-register.service"
       ];
+
+      # nixpkgs ends the hub-update timer with
+      # `ExecStartPost=systemctl reload crowdsec.service`, but runs the unit as
+      # an unprivileged `DynamicUser`. Reloading a system unit is a privileged
+      # operation, so polkit refuses it:
+      #
+      #   systemctl[…]: Failed to reload crowdsec.service: Access denied
+      #
+      # The update itself succeeds — `cscli hub update` exits 0 and the new
+      # index is on disk — so this is purely the notification step failing, and
+      # the damage is that the unit goes red on every tick. That drags the whole
+      # host to `degraded` and fires the OnFailure ntfy route, which is exactly
+      # the kind of standing false alarm that teaches you to ignore the channel.
+      #
+      # Granting the reload is narrower than the alternatives (dropping the
+      # ExecStartPost loses the reload; running the timer as root grants far
+      # more): one verb, on one unit, for the user crowdsec already runs as.
+      security.polkit.extraConfig = ''
+        polkit.addRule(function (action, subject) {
+          if (action.id == "org.freedesktop.systemd1.manage-units"
+              && action.lookup("unit") == "crowdsec.service"
+              && action.lookup("verb") == "reload"
+              && subject.user == "${config.services.crowdsec.user}") {
+            return polkit.Result.YES;
+          }
+        });
+      '';
     };
   };
 }
