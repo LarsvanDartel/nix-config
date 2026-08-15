@@ -98,6 +98,10 @@
             # of the DID, and no amount of the rest reconstructs it.
             "/persist/var/lib/pds"
             "/persist/var/lib/opencloud"
+            # Open WebUI: chats, accounts and knowledge bases. Small, and the
+            # only part of the LLM stack worth backing up — the models it talks
+            # to are a re-download and are deliberately excluded.
+            "/persist/var/lib/open-webui"
             "/persist/home"
             "/persist/etc/opencloud"
             "/tank/opencloud"
