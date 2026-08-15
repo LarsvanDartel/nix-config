@@ -15,8 +15,26 @@ when:
 engine: microvm
 image: nixos
 
-dependencies:
-  - git
+# No `dependencies:`, deliberately, and not because nothing is needed — git is,
+# for the clone. The base NixOS image already ships gitMinimal, curl, jq and
+# nix (nix/microvm/base.nix), so naming git here installed something that was
+# already present.
+#
+# It was not free. `dependencies`, `services`, `virtualisation` and `registry`
+# are the four keys that make the engine consider the guest config customised
+# (manifestConfig.Enabled, spindle/engines/microvm/models.go:48), and any one
+# of them inserts a "NixOS config activation" step that rebuilds and activates
+# a guest system closure before the first real step runs. That cost 58 seconds
+# of a 175-second run, to install git over git.
+#
+# The giveaway was in the log's own ordering: the clone step ran `git init`,
+# `git fetch` and `git checkout` successfully three seconds *before* the
+# activation step that supposedly provided git.
+#
+# So adding a dependency here is not a small thing — it turns a ~90s run back
+# into a ~150s one. Check base.nix before reaching for it, and if something
+# genuinely is missing, that activation is also the step the config cache would
+# make cheap (see the uploadUrl comment in services/tangled.nix).
 
 steps:
   # Two flags carry all the weight here.
