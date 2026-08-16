@@ -127,6 +127,32 @@
               "com.sun:auto-snapshot" = "false";
             };
           };
+
+          # The binary cache's chunk store, tuned for what it actually is.
+          #
+          # recordsize 1M matches the chunk sizes set in services/attic.nix; at
+          # the pool default of 128K every chunk was several records and so
+          # several IOs on a raidz1 stripe.
+          #
+          # sync=disabled is the significant one and is safe *here* specifically
+          # because every byte in this dataset is reproducible: it is a cache of
+          # build outputs that exist in the stores that pushed them. The pool
+          # has no SLOG, so honouring sync meant a ZIL round trip across
+          # spinning disks per chunk — measured at ~150 KB/s ingest against a
+          # 24 MB/s link. The exposure is that a power loss can lose the last
+          # few seconds of uploads, which costs a re-push and nothing else.
+          #
+          # Not snapshotted for the same reason: there is nothing here worth
+          # keeping a history of.
+          "atticd" = {
+            type = "zfs_fs";
+            options = {
+              mountpoint = "/tank/atticd";
+              recordsize = "1M";
+              sync = "disabled";
+              "com.sun:auto-snapshot" = "false";
+            };
+          };
         };
       };
     };

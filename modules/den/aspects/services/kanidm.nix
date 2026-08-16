@@ -28,6 +28,11 @@
       "sonarr"
       "lidarr"
       "bazarr"
+
+      # The Minecraft start/stop page. The only entry here that is shared with
+      # people who administer nothing else — which is the point of it being a
+      # group of its own rather than folded into an existing one.
+      "minecraft-control"
     ];
 
     # Baseline: mesh access at all. Kept in the claim because NetBird replaces
