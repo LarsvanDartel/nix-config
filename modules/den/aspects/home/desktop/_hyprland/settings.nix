@@ -87,6 +87,26 @@ in {
             shadow.enabled = false;
           };
 
+          # No news screen, no donation nag.
+          #
+          # Not cosmetic. On a version change Hyprland spawns
+          # `hyprland-update-screen --new-version <v>` from hyprland-qtutils as
+          # a child of its own unit, and here that Qt app cannot reach the
+          # compositor socket yet and aborts — a real SIGABRT coredump under
+          # wayland-wm@hyprland.desktop.service, timed to the second with the
+          # session dying. The nixpkgs 0726 → 0813 bump moved Hyprland to
+          # 0.56.2, which is what started firing this path; it had been quiet
+          # because nothing had changed the version in a while.
+          #
+          # Worth setting on its own merits regardless: a machine whose
+          # configuration is generated from a flake has no use for a nag about
+          # what changed, and every use for one fewer process racing the
+          # compositor's own startup.
+          ecosystem = {
+            no_update_news = true;
+            no_donation_nag = true;
+          };
+
           misc = let
             FULLSCREEN_ONLY = 2;
           in {
