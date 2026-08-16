@@ -158,6 +158,44 @@ in {
       "f /var/log/noctalia-greeter.log 0664 ${cfg.user} ${cfg.user} -"
     ];
 
+    # Keyboard layout and cursor for the greeter, neither of which it inherits.
+    #
+    # Both are the same class of bug: this greeter is a Wayland client in its
+    # own cage compositor, running as the unprivileged `greeter` account, and a
+    # systemd unit's environment is nearly empty — greetd's was LOCALE_ARCHIVE,
+    # PATH and TZDIR and nothing else.
+    #
+    #   * xkb. `services.xserver.xkb` configures X11 and the console (via
+    #     console.useXkbConfig), and cage reads neither: libxkbcommon takes its
+    #     defaults from XKB_DEFAULT_*. Without these the login prompt is plain
+    #     us qwerty while the layout here is Programmer Dvorak, so a password
+    #     typed correctly is rejected — which looks like a wrong password
+    #     rather than a wrong layout, and is why this is worth fixing properly
+    #     rather than living with.
+    #   * cursor. The theme is set through home-manager (stylix →
+    #     home.pointerCursor), and home-manager configures the *primary user*.
+    #     The greeter is a different account with no home, so it fell back to
+    #     the default X cursor. Read from the primary user's stylix settings —
+    #     the same trick `wallpaper` above uses, and for the same reason.
+    #
+    # XCURSOR_PATH has to be explicit: the theme is a store path, and nothing
+    # puts it on the default icon search path for a system service.
+    systemd.services.greetd.environment = let
+      xkb = config.services.xserver.xkb;
+      cursor = config.home-manager.users.${config.cosmos.user.name}.stylix.cursor or null;
+    in
+      {
+        XKB_DEFAULT_LAYOUT = xkb.layout;
+        XKB_DEFAULT_MODEL = xkb.model;
+        XKB_DEFAULT_VARIANT = xkb.variant;
+        XKB_DEFAULT_OPTIONS = xkb.options;
+      }
+      // lib.optionalAttrs (cursor != null) {
+        XCURSOR_THEME = cursor.name;
+        XCURSOR_SIZE = toString cursor.size;
+        XCURSOR_PATH = "${cursor.package}/share/icons";
+      };
+
     # The tuigreet aspect hands greetd a tty for its TUI; a Wayland greeter must
     # not have one, or systemd hangs the unit on a terminal nobody reads.
     systemd.services.greetd.serviceConfig = {
