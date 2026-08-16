@@ -211,11 +211,22 @@
       # you booted (nh 4.4.1, SPEC_LOCATION); NixOS itself never writes that
       # file, so each specialisation declares its own name here. The base config
       # deliberately has no such file, so it resolves to the parent system.
+      # `configurationName` is what GRUB calls the entry. Without it
+      # install-grub.pl falls back to "(<name> - <date> - <version>)", where
+      # the date comes from lstat()ing a *store* symlink — so every
+      # specialisation is dated 1970-01-01 and the real label is buried in
+      # parentheses behind it. The result is unreadable at boot, which is the
+      # one moment it has to be readable.
       specialisation = {
         # Explicit, labelled entry, otherwise identical to the default.
-        hyprland.configuration.environment.etc.specialisation.text = "hyprland";
+        hyprland.configuration = {
+          environment.etc.specialisation.text = "hyprland";
+          boot.loader.grub.configurationName = "Hyprland";
+        };
 
         niri.configuration = {
+          boot.loader.grub.configurationName = "niri + noctalia";
+
           imports = [
             (import ../aspects/desktop/_niri/system.nix {inherit inputs;})
             # Swap tuigreet for the noctalia greeter, so the login screen
