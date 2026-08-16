@@ -124,11 +124,37 @@
       # fast one. All comfortably inside 16 G of VRAM at Q4, with room left for
       # context — the 14B pair are ~9 G each, so only one is resident at a time
       # and swapping between them costs a reload.
-      cosmos.services.ollama.models = [
-        "qwen3:14b"
-        "qwen2.5-coder:14b"
-        "llama3.1:8b"
-      ];
+      cosmos.services.ollama = {
+        models = [
+          "qwen3:14b"
+          "qwen2.5-coder:14b"
+          "llama3.1:8b"
+
+          # For inline completion rather than chat, which is a different job
+          # with a different constraint: ghost-text has to arrive inside the
+          # pause between keystrokes, and the 14B above generates at 12.5 tok/s
+          # — an order of magnitude too slow to ever feel like completion.
+          #
+          # 3B is the compromise. ~2 G, so it sits alongside a resident 14B in
+          # the 16 G rather than evicting it, which matters because chat and
+          # completion are wanted at the same time. Both tags carry the same
+          # fill-in-middle template, so this understands <|fim_prefix|> and a
+          # `suffix` parameter exactly as its larger sibling does.
+          "qwen2.5-coder:3b"
+        ];
+
+        # Reachable from the rest of the mesh, not just from the web UI on
+        # this host. Turned on knowingly: the option's own description spells
+        # out that ollama has no authentication whatsoever, so this gives every
+        # peer free use of the GPU and of whatever is loaded into it.
+        #
+        # Acceptable here because the mesh is not a public network — it is four
+        # machines and a phone, all enrolled — and because the alternative is
+        # that the card is only usable through a browser. Nothing on the
+        # internet reaches this: gaia publishes no service pointing at 11434,
+        # and the firewall opens the port on the NetBird interface alone.
+        meshExposed = true;
+      };
 
       # The survival server. One instance on the default port, which is what
       # keeps the address a bare `minecraft.lvdar.nl` with no port suffix for
@@ -323,6 +349,11 @@
 
           3030 # typstnique  typstnique.lvdar.nl
           8084 # open-webui  chat.lvdar.nl
+
+          # ollama's API, mesh-only and deliberately absent from gaia.nix —
+          # unlike every other port in this list, publishing this one would
+          # expose an unauthenticated API that runs arbitrary inference.
+          11434 # ollama     (no public service)
         ];
 
         # Simple Voice Chat on the hardcore server. UDP because it carries
