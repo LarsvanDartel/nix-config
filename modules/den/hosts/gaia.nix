@@ -364,6 +364,20 @@
           targets = endeavour 5055;
         };
 
+        # The start/stop page for the two servers below — and the one Minecraft
+        # entry here that is GATED, which is the whole point of it. Everything
+        # else on this page is either public by design or protected by the
+        # game's own whitelist; this one hands out control of a systemd unit,
+        # so it takes the default NetBird identity check and admits only the
+        # kanidm group netbird-minecraft-control.
+        #
+        # Ordinary HTTP rather than L4: it is a browser talking to nginx, so
+        # there is TLS to terminate and a CrowdSec verdict worth applying, and
+        # a human can complete the IdP redirect that a game client cannot.
+        minecraft-control = {
+          targets = endeavour 8086;
+        };
+
         # Minecraft. L4 for the same reason as traccar-osmand: the client
         # opens a socket and speaks Mojang's own protocol, so there is no TLS
         # to terminate and no HTTP for CrowdSec to read. The domain routes

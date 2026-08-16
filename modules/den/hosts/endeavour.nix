@@ -64,6 +64,7 @@
       services.tangled.spindle
       services.pds
       services.minecraft
+      services.minecraft.control
       services.ollama.webui
     ];
 
@@ -179,6 +180,11 @@
         };
         operators = {};
       };
+
+      # Start/stop from a browser, for the people who play here and administer
+      # nothing. Membership of the kanidm group `netbird-minecraft-control` is
+      # the entire access control; see services/minecraft-control.nix.
+      cosmos.services.minecraft.control.enable = true;
 
       # The second server, and the thing the comment above warned about: two
       # servers cannot both have the default port. Upstream's duplicate-port
@@ -349,6 +355,7 @@
 
           3030 # typstnique  typstnique.lvdar.nl
           8084 # open-webui  chat.lvdar.nl
+          8086 # mc control  minecraft-control.lvdar.nl
 
           # ollama's API, mesh-only and deliberately absent from gaia.nix —
           # unlike every other port in this list, publishing this one would

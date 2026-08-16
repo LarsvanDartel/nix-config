@@ -229,6 +229,7 @@
     nixos = {
       config,
       lib,
+      pkgs,
       ...
     }: let
       inherit (lib.options) mkOption;
@@ -354,11 +355,36 @@
             # derivation share the chunks of everything else, which matters
             # most for exactly the case this exists for — rebuilding pioneer's
             # aarch64 system closure over and over.
+            #
+            # The sizes are 16x upstream's, and that is a storage decision
+            # rather than a dedup one. Every chunk costs a database transaction
+            # and a synchronous file write, and /tank is two raidz1 vdevs of
+            # spinning disks with no SLOG — so a sync write is a round trip
+            # across a stripe, and the array sustains only a few per second.
+            #
+            # Measured before changing anything: ingest ran at ~150 KB/s on a
+            # link that does 24 MB/s, about 2.3 chunks/second, with 202,982
+            # chunks recorded for 6,437 NARs — 31 chunks for every store path.
+            # A 2 GB CUDA closure at that rate takes four hours, which is what
+            # made a push look hung rather than slow, and what starved
+            # watch-store into 30-second pool timeouts.
+            #
+            # The dedup lost is small in the case this serves: the wins here
+            # come from whole closures being reused across four hosts, not from
+            # sub-megabyte overlap inside a NAR.
+            #
+            # nar-size-threshold is the bigger lever of the two. At 64 KiB
+            # essentially every path was chunked; at 32 MiB the overwhelming
+            # majority are stored whole and skip the machinery entirely.
+            #
+            # Only new uploads are affected — the existing chunks stay as they
+            # are, so this improves things going forward rather than
+            # retroactively.
             chunking = {
-              nar-size-threshold = 65536;
-              min-size = 16384;
-              avg-size = 65536;
-              max-size = 262144;
+              nar-size-threshold = 33554432; # 32 MiB
+              min-size = 262144; # 256 KiB
+              avg-size = 1048576; # 1 MiB
+              max-size = 4194304; # 4 MiB
             };
 
             compression.type = "zstd";
@@ -381,6 +407,31 @@
           # harmless with a dynamic UID but hides the static one from the files
           # it owns on /tank.
           PrivateUsers = lib.mkForce false;
+
+          # Refuse to start rather than fill the system SSD, the same guard and
+          # the same reasoning as services/minecraft.nix.
+          #
+          # dataDir is its own dataset (see hosts/_hw/endeavour/disko.nix) whose
+          # recordsize and sync settings are half of why uploads are not
+          # glacial. If it is missing or unmounted the path still *exists* as a
+          # directory on the pool root, so atticd would start happily, write
+          # chunks with the wrong properties, and be slow again for reasons
+          # nobody would think to look for.
+          ExecStartPre = [
+            (lib.getExe (pkgs.writeShellApplication {
+              name = "atticd-datadir-guard";
+              runtimeInputs = [pkgs.util-linux];
+              text = ''
+                if ! mountpoint -q ${lib.escapeShellArg cfg.dataDir}; then
+                  echo "${cfg.dataDir} is not a mount point — refusing to start." >&2
+                  echo "Chunks would land on the pool root with the wrong" >&2
+                  echo "recordsize and sync settings. Create it with:" >&2
+                  echo "  zfs create -o recordsize=1M -o sync=disabled tank/atticd" >&2
+                  exit 1
+                fi
+              '';
+            }))
+          ];
         };
 
         cosmos.services.netbird.client.exposedPorts = [cfg.port];
