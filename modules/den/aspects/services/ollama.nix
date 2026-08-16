@@ -58,14 +58,21 @@
 
       keepAlive = mkOption {
         type = str;
-        default = "5m";
+        default = "60m";
         description = ''
           How long a model stays resident in VRAM after its last request.
 
-          This is a power setting as much as a latency one. The card idles
-          around 25 W but pulls up to 250 W with work in flight, and a longer
-          window trades electricity for not waiting ~10s to reload 9 GB of
-          weights across PCIe.
+          Raised from upstream's 5m once the cost of a cold load was measured
+          here: 199s for llama3.1:8b and 105s for a 14B, because the weights
+          come off the spinning array rather than an SSD. At 5m, stepping away
+          for a coffee means waiting two to three minutes for the first token,
+          which reads as broken rather than slow.
+
+          Cheaper than it sounds. The card was measured idling at 40 W holding
+          259 MiB, and holding weights in VRAM adds almost nothing to that —
+          the power goes on computing, not on storing. The real cost is space:
+          a resident 14B occupies ~9 GB of the 16 GB, so a second large model
+          will evict the first rather than sit alongside it.
         '';
       };
 
