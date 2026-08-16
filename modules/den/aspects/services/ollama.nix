@@ -250,6 +250,50 @@
             # the local form off is the tidy end state, but doing it before the
             # OIDC round trip is proven leaves no way in at all — the first
             # account also has to exist before it can be made an admin.
+
+            # Everything below this line is a PersistentConfig setting, and
+            # this is the switch that makes any of it take effect.
+            #
+            # Open WebUI copies each such variable into a `config` table in its
+            # database on first boot and reads the *database* from then on. So
+            # the settings below, added to a deployment that has already run
+            # once, would do exactly nothing — the values are already in the DB
+            # and win. There is no error; the flags simply have no effect,
+            # which is a deeply confusing thing to debug.
+            #
+            # False makes the environment authoritative on every start, which
+            # is what this repo wants anyway: settings in git, surviving a
+            # rollback and a reinstall. The cost is real and worth stating —
+            # changes made in the admin UI no longer persist across a restart,
+            # so anything that matters has to be written here instead.
+            ENABLE_PERSISTENT_CONFIG = "False";
+
+            # The reason this block exists.
+            #
+            # Both of these default to True, and both inject substantial tool
+            # and prompt scaffolding ahead of every message. Together they took
+            # "Tell me a random fun fact about the Roman Empire" from ten words
+            # to an `input_tokens` of 2050, and llama3.1:8b read all that
+            # scaffolding as its actual instructions: it answered by inventing
+            # a `create_tasks` function and asserting it could not generate
+            # text at all.
+            #
+            # That is a small-model failure, not a broken one — the same model
+            # writes fine through the raw API, at the same 35.8 tok/s. An 8B is
+            # simply captured by a large tool preamble in a way a frontier
+            # model is not. Neither feature is useful here: automations schedule
+            # recurring prompts, and the code interpreter runs Python in the
+            # browser via pyodide.
+            ENABLE_AUTOMATIONS = "False";
+            ENABLE_CODE_INTERPRETER = "False";
+
+            # Each of these fires an *extra* model call per message, on top of
+            # the answer. On a 14B at ~12 tok/s that is a wait you can feel.
+            # Titles are worth their call — they are how a conversation is
+            # findable later — so that one stays on.
+            ENABLE_TAGS_GENERATION = "False";
+            ENABLE_FOLLOW_UP_GENERATION = "False";
+            ENABLE_TITLE_GENERATION = "True";
           };
 
           environmentFile = config.sops.templates."open-webui.env".path;
