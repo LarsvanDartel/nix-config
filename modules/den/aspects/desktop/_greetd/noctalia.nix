@@ -37,6 +37,10 @@
 
   stateDir = "/var/lib/noctalia-greeter";
 
+  # The primary user's cursor, for the same reason `wallpaper` below reads from
+  # home-manager: the greeter account has no home and therefore no stylix.
+  cursor = config.home-manager.users.${config.cosmos.user.name}.stylix.cursor;
+
   # cage/wlr-randr/dbus are looked up on PATH by the session wrapper.
   greeter = pkgs.symlinkJoin {
     name = "noctalia-greeter-wrapped";
@@ -133,6 +137,43 @@ in {
       command = "${greeter}/bin/noctalia-greeter-session";
     };
 
+    # Keyboard and cursor, through nixpkgs' own module rather than by hand.
+    #
+    # These are the two things the greeter will NOT pick up from anywhere else.
+    # An earlier attempt set XKB_DEFAULT_* and XCURSOR_* on the greetd unit and
+    # was silently inert: `strings` on noctalia-greeter 1.2.1 finds neither
+    # variable anywhere in the binary. It reads its own greeter.toml and
+    # nothing else.
+    #
+    # That matters most for the layout. This machine is Programmer Dvorak and
+    # the greeter defaulted to us qwerty, so a correctly typed password came
+    # back rejected — indistinguishable from a wrong password unless you
+    # already suspect the layout.
+    #
+    # `settings` is written to greeter.toml as a *store symlink* (tmpfiles
+    # `L+`), which is why this is worth using over hand-writing the file: no
+    # copy to go stale, and no repeat of the `C` vs `C+` trap below.
+    #
+    # `package` is the wrapped build, not pkgs.noctalia-greeter: 1.2.1's
+    # session script still calls dbus-run-session and cage by name, and the
+    # upstream module does not wrap them.
+    services.displayManager.noctalia-greeter = {
+      enable = true;
+      package = greeter;
+
+      # Fills in settings.cursor.theme and .path for us.
+      cursorTheme = {
+        inherit (cursor) name package;
+      };
+
+      settings = {
+        keyboard = {
+          inherit (config.services.xserver.xkb) layout variant options;
+        };
+        cursor.size = cursor.size;
+      };
+    };
+
     environment.systemPackages = [greeter];
 
     # The polkit action for noctalia-shell v5's "sync appearance" button. Unused
@@ -153,48 +194,17 @@ in {
 
       "d ${stateDir} 0755 ${cfg.user} ${cfg.user} -"
       "L+ ${stateDir}/appearance.json - - - - ${appearance}"
-      "C ${stateDir}/greeter.conf 0644 ${cfg.user} ${cfg.user} - ${greeterConf}"
+      # `C+`, not `C`. Plain `C` copies only when the destination does not
+      # exist, so this file was seeded on the very first boot and every change
+      # to it since has been silently ignored — the deploy succeeds, the
+      # greeter keeps its original copy. `+` forces the copy each activation,
+      # which is what makes the setting declarative rather than a one-time
+      # seed. The greeter records mutable state in sync.toml, not here, so
+      # overwriting costs nothing.
+      "C+ ${stateDir}/greeter.conf 0644 ${cfg.user} ${cfg.user} - ${greeterConf}"
       "f ${stateDir}/greeter.log 0664 ${cfg.user} ${cfg.user} -"
       "f /var/log/noctalia-greeter.log 0664 ${cfg.user} ${cfg.user} -"
     ];
-
-    # Keyboard layout and cursor for the greeter, neither of which it inherits.
-    #
-    # Both are the same class of bug: this greeter is a Wayland client in its
-    # own cage compositor, running as the unprivileged `greeter` account, and a
-    # systemd unit's environment is nearly empty — greetd's was LOCALE_ARCHIVE,
-    # PATH and TZDIR and nothing else.
-    #
-    #   * xkb. `services.xserver.xkb` configures X11 and the console (via
-    #     console.useXkbConfig), and cage reads neither: libxkbcommon takes its
-    #     defaults from XKB_DEFAULT_*. Without these the login prompt is plain
-    #     us qwerty while the layout here is Programmer Dvorak, so a password
-    #     typed correctly is rejected — which looks like a wrong password
-    #     rather than a wrong layout, and is why this is worth fixing properly
-    #     rather than living with.
-    #   * cursor. The theme is set through home-manager (stylix →
-    #     home.pointerCursor), and home-manager configures the *primary user*.
-    #     The greeter is a different account with no home, so it fell back to
-    #     the default X cursor. Read from the primary user's stylix settings —
-    #     the same trick `wallpaper` above uses, and for the same reason.
-    #
-    # XCURSOR_PATH has to be explicit: the theme is a store path, and nothing
-    # puts it on the default icon search path for a system service.
-    systemd.services.greetd.environment = let
-      xkb = config.services.xserver.xkb;
-      cursor = config.home-manager.users.${config.cosmos.user.name}.stylix.cursor or null;
-    in
-      {
-        XKB_DEFAULT_LAYOUT = xkb.layout;
-        XKB_DEFAULT_MODEL = xkb.model;
-        XKB_DEFAULT_VARIANT = xkb.variant;
-        XKB_DEFAULT_OPTIONS = xkb.options;
-      }
-      // lib.optionalAttrs (cursor != null) {
-        XCURSOR_THEME = cursor.name;
-        XCURSOR_SIZE = toString cursor.size;
-        XCURSOR_PATH = "${cursor.package}/share/icons";
-      };
 
     # The tuigreet aspect hands greetd a tty for its TUI; a Wayland greeter must
     # not have one, or systemd hangs the unit on a terminal nobody reads.
