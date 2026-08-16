@@ -60,14 +60,23 @@
       # voyager-specific home settings.
       homeManager = {pkgs, ...}: {
         cosmos = {
-          cli.programs.nvim.languages = {
-            rust.enable = true;
-            clang.enable = true;
-            typst.enable = true;
-            python.enable = true;
-            rocq.enable = true;
-            formal.enable = true;
-            mcrl2.enable = true;
+          cli.programs.nvim = {
+            languages = {
+              rust.enable = true;
+              clang.enable = true;
+              typst.enable = true;
+              python.enable = true;
+              rocq.enable = true;
+              formal.enable = true;
+              mcrl2.enable = true;
+            };
+
+            # Here and not in the nvim aspect: it needs endeavour's ollama on
+            # the mesh, so it is a property of this machine's reachability
+            # rather than of the editor. Manual trigger — see the option — so
+            # that being off the mesh costs a keypress rather than a stall on
+            # every pause.
+            minuet.enable = true;
           };
 
           desktops.hyprland.animations.enable = false;
