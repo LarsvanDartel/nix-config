@@ -157,11 +157,13 @@
         meshExposed = true;
       };
 
-      # The survival server. One instance on the default port, which is what
-      # keeps the address a bare `minecraft.lvdar.nl` with no port suffix for
-      # anyone joining — a second server would need its own port here, its own
-      # entry in gaia.nix, and either an SRV record or a Velocity proxy in
-      # front to stay typeable.
+      # The survival server, published as `smp.lvdar.nl`. It holds the default
+      # port, which is what keeps that address free of a port suffix: gaia
+      # forwards its 25565 straight here, and L4 has only one 25565 to give.
+      # The other world is on 25566 and buys the same bare address with an SRV
+      # record instead — see the comment on `hardcore` below.
+      #
+      # `minecraft.lvdar.nl` is no longer this; it is the control page.
       #
       # The whitelist is enforced, so this list is exactly who can join and the
       # internet is everyone else. Taken from the restored world itself —
@@ -208,10 +210,16 @@
       # server to start would take 25565 and the second would fail to bind,
       # trigger its OnFailure notification, and roll the deploy back.
       #
-      # 25566 is published from gaia as its own L4 service, so the address is
-      # minecraft.lvdar.nl:25566. To drop the port suffix, add a Cloudflare SRV
-      # record `_minecraft._tcp.hardcore.lvdar.nl` → 25566; the Java client
-      # follows SRV, so players would type `hardcore.lvdar.nl`.
+      # 25566 is published from gaia as its own L4 service, because L4 routes by
+      # listen port and 25565 is already smp's. The port is invisible to players
+      # anyway, via a Cloudflare SRV record the Java client resolves before it
+      # connects:
+      #
+      #   _minecraft._tcp.hardcore.lvdar.nl  SRV  0 0 25566 hardcore.lvdar.nl
+      #
+      # so the address typed is a bare `hardcore.lvdar.nl`. That record is
+      # manual — the *.lvdar.nl wildcard answers A lookups but not SRV — and if
+      # it is missing this is still reachable as hardcore.lvdar.nl:25566.
       cosmos.services.minecraft.servers.hardcore = {
         port = 25566;
         motd = "lvdar.nl — hardcore";
@@ -370,7 +378,7 @@
 
           3030 # typstnique  typstnique.lvdar.nl
           8084 # open-webui  chat.lvdar.nl
-          8086 # mc control  minecraft-control.lvdar.nl
+          8086 # mc control  minecraft.lvdar.nl
 
           # ollama's API, mesh-only and deliberately absent from gaia.nix —
           # unlike every other port in this list, publishing this one would
