@@ -98,6 +98,44 @@
 
       script = name: text: pkgs.writeShellApplication {inherit name text;};
 
+      # Who is online, via the server's own status ping.
+      #
+      # Not `mcstatus <addr> json`, which is what this was and which cost 3.24s
+      # a call against 0.22s for the same data. That subcommand also runs a
+      # *query*, and query is a separate protocol that services/minecraft.nix
+      # leaves off (enable-query=false) — so every single call sat through a UDP
+      # timeout that could only ever time out.
+      #
+      # It mattered more than a slow hook: the page polled servers one after
+      # another, so two servers cost 6.5s a round, the second card looked like
+      # it never loaded, and CPU — which needs two samples to subtract — took
+      # the better part of half a minute to show anything.
+      #
+      # The port is an argument because it comes from the nix config, not from
+      # a request. Nothing a caller sends reaches this.
+      players =
+        pkgs.writers.writePython3Bin "mc-players" {
+          libraries = [pkgs.python3Packages.mcstatus];
+        } ''
+          import json
+          import sys
+
+          from mcstatus import JavaServer
+
+          try:
+              server = JavaServer("127.0.0.1", int(sys.argv[1]), timeout=3)
+              status = server.status()
+              print(json.dumps({
+                  "online": status.players.online,
+                  "max": status.players.max,
+                  "sample": [p.name for p in (status.players.sample or [])],
+              }))
+          except Exception:
+              # A server that is up as a unit but still loading its world refuses
+              # the connection, which is a state to report rather than an error.
+              print("null")
+        '';
+
       # start/stop: the two that need root, and the only two that still go
       # through a path unit. No request data reaches these at all — the URL
       # selects a filename fixed at build time, and that is the whole grant.
@@ -120,16 +158,12 @@
             case "$v" in ''' | "[not set]" | infinity) echo null ;; *) echo "$v" ;; esac
           }
 
-          # mcstatus never throws: it reports {"online": false, "error": ...}
-          # for a refused connection, which is exactly the state of a server
-          # that is up as a unit but still loading its world. The timeout is
-          # for the other case — a server wedged badly enough to accept the
-          # TCP connection and then never answer the status ping.
+          # Prints "null" rather than failing for a server that is not answering
+          # yet, so there is no case where this turns a loading world into an
+          # HTTP error.
           players=null
           if [ "$state" = active ]; then
-            players="$(${lib.getExe' pkgs.mcstatus "mcstatus"} \
-              127.0.0.1:${toString minecraft.servers.${server}.port} json 2>/dev/null \
-              | ${lib.getExe pkgs.jq} -c '.status.players // null' || echo null)"
+            players="$(${lib.getExe players} ${toString minecraft.servers.${server}.port})"
             [ -n "$players" ] || players=null
           fi
 

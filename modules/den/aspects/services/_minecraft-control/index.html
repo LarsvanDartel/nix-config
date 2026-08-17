@@ -139,7 +139,7 @@
 
     // The status ping only carries a sample, and vanilla caps it at 12 — so
     // this is "who is on" for a small server and a partial list for a busy one.
-    const names = (p && p.sample || []).map(s => s.name).filter(Boolean);
+    const names = (p && p.sample || []).filter(Boolean);
     v.who.textContent = names.length ? names.join(", ") : "";
 
     return info.state;
@@ -282,10 +282,14 @@
     // nginx rule that guards every other hook, so what is on screen is exactly
     // what this person may act on — there is no second, weaker notion of
     // visibility to keep in step with the real one.
-    const servers = [];
-    for (const s of declared) {
-      if ((await hook("info-" + s)) !== null) servers.push(s);
-    }
+    // In parallel, not one after another. Every request here is independent,
+    // and doing them in sequence meant the last server's card appeared a
+    // multiple of one round-trip after the first — which looked exactly like
+    // that server failing to load.
+    const allowed = await Promise.all(
+      declared.map(s => hook("info-" + s).then(r => r !== null).catch(() => false))
+    );
+    const servers = declared.filter((_, i) => allowed[i]);
 
     if (!servers.length) {
       const p = document.createElement("p");
@@ -299,12 +303,17 @@
     for (const s of servers) card(s);
 
     // One timer for every server rather than one each, so the requests stay in
-    // step and a slow server cannot make the page drift out of phase.
+    // step and a slow server cannot make the page drift out of phase — but the
+    // servers within a round go together, so a round costs one round-trip
+    // rather than one per server. That matters for the CPU figure especially:
+    // it is a difference between two samples, so nothing at all is displayed
+    // until the second round completes.
     const tick = async () => {
-      for (const s of servers) {
-        await refresh(s);
-        await loadLog(s);
-      }
+      try {
+        await Promise.all(
+          servers.map(s => refresh(s).then(() => loadLog(s)))
+        );
+      } catch { /* a bad round must not stop the timer */ }
       setTimeout(tick, POLL_MS);
     };
     tick();
