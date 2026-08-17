@@ -1,6 +1,6 @@
 <!doctype html>
 <!--
-  The Minecraft start/stop page served by services/minecraft-control.nix.
+  The Minecraft control page served by services/minecraft-control.nix.
 
   Deliberately free of nix interpolation so it stays a file a browser can open
   and a linter can read: the server list arrives from servers.json, which the
@@ -14,32 +14,66 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Minecraft</title>
 <style>
-  :root { color-scheme: dark }
-  body { font: 16px/1.5 system-ui, sans-serif; max-width: 34rem;
-         margin: 3rem auto; padding: 0 1rem;
-         background: #16161d; color: #d8d8e0 }
-  h1 { font-size: 1.25rem; font-weight: 600 }
-  .s { border: 1px solid #2c2c38; border-radius: .5rem;
-       padding: 1rem; margin: 1rem 0 }
+  :root { color-scheme: dark; --bg:#16161d; --fg:#d8d8e0; --dim:#9a9aa8;
+          --line:#2c2c38; --panel:#1b1b24; --btn:#22222c }
+  * { box-sizing: border-box }
+  body { font: 16px/1.5 system-ui, sans-serif; max-width: 52rem;
+         margin: 2.5rem auto; padding: 0 1rem;
+         background: var(--bg); color: var(--fg) }
+  h1 { font-size: 1.25rem; font-weight: 600; margin: 0 0 1rem }
+  .s { border: 1px solid var(--line); border-radius: .5rem;
+       padding: 1rem; margin: 1rem 0; background: var(--panel) }
   .n { font-weight: 600; display: flex; justify-content: space-between;
-       align-items: center }
-  .t { font-size: .8rem; padding: .15rem .5rem; border-radius: 1rem;
-       background: #2c2c38; color: #9a9aa8 }
+       align-items: center; gap: .5rem }
+  .t { font-size: .8rem; font-weight: 400; padding: .15rem .5rem;
+       border-radius: 1rem; background: var(--line); color: var(--dim) }
   .up { background: #1d3a24; color: #7fd18f }
   .dn { background: #3a1d1d; color: #d18f8f }
+
+  /* Resource line: three fixed cells so the numbers do not jump about as they
+     change width. */
+  .m { display: flex; flex-wrap: wrap; gap: 1.25rem; margin: .75rem 0 0;
+       font-size: .85rem; color: var(--dim) }
+  .m b { font-weight: 600; color: var(--fg); font-variant-numeric: tabular-nums }
+  .who { font-size: .85rem; color: var(--dim); margin-top: .35rem;
+         word-break: break-word }
+
   button { font: inherit; padding: .4rem 1rem; margin: .75rem .5rem 0 0;
-           border: 1px solid #2c2c38; border-radius: .375rem;
-           background: #22222c; color: inherit; cursor: pointer }
-  button:hover:not(:disabled) { background: #2c2c38 }
+           border: 1px solid var(--line); border-radius: .375rem;
+           background: var(--btn); color: inherit; cursor: pointer }
+  button:hover:not(:disabled) { background: var(--line) }
   button:disabled { opacity: .5; cursor: default }
+  button.link { border: 0; background: 0; padding: 0; margin: 0;
+                color: var(--dim); font-size: .85rem;
+                text-decoration: underline; cursor: pointer }
+
+  details { margin-top: .75rem }
+  summary { cursor: pointer; font-size: .85rem; color: var(--dim) }
+  pre { margin: .5rem 0 0; padding: .75rem; max-height: 24rem; overflow: auto;
+        background: #101016; border: 1px solid var(--line); border-radius: .375rem;
+        font: 12px/1.45 ui-monospace, SFMono-Regular, Menlo, monospace;
+        white-space: pre-wrap; word-break: break-word }
+  .console { display: flex; gap: .5rem; margin-top: .5rem }
+  .console input { flex: 1 1 auto; min-width: 0; font: inherit;
+                   padding: .4rem .6rem; border-radius: .375rem;
+                   border: 1px solid var(--line);
+                   background: #101016; color: inherit }
+  .console button { margin: 0 }
+  .sent { font-size: .8rem; color: var(--dim); margin-top: .35rem; min-height: 1.2em }
 </style>
 <h1>Minecraft servers</h1>
 <div id="servers"></div>
 <script>
   const el = document.getElementById("servers");
 
-  async function hook(name) {
-    const r = await fetch("hooks/" + name, { method: "POST" });
+  async function hook(name, body) {
+    const r = await fetch("hooks/" + name, {
+      method: "POST",
+      // text/plain keeps this a simple request: no preflight, and the console
+      // line reaches the hook byte for byte as raw-request-body.
+      headers: body === undefined ? {} : { "Content-Type": "text/plain" },
+      body,
+    });
     return (await r.text()).trim();
   }
 
@@ -54,20 +88,69 @@
     failed: "failed",
   };
   const TARGET = { start: "active", stop: "inactive" };
+  const POLL_MS = 5000;
+
+  const gib = n => (n / 1073741824).toFixed(1) + " GiB";
+
+  // Per-server view state. `cpu` holds the previous CPUUsageNSec sample and the
+  // wall clock it was taken at: the counter is cumulative, so a percentage only
+  // exists as a difference between two polls. The first poll therefore shows a
+  // dash rather than a made-up number.
+  const state = new Map();
+
+  function cpuPercent(name, cpuNs) {
+    const now = Date.now();
+    const prev = state.get(name).cpu;
+    state.get(name).cpu = { cpuNs, at: now };
+    if (!prev || cpuNs === null || prev.cpuNs === null || cpuNs < prev.cpuNs) return null;
+    const elapsedNs = (now - prev.at) * 1e6;
+    if (elapsedNs <= 0) return null;
+    return ((cpuNs - prev.cpuNs) / elapsedNs) * 100;
+  }
 
   async function refresh(name) {
-    const tag = document.getElementById("t-" + name);
-    const state = await hook("status-" + name);
-    tag.textContent = LABEL[state] || state || "unknown";
-    tag.className = "t " + (state === "active" ? "up" : "dn");
-    return state;
+    const v = state.get(name);
+    let info;
+    try {
+      info = JSON.parse(await hook("info-" + name));
+    } catch {
+      v.tag.textContent = "unreachable";
+      v.tag.className = "t dn";
+      return null;
+    }
+
+    v.tag.textContent = LABEL[info.state] || info.state || "unknown";
+    v.tag.className = "t " + (info.state === "active" ? "up" : "dn");
+
+    const p = info.players;
+    v.players.textContent = p ? p.online + " / " + p.max : "—";
+    v.mem.textContent = info.memory === null ? "—" : gib(info.memory);
+    const pct = cpuPercent(name, info.cpuNs);
+    v.cpuCell.textContent = pct === null ? "—" : pct.toFixed(0) + "%";
+
+    // The status ping only carries a sample, and vanilla caps it at 12 — so
+    // this is "who is on" for a small server and a partial list for a busy one.
+    const names = (p && p.sample || []).map(s => s.name).filter(Boolean);
+    v.who.textContent = names.length ? names.join(", ") : "";
+
+    return info.state;
+  }
+
+  async function loadLog(name) {
+    const v = state.get(name);
+    if (!v.log.parentElement.open) return;
+    const atBottom =
+      v.log.scrollHeight - v.log.scrollTop - v.log.clientHeight < 40;
+    v.log.textContent = (await hook("logs-" + name)) || "(no log yet)";
+    // Only chase the bottom if that is where the reader already was, so
+    // scrolling back through the log is not yanked away on the next poll.
+    if (atBottom) v.log.scrollTop = v.log.scrollHeight;
   }
 
   async function act(name, verb) {
-    const bs = document.querySelectorAll('button[data-s="' + name + '"]');
-    bs.forEach(b => b.disabled = true);
-    document.getElementById("t-" + name).textContent =
-      verb === "start" ? "starting…" : "stopping…";
+    const v = state.get(name);
+    v.buttons.forEach(b => b.disabled = true);
+    v.tag.textContent = verb === "start" ? "starting…" : "stopping…";
     await hook(verb + "-" + name);
     // Wait for the state we asked for, not for any settled state. The request
     // only drops a flag file — a path unit has to notice it, and the server
@@ -76,46 +159,110 @@
     // report success before anything had happened.
     for (let i = 0; i < 60; i++) {
       await new Promise(r => setTimeout(r, 1500));
-      const state = await refresh(name);
-      if (state === TARGET[verb] || state === "failed") break;
+      const s = await refresh(name);
+      if (s === TARGET[verb] || s === "failed") break;
     }
-    bs.forEach(b => b.disabled = false);
+    v.buttons.forEach(b => b.disabled = false);
+  }
+
+  async function send(name) {
+    const v = state.get(name);
+    const cmd = v.input.value.trim();
+    if (!cmd) return;
+    v.input.value = "";
+    // Minecraft's console takes commands without the leading slash; typing it
+    // is the habit everyone has from in-game, so accept both.
+    v.sent.textContent = await hook("cmd-" + name, cmd.replace(/^\//, ""));
+    // Give the server a moment to answer into the log, which is where the
+    // reply to a console command actually appears.
+    setTimeout(() => loadLog(name), 400);
+  }
+
+  function card(name) {
+    const d = document.createElement("div");
+    d.className = "s";
+
+    const head = document.createElement("div");
+    head.className = "n";
+    const label = document.createElement("span");
+    // textContent, not innerHTML: a server name comes from the nix config
+    // rather than from a user, but building the DOM this way means it never
+    // matters whether that stays true.
+    label.textContent = name;
+    const tag = document.createElement("span");
+    tag.className = "t";
+    tag.textContent = "…";
+    head.append(label, tag);
+
+    const metrics = document.createElement("div");
+    metrics.className = "m";
+    const cells = {};
+    for (const [key, text] of [["players", "players"], ["mem", "memory"], ["cpu", "cpu"]]) {
+      const wrap = document.createElement("span");
+      const val = document.createElement("b");
+      val.textContent = "—";
+      wrap.append(text + " ", val);
+      metrics.append(wrap);
+      cells[key] = val;
+    }
+
+    const who = document.createElement("div");
+    who.className = "who";
+
+    const buttons = ["start", "stop"].map(verb => {
+      const b = document.createElement("button");
+      b.textContent = verb === "start" ? "Start" : "Stop";
+      b.onclick = () => act(name, verb);
+      return b;
+    });
+
+    const details = document.createElement("details");
+    const summary = document.createElement("summary");
+    summary.textContent = "log and console";
+    const log = document.createElement("pre");
+    log.textContent = "…";
+
+    const consoleRow = document.createElement("div");
+    consoleRow.className = "console";
+    const input = document.createElement("input");
+    input.placeholder = "console command, e.g. list";
+    input.setAttribute("aria-label", name + " console command");
+    input.onkeydown = e => { if (e.key === "Enter") send(name); };
+    const go = document.createElement("button");
+    go.textContent = "Send";
+    go.onclick = () => send(name);
+    consoleRow.append(input, go);
+
+    const sent = document.createElement("div");
+    sent.className = "sent";
+
+    details.append(summary, log, consoleRow, sent);
+    // Opening the log should not wait a whole poll interval to fill in.
+    details.ontoggle = () => { if (details.open) loadLog(name); };
+
+    d.append(head, metrics, who, ...buttons, details);
+    el.append(d);
+
+    state.set(name, {
+      tag, log, input, sent, buttons,
+      players: cells.players, mem: cells.mem, cpuCell: cells.cpu,
+      // Previous CPUUsageNSec sample; null until there are two to compare.
+      cpu: null,
+    });
   }
 
   fetch("servers.json").then(r => r.json()).then(servers => {
-    for (const s of servers) {
-      const d = document.createElement("div");
-      d.className = "s";
+    for (const s of servers) card(s);
 
-      const head = document.createElement("div");
-      head.className = "n";
-      const label = document.createElement("span");
-      // textContent, not innerHTML: a server name comes from the nix config
-      // rather than from a user, but building the DOM this way means it never
-      // matters whether that stays true.
-      label.textContent = s;
-      const tag = document.createElement("span");
-      tag.className = "t";
-      tag.id = "t-" + s;
-      tag.textContent = "…";
-      head.append(label, tag);
-      d.append(head);
-
-      for (const verb of ["start", "stop"]) {
-        const b = document.createElement("button");
-        b.dataset.s = s;
-        b.dataset.v = verb;
-        b.textContent = verb === "start" ? "Start" : "Stop";
-        d.append(b);
+    // One timer for every server rather than one each, so the requests stay in
+    // step and a slow server cannot make the page drift out of phase.
+    const tick = async () => {
+      for (const s of servers) {
+        await refresh(s);
+        await loadLog(s);
       }
-
-      el.append(d);
-      refresh(s);
-    }
-  });
-
-  el.addEventListener("click", e => {
-    const b = e.target.closest("button");
-    if (b) act(b.dataset.s, b.dataset.v);
+      setTimeout(tick, POLL_MS);
+    };
+    tick();
   });
 </script>
