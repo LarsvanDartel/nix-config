@@ -103,18 +103,34 @@
   // dash rather than a made-up number.
   const state = new Map();
 
-  function cpuPercent(name, cpuNs) {
+  // Returns cores, not a percentage.
+  //
+  // CPUUsageNSec counts every thread, so a JVM across 72 cores reported things
+  // like "827%" — true (8.3 cores busy) and useless to read. Expressing it
+  // against the whole machine is no better: the same figure becomes 11%, and
+  // an idle server 0.8%, so the number is either alarming or invisible and
+  // never informative. "8.3 cores" is the thing a person can act on.
+  function cpuCores(name, cpuNs) {
     const now = Date.now();
     const prev = state.get(name).cpu;
     state.get(name).cpu = { cpuNs, at: now };
+    // cpuNs going backwards means the cgroup was replaced — the unit restarted
+    // between polls — so there is no interval to measure across.
     if (!prev || cpuNs === null || prev.cpuNs === null || cpuNs < prev.cpuNs) return null;
     const elapsedNs = (now - prev.at) * 1e6;
     if (elapsedNs <= 0) return null;
-    return ((cpuNs - prev.cpuNs) / elapsedNs) * 100;
+    return (cpuNs - prev.cpuNs) / elapsedNs;
+  }
+
+  function fmtCores(cores) {
+    if (cores === null) return "—";
+    if (cores < 0.05) return "idle";
+    return (cores < 10 ? cores.toFixed(1) : Math.round(cores)) + " cores";
   }
 
   async function refresh(name) {
     const v = state.get(name);
+    const started = performance.now();
     let info;
     try {
       const raw = await hook("info-" + name);
@@ -122,7 +138,10 @@
       // failure to read rather than leaving stale numbers on screen.
       if (raw === null) throw new Error("forbidden");
       info = JSON.parse(raw);
-    } catch {
+    } catch (err) {
+      // warn, not debug: this is the case worth seeing without having turned
+      // verbose logging on first.
+      console.warn("info-" + name + " failed", err);
       v.tag.textContent = "unreachable";
       v.tag.className = "t dn";
       return null;
@@ -134,8 +153,27 @@
     const p = info.players;
     v.players.textContent = p ? p.online + " / " + p.max : "—";
     v.mem.textContent = info.memory === null ? "—" : gib(info.memory);
-    const pct = cpuPercent(name, info.cpuNs);
-    v.cpuCell.textContent = pct === null ? "—" : pct.toFixed(0) + "%";
+    const cores = cpuCores(name, info.cpuNs);
+    v.cpuCell.textContent = fmtCores(cores);
+    v.cpuCell.title =
+      cores === null || !info.cpus
+        ? ""
+        : cores.toFixed(2) + " of " + info.cpus + " cores (" +
+          ((cores / info.cpus) * 100).toFixed(1) + "% of the machine)";
+
+    // Every poll, at debug level — a devtools filter away, and off the console
+    // by default, since this fires once per server every POLL_MS.
+    //
+    // `ms` is here because it is what the two bugs this page has had both
+    // showed up as. A 3.2s reply meant a player lookup waiting on a query
+    // protocol the servers do not run; the round-trip is the number that says
+    // so. cpuCores is null on the first poll by construction: it is a
+    // difference between two samples and there is nothing yet to subtract.
+    console.debug("info-" + name, {
+      ...info,
+      cpuCores: cores,
+      ms: Math.round(performance.now() - started),
+    });
 
     // The status ping only carries a sample, and vanilla caps it at 12 — so
     // this is "who is on" for a small server and a partial list for a busy one.

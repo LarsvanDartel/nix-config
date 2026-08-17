@@ -173,7 +173,8 @@
             --argjson cpuNs "$(prop CPUUsageNSec)" \
             --argjson tasks "$(prop TasksCurrent)" \
             --argjson players "$players" \
-            '{$state, $memory, $cpuNs, $tasks, $players}'
+            --argjson cpus "$(${pkgs.coreutils}/bin/nproc)" \
+            '{$state, $memory, $cpuNs, $tasks, $players, $cpus}'
         '';
 
       logs = server:
