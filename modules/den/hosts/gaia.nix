@@ -214,6 +214,35 @@
       # so it adds no failure mode that was not already fatal.
       cosmos.services.netbird.dnsPeers = ["endeavour" "gaia"];
 
+      # Who may talk to whom on the mesh. The four machines are peers of each
+      # other; anything else enrolled — a phone, or a device belonging to
+      # somebody given a published web page — gets DNS and nothing more.
+      #
+      # panther is deliberately absent from the fleet despite being trusted. It
+      # reaches every service it uses through gaia's published names, which is
+      # the proxy's own path and unaffected by this: of 1667 requests in
+      # endeavour's access log, all 1667 came from netbird-proxy and none
+      # directly from a peer. Being in the fleet would buy it nothing and cost
+      # the distinction this is drawing.
+      #
+      # `enforce` is what actually retires the All -> All rule. Left off until
+      # the replacement rules have been seen in the nftables chain on more than
+      # one host, because getting this wrong takes out SSH to everything at
+      # once.
+      cosmos.services.netbird.mesh = {
+        fleet = [
+          "endeavour"
+          "gaia"
+          "pioneer"
+          "voyager"
+        ];
+        resolvers = [
+          "endeavour"
+          "gaia"
+        ];
+        enforce = true;
+      };
+
       # Peers reachable with `netbird ssh <peer>`. Names, not ids, resolved by
       # the reconciler like everything else here. panther is somebody's phone,
       # which has no shell to offer.

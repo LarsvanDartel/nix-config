@@ -404,6 +404,12 @@
       # service created by hand in the dashboard.
       managedPrefix = "nix-";
 
+      # The same convention for mesh policy: anything carrying the prefix is
+      # ours to rewrite, anything without it was made by hand and is left alone.
+      policyPrefix = managedPrefix;
+      fleetGroup = "${managedPrefix}fleet";
+      resolverGroup = "${managedPrefix}resolvers";
+
       target = submodule {
         options = {
           peer = mkOption {
@@ -693,6 +699,201 @@
                    "delete it and log in again, or nobody will ever match it"
             done <<<"$unfillable"
           fi
+
+          ${lib.optionalString (cfg.mesh.fleet != []) ''
+            # Who may talk to whom on the mesh.
+            #
+            # NetBird ships one policy: All -> All, every protocol, both
+            # directions. "All" holds every peer, so that is not a default so
+            # much as an absence of one — and it is what made approving somebody
+            # for a web page equivalent to handing them the fleet. Anything they
+            # enrolled could reach every port on every host, including services
+            # with no authentication of their own: ollama's API, the attic
+            # cache, prometheus, node_exporter.
+            #
+            # Published services do NOT depend on this. netbird-proxy gets its
+            # own per-service ACL rule for each one, which is what the dport in
+            # `ip saddr @nb0000031 tcp dport 8096-8096 accept` is; the broad
+            # policy is the rule with no dport at all. Confirmed on endeavour
+            # before touching any of it, and it is the same distinction the ACL
+            # watchdog above keys on.
+            #
+            # These groups hold *peers*, not users, so unlike a distribution
+            # group they are ours to create — the issued=jwt rule that governs
+            # gate membership does not apply here.
+            ensure_group() {
+              local gname="$1" want="$2" gid have
+              gid="$(jq -r --arg n "$gname" \
+                '.[] | select(.name == $n) | .id' <<<"$groups" | head -n1)"
+
+              if [ -z "$gid" ]; then
+                echo "netbird: creating peer group $gname"
+                req -X POST -d "$(jq -n --arg n "$gname" --argjson p "$want" \
+                  '{name: $n, peers: $p}')" "$api/groups" >/dev/null \
+                  || echo "netbird: WARNING group $gname not created"
+                groups="$(req "$api/groups")"
+                return
+              fi
+
+              have="$(jq -c --arg n "$gname" \
+                '[.[] | select(.name == $n) | .peers[]?.id] | sort' <<<"$groups")"
+              if [ "$have" != "$(jq -cS . <<<"$want")" ]; then
+                echo "netbird: updating peer group $gname"
+                req -X PUT -d "$(jq -n --arg n "$gname" --argjson p "$want" \
+                  '{name: $n, peers: $p}')" "$api/groups/$gid" >/dev/null \
+                  || echo "netbird: WARNING group $gname not updated"
+                groups="$(req "$api/groups")"
+              fi
+            }
+
+            # A name that does not resolve to a peer is dropped rather than
+            # failing the run — the same convergence rule the services use, and
+            # it matters more here: a half-enrolled fleet must not produce a
+            # policy that locks the rest of it out.
+            peer_ids() {
+              jq -c --argjson peers "$peers" --argjson want "$1" \
+                '[$peers[] | select(.name as $n | $want | index($n)) | .id] | sort' <<<'{}'
+            }
+
+            fleet_ids="$(peer_ids '${builtins.toJSON cfg.mesh.fleet}')"
+            resolver_ids="$(peer_ids '${builtins.toJSON cfg.mesh.resolvers}')"
+
+            if [ "$(jq 'length' <<<"$fleet_ids")" -eq 0 ]; then
+              echo "netbird: no declared fleet peer exists yet; leaving mesh policy alone"
+            else
+              ensure_group ${fleetGroup} "$fleet_ids"
+              ensure_group ${resolverGroup} "$resolver_ids"
+
+              gid() { jq -r --arg n "$1" '.[] | select(.name == $n) | .id' <<<"$groups" | head -n1; }
+              fleet_gid="$(gid ${fleetGroup})"
+              resolver_gid="$(gid ${resolverGroup})"
+              all_gid="$(gid All)"
+
+              # One rule per policy. NetBird keeps only the first rule of a
+              # policy it is given — a two-rule DNS policy came back with the
+              # udp half and no tcp half and no error about it — so the split is
+              # forced rather than stylistic.
+              #
+              # Three of them, answering two questions: which machines are peers
+              # of each other, and what every other peer may still do. DNS is
+              # the whole of that second answer — nix-resolver is the primary
+              # nameserver group for All, so dropping :53 leaves every phone
+              # resolving nothing at all, which is not a boundary, just an
+              # outage. tcp as well as udp, for responses that do not fit in a
+              # datagram.
+              desired_policies="$(jq -n \
+                --arg fleet "$fleet_gid" --arg resolver "$resolver_gid" --arg all "$all_gid" \
+                '[
+                  { name: "${policyPrefix}fleet",
+                    description: "The fleet'"'"'s own machines, freely",
+                    enabled: true,
+                    rules: [{ name: "${policyPrefix}fleet", enabled: true, action: "accept",
+                              bidirectional: true, protocol: "all",
+                              sources: [$fleet], destinations: [$fleet] }] },
+                  { name: "${policyPrefix}dns-udp",
+                    description: "Every peer may resolve names",
+                    enabled: true,
+                    rules: [{ name: "${policyPrefix}dns-udp", enabled: true, action: "accept",
+                              bidirectional: false, protocol: "udp", ports: ["53"],
+                              sources: [$all], destinations: [$resolver] }] },
+                  { name: "${policyPrefix}dns-tcp",
+                    description: "Every peer may resolve names, over tcp too",
+                    enabled: true,
+                    rules: [{ name: "${policyPrefix}dns-tcp", enabled: true, action: "accept",
+                              bidirectional: false, protocol: "tcp", ports: ["53"],
+                              sources: [$all], destinations: [$resolver] }] }
+                ]')"
+
+              existing_policies="$(req "$api/policies")"
+
+              jq -c '.[]' <<<"$desired_policies" | while read -r pol; do
+                pname="$(jq -r .name <<<"$pol")"
+                pid="$(jq -r --arg n "$pname" \
+                  '.[] | select(.name == $n) | .id' <<<"$existing_policies" | head -n1)"
+
+                if [ -z "$pid" ]; then
+                  echo "netbird: creating policy $pname"
+                  req -X POST -d "$pol" "$api/policies" >/dev/null \
+                    || echo "netbird: WARNING policy $pname not created"
+                else
+                  # Compare only what is declared here. The API echoes group
+                  # objects, peer counts and ids back on every read, none of
+                  # which this owns, and diffing those would rewrite the policy
+                  # on every tick.
+                  current="$(jq -c --arg n "$pname" '.[] | select(.name == $n)
+                    | {name, description, enabled,
+                       rules: [.rules[] | {name, enabled, action, bidirectional,
+                                           protocol, ports,
+                                           sources: [.sources[].id],
+                                           destinations: [.destinations[].id]}]}' \
+                    <<<"$existing_policies")"
+                  want="$(jq -cS '{name, description, enabled,
+                    rules: [.rules[] | {name, enabled, action, bidirectional,
+                                        protocol, ports: (.ports // null),
+                                        sources, destinations}]}' <<<"$pol")"
+                  if [ "$(jq -cS . <<<"$current")" != "$want" ]; then
+                    echo "netbird: updating policy $pname"
+                    req -X PUT -d "$pol" "$api/policies/$pid" >/dev/null \
+                      || echo "netbird: WARNING policy $pname not updated"
+                  fi
+                fi
+              done
+
+              # Prune on the same rule as the services above: anything carrying
+              # the prefix that is no longer declared. Renaming a policy would
+              # otherwise leave the old one enforcing, which for an allow-list
+              # means a grant nobody has written down any more — a two-rule DNS
+              # policy became two one-rule policies here and left exactly that.
+              jq -r --arg p '${policyPrefix}' --argjson d "$desired_policies" '
+                [$d[].name] as $declared
+                | .[]
+                | select(.name | startswith($p))
+                | select(.name | IN($declared[]) | not)
+                | "\(.id) \(.name)"' <<<"$existing_policies" |
+              while read -r id name; do
+                echo "netbird: removing policy $name"
+                req -X DELETE "$api/policies/$id" >/dev/null \
+                  || echo "netbird: WARNING policy $name not removed"
+              done
+
+              ${
+              if cfg.mesh.enforce
+              then ''
+                # The cut-over, deliberately a separate flag from creating the
+                # policies above. Deploy once to put the replacements in
+                # place, confirm they appear in `nft list chain ip netbird
+                # netbird-acl-input-rules` on a couple of hosts, and only then
+                # turn this on — because the mistake this guards against is
+                # losing SSH to the whole fleet at once, and everything here
+                # is reached over the mesh.
+                #
+                # Disabled rather than deleted: flipping `enabled` back in the
+                # dashboard is the fastest way out, and there is no rebuild in
+                # the path.
+                default_id="$(jq -r '.[] | select(.name == "Default" and .enabled) | .id' \
+                  <<<"$existing_policies" | head -n1)"
+                if [ -n "$default_id" ]; then
+                  echo "netbird: disabling the built-in All -> All policy"
+                  req -X PUT -d "$(jq -c --arg id "$default_id" \
+                    '.[] | select(.id == $id)
+                     | .enabled = false
+                     | .rules |= map(.enabled = false)
+                     | {name, description, enabled,
+                        rules: [.rules[] | {name, description, enabled, action,
+                                            bidirectional, protocol,
+                                            sources: [.sources[].id],
+                                            destinations: [.destinations[].id]}]}' \
+                    <<<"$existing_policies")" "$api/policies/$default_id" >/dev/null \
+                    || echo "netbird: WARNING could not disable the Default policy"
+                fi
+              ''
+              else ''
+                echo "netbird: mesh policies present; All -> All still enabled" \
+                     "(set cosmos.services.netbird.mesh.enforce to cut over)"
+              ''
+            }
+            fi
+          ''}
 
           # NetBird's own SSH server, which is what `netbird ssh <peer>` talks
           # to — not the OpenSSH on the same port. Its client offers no SSH
@@ -1052,6 +1253,67 @@
             Every peer listed must be able to answer on the mesh: see
             cosmos.services.unbound.mesh.
           '';
+        };
+
+        mesh = {
+          fleet = mkOption {
+            type = listOf str;
+            default = [];
+            example = ["endeavour" "gaia" "pioneer" "voyager"];
+            description = ''
+              Peers, by name, that may reach each other on the mesh without
+              restriction — the fleet's own machines.
+
+              Empty leaves mesh policy untouched, which is NetBird's default of
+              one All -> All rule covering every peer in both directions. That
+              is not really a default: it means any peer anybody enrols reaches
+              every port on every host, including services with no
+              authentication of their own.
+
+              Published services do not depend on this. netbird-proxy holds its
+              own per-service ACL rule for each, so scoping this affects
+              machine-to-machine traffic and nothing a browser does.
+
+              A name that matches no peer is skipped, and if none match the
+              policy is left alone entirely — a half-enrolled fleet must not
+              produce a rule that locks out the rest of it.
+            '';
+          };
+
+          resolvers = mkOption {
+            type = listOf str;
+            default = [];
+            example = ["endeavour" "gaia"];
+            description = ''
+              Peers running the mesh nameservers. Every peer keeps udp/tcp 53 to
+              these, fleet or not.
+
+              Not optional in practice: the nameserver group is primary for All,
+              so a peer that cannot reach :53 resolves nothing whatsoever. That
+              is an outage rather than a boundary, and it would land on phones
+              first. Keep in step with the resolver addresses this aspect hands
+              out.
+            '';
+          };
+
+          enforce = mkOption {
+            type = bool;
+            default = false;
+            description = ''
+              Disable NetBird's built-in All -> All policy, leaving the ones
+              built from `fleet` and `resolvers` as the whole of mesh access.
+
+              Separate from creating those policies on purpose. Deploy once with
+              this off, confirm the new rules have appeared in
+              `nft list chain ip netbird netbird-acl-input-rules` on a couple of
+              hosts, and only then turn it on — the failure this guards against
+              is losing SSH to the entire fleet simultaneously, and every host
+              here is reached over the mesh.
+
+              The policy is disabled rather than deleted, so re-enabling it in
+              the dashboard is the way back and needs no rebuild.
+            '';
+          };
         };
 
         sshPeers = mkOption {
