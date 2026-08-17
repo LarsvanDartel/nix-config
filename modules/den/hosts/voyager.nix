@@ -196,8 +196,32 @@
         bgscan=""
       '';
 
-      networking.firewall.allowedUDPPorts = [25565];
-      networking.firewall.allowedTCPPorts = [25565];
+      # 25565 is a Minecraft server run here occasionally, for people on the
+      # same network.
+      #
+      # 5353 and 45114 are what home.catt needs, and are the reason `catt scan`
+      # found four devices with the firewall stopped and none with it running.
+      # Chromecast discovery is mDNS: the query goes to the multicast group and
+      # the replies come back unsolicited, so with nothing opened they are
+      # dropped and the scan reports an empty network rather than an error.
+      # 45114 is the little web server catt starts when casting a *local file* —
+      # the device is handed a URL pointing back here and fetches it itself, so
+      # without that port a scan succeeds, the cast is accepted, and the video
+      # never starts.
+      #
+      # Open on every interface rather than the wireless one alone, which reads
+      # careless and is close to it: this is a laptop, so the untrusted network
+      # is the same interface as the trusted one and scoping buys nothing
+      # against a café. What it would exclude is wt0, and the mesh already
+      # refuses this by policy — a non-fleet peer gets DNS and nothing else, and
+      # no fleet machine is looking for a Chromecast.
+      #
+      # The exposure is bounded by nothing listening most of the time: a port
+      # opened in the firewall with no process behind it refuses connections.
+      # It matters only while catt is running, and then it is one file, being
+      # served to a device on the same network, for as long as it plays.
+      networking.firewall.allowedUDPPorts = [25565 5353];
+      networking.firewall.allowedTCPPorts = [25565 45114];
 
       cosmos.system.impermanence.device = "/dev/mapper/crypted";
 
