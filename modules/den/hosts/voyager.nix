@@ -42,6 +42,7 @@
         home.minecraft
         home.claude
         home.taskwarrior
+        home.catt
         home.zathura
         home.thunderbird
         home.libreoffice
