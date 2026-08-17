@@ -1,0 +1,121 @@
+<!doctype html>
+<!--
+  The Minecraft start/stop page served by services/minecraft-control.nix.
+
+  Deliberately free of nix interpolation so it stays a file a browser can open
+  and a linter can read: the server list arrives from servers.json, which the
+  aspect generates from cosmos.services.minecraft.control.servers and nginx
+  serves next to this file. Changing the list therefore never touches this file.
+
+  Everything is same-origin — /hooks/ is proxied to webhook by the same vhost —
+  so there is no CORS, no API base URL and no second published port.
+-->
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Minecraft</title>
+<style>
+  :root { color-scheme: dark }
+  body { font: 16px/1.5 system-ui, sans-serif; max-width: 34rem;
+         margin: 3rem auto; padding: 0 1rem;
+         background: #16161d; color: #d8d8e0 }
+  h1 { font-size: 1.25rem; font-weight: 600 }
+  .s { border: 1px solid #2c2c38; border-radius: .5rem;
+       padding: 1rem; margin: 1rem 0 }
+  .n { font-weight: 600; display: flex; justify-content: space-between;
+       align-items: center }
+  .t { font-size: .8rem; padding: .15rem .5rem; border-radius: 1rem;
+       background: #2c2c38; color: #9a9aa8 }
+  .up { background: #1d3a24; color: #7fd18f }
+  .dn { background: #3a1d1d; color: #d18f8f }
+  button { font: inherit; padding: .4rem 1rem; margin: .75rem .5rem 0 0;
+           border: 1px solid #2c2c38; border-radius: .375rem;
+           background: #22222c; color: inherit; cursor: pointer }
+  button:hover:not(:disabled) { background: #2c2c38 }
+  button:disabled { opacity: .5; cursor: default }
+</style>
+<h1>Minecraft servers</h1>
+<div id="servers"></div>
+<script>
+  const el = document.getElementById("servers");
+
+  async function hook(name) {
+    const r = await fetch("hooks/" + name, { method: "POST" });
+    return (await r.text()).trim();
+  }
+
+  // systemctl is-active's vocabulary, spelled for people who are here to play
+  // Minecraft. Anything unrecognised is shown verbatim rather than guessed at
+  // — "failed" in particular must not read as "stopped".
+  const LABEL = {
+    active: "running",
+    inactive: "stopped",
+    activating: "starting…",
+    deactivating: "stopping…",
+    failed: "failed",
+  };
+  const TARGET = { start: "active", stop: "inactive" };
+
+  async function refresh(name) {
+    const tag = document.getElementById("t-" + name);
+    const state = await hook("status-" + name);
+    tag.textContent = LABEL[state] || state || "unknown";
+    tag.className = "t " + (state === "active" ? "up" : "dn");
+    return state;
+  }
+
+  async function act(name, verb) {
+    const bs = document.querySelectorAll('button[data-s="' + name + '"]');
+    bs.forEach(b => b.disabled = true);
+    document.getElementById("t-" + name).textContent =
+      verb === "start" ? "starting…" : "stopping…";
+    await hook(verb + "-" + name);
+    // Wait for the state we asked for, not for any settled state. The request
+    // only drops a flag file — a path unit has to notice it, and the server
+    // takes a while either way — so for the first seconds of a stop the unit
+    // is still legitimately "active", and treating that as the answer would
+    // report success before anything had happened.
+    for (let i = 0; i < 60; i++) {
+      await new Promise(r => setTimeout(r, 1500));
+      const state = await refresh(name);
+      if (state === TARGET[verb] || state === "failed") break;
+    }
+    bs.forEach(b => b.disabled = false);
+  }
+
+  fetch("servers.json").then(r => r.json()).then(servers => {
+    for (const s of servers) {
+      const d = document.createElement("div");
+      d.className = "s";
+
+      const head = document.createElement("div");
+      head.className = "n";
+      const label = document.createElement("span");
+      // textContent, not innerHTML: a server name comes from the nix config
+      // rather than from a user, but building the DOM this way means it never
+      // matters whether that stays true.
+      label.textContent = s;
+      const tag = document.createElement("span");
+      tag.className = "t";
+      tag.id = "t-" + s;
+      tag.textContent = "…";
+      head.append(label, tag);
+      d.append(head);
+
+      for (const verb of ["start", "stop"]) {
+        const b = document.createElement("button");
+        b.dataset.s = s;
+        b.dataset.v = verb;
+        b.textContent = verb === "start" ? "Start" : "Stop";
+        d.append(b);
+      }
+
+      el.append(d);
+      refresh(s);
+    }
+  });
+
+  el.addEventListener("click", e => {
+    const b = e.target.closest("button");
+    if (b) act(b.dataset.s, b.dataset.v);
+  });
+</script>

@@ -17,10 +17,26 @@
 #   * webhook (nixpkgs' own) turns an HTTP request into one fixed command. It is
 #     bound to loopback and never reached directly.
 #   * nginx serves a static page and proxies /hooks to webhook, so the page and
-#     its API are one origin and the whole thing is one port to publish.
-#   * sudo grants the webhook user exactly six commands. polkit would be the
-#     conventional answer and is not available: security.polkit.enable is false
-#     on these headless hosts, which is the same wall services/crowdsec.nix hit.
+#     its API are one origin and the whole thing is one port to publish. The
+#     page itself lives in _minecraft-control/index.html — underscored so
+#     import-tree leaves the directory alone, as with every other _-prefixed
+#     path here.
+#   * a systemd path unit per action carries the privilege. The unprivileged
+#     side can only create one specific empty file; a root oneshot watching for
+#     it runs the one command it exists to run.
+#
+# That last piece was sudo first and could not work. roles/server.nix sets
+# security.sudo.execWheelOnly, so the wrapper is mode 4550 root:wheel and a
+# non-wheel user is refused at exec — before any rule is consulted, and with
+# "Permission denied" rather than anything about permissions policy. Putting
+# this user in wheel to reach a six-command rule is a far larger grant than the
+# rule withholds. polkit is the conventional answer and is unavailable:
+# security.polkit.enable is false on headless hosts, the same wall
+# services/crowdsec.nix hit.
+#
+# The path units end up being the better boundary anyway. There is no setuid
+# binary, nothing parses an argument, and the privileged half never sees input
+# at all — it is triggered by the *existence* of a filename fixed at build time.
 #
 # Authentication is not implemented here, on purpose. gaia publishes this
 # *gated*, so netbird-proxy demands a NetBird identity, NetBird fills its groups
@@ -46,9 +62,13 @@
 
       user = "minecraft-control";
       systemctl = "/run/current-system/sw/bin/systemctl";
-      sudo = "/run/wrappers/bin/sudo";
 
       unit = server: "minecraft-server-${server}.service";
+
+      # Where the unprivileged half drops its request. tmpfs, so a pending flag
+      # never survives a reboot into an action nobody asked for any more.
+      flagDir = "/run/minecraft-control";
+      flag = server: verb: "${flagDir}/${verb}-${server}";
 
       # One script per server per action, generated rather than parameterised.
       #
@@ -57,10 +77,13 @@
       # no server name to validate, no quoting to get wrong, and no way to ask
       # for a unit that is not in this list.
       action = server: verb: let
-        privileged =
+        body =
           if verb == "status"
+          # is-active needs no privilege, so it stays a direct call.
           then "${systemctl} is-active ${unit server}"
-          else "${sudo} -n ${systemctl} ${verb} ${unit server}";
+          # Everything the unprivileged side can express: this filename exists,
+          # or it does not. The matching path unit turns that into the command.
+          else "${pkgs.coreutils}/bin/touch ${flag server verb}";
       in
         pkgs.writeShellApplication {
           name = "mc-${verb}-${server}";
@@ -68,11 +91,16 @@
             # is-active exits non-zero for a stopped unit, which is information
             # rather than failure — webhook would otherwise turn a stopped
             # server into an HTTP error.
-            ${privileged} || true
+            ${body} || true
           '';
         };
 
       actions = ["start" "stop" "status"];
+
+      # start/stop only: status is not privileged and has no unit.
+      privilegedActions =
+        lib.concatMap (server: map (verb: {inherit server verb;}) ["start" "stop"])
+        cfg.servers;
 
       scripts = lib.listToAttrs (lib.concatMap (server:
         map (verb:
@@ -90,86 +118,14 @@
         })
         scripts;
 
-      page = pkgs.writeText "index.html" ''
-        <!doctype html>
-        <meta charset="utf-8">
-        <meta name="viewport" content="width=device-width,initial-scale=1">
-        <title>Minecraft</title>
-        <style>
-          :root { color-scheme: dark }
-          body { font: 16px/1.5 system-ui, sans-serif; max-width: 34rem;
-                 margin: 3rem auto; padding: 0 1rem;
-                 background: #16161d; color: #d8d8e0 }
-          h1 { font-size: 1.25rem; font-weight: 600 }
-          .s { border: 1px solid #2c2c38; border-radius: .5rem;
-               padding: 1rem; margin: 1rem 0 }
-          .n { font-weight: 600; display: flex; justify-content: space-between;
-               align-items: center }
-          .t { font-size: .8rem; padding: .15rem .5rem; border-radius: 1rem;
-               background: #2c2c38; color: #9a9aa8 }
-          .up { background: #1d3a24; color: #7fd18f }
-          .dn { background: #3a1d1d; color: #d18f8f }
-          button { font: inherit; padding: .4rem 1rem; margin: .75rem .5rem 0 0;
-                   border: 1px solid #2c2c38; border-radius: .375rem;
-                   background: #22222c; color: inherit; cursor: pointer }
-          button:hover:not(:disabled) { background: #2c2c38 }
-          button:disabled { opacity: .5; cursor: default }
-        </style>
-        <h1>Minecraft servers</h1>
-        <div id="servers"></div>
-        <script>
-          const servers = ${builtins.toJSON cfg.servers};
-          const el = document.getElementById("servers");
-
-          async function hook(name) {
-            const r = await fetch("hooks/" + name, { method: "POST" });
-            return (await r.text()).trim();
-          }
-
-          async function refresh(name) {
-            const tag = document.getElementById("t-" + name);
-            const state = await hook("status-" + name);
-            const up = state === "active";
-            tag.textContent = up ? "running" : state || "stopped";
-            tag.className = "t " + (up ? "up" : "dn");
-          }
-
-          async function act(name, verb) {
-            const bs = document.querySelectorAll("button[data-s=" + name + "]");
-            bs.forEach(b => b.disabled = true);
-            document.getElementById("t-" + name).textContent = verb + "ing…";
-            await hook(verb + "-" + name);
-            // Starting is not instant; poll until it settles.
-            for (let i = 0; i < 20; i++) {
-              await new Promise(r => setTimeout(r, 1500));
-              await refresh(name);
-              const t = document.getElementById("t-" + name).textContent;
-              if (t === "running" || t === "stopped" || t === "inactive") break;
-            }
-            bs.forEach(b => b.disabled = false);
-          }
-
-          for (const s of servers) {
-            const d = document.createElement("div");
-            d.className = "s";
-            d.innerHTML =
-              '<div class="n"><span>' + s + '</span>' +
-              '<span class="t" id="t-' + s + '">…</span></div>' +
-              '<button data-s="' + s + '" data-v="start">Start</button>' +
-              '<button data-s="' + s + '" data-v="stop">Stop</button>';
-            el.appendChild(d);
-            refresh(s);
-          }
-          el.addEventListener("click", e => {
-            const b = e.target.closest("button");
-            if (b) act(b.dataset.s, b.dataset.v);
-          });
-        </script>
-      '';
-
+      # The page and its data, kept apart on purpose: index.html carries no
+      # nix interpolation at all, so it stays a file a browser can open and a
+      # linter can read, and changing the server list never touches it.
       root = pkgs.runCommand "minecraft-control-page" {} ''
         mkdir -p $out
-        cp ${page} $out/index.html
+        cp ${./_minecraft-control/index.html} $out/index.html
+        cp ${pkgs.writeText "servers.json" (builtins.toJSON cfg.servers)} \
+          $out/servers.json
       '';
     in {
       options.cosmos.services.minecraft.control = {
@@ -223,20 +179,55 @@
           inherit hooks;
         };
 
-        # Exactly these commands, no arguments accepted, no password. The unit
-        # names are baked in from `servers`, so this grants control of the
-        # Minecraft servers and provably nothing else on the host.
-        security.sudo.extraRules = [
-          {
-            users = [user];
-            commands = lib.concatMap (server:
-              map (verb: {
-                command = "${systemctl} ${verb} ${unit server}";
-                options = ["NOPASSWD" "SETENV"];
-              }) ["start" "stop"])
-            cfg.servers;
-          }
-        ];
+        # The drop box. Only this user may create anything in it, and the only
+        # names that mean anything are the ones a path unit below watches for.
+        systemd.tmpfiles.settings."10-minecraft-control".${flagDir}.d = {
+          inherit user;
+          group = user;
+          mode = "0700";
+        };
+
+        # The privilege boundary, one pair of units per action.
+        #
+        # The path unit fires on the file existing and starts the service; the
+        # service deletes the flag first, so the path unit re-arms instead of
+        # looping on a file that is still there. systemd holds the path unit
+        # inactive while the service runs, which is also what keeps a
+        # double-click from stacking two `systemctl stop`s.
+        systemd.paths = lib.listToAttrs (map ({
+          server,
+          verb,
+        }:
+          lib.nameValuePair "mc-${verb}-${server}" {
+            description = "Watch for a request to ${verb} the ${server} Minecraft server";
+            wantedBy = ["multi-user.target"];
+            pathConfig = {
+              PathExists = flag server verb;
+              Unit = "mc-${verb}-${server}.service";
+            };
+          })
+        privilegedActions);
+
+        systemd.services = lib.listToAttrs (map ({
+          server,
+          verb,
+        }:
+          lib.nameValuePair "mc-${verb}-${server}" {
+            description = "${verb} the ${server} Minecraft server on request";
+            serviceConfig = {
+              Type = "oneshot";
+              ExecStartPre = "${pkgs.coreutils}/bin/rm -f ${flag server verb}";
+              # The entire grant. No argument reaches this from anywhere.
+              ExecStart = "${systemctl} ${verb} ${unit server}";
+              # Blocking is deliberate — systemd keeps the path unit inactive
+              # while this runs, which is what stops a double click stacking two
+              # of these. But nix-minecraft gives the server TimeoutStopSec=75s
+              # to save its world, and the default 90s here leaves almost no
+              # margin over that; a slow save would land as a failed unit.
+              TimeoutStartSec = 180;
+            };
+          })
+        privilegedActions);
 
         services.nginx.virtualHosts."minecraft-control" = {
           listen = [
