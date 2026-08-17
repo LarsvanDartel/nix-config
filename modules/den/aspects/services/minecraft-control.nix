@@ -1,16 +1,27 @@
-# services.minecraft.control — a web page for starting and stopping the
-# Minecraft servers, for people who are not administrators of this host.
+# services.minecraft.control — a web page for running the Minecraft servers,
+# for people who are not administrators of this host: start and stop, who is
+# online, the console, the log, and what each server is costing in memory and
+# CPU.
 #
-# The problem this solves is narrow and the shape follows from it. Players want
-# a server up; the person who can currently do that is whoever has root on
-# endeavour. Everything else here is about granting exactly that and nothing
-# adjacent.
+# It began as start/stop alone and the shape still shows that: the two commands
+# that need root go through a path unit that never sees input, while everything
+# added since is either a plain read or a line written to the server's own
+# console FIFO. Worth keeping in mind when adding to it — reaching for root is
+# almost never the answer, because nix-minecraft already exposes the console and
+# the log to group `minecraft`.
 #
-# Deliberately NOT a server panel. nixpkgs has no Crafty/MCSManager/Pterodactyl,
-# and the one general-purpose thing it does have — cockpit — is a full systems
-# administration console with a terminal in it. Handing that to somebody so they
-# can restart a survival world is not a smaller grant than root, it *is* root
-# with extra steps.
+# Still not a general server panel: nixpkgs has no Crafty/MCSManager/
+# Pterodactyl, and the one general-purpose thing it does have — cockpit — is a
+# systems administration console with a terminal in it. Handing that to somebody
+# so they can restart a survival world is not a smaller grant than root, it *is*
+# root with extra steps. What this does hand out is bounded by two things: the
+# five commands per server below, and the game's own authority model.
+#
+# The console is the part to think twice about. It takes arbitrary input and
+# passes it to the server, so anyone who reaches this page can `op` themselves,
+# `ban` anyone, or `stop` the server — membership of the gating kanidm group is
+# server administration, not merely the power to restart. That is the intended
+# grant here and it is why the group exists separately from every other one.
 #
 # Three pieces, each doing one thing:
 #
@@ -21,9 +32,11 @@
 #     page itself lives in _minecraft-control/index.html — underscored so
 #     import-tree leaves the directory alone, as with every other _-prefixed
 #     path here.
-#   * a systemd path unit per action carries the privilege. The unprivileged
-#     side can only create one specific empty file; a root oneshot watching for
-#     it runs the one command it exists to run.
+#   * a systemd path unit per lifecycle action carries the privilege. The
+#     unprivileged side can only create one specific empty file; a root oneshot
+#     watching for it runs the one command it exists to run. Only start and stop
+#     need this — see SupplementaryGroups below for how the rest gets its
+#     access, and why it is not root.
 #
 # That last piece was sudo first and could not work. roles/server.nix sets
 # security.sudo.execWheelOnly, so the wrapper is mode 4550 root:wheel and a
@@ -55,7 +68,7 @@
       ...
     }: let
       inherit (lib.options) mkOption mkEnableOption;
-      inherit (lib.types) listOf port str;
+      inherit (lib.types) ints listOf port str;
       inherit (lib.modules) mkIf;
 
       cfg = config.cosmos.services.minecraft.control;
@@ -63,60 +76,148 @@
       user = "minecraft-control";
       systemctl = "/run/current-system/sw/bin/systemctl";
 
+      minecraft = config.cosmos.services.minecraft;
       unit = server: "minecraft-server-${server}.service";
+
+      # nix-minecraft's systemd-socket console, chosen in services/minecraft.nix
+      # over tmux. Mode 0660 minecraft:minecraft, so writing to it is what the
+      # SupplementaryGroups grant below is for. RCON is not an option here and
+      # deliberately so — that file explains why.
+      fifo = server: "/run/minecraft/${server}.stdin";
+
+      # The server's own log rather than the journal. Both exist (that is the
+      # point of the systemd-socket choice), but the journal is readable only by
+      # systemd-journal/adm, and joining this user to either would hand it every
+      # service's log on the host to show a Minecraft one.
+      logFile = server: "${minecraft.dataDir}/${server}/logs/latest.log";
 
       # Where the unprivileged half drops its request. tmpfs, so a pending flag
       # never survives a reboot into an action nobody asked for any more.
       flagDir = "/run/minecraft-control";
       flag = server: verb: "${flagDir}/${verb}-${server}";
 
-      # One script per server per action, generated rather than parameterised.
+      script = name: text: pkgs.writeShellApplication {inherit name text;};
+
+      # start/stop: the two that need root, and the only two that still go
+      # through a path unit. No request data reaches these at all — the URL
+      # selects a filename fixed at build time, and that is the whole grant.
+      lifecycle = server: verb:
+        script "mc-${verb}-${server}" ''
+          ${pkgs.coreutils}/bin/touch ${flag server verb}
+        '';
+
+      # Everything the page polls, in one request. Four round trips per server
+      # per tick is what this replaces, and they were never independently
+      # useful: the player count is meaningless without knowing the unit is up.
+      info = server:
+        script "mc-info-${server}" ''
+          state="$(${systemctl} is-active ${unit server} || true)"
+
+          # systemctl prints "[not set]" for a stopped unit rather than 0, and
+          # accounting is only guaranteed while the cgroup exists.
+          prop() {
+            v="$(${systemctl} show ${unit server} -p "$1" --value)"
+            case "$v" in ''' | "[not set]" | infinity) echo null ;; *) echo "$v" ;; esac
+          }
+
+          # mcstatus never throws: it reports {"online": false, "error": ...}
+          # for a refused connection, which is exactly the state of a server
+          # that is up as a unit but still loading its world. The timeout is
+          # for the other case — a server wedged badly enough to accept the
+          # TCP connection and then never answer the status ping.
+          players=null
+          if [ "$state" = active ]; then
+            players="$(${lib.getExe' pkgs.mcstatus "mcstatus"} \
+              127.0.0.1:${toString minecraft.servers.${server}.port} json 2>/dev/null \
+              | ${lib.getExe pkgs.jq} -c '.status.players // null' || echo null)"
+            [ -n "$players" ] || players=null
+          fi
+
+          ${lib.getExe pkgs.jq} -n \
+            --arg state "$state" \
+            --argjson memory "$(prop MemoryCurrent)" \
+            --argjson cpuNs "$(prop CPUUsageNSec)" \
+            --argjson tasks "$(prop TasksCurrent)" \
+            --argjson players "$players" \
+            '{$state, $memory, $cpuNs, $tasks, $players}'
+        '';
+
+      logs = server:
+        script "mc-logs-${server}" ''
+          # Missing is normal: a server that has never started has no log yet.
+          ${pkgs.coreutils}/bin/tail -n ${toString cfg.logLines} \
+            ${logFile server} 2>/dev/null || true
+        '';
+
+      # The console. Unlike every other hook here this one takes input, and it
+      # is the reason this page is a bigger grant than start/stop: whoever
+      # reaches it can run any command the server accepts, `op` and `stop`
+      # included. That is a deliberate choice — see the option description.
       #
-      # This is the whole security argument: no request data reaches a shell.
-      # webhook maps a URL to a fixed argv with no arguments at all, so there is
-      # no server name to validate, no quoting to get wrong, and no way to ask
-      # for a unit that is not in this list.
-      action = server: verb: let
-        body =
-          if verb == "status"
-          # is-active needs no privilege, so it stays a direct call.
-          then "${systemctl} is-active ${unit server}"
-          # Everything the unprivileged side can express: this filename exists,
-          # or it does not. The matching path unit turns that into the command.
-          else "${pkgs.coreutils}/bin/touch ${flag server verb}";
-      in
-        pkgs.writeShellApplication {
-          name = "mc-${verb}-${server}";
-          text = ''
-            # is-active exits non-zero for a stopped unit, which is information
-            # rather than failure — webhook would otherwise turn a stopped
-            # server into an HTTP error.
-            ${body} || true
-          '';
-        };
+      # The input never reaches a shell as code. writeShellApplication runs
+      # under `set -euo pipefail`, "$1" is quoted, and printf writes it as data.
+      command = server:
+        script "mc-cmd-${server}" ''
+          # First line only. A body with embedded newlines would otherwise be
+          # several console commands from one request, which is surprising in a
+          # way nothing here needs.
+          cmd="$(printf '%s' "''${1-}" | ${pkgs.coreutils}/bin/head -n1 | ${pkgs.coreutils}/bin/tr -d '\r')"
 
-      actions = ["start" "stop" "status"];
+          if [ -z "$cmd" ]; then
+            echo "nothing to send"
+            exit 0
+          fi
 
-      # start/stop only: status is not privileged and has no unit.
+          if ! ${systemctl} is-active --quiet ${unit server}; then
+            echo "server is not running"
+            exit 0
+          fi
+
+          # Opening a FIFO for writing blocks until something is reading it, so
+          # a server that died between the check above and here would hang this
+          # request until webhook's own timeout. tee lets timeout own that.
+          if printf '%s\n' "$cmd" \
+            | ${pkgs.coreutils}/bin/timeout 5 ${pkgs.coreutils}/bin/tee ${fifo server} >/dev/null; then
+            echo "sent"
+          else
+            echo "the console did not accept it"
+          fi
+        '';
+
+      # Hook id -> { script, whether it takes the request body }. The id becomes
+      # the URL, so `start-smp` is served at /hooks/start-smp.
+      scripts = lib.listToAttrs (lib.concatMap (server:
+        [
+          (lib.nameValuePair "info-${server}" {script = info server;})
+          (lib.nameValuePair "logs-${server}" {script = logs server;})
+          (lib.nameValuePair "cmd-${server}" {
+            script = command server;
+            takesBody = true;
+          })
+        ]
+        ++ map (verb:
+          lib.nameValuePair "${verb}-${server}" {script = lifecycle server verb;})
+        ["start" "stop"])
+      cfg.servers);
+
+      hooks = lib.mapAttrs (_: h:
+        {
+          execute-command = lib.getExe h.script;
+          command-working-directory = "/tmp";
+          include-command-output-in-response = true;
+        }
+        // lib.optionalAttrs (h.takesBody or false) {
+          # The POST body verbatim as $1 — not a JSON field, because a console
+          # line is text and wrapping it in JSON only adds a parse that can
+          # disagree with the sender about escaping.
+          pass-arguments-to-command = [{source = "raw-request-body";}];
+        })
+      scripts;
+
+      # start/stop only: the rest are reads or go through the FIFO.
       privilegedActions =
         lib.concatMap (server: map (verb: {inherit server verb;}) ["start" "stop"])
         cfg.servers;
-
-      scripts = lib.listToAttrs (lib.concatMap (server:
-        map (verb:
-          lib.nameValuePair "${verb}-${server}" (action server verb))
-        actions)
-      cfg.servers);
-
-      # Keyed by hook id — the attribute name becomes the id and the URL, so
-      # `start-smp` is served at /hooks/start-smp.
-      hooks =
-        lib.mapAttrs (_: script: {
-          execute-command = lib.getExe script;
-          command-working-directory = "/tmp";
-          include-command-output-in-response = true;
-        })
-        scripts;
 
       # The page and its data, kept apart on purpose: index.html carries no
       # nix interpolation at all, so it stays a file a browser can open and a
@@ -129,7 +230,7 @@
       '';
     in {
       options.cosmos.services.minecraft.control = {
-        enable = mkEnableOption "the Minecraft start/stop web page";
+        enable = mkEnableOption "the Minecraft control web page";
 
         servers = mkOption {
           type = listOf str;
@@ -138,8 +239,19 @@
           description = ''
             Servers offered on the page. Each name must match a
             `cosmos.services.minecraft.servers` entry, because it is used to
-            build the unit name granted in the sudo rule below — a name here
-            that is not a real server is a rule that grants nothing.
+            build the unit name the path units below act on — a name here that
+            is not a real server is a pair of units that control nothing.
+          '';
+        };
+
+        logLines = mkOption {
+          type = ints.positive;
+          default = 300;
+          description = ''
+            How much of each server's `latest.log` the page shows. Raw, IP
+            addresses included: a join line reads
+            `Name[/1.2.3.4:5678] logged in`, so everyone who can reach this
+            page can see the addresses of everyone who plays.
           '';
         };
 
@@ -179,6 +291,19 @@
           inherit hooks;
         };
 
+        # The console and the log both live behind group `minecraft`: the FIFO
+        # is 0660 minecraft:minecraft and latest.log is 0660 under a 0770 data
+        # directory. This is the one grant in this aspect that is broader than
+        # the thing it enables — it also means read and write access to the
+        # world data on disk.
+        #
+        # Taken deliberately rather than built around, because the alternative
+        # is worse in both directions. Reaching the journal instead would need
+        # systemd-journal or adm, which is *every* service's log on this host.
+        # Routing reads through the root path units too would mean a
+        # request/response protocol over files for what is a `tail` — more
+        # moving parts guarding a smaller gap, since a full console can already
+        # `stop` the server and `op` anyone.
         # The drop box. Only this user may create anything in it, and the only
         # names that mean anything are the ones a path unit below watches for.
         systemd.tmpfiles.settings."10-minecraft-control".${flagDir}.d = {
@@ -208,26 +333,43 @@
           })
         privilegedActions);
 
-        systemd.services = lib.listToAttrs (map ({
-          server,
-          verb,
-        }:
-          lib.nameValuePair "mc-${verb}-${server}" {
-            description = "${verb} the ${server} Minecraft server on request";
-            serviceConfig = {
-              Type = "oneshot";
-              ExecStartPre = "${pkgs.coreutils}/bin/rm -f ${flag server verb}";
-              # The entire grant. No argument reaches this from anywhere.
-              ExecStart = "${systemctl} ${verb} ${unit server}";
-              # Blocking is deliberate — systemd keeps the path unit inactive
-              # while this runs, which is what stops a double click stacking two
-              # of these. But nix-minecraft gives the server TimeoutStopSec=75s
-              # to save its world, and the default 90s here leaves almost no
-              # margin over that; a slow save would land as a failed unit.
-              TimeoutStartSec = 180;
-            };
-          })
-        privilegedActions);
+        systemd.services =
+          {
+            # The console and the log both live behind group `minecraft`: the
+            # FIFO is 0660 minecraft:minecraft and latest.log is 0660 under a
+            # 0770 data directory. This is the one grant in this aspect that is
+            # broader than the thing it enables — it also carries read and write
+            # access to the world data on disk.
+            #
+            # Taken deliberately rather than built around, because both
+            # alternatives are worse. Reading the journal instead would need
+            # systemd-journal or adm, which is *every* service's log on this
+            # host. Routing the reads through the root path units below would
+            # mean a request/response protocol over files to run a `tail` —
+            # more moving parts guarding a smaller gap, given a full console can
+            # already `stop` the server and `op` anyone.
+            webhook.serviceConfig.SupplementaryGroups = ["minecraft"];
+          }
+          // lib.listToAttrs (map ({
+            server,
+            verb,
+          }:
+            lib.nameValuePair "mc-${verb}-${server}" {
+              description = "${verb} the ${server} Minecraft server on request";
+              serviceConfig = {
+                Type = "oneshot";
+                ExecStartPre = "${pkgs.coreutils}/bin/rm -f ${flag server verb}";
+                # The entire grant. No argument reaches this from anywhere.
+                ExecStart = "${systemctl} ${verb} ${unit server}";
+                # Blocking is deliberate — systemd keeps the path unit inactive
+                # while this runs, which is what stops a double click stacking two
+                # of these. But nix-minecraft gives the server TimeoutStopSec=75s
+                # to save its world, and the default 90s here leaves almost no
+                # margin over that; a slow save would land as a failed unit.
+                TimeoutStartSec = 180;
+              };
+            })
+          privilegedActions);
 
         services.nginx.virtualHosts."minecraft-control" = {
           listen = [
