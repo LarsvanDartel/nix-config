@@ -295,9 +295,10 @@
 
         proxyAddress = mkOption {
           type = str;
-          default = "100.68.38.155";
+          default = "100.68.242.26";
           description = ''
-            gaia's NetBird address, and the only source this vhost accepts.
+            netbird-proxy's own mesh address, and the only source this vhost
+            accepts.
 
             Necessary rather than defensive. The fleet runs a single All -> All
             NetBird policy, so binding to the mesh means every enrolled peer can
@@ -305,6 +306,24 @@
             which lives on gaia. It is also what makes the identity headers
             trustworthy: they are believable exactly because the one peer that
             can set them is the proxy that authenticated the user.
+
+            NOT gaia's address. netbird-proxy enrols as its own NetBird client,
+            with a WireGuard address separate from the host agent's, and dials
+            upstream targets from that one. It is also absent from /api/peers,
+            so the peer list does not show it and gaia's own 100.68.38.155 —
+            the address in PerSourcePenaltyExemptList on this host — is the
+            wrong answer, which cost a round of 403s to discover.
+
+            Two ways to find the right one, easiest first:
+
+              * the denial itself, in this host's nginx error log:
+                `access forbidden by rule, client: <address>`
+              * on gaia, nftables_state.interface_state.wg_address.IP in
+                /var/lib/netbird-proxy/state.json
+
+            Stable across reboots, that path being persisted — but it would
+            change if the proxy ever re-enrolled, and the symptom of that is
+            every request to this page answering 403.
           '';
         };
 
