@@ -244,6 +244,23 @@
           '';
         };
 
+        proxyAddress = mkOption {
+          type = str;
+          default = "100.68.38.155";
+          description = ''
+            gaia's NetBird address, and the only source this vhost accepts.
+
+            Necessary rather than defensive. The fleet runs a single All -> All
+            NetBird policy, so binding to the mesh means every enrolled peer can
+            reach this port — and reaching it directly skips the kanidm gate,
+            which lives on gaia.
+
+            A literal for the same reason every other cross-host value here is
+            one: den cannot read gaia's config. It matches the address in
+            `PerSourcePenaltyExemptList` on this host.
+          '';
+        };
+
         logLines = mkOption {
           type = ints.positive;
           default = 300;
@@ -375,13 +392,25 @@
           listen = [
             {
               # The mesh, not loopback: netbird-proxy on gaia dials
-              # `endeavour:<port>` and a loopback socket refuses that. Reach is
-              # governed by the firewall, which opens this on the NetBird
-              # interface only — see exposedPorts on the host.
+              # `endeavour:<port>` and a loopback socket refuses that.
               addr = "0.0.0.0";
               inherit (cfg) port;
             }
           ];
+
+          # The firewall opening this on wt0 alone is NOT a gate, which is what
+          # the comment above used to claim. The fleet runs a single NetBird
+          # policy — All -> All, every protocol, bidirectional — so "reachable
+          # on the mesh" means reachable by every enrolled peer, and that is
+          # exactly what this page was: anyone with a peer could skip gaia, POST
+          # /hooks/stop-smp and never meet the kanidm gate at all. Verified by
+          # doing it from voyager, which is in no minecraft group.
+          #
+          # Pinning the source to gaia makes the gate the only way in.
+          extraConfig = ''
+            allow ${cfg.proxyAddress};
+            deny all;
+          '';
 
           locations."/" = {
             inherit root;
