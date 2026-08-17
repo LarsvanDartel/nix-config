@@ -781,29 +781,51 @@
               | .auth.bearer_auth.distribution_groups |= map({name: ., id: group_id(.)})
             )' ${desiredFile})"
 
-          # Anything still waiting on a peer or group is reported, not failed:
-          # a name that never resolves shows up as a recurring warning here.
+          # Unresolved names are reported, not failed — one that never resolves
+          # shows up as a recurring warning here. The two kinds differ in
+          # consequence, so they are worded differently: an absent peer holds
+          # the service back entirely, while an absent group is simply left out
+          # of the gate below.
           jq -r '
-            .[] | select(
-              (any(.targets[]; .target_id == null))
-              or (.auth.bearer_auth.enabled
-                  and any(.auth.bearer_auth.distribution_groups[]; .id == null))
-            )
+            .[] | select(any(.targets[]; .target_id == null))
             | "netbird: \(.name) waiting on " + (
-                [(.targets[] | select(.target_id == null) | "peer " + .peer),
-                 (.auth.bearer_auth.distribution_groups[] | select(.id == null) | "group " + .name)]
+                [.targets[] | select(.target_id == null) | "peer " + .peer]
                 | join(", ")
               )' <<<"$annotated"
 
+          jq -r '
+            .[] | select(.auth.bearer_auth.enabled
+                         and any(.auth.bearer_auth.distribution_groups[]; .id == null))
+            | "netbird: \(.name) gate omits " + (
+                [.auth.bearer_auth.distribution_groups[] | select(.id == null) | .name]
+                | join(", ")
+              ) + " — no such jwt-issued group yet"' <<<"$annotated"
+
+          # `any`, not `all`. A group that does not exist yet has no members, so
+          # publishing with the ones that do resolve admits exactly the same
+          # people as waiting would — while waiting freezes the *whole* service,
+          # including changes that have nothing to do with groups.
+          #
+          # That is not hypothetical: adding netbird-minecraft-smp and
+          # -hardcore to the control page's list left the service pinned to its
+          # old domain, because neither group exists until somebody whose claim
+          # carries it logs in, and until then `all` was never satisfied. The
+          # service was already published and gated on a group that worked; the
+          # only effect of holding it back was that the rename never happened.
+          #
+          # None resolving is still a skip. An empty distribution list is not a
+          # narrower gate, and it is not worth finding out which way NetBird
+          # reads it.
           desired="$(jq '
             [.[] | select(
               (all(.targets[]; .target_id != null))
               and ((.auth.bearer_auth.enabled | not)
-                   or all(.auth.bearer_auth.distribution_groups[]; .id != null))
+                   or any(.auth.bearer_auth.distribution_groups[]; .id != null))
             )]
             | map(
               .targets |= map(del(.peer))
-              | .auth.bearer_auth.distribution_groups |= map(.id)
+              | .auth.bearer_auth.distribution_groups |=
+                  (map(select(.id != null) | .id))
             )' <<<"$annotated")"
 
           echo "$desired" | jq -c '.[]' | while read -r svc; do
@@ -862,7 +884,7 @@
             else
               echo "netbird: creating $name"
               req -X POST -d "$svc" "$api/reverse-proxies/services" >/dev/null \
-                || echo "netbird: WARNING $name not created — is its domain taken by a service not managed here?"
+                || echo "netbird: WARNING $name not created — domain or listen port already taken; if a rename is in flight this clears on the next tick"
             fi
           done
 
