@@ -43,7 +43,6 @@
         home.claude
         home.taskwarrior
         home.catt
-        home.network-displays
         home.zathura
         home.thunderbird
         home.libreoffice
@@ -221,19 +220,8 @@
       # opened in the firewall with no process behind it refuses connections.
       # It matters only while catt is running, and then it is one file, being
       # served to a device on the same network, for as long as it plays.
-      # 7236 and 67 are home.network-displays. Miracast inverts the usual
-      # direction: after wpa_supplicant negotiates the Wi-Fi Direct group, the
-      # TV takes a DHCP lease from the dnsmasq NetworkManager puts on that link
-      # and then opens an RTSP connection *back* to here on 7236. Both arrive
-      # inbound, on an interface created seconds earlier, so both need opening
-      # or the sink appears in the list, is selected, and nothing happens.
-      #
-      # 67 is a DHCP *server* port and looks alarming on a laptop. Nothing
-      # listens on it except the dnsmasq NetworkManager starts for a P2P group,
-      # bound to that interface — on an ordinary network there is no server to
-      # reach, and an open port with nothing behind it refuses connections.
-      networking.firewall.allowedUDPPorts = [25565 5353 7236 67];
-      networking.firewall.allowedTCPPorts = [25565 45114 7236];
+      networking.firewall.allowedUDPPorts = [25565 5353];
+      networking.firewall.allowedTCPPorts = [25565 45114];
 
       cosmos.system.impermanence.device = "/dev/mapper/crypted";
 
