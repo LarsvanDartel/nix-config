@@ -385,6 +385,11 @@
         # there is TLS to terminate and a CrowdSec verdict worth applying, and
         # a human can complete the IdP redirect that a game client cannot.
         minecraft-control = {
+          # The bare name, because this is the thing a person opens. The game
+          # servers took it first and have moved to smp./hardcore., which are
+          # what players type; a browser going to minecraft.lvdar.nl wants the
+          # page, not a TCP socket speaking Mojang's protocol.
+          domain = "minecraft.lvdar.nl";
           targets = endeavour 8086;
           bearerAuth.groups = [
             "netbird-minecraft-control"
@@ -416,21 +421,38 @@
         # target protocol to "tcp" is the first thing to try if this does not
         # forward — it would also be the first new lead on the knot's :22 in a
         # while, since that service had this same shape.
-        minecraft = {
-          domain = "minecraft.lvdar.nl";
+        minecraft-smp = {
+          domain = "smp.lvdar.nl";
           mode = "tcp";
           listenPort = 25565;
           bearerAuth.enable = false;
           targets = endeavour 25565;
         };
 
-        # The second world. Its own listen port because L4 routes by port and
-        # nothing else — the domain here is inert, so both Minecraft services
-        # would be indistinguishable on 25565. Players reach this one as
-        # minecraft.lvdar.nl:25566 unless an SRV record is added; see the
-        # comment on the server in hosts/endeavour.nix.
+        # The second world, and the one that explains why both cannot simply be
+        # 25565: L4 routes by listen port and nothing else. Every name under
+        # lvdar.nl is a wildcard onto this host's single address, and a TCP
+        # connection carries no hostname for the proxy to read, so two services
+        # on 25565 would be one socket with two names for it.
+        #
+        # An SRV record is what makes the port invisible anyway. The Java client
+        # looks up _minecraft._tcp.<host> before connecting and honours the port
+        # it finds, so players type a bare `hardcore.lvdar.nl` and land here:
+        #
+        #   _minecraft._tcp.hardcore.lvdar.nl  SRV  0 0 25566 hardcore.lvdar.nl
+        #
+        # That record lives in Cloudflare by hand — the wildcard covers A
+        # lookups but cannot answer SRV. Without it this is still reachable, as
+        # hardcore.lvdar.nl:25566 typed in full.
+        #
+        # The alternative would be a Velocity proxy on 25565 routing by the
+        # hostname in the handshake, which is the only way to put both worlds
+        # literally on the same port. It was not worth it: it makes one process
+        # a dependency of both servers, and it requires turning off online-mode
+        # on the backends in favour of a forwarding secret — a configuration
+        # whose failure mode is anyone joining as anyone.
         minecraft-hardcore = {
-          domain = "minecraft-hardcore.lvdar.nl";
+          domain = "hardcore.lvdar.nl";
           mode = "tcp";
           listenPort = 25566;
           bearerAuth.enable = false;
@@ -451,7 +473,7 @@
         # check — an unreachable voice port is silent by design, showing
         # players "voice chat unavailable" rather than failing the connection.
         minecraft-hardcore-voice = {
-          domain = "minecraft-hardcore-voice.lvdar.nl";
+          domain = "hardcore-voice.lvdar.nl";
           mode = "udp";
           listenPort = 24454;
           bearerAuth.enable = false;
