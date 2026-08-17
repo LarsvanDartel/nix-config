@@ -638,23 +638,40 @@
               || echo "netbird: WARNING could not enable JWT group sync"
           fi
 
-          # NetBird creates a group the first time a token carries its name, so
-          # a freshly declared one does not exist until somebody happens to log
-          # in — and until then every service gated on it is skipped. Create
-          # them here instead, so the declared state converges on its own. JWT
-          # sync then matches these by name rather than making duplicates.
           groups="$(req "$api/groups")"
-          missing="$(jq -r --argjson have "$groups" '
-            [.[] | select(.auth.bearer_auth.enabled) | .auth.bearer_auth.distribution_groups[]]
-            | unique - [$have[].name] | .[]' ${desiredFile})"
 
-          if [ -n "$missing" ]; then
+          # A distribution group MUST have been created by JWT sync — this
+          # reconciler must never create one, however tempting it looks.
+          #
+          # NetBird stamps every group with how it came to exist, and the API
+          # hardcodes `api` on create (groups_handler.go:226) with no way to
+          # change it afterwards (:165 copies the old value on update). JWT
+          # sync then looks a group up by name and, if it finds one, only adds
+          # the user when `Issued == "jwt"` (account.go:169). It does not
+          # duplicate it and it does not complain — it silently declines.
+          #
+          # So a group pre-created here is permanently unfillable, and a
+          # service gated on it is one nobody can ever reach: the group exists,
+          # the service wires up, the reconciler reports success, and every
+          # login is refused. That is exactly what happened to
+          # minecraft-control, whose group sat at `issued=api, peers=0` while
+          # the other seven gated groups were `issued=jwt`.
+          #
+          # The convergence this used to buy was never needed anyway: the name
+          # is already in kanidm's `groups` claim, so the first login by any
+          # member creates the group correctly and the next tick wires the
+          # service. Waiting for that is the whole cost.
+          unfillable="$(jq -r --argjson have "$groups" '
+            [$have[] | select(.issued != "jwt") | .name] as $notjwt
+            | [.[] | select(.auth.bearer_auth.enabled)
+                   | .auth.bearer_auth.distribution_groups[]]
+            | unique | map(select(. as $g | $notjwt | index($g))) | .[]' ${desiredFile})"
+
+          if [ -n "$unfillable" ]; then
             while read -r name; do
-              echo "netbird: creating group $name"
-              req -X POST -d "$(jq -n --arg n "$name" '{name: $n}')" \
-                "$api/groups" >/dev/null || echo "netbird: WARNING group $name not created"
-            done <<<"$missing"
-            groups="$(req "$api/groups")"
+              echo "netbird: WARNING group $name exists but was not issued by JWT sync;" \
+                   "delete it and log in again, or nobody will ever match it"
+            done <<<"$unfillable"
           fi
 
           # NetBird's own SSH server, which is what `netbird ssh <peer>` talks
@@ -752,7 +769,12 @@
             --argjson peers "$peers" \
             --argjson groups "$groups" '
             def peer_id($n): ([$peers[] | select(.name == $n) | .id] | first);
-            def group_id($n): ([$groups[] | select(.name == $n) | .id] | first);
+            # issued == "jwt" only, for the reason spelled out above the
+            # unfillable check: an api-issued group can never gain a member, so
+            # treating it as resolved wires a service that refuses everyone.
+            # Left unresolved it becomes a "waiting on group" line instead.
+            def group_id($n):
+              ([$groups[] | select(.name == $n and .issued == "jwt") | .id] | first);
 
             map(
               .targets |= map(.target_id = peer_id(.peer))
