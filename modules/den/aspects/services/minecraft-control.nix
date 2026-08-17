@@ -96,6 +96,19 @@
       flagDir = "/run/minecraft-control";
       flag = server: verb: "${flagDir}/${verb}-${server}";
 
+      # Where the *desired* state lives, which is a different thing entirely
+      # and therefore not on tmpfs. Present means "this server is meant to be
+      # down"; the unit below refuses to start while it exists.
+      #
+      # Without it, stopping a server from the page held only until the next
+      # deploy. The unit is wantedBy=multi-user.target, and
+      # switch-to-configuration starts every enabled unit that is not running —
+      # so a stop lasted until comin's next switch and then quietly undid
+      # itself. `systemctl disable` does not help either: the .wants symlinks
+      # are regenerated from the generation on every switch.
+      stateDir = "/var/lib/minecraft-control";
+      stopped = server: "${stateDir}/${server}.stopped";
+
       script = name: text: pkgs.writeShellApplication {inherit name text;};
 
       # Who is online, via the server's own status ping.
@@ -424,11 +437,34 @@
         # `stop` the server and `op` anyone.
         # The drop box. Only this user may create anything in it, and the only
         # names that mean anything are the ones a path unit below watches for.
-        systemd.tmpfiles.settings."10-minecraft-control".${flagDir}.d = {
-          inherit user;
-          group = user;
-          mode = "0700";
+        systemd.tmpfiles.settings."10-minecraft-control" = {
+          ${flagDir}.d = {
+            inherit user;
+            group = user;
+            mode = "0700";
+          };
+
+          # The desired-state directory, root-owned: the unprivileged side must
+          # not be able to pin a server down by writing here directly. It only
+          # ever asks, and the root oneshot records the answer.
+          ${stateDir}.d = {
+            user = "root";
+            group = "root";
+            mode = "0755";
+          };
         };
+
+        # Survives the rollback, or "stopped" would mean "stopped until the
+        # next reboot" — which is the same surprise as "stopped until the next
+        # deploy", just rarer and harder to spot.
+        cosmos.system.impermanence.persist.directories = [
+          {
+            directory = stateDir;
+            user = "root";
+            group = "root";
+            mode = "0755";
+          }
+        ];
 
         # The privilege boundary, one pair of units per action.
         #
@@ -468,6 +504,19 @@
             # already `stop` the server and `op` anyone.
             webhook.serviceConfig.SupplementaryGroups = ["minecraft"];
           }
+          # What makes a stop outlast a deploy. A failed condition is not a
+          # failure: systemd skips the unit and reports it inactive, which is
+          # exactly what an operator asked for and exactly what the page then
+          # displays.
+          #
+          # It governs `systemctl start` by hand as well, which is the point
+          # rather than a side effect — the file is the desired state, and one
+          # way to change it is the page. The other is deleting the file.
+          // lib.listToAttrs (map (server:
+            lib.nameValuePair "minecraft-server-${server}" {
+              unitConfig.ConditionPathExists = "!${stopped server}";
+            })
+          cfg.servers)
           // lib.listToAttrs (map ({
             server,
             verb,
@@ -476,7 +525,18 @@
               description = "${verb} the ${server} Minecraft server on request";
               serviceConfig = {
                 Type = "oneshot";
-                ExecStartPre = "${pkgs.coreutils}/bin/rm -f ${flag server verb}";
+                ExecStartPre =
+                  [
+                    "${pkgs.coreutils}/bin/rm -f ${flag server verb}"
+                  ]
+                  # Record the intent before acting on it, so a crash between
+                  # the two leaves the server running with a stop recorded
+                  # rather than stopped with nothing to keep it that way.
+                  ++ (
+                    if verb == "stop"
+                    then ["${pkgs.coreutils}/bin/touch ${stopped server}"]
+                    else ["${pkgs.coreutils}/bin/rm -f ${stopped server}"]
+                  );
                 # The entire grant. No argument reaches this from anywhere.
                 ExecStart = "${systemctl} ${verb} ${unit server}";
                 # Blocking is deliberate — systemd keeps the path unit inactive
