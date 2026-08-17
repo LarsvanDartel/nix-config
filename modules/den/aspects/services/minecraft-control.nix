@@ -234,7 +234,7 @@
       # all of them land on 0 and are refused.
       groupMaps =
         lib.concatMapStringsSep "\n" (server: ''
-          map $http_x_netbird_groups ${mayVar server} {
+          map $http_x_netbird_groups ${"$" + mayVar server} {
             default 0;
           ${lib.concatMapStringsSep "\n" (g: ''"~(^|,)${g}(,|$)" 1;'') (cfg.access.${server} or [])}
           }
