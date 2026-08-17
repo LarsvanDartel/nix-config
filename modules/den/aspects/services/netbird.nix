@@ -626,16 +626,36 @@
           # partial replace would quietly reset them.
           account="$(req "$api/accounts" | jq -r '.[0]')"
           account_id="$(jq -r .id <<<"$account")"
+          # peer_approval_enabled is the setting that separates "may use a
+          # published web page" from "may join the mesh", and without it those
+          # are the same grant.
+          #
+          # A person who authenticates to a gated service gets a NetBird user
+          # record created for them on their first token. user_approval_required
+          # holds that record blocked until an administrator approves it, and a
+          # blocked user cannot reach the service either — so approving them is
+          # unavoidable if they are to use the page at all. The catch is what
+          # else approval carries: handleUserAddedPeer (peer.go:688) refuses a
+          # peer only while the user is pending, so an approved user may run
+          # `netbird up` and enrol a device. With peer approval off that device
+          # is live immediately, and it lands in the All group, which the
+          # default policy pairs with itself for every protocol in both
+          # directions — the whole fleet, every port, from someone who was
+          # given a Minecraft page.
+          #
+          # With this on, their peer is created but stays pending and carries no
+          # access until it is approved here. Approving a person to read a web
+          # page no longer decides anything about the mesh.
           settings="$(jq '.settings
             | .jwt_groups_enabled = true
-            | .jwt_groups_claim_name = "groups"' <<<"$account")"
+            | .jwt_groups_claim_name = "groups"
+            | .extra.peer_approval_enabled = true' <<<"$account")"
 
-          if [ "$(jq -r '.jwt_groups_enabled, .jwt_groups_claim_name' <<<"$settings" | tr '\n' ' ')" \
-               != "$(jq -r '.settings.jwt_groups_enabled, .settings.jwt_groups_claim_name' <<<"$account" | tr '\n' ' ')" ]; then
-            echo "netbird: enabling JWT group sync on the account"
+          if [ "$(jq -rS . <<<"$settings")" != "$(jq -rS .settings <<<"$account")" ]; then
+            echo "netbird: updating account settings (JWT group sync, peer approval)"
             req -X PUT -d "$(jq -n --argjson s "$settings" '{settings: $s}')" \
               "$api/accounts/$account_id" >/dev/null \
-              || echo "netbird: WARNING could not enable JWT group sync"
+              || echo "netbird: WARNING could not update account settings"
           fi
 
           groups="$(req "$api/groups")"
