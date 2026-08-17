@@ -197,7 +197,26 @@
                 "http://localhost:54000/"
               ];
               originLanding = "https://netbird.lvdar.nl";
-              scopeMaps.netbird-users = ["openid" "profile" "email"];
+              # Who may obtain a token at all, as opposed to what they reach
+              # once they have one. Every netbird-* group, not just the mesh
+              # baseline, because those two questions were conflated and the
+              # failure was unreadable: a person in netbird-minecraft-control
+              # and nothing else got
+              #
+              #   Identity does not have access to the requested scopes
+              #   requested_scopes: {"email","openid","profile"}
+              #   available_scopes: {}
+              #
+              # — kanidm refusing to issue a token, before the service gate on
+              # gaia was ever consulted, so the symptom pointed at the wrong
+              # layer entirely. Being in one of these grants a token and
+              # nothing more; the distribution list on each published service
+              # still decides what that token opens.
+              #
+              # netbird-users remains the group that means mesh access, and
+              # anyone with a peer still needs it — see the claim map below for
+              # why it must also appear there.
+              scopeMaps = lib.genAttrs netbirdGroups (_: ["openid" "profile" "email"]);
 
               # Each group contributes its own name to the claim. NetBird
               # creates a group per value it has not seen and sets the user's
