@@ -35,11 +35,29 @@
       "minecraft-control"
     ];
 
+    # Groups that gate something *inside* a service rather than access to it.
+    # They are not published domains, so they never appear in a service's
+    # distribution list; they exist only to reach the `groups` claim, where the
+    # application reads them out of the X-NetBird-Groups header netbird-proxy
+    # stamps on the request.
+    #
+    # One per Minecraft server, consumed by
+    # `cosmos.services.minecraft.control.access` on endeavour. Someone who plays
+    # on one server has no business restarting the other, and until these
+    # existed the page's own gate group was the only granularity there was.
+    inAppGroups = [
+      "netbird-minecraft-smp"
+      "netbird-minecraft-hardcore"
+    ];
+
     # Baseline: mesh access at all. Kept in the claim because NetBird replaces
     # a user's auto-groups wholesale with whatever the token says — anything
     # omitted here is taken away from them on their next login, including the
     # group the setup key enrols peers into.
-    netbirdGroups = ["netbird-users"] ++ map (s: "netbird-${s}") gatedServices;
+    netbirdGroups =
+      ["netbird-users"]
+      ++ map (s: "netbird-${s}") gatedServices
+      ++ inAppGroups;
   in {
     options.cosmos.services.kanidm.expose = mkOption {
       type = bool;

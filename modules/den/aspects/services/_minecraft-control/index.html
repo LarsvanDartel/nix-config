@@ -62,10 +62,14 @@
   .sent { font-size: .8rem; color: var(--dim); margin-top: .35rem; min-height: 1.2em }
 </style>
 <h1>Minecraft servers</h1>
+<div id="who"></div>
 <div id="servers"></div>
 <script>
   const el = document.getElementById("servers");
 
+  // null means the gate refused this server for this person. nginx decides
+  // that from X-NetBird-Groups; the page only mirrors the answer, so there is
+  // nothing here to get wrong in a way that grants anything.
   async function hook(name, body) {
     const r = await fetch("hooks/" + name, {
       method: "POST",
@@ -74,6 +78,7 @@
       headers: body === undefined ? {} : { "Content-Type": "text/plain" },
       body,
     });
+    if (r.status === 403) return null;
     return (await r.text()).trim();
   }
 
@@ -112,7 +117,11 @@
     const v = state.get(name);
     let info;
     try {
-      info = JSON.parse(await hook("info-" + name));
+      const raw = await hook("info-" + name);
+      // Access can be taken away between page loads; treat it like any other
+      // failure to read rather than leaving stale numbers on screen.
+      if (raw === null) throw new Error("forbidden");
+      info = JSON.parse(raw);
     } catch {
       v.tag.textContent = "unreachable";
       v.tag.className = "t dn";
@@ -251,7 +260,42 @@
     });
   }
 
-  fetch("servers.json").then(r => r.json()).then(servers => {
+  async function whoami() {
+    const el = document.getElementById("who");
+    try {
+      const [user, groups] = (await (await fetch("whoami")).text()).split("\n");
+      if (!user) return;
+      el.className = "who";
+      el.textContent = "signed in as " + user;
+      // The groups are worth showing: "why can I not see the other server" is
+      // otherwise a question only somebody with kanidm access can answer.
+      if (groups) el.title = groups.split(",").join("\n");
+    } catch { /* the page is still usable without knowing who you are */ }
+  }
+
+  async function main() {
+    whoami();
+
+    const declared = await (await fetch("servers.json")).json();
+
+    // Ask about each server before drawing it. The 403 comes from the same
+    // nginx rule that guards every other hook, so what is on screen is exactly
+    // what this person may act on — there is no second, weaker notion of
+    // visibility to keep in step with the real one.
+    const servers = [];
+    for (const s of declared) {
+      if ((await hook("info-" + s)) !== null) servers.push(s);
+    }
+
+    if (!servers.length) {
+      const p = document.createElement("p");
+      p.className = "who";
+      p.textContent =
+        "You are signed in, but no server has been shared with you yet.";
+      el.append(p);
+      return;
+    }
+
     for (const s of servers) card(s);
 
     // One timer for every server rather than one each, so the requests stay in
@@ -264,5 +308,7 @@
       setTimeout(tick, POLL_MS);
     };
     tick();
-  });
+  }
+
+  main();
 </script>

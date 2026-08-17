@@ -68,7 +68,7 @@
       ...
     }: let
       inherit (lib.options) mkOption mkEnableOption;
-      inherit (lib.types) ints listOf port str;
+      inherit (lib.types) attrsOf ints listOf port str;
       inherit (lib.modules) mkIf;
 
       cfg = config.cosmos.services.minecraft.control;
@@ -219,6 +219,28 @@
         lib.concatMap (server: map (verb: {inherit server verb;}) ["start" "stop"])
         cfg.servers;
 
+      # One nginx variable per server, holding 1 when the caller's groups admit
+      # them. Dashes are not legal in an nginx variable name.
+      mayVar = server: "mc_may_${lib.replaceStrings ["-"] ["_"] server}";
+
+      # X-NetBird-Groups is a comma-separated list of group *display names* —
+      # exactly the netbird-* names kanidm puts in the `groups` claim. netbird
+      # drops any label containing a comma before joining (reverseproxy.go:934),
+      # so anchoring on comma-or-end is an exact membership test rather than a
+      # substring one: netbird-minecraft-smp2 cannot match netbird-minecraft-smp.
+      #
+      # `default 0` is the entire safety property. A server with no groups
+      # listed, a request that arrived without the header, a name nobody has —
+      # all of them land on 0 and are refused.
+      groupMaps =
+        lib.concatMapStringsSep "\n" (server: ''
+          map $http_x_netbird_groups ${mayVar server} {
+            default 0;
+          ${lib.concatMapStringsSep "\n" (g: ''"~(^|,)${g}(,|$)" 1;'') (cfg.access.${server} or [])}
+          }
+        '')
+        cfg.servers;
+
       # The page and its data, kept apart on purpose: index.html carries no
       # nix interpolation at all, so it stays a file a browser can open and a
       # linter can read, and changing the server list never touches it.
@@ -244,6 +266,33 @@
           '';
         };
 
+        access = mkOption {
+          type = attrsOf (listOf str);
+          default = lib.genAttrs cfg.servers (_: ["netbird-minecraft-control"]);
+          defaultText = "every server, to netbird-minecraft-control";
+          example = {
+            smp = ["netbird-minecraft-smp" "netbird-minecraft-control"];
+            hardcore = ["netbird-minecraft-control"];
+          };
+          description = ''
+            Which kanidm groups may drive which server, keyed by server name.
+
+            The names are matched against the `X-NetBird-Groups` header that
+            netbird-proxy stamps on the request, which carries the caller's
+            group display names straight from kanidm's `groups` claim. So a
+            name here must be one of the groups
+            `services/kanidm.nix` puts in that claim, or it can never match.
+
+            A server absent from this attrset is controllable by nobody, and
+            that is the intended behaviour: the nginx map backing this defaults
+            to refusing, so a typo costs access rather than granting it.
+
+            Membership is all-or-nothing per server. Someone who is not in a
+            server's groups cannot read its log or its player count either — it
+            is simply not their server, and the page does not show it.
+          '';
+        };
+
         proxyAddress = mkOption {
           type = str;
           default = "100.68.38.155";
@@ -253,11 +302,9 @@
             Necessary rather than defensive. The fleet runs a single All -> All
             NetBird policy, so binding to the mesh means every enrolled peer can
             reach this port — and reaching it directly skips the kanidm gate,
-            which lives on gaia.
-
-            A literal for the same reason every other cross-host value here is
-            one: den cannot read gaia's config. It matches the address in
-            `PerSourcePenaltyExemptList` on this host.
+            which lives on gaia. It is also what makes the identity headers
+            trustworthy: they are believable exactly because the one peer that
+            can set them is the proxy that authenticated the user.
           '';
         };
 
@@ -398,29 +445,70 @@
             }
           ];
 
-          # The firewall opening this on wt0 alone is NOT a gate, which is what
-          # the comment above used to claim. The fleet runs a single NetBird
-          # policy — All -> All, every protocol, bidirectional — so "reachable
-          # on the mesh" means reachable by every enrolled peer, and that is
-          # exactly what this page was: anyone with a peer could skip gaia, POST
-          # /hooks/stop-smp and never meet the kanidm gate at all. Verified by
-          # doing it from voyager, which is in no minecraft group.
+          # The firewall opening this on wt0 alone is NOT a gate. The fleet runs
+          # one NetBird policy — All -> All, every protocol, bidirectional — so
+          # "reachable on the mesh" means reachable by every enrolled peer, and
+          # for a while that is exactly what this page was: anyone with a peer
+          # could skip gaia, call /hooks/stop-smp directly and never meet the
+          # kanidm gate at all.
           #
-          # Pinning the source to gaia makes the gate the only way in.
+          # Pinning the source to gaia's mesh address is what makes the gate the
+          # only way in, and it is also what makes the identity headers below
+          # mean anything: they are trustworthy precisely because the only peer
+          # that can set them is the proxy that authenticates the user.
+          #
+          # A literal for the same reason every other cross-host value here is
+          # one — den cannot read gaia's config. It matches the address in
+          # PerSourcePenaltyExemptList on this host.
           extraConfig = ''
             allow ${cfg.proxyAddress};
             deny all;
           '';
 
-          locations."/" = {
-            inherit root;
-            index = "index.html";
-          };
-
           # Same origin as the page, so the fetch() calls above need no CORS
           # and no second published port.
-          locations."/hooks/".proxyPass = "http://127.0.0.1:${toString cfg.webhookPort}/hooks/";
+          #
+          # Per-server authorisation lives here rather than in the hooks: this
+          # is the only path to webhook, which binds loopback, and a `map` that
+          # defaults to 0 fails closed in a way a shell test repeated in ten
+          # scripts does not.
+          locations =
+            {
+              "/" = {
+                inherit root;
+                index = "index.html";
+              };
+
+              # Who the gate says you are. Plain text rather than JSON because a
+              # display name may legally contain a quote — netbird only
+              # guarantees printable ASCII — and assembling JSON from it in an
+              # nginx string would let that break the document.
+              "= /whoami".extraConfig = ''
+                default_type text/plain;
+                return 200 "$http_x_netbird_user\n$http_x_netbird_groups\n";
+              '';
+
+              # The catch-all, and it refuses. Every real hook is matched by a
+              # regex location below, which nginx prefers over this prefix; what
+              # lands here is a hook for a server that is not in `servers`, or a
+              # name that does not exist. Neither should reach webhook.
+              "/hooks/".extraConfig = "return 403;";
+            }
+            // lib.listToAttrs (map (server:
+              lib.nameValuePair
+              "~ ^/hooks/(info|logs|start|stop|cmd)-${server}$" {
+                # No URI part: nginx forbids one in a regex location, and the
+                # path wants passing through unchanged anyway.
+                proxyPass = "http://127.0.0.1:${toString cfg.webhookPort}";
+                extraConfig = ''
+                  if (${"$" + mayVar server} = 0) { return 403; }
+                '';
+              })
+            cfg.servers);
         };
+
+        # The maps have to live in the http block, not the server block.
+        services.nginx.appendHttpConfig = groupMaps;
       };
     };
   };

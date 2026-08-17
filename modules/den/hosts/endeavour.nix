@@ -181,10 +181,25 @@
         operators = {};
       };
 
-      # Start/stop from a browser, for the people who play here and administer
-      # nothing. Membership of the kanidm group `netbird-minecraft-control` is
-      # the entire access control; see services/minecraft-control.nix.
-      cosmos.services.minecraft.control.enable = true;
+      # Run the servers from a browser, for the people who play here and
+      # administer nothing: start/stop, who is online, the console, the log.
+      #
+      # Two layers of kanidm groups. `netbird-minecraft-control` is the gate on
+      # gaia and decides who sees the page at all; the per-server groups below
+      # decide which servers they then get, and are checked against the
+      # X-NetBird-Groups header. Being in the gate group alone now shows an
+      # empty page — deliberately, so handing someone one server is the default
+      # shape rather than an afterthought.
+      #
+      # netbird-minecraft-control stays on both because it is the group the
+      # people who look after the whole thing are in.
+      cosmos.services.minecraft.control = {
+        enable = true;
+        access = {
+          smp = ["netbird-minecraft-smp" "netbird-minecraft-control"];
+          hardcore = ["netbird-minecraft-hardcore" "netbird-minecraft-control"];
+        };
+      };
 
       # The second server, and the thing the comment above warned about: two
       # servers cannot both have the default port. Upstream's duplicate-port
