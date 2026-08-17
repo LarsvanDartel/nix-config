@@ -364,18 +364,33 @@
           targets = endeavour 5055;
         };
 
-        # The start/stop page for the two servers below — and the one Minecraft
+        # The control page for the two servers below — and the one Minecraft
         # entry here that is GATED, which is the whole point of it. Everything
         # else on this page is either public by design or protected by the
-        # game's own whitelist; this one hands out control of a systemd unit,
-        # so it takes the default NetBird identity check and admits only the
-        # kanidm group netbird-minecraft-control.
+        # game's own whitelist; this one hands out a console on a systemd unit.
+        #
+        # The gate is deliberately wider than the default `netbird-<name>`.
+        # This service does its own per-server authorisation from the groups
+        # netbird-proxy stamps on the request, and its finest-grained group is
+        # per server — so gating solely on netbird-minecraft-control would mean
+        # nobody could reach the page without already holding the group that
+        # grants every server, and the per-server split could never do anything.
+        #
+        # So: any of the three gets you to the page, and
+        # cosmos.services.minecraft.control.access on endeavour decides what you
+        # see once you are there. Kept in sync by hand with `inAppGroups` in
+        # services/kanidm.nix, den being unable to read another host's config.
         #
         # Ordinary HTTP rather than L4: it is a browser talking to nginx, so
         # there is TLS to terminate and a CrowdSec verdict worth applying, and
         # a human can complete the IdP redirect that a game client cannot.
         minecraft-control = {
           targets = endeavour 8086;
+          bearerAuth.groups = [
+            "netbird-minecraft-control"
+            "netbird-minecraft-smp"
+            "netbird-minecraft-hardcore"
+          ];
         };
 
         # Minecraft. L4 for the same reason as traccar-osmand: the client
