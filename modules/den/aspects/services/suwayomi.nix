@@ -53,7 +53,7 @@
         type = nullOr path;
         default = null;
       };
-      extensionRepos = mkOption {
+      extensionStores = mkOption {
         type = listOf str;
         # index.pb, not the index.min.json this used to point at. keiyoushi
         # moved to Mihon's Extension Store and left the old URL serving a
@@ -62,6 +62,13 @@
         # everything it had been given. Needs suwayomi-server >= 2.3.2223 for
         # extension API v1.6, which is why modules/pkgs/suwayomi-server.nix
         # pins ahead of nixpkgs.
+        #
+        # Named for the *server.conf* key, which 2.3 renamed from
+        # extensionRepos to extensionStores. That rename is not cosmetic: the
+        # nixpkgs module still writes the old key, 2.3's migration of it yields
+        # an empty list rather than an error, and the extension page then looks
+        # exactly as broken as it did before the upgrade. Hence the explicit
+        # settings.server.extensionStores below rather than the module option.
         default = ["https://raw.githubusercontent.com/keiyoushi/extensions/repo/index.pb"];
       };
       expose = mkOption {
@@ -131,7 +138,16 @@
         package = mkIf cfg.webview.enable webviewPackage;
 
         settings.server = {
-          inherit (cfg) ip port extensionRepos;
+          inherit (cfg) ip port;
+
+          # The 2.3 key. Written directly because the nixpkgs module's
+          # extensionRepos option targets the 2.1 name, which 2.3 silently
+          # discards. The basicAuth* keys below are left on the module options
+          # on purpose — 2.3 does migrate those to authMode/authUsername, and
+          # the module turns basicAuthPasswordFile into an envsubst placeholder
+          # so the secret never enters the store. Hand-writing them would lose
+          # that.
+          extensionStores = cfg.extensionStores;
           downloadAsCbz = true;
           downloadsPath = mkIf (cfg.downloadsDir != null) cfg.downloadsDir;
           basicAuthEnabled = cfg.basicAuth.enable;
