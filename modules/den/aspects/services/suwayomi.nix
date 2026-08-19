@@ -55,7 +55,14 @@
       };
       extensionRepos = mkOption {
         type = listOf str;
-        default = ["https://raw.githubusercontent.com/keiyoushi/extensions/repo/index.min.json"];
+        # index.pb, not the index.min.json this used to point at. keiyoushi
+        # moved to Mihon's Extension Store and left the old URL serving a
+        # two-entry stub that reads "Outdated App" / "Update to Mihon 0.20.1+" —
+        # so the page looked broken while the server was faithfully rendering
+        # everything it had been given. Needs suwayomi-server >= 2.3.2223 for
+        # extension API v1.6, which is why modules/pkgs/suwayomi-server.nix
+        # pins ahead of nixpkgs.
+        default = ["https://raw.githubusercontent.com/keiyoushi/extensions/repo/index.pb"];
       };
       expose = mkOption {
         type = bool;
