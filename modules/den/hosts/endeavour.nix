@@ -507,6 +507,10 @@
         # on voyager and have to be copied across.
         suwayomi = {
           basicAuth.enable = true;
+          # Explicit rather than the aspect's default of cosmos.user.name,
+          # which is "nixos" on this host and is the fleet's deploy account
+          # rather than a person.
+          basicAuth.username = "lvdar";
           # Off since the 2.3 bump. 2.3 switched the WebView to JCEF directly
           # and the aspect's buildFHSEnv + xvfb-run wrapper, written around the
           # old KCEF, no longer survives it: libcef.so takes a SIGTRAP during
