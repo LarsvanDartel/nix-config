@@ -511,17 +511,28 @@
           # which is "nixos" on this host and is the fleet's deploy account
           # rather than a person.
           basicAuth.username = "lvdar";
-          # Off since the 2.3 bump. 2.3 switched the WebView to JCEF directly
-          # and the aspect's buildFHSEnv + xvfb-run wrapper, written around the
-          # old KCEF, no longer survives it: libcef.so takes a SIGTRAP during
-          # startup and the server exits 133 before ever binding 8080. Clearing
-          # the 519 MB kcef cache changed nothing — it re-downloads and dies the
-          # same way — so this is the loader, not the cache.
+          # Off since the 2.3 bump. Inside the FHS wrapper libcef.so takes a
+          # SIGTRAP and the server exits 133 before ever binding 8080, so the
+          # whole service was down rather than just the bypass. Clearing the
+          # 519 MB kcef cache changed nothing; it re-downloads and dies the same
+          # way.
           #
-          # The cost is Cloudflare-protected sources, which need a real browser
-          # to clear the challenge. Everything else works without it, and a
-          # server that starts beats a server with a bypass it cannot reach.
-          # Revisit if the aspect's wrapper is rewritten for JCEF.
+          # What it is NOT, both checked rather than assumed: not a missing
+          # library — every soname libcef.so wants is present inside the FHS
+          # env — and not this host being hostile to browsers, since the same
+          # chromium store path runs headless and sandboxed here as the
+          # suwayomi user, exit 0. voyager only ever looked healthier because it
+          # ran 2.1, whose CEF build worked; the variable is the version, not
+          # the machine.
+          #
+          # The remaining suspect is chromium's sandbox failing to initialise
+          # nested inside bubblewrap, which is what buildFHSEnv uses. Suwayomi
+          # exposes no knob to pass CEF a --no-sandbox, so there is nothing to
+          # try from here without patching it.
+          #
+          # The cost is Cloudflare-protected sources. FlareSolverr was tried as
+          # a replacement and reverted: 3.5.0's undetected-chromedriver cannot
+          # drive chromium 151 and crashlooped on startup, host-independently.
           webview.enable = false;
           # Same paths it used on voyager. Putting downloads under /tank would
           # be the obvious move on the host with the array, but the aspect adds

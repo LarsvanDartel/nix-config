@@ -148,6 +148,15 @@
           # so the secret never enters the store. Hand-writing them would lose
           # that.
           extensionStores = cfg.extensionStores;
+
+          # Follows webview.enable, which until now it did not. That option only
+          # swapped the *package* for the FHS-wrapped one; whether the server
+          # tries to start CEF at all is this runtime setting, and it defaults
+          # to true. So with the webview off, suwayomi still initialised CEF on
+          # every start — outside the FHS env, where it cannot resolve glib —
+          # logged an UnsatisfiedLinkError, and re-downloaded 519 MB of Chromium
+          # into the state directory to do it. Harmless but entirely wasted.
+          kcefEnabled = cfg.webview.enable;
           downloadAsCbz = true;
           downloadsPath = mkIf (cfg.downloadsDir != null) cfg.downloadsDir;
           basicAuthEnabled = cfg.basicAuth.enable;
