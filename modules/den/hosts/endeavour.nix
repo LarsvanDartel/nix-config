@@ -507,7 +507,18 @@
         # on voyager and have to be copied across.
         suwayomi = {
           basicAuth.enable = true;
-          webview.enable = true;
+          # Off since the 2.3 bump. 2.3 switched the WebView to JCEF directly
+          # and the aspect's buildFHSEnv + xvfb-run wrapper, written around the
+          # old KCEF, no longer survives it: libcef.so takes a SIGTRAP during
+          # startup and the server exits 133 before ever binding 8080. Clearing
+          # the 519 MB kcef cache changed nothing — it re-downloads and dies the
+          # same way — so this is the loader, not the cache.
+          #
+          # The cost is Cloudflare-protected sources, which need a real browser
+          # to clear the challenge. Everything else works without it, and a
+          # server that starts beats a server with a bypass it cannot reach.
+          # Revisit if the aspect's wrapper is rewritten for JCEF.
+          webview.enable = false;
           # Same paths it used on voyager. Putting downloads under /tank would
           # be the obvious move on the host with the array, but the aspect adds
           # downloadsDir to impermanence — and /tank is a ZFS pool outside the
