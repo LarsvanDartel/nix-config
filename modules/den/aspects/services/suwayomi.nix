@@ -79,6 +79,29 @@
         type = bool;
         default = false;
       };
+      flareSolverrUrl = mkOption {
+        type = nullOr str;
+        default = null;
+        example = "http://127.0.0.1:8191";
+        description = ''
+          Where to reach a FlareSolverr instance, or null to go without.
+
+          This is how Cloudflare-protected sources are read now. The
+          alternative is suwayomi's embedded Chromium (see webview.enable),
+          which on 2.3 fails to link against glib inside the FHS wrapper and
+          crashloops the whole server rather than just failing the bypass. Out
+          of process, a browser crash costs one chapter fetch.
+
+          Without it, a protected source raises
+          "IOException: Cloudflare bypass currently disabled" on every request
+          and the manga shows zero chapters — which looks exactly like the
+          series having no chapters, so it is worth knowing the difference.
+
+          Pair with den.aspects.services.flaresolverr on the same host; see
+          hosts/endeavour.nix.
+        '';
+      };
+
       basicAuth = {
         enable = mkEnableOption "HTTP basic authentication for the web UI";
         username = mkOption {
@@ -148,6 +171,11 @@
           # so the secret never enters the store. Hand-writing them would lose
           # that.
           extensionStores = cfg.extensionStores;
+
+          # Cloudflare. mkIf rather than writing false explicitly, so a host
+          # that has not set a URL leaves suwayomi's own default alone.
+          flareSolverrEnabled = mkIf (cfg.flareSolverrUrl != null) true;
+          flareSolverrUrl = mkIf (cfg.flareSolverrUrl != null) cfg.flareSolverrUrl;
           downloadAsCbz = true;
           downloadsPath = mkIf (cfg.downloadsDir != null) cfg.downloadsDir;
           basicAuthEnabled = cfg.basicAuth.enable;
