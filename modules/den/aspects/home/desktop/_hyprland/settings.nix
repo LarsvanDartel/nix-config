@@ -13,8 +13,25 @@ in {
       enable = true;
       configType = "lua";
 
-      systemd.enable = true;
-      systemd.enableXdgAutostart = true;
+      # OFF, and it has to stay off: the NixOS side runs Hyprland under uwsm
+      # (programs.hyprland.withUWSM, see desktop/hyprland.nix), and uwsm already
+      # owns the session target. Home Manager's own integration is not merely
+      # redundant on top of that, it is fatal — it emits an exec-once of
+      # `systemctl --user stop hyprland-session.target && ... start ...`, and
+      # its hyprland-session.target carries PropagatesStopTo=graphical-session
+      # .target. uwsm's wayland-session@<compositor>.target is BindsTo= that
+      # same target and Requires= the compositor service, so the *stop* half of
+      # that exec-once tears the whole session down microseconds after it comes
+      # up: greeter -> login -> black -> greeter, with no error anywhere,
+      # because the compositor exits 0 on the way out.
+      #
+      # uwsm does everything this option would: it exports WAYLAND_DISPLAY and
+      # friends to systemd and D-Bus (wayland-session-waitenv.service plus
+      # `uwsm finalize` from the start_hyprland plugin) and it provides its own
+      # wayland-session-xdg-autostart@<compositor>.target, which is why
+      # enableXdgAutostart is gone too rather than merely false — it only ever
+      # fed the target this disables.
+      systemd.enable = false;
       xwayland.enable = true;
 
       settings = {
