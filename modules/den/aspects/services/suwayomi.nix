@@ -79,6 +79,23 @@
         type = bool;
         default = false;
       };
+      flareSolverrUrl = mkOption {
+        type = nullOr str;
+        default = null;
+        example = "http://127.0.0.1:8191";
+        description = ''
+          Where to reach a FlareSolverr instance, or null to go without.
+
+          This is how Cloudflare-protected sources are read. Without it such a
+          source raises "IOException: Cloudflare bypass currently disabled" on
+          every request and the manga shows zero chapters — indistinguishable in
+          the UI from the series genuinely having none, which is worth knowing
+          before debugging the wrong thing.
+
+          Pair with den.aspects.services.flaresolverr on the same host.
+        '';
+      };
+
       basicAuth = {
         enable = mkEnableOption "HTTP basic authentication for the web UI";
         username = mkOption {
@@ -157,6 +174,11 @@
           # logged an UnsatisfiedLinkError, and re-downloaded 519 MB of Chromium
           # into the state directory to do it. Harmless but entirely wasted.
           kcefEnabled = cfg.webview.enable;
+
+          # Cloudflare. mkIf rather than an explicit false, so a host that sets
+          # no URL leaves suwayomi's own default alone.
+          flareSolverrEnabled = mkIf (cfg.flareSolverrUrl != null) true;
+          flareSolverrUrl = mkIf (cfg.flareSolverrUrl != null) cfg.flareSolverrUrl;
           downloadAsCbz = true;
           downloadsPath = mkIf (cfg.downloadsDir != null) cfg.downloadsDir;
           basicAuthEnabled = cfg.basicAuth.enable;
