@@ -37,6 +37,7 @@
       services.flake-bump
       services.build-gate
       services.suwayomi
+      services.flaresolverr
       services.opencloud
       services.typstnique
       services.cdrom
@@ -534,6 +535,10 @@
           # a replacement and reverted: 3.5.0's undetected-chromedriver cannot
           # drive chromium 151 and crashlooped on startup, host-independently.
           webview.enable = false;
+
+          # What covers Cloudflare instead. Loopback: flaresolverr is
+          # unauthenticated and fetches whatever URL it is handed.
+          flareSolverrUrl = "http://127.0.0.1:8191";
           # Same paths it used on voyager. Putting downloads under /tank would
           # be the obvious move on the host with the array, but the aspect adds
           # downloadsDir to impermanence — and /tank is a ZFS pool outside the
