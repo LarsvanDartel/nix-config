@@ -61,6 +61,9 @@
       # voyager-specific home settings.
       homeManager = {pkgs, ...}: {
         cosmos = {
+          # The file manager for inode/directory.
+          cli.programs.yazi.defaultApplication = true;
+
           cli.programs.nvim = {
             languages = {
               rust.enable = true;
@@ -86,6 +89,8 @@
 
           programs = {
             zathura.defaultApplication = true;
+            mpv.defaultApplication = true;
+            thunderbird.defaultApplication = true;
             obs-studio = {
               cudaSupport = true;
               plugins = with pkgs.obs-studio-plugins; [
