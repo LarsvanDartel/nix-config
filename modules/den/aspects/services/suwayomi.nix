@@ -7,7 +7,7 @@
     ...
   }: let
     inherit (lib.options) mkEnableOption mkOption;
-    inherit (lib.types) bool port str path listOf nullOr;
+    inherit (lib.types) bool int port str path listOf nullOr;
     inherit (lib.lists) optional;
     inherit (lib.modules) mkIf;
 
@@ -104,6 +104,28 @@
         };
       };
       webview.enable = mkEnableOption "the embedded Chromium WebView (KCEF)" // {default = false;};
+
+      downloadRetry = {
+        enable =
+          mkEnableOption ''
+            a timer that revives chapter downloads killed by HTTP 429
+          ''
+          // {default = false;};
+        interval = mkOption {
+          type = str;
+          default = "2min";
+          description = "How long between sweeps of the download queue.";
+        };
+        maxResets = mkOption {
+          type = int;
+          default = 20;
+          description = ''
+            Stop resetting a chapter after this many sweeps, so one that can
+            never finish — pulled upstream, say — is not cycled forever. It
+            stays in the queue as ERROR for you to look at.
+          '';
+        };
+      };
     };
 
     config = {
@@ -139,6 +161,83 @@
       systemd.tmpfiles.rules =
         optional (cfg.homeLink != null)
         "L+ ${cfg.homeLink} - - - - ${cfg.downloadsDir}";
+
+      # Comick's image CDN answers a burst of page requests with HTTP 429, and
+      # not on a rate you can pace around — a plain sequential fetch with a
+      # second between pages still trips it intermittently. The reader survives
+      # that because a failed page gets a retry button; the downloader gives up
+      # after three tries and parks the chapter as ERROR.
+      #
+      # startDownloader does not revive those: an entry already at tries=3 is
+      # skipped and the queue goes straight back to STOPPED. Re-enqueueing it
+      # where it sits is worse than useless — it increments the try count
+      # instead of clearing it and zeroes the progress. Only a dequeue resets
+      # the counter, so this sweeps ERROR entries out and puts them back.
+      #
+      # It converges because the pages already fetched stay in the on-disk
+      # cache: measured over one sweep, two chapters went 22% -> 61% and
+      # 10% -> 84%, and both finished on the next. So each pass resumes rather
+      # than restarting, and a chapter completes after a few sweeps.
+      systemd.services.suwayomi-download-retry = mkIf cfg.downloadRetry.enable {
+        description = "Re-queue suwayomi chapter downloads that failed on HTTP 429";
+        after = ["suwayomi-server.service"];
+        path = [pkgs.curl pkgs.jq pkgs.gawk];
+        serviceConfig = {
+          Type = "oneshot";
+          User = "suwayomi";
+          Group = "suwayomi";
+        };
+        script = ''
+          set -euo pipefail
+
+          state="${cfg.dataDir}/download-retry.state"
+          api="http://127.0.0.1:${toString cfg.port}/api/graphql"
+          auth=()
+          ${lib.optionalString cfg.basicAuth.enable ''
+            auth=(--user "${cfg.basicAuth.username}:$(cat ${config.sops.secrets."keys/suwayomi/basic-auth-password".path})")
+          ''}
+
+          gql() {
+            curl -sf "''${auth[@]}" "$api" \
+              -H 'Content-Type: application/json' --data-binary "$1"
+          }
+
+          # A server that is still starting is not an error worth reporting.
+          queue=$(gql '{"query":"{ downloadStatus { queue { chapter { id } state } } }"}') || exit 0
+          failed=$(printf '%s' "$queue" |
+            jq -r '.data.downloadStatus.queue[]? | select(.state == "ERROR") | .chapter.id')
+          [ -n "$failed" ] || exit 0
+
+          touch "$state"
+          next=""
+          retry=""
+          for id in $failed; do
+            n=$(awk -v i="$id" '$1 == i { print $2 }' "$state")
+            n=''${n:-0}
+            if [ "$n" -ge ${toString cfg.downloadRetry.maxResets} ]; then
+              echo "chapter $id has failed $n sweeps; leaving it alone"
+              next="$next$id $n"$'\n'
+              continue
+            fi
+            next="$next$id $((n + 1))"$'\n'
+            if [ -z "$retry" ]; then retry="$id"; else retry="$retry,$id"; fi
+          done
+          printf '%s' "$next" > "$state"
+          [ -n "$retry" ] || exit 0
+
+          gql "{\"query\":\"mutation { dequeueChapterDownloads(input:{ids:[$retry]}) { clientMutationId } }\"}" > /dev/null
+          gql "{\"query\":\"mutation { enqueueChapterDownloads(input:{ids:[$retry]}) { clientMutationId } }\"}" > /dev/null
+          echo "re-queued chapter(s): $retry"
+        '';
+      };
+
+      systemd.timers.suwayomi-download-retry = mkIf cfg.downloadRetry.enable {
+        wantedBy = ["timers.target"];
+        timerConfig = {
+          OnBootSec = "5min";
+          OnUnitActiveSec = cfg.downloadRetry.interval;
+        };
+      };
 
       systemd.services.suwayomi-server = {
         preStart = ''

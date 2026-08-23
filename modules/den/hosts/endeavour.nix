@@ -547,6 +547,11 @@
           # persisting an explicitly-placed downloadsDir first.
           downloadsDir = "/var/lib/suwayomi-downloads";
           homeLink = "/home/${config.cosmos.user.name}/manga";
+
+          # Comick rate-limits hard enough that a chapter rarely survives the
+          # downloader's three tries. See the aspect for why this needs a
+          # dequeue rather than a restart.
+          downloadRetry.enable = true;
         };
 
         # Sized to the nightly window rather than to the backlog. The first
