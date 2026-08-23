@@ -7,7 +7,7 @@
       wallpapers
       hyprland
       foot
-      firefox
+      zen
       mpv
       spotify
       # Fetches `full.distro` from a version-pinned stable.dl2.discordapp.net
