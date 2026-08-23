@@ -35,8 +35,20 @@
     # the old profile across, so history and logins start empty.
     cosmos.system.impermanence.persist.directories = [".config/zen"];
 
+    # xdg.mimeApps.enable is set here rather than relied on: setAsDefaultBrowser
+    # writes defaultApplications but does not enable the module itself, so
+    # without this it only works by accident, via whichever other aspect happens
+    # to have switched it on.
+    xdg.mimeApps.enable = true;
+
     programs.zen-browser = {
       enable = true;
+
+      # Claims http/https, the html/xhtml types, and BROWSER in the session
+      # environment. Everything it writes is mkDefault, so an aspect that wants
+      # one of those types back only has to state it -- which is how
+      # thunderbird keeps mailto below.
+      setAsDefaultBrowser = true;
 
       policies = {
         AppAutoUpdate = false;
