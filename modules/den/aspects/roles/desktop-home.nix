@@ -7,6 +7,10 @@
       wallpapers
       hyprland
       foot
+      # `, <cmd>` plus nix-index's command-not-found suggestions. Here rather
+      # than in home-base because the prebuilt index is 101 MB and pioneer has
+      # no room for it — see the aspect.
+      comma
       zen
       mpv
       spotify
