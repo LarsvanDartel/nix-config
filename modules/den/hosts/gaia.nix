@@ -35,7 +35,7 @@
       services.comin
     ];
 
-    nixos = {...}: {
+    nixos = {config, ...}: {
       imports = [
         inputs.nixos-facter-modules.nixosModules.facter
         {
@@ -73,6 +73,17 @@
       # cannot lock the only administrator out of the only way in. Dynamic, so
       # it will drift; the lvdar.nl entry in whitelistFqdns is the durable half.
       cosmos.services.crowdsec.whitelistIps = ["86.86.217.11"];
+
+      # Mesh interface only. This host has exactly two interfaces — wt0 and the
+      # public enp1s0 — and no LAN behind it, so every legitimate client of this
+      # resolver arrives over the mesh. Unscoped, :53 was a listener reachable
+      # from the internet; access-control REFUSED those queries, so it was never
+      # an open resolver, but there is no reason for the port to answer at all
+      # out there. endeavour deliberately keeps the global opening: its :53 is
+      # behind home NAT and serves LAN clients as well as the mesh.
+      cosmos.services.unbound.firewallInterfaces = [
+        config.services.netbird.clients.default.interface
+      ];
 
       # The backup resolver for the mesh. unbound with the oisd list costs
       # ~330 MB here, against ~2.9 GB free — affordable, and the alternative
