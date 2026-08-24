@@ -79,6 +79,11 @@ Hardware comes from committed **nixos-facter** reports (`hosts/_facter/<host>.fa
 
 Secrets are sops-nix, sourced from the private `nix-secrets` flake input over SSH — you cannot evaluate a host without access to that repo.
 
+**Restoring a host: [`docs/RESTORE.md`](docs/RESTORE.md).** Read the first section
+before you need it — the restic password and storage-box SSH key are themselves
+sops secrets, so they have to exist outside the fleet or the backups cannot be
+opened.
+
 ## Deployment
 
 **endeavour and gaia deploy themselves. Pushing to `main` is not what deploys them.**
