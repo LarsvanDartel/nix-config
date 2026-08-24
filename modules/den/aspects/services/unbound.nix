@@ -31,8 +31,9 @@
   }: let
     inherit (lib.options) mkEnableOption mkOption;
     inherit (lib.modules) mkIf mkMerge;
-    inherit (lib.types) port str nullOr bool;
+    inherit (lib.types) port str nullOr bool listOf;
     inherit (lib.lists) optional;
+    inherit (lib.attrsets) genAttrs;
     inherit (lib.strings) splitString concatStringsSep;
     inherit (lib.lists) filter uniqueStrings;
 
@@ -43,6 +44,25 @@
       port = mkOption {
         type = port;
         default = 53;
+      };
+      firewallInterfaces = mkOption {
+        type = nullOr (listOf str);
+        default = null;
+        example = ["wt0"];
+        description = ''
+          Interfaces to open the DNS port on, or null to open it on all of them.
+
+          null is the default because getting this wrong is expensive: this is a
+          mesh resolver (see mesh.resolvers), so a host that stops answering :53
+          takes name resolution with it, and comin cannot fetch a fix over a
+          network it can no longer resolve.
+
+          Worth setting on a host with a public interface. access-control
+          already REFUSES anything outside loopback, RFC1918 and the mesh, so an
+          unscoped port is not an open resolver — but on a public VPS it is
+          still a listener the internet can reach, and scoping it to the mesh
+          interface removes that surface.
+        '';
       };
       blocklist = mkOption {
         type = nullOr str;
@@ -211,10 +231,23 @@
         ];
       };
 
-      networking.firewall = {
-        allowedUDPPorts = [cfg.port];
-        allowedTCPPorts = [cfg.port];
-      };
+      # Scoped when firewallInterfaces says so, global otherwise. Global is the
+      # old behaviour and remains the default deliberately: this resolver serves
+      # the mesh AND, on endeavour, the home LAN, and a wrong list here takes
+      # name resolution down for everything that depends on it — including
+      # comin, which then cannot fetch the fix.
+      networking.firewall = mkMerge [
+        (mkIf (cfg.firewallInterfaces == null) {
+          allowedUDPPorts = [cfg.port];
+          allowedTCPPorts = [cfg.port];
+        })
+        (mkIf (cfg.firewallInterfaces != null) {
+          interfaces = genAttrs cfg.firewallInterfaces (_: {
+            allowedUDPPorts = [cfg.port];
+            allowedTCPPorts = [cfg.port];
+          });
+        })
+      ];
     };
   };
 }
