@@ -103,7 +103,34 @@
             # to are a re-download and are deliberately excluded.
             "/persist/var/lib/open-webui"
             "/persist/home"
-            "/persist/etc/opencloud"
+            # The whole of /etc, not just /etc/opencloud as this used to say —
+            # 20 KB in total, and the ssh host key inside it is what makes any
+            # of the rest restorable. sops decrypts with
+            # /persist/etc/ssh/ssh_host_ed25519_key (core/sops.nix), and one of
+            # the secrets it guards is keys/zfs/tank, which unlocks the array
+            # (hosts/endeavour.nix). Without this path a rebuilt endeavour can
+            # decrypt nothing, so the /tank entries below would restore into a
+            # pool that cannot be opened and every credential would have to be
+            # re-keyed by hand. gaia has backed this up all along and says why
+            # in hosts/gaia.nix; endeavour did not. Subsumes the old
+            # /persist/etc/opencloud entry, and carries machine-id too.
+            "/persist/etc"
+            # The uid/gid map. Same reasoning as gaia's copy: without it a
+            # rebuilt host hands out different numeric owners than the restored
+            # files expect.
+            "/persist/var/lib/nixos"
+            # radicale's CalDAV/CardDAV trees — 32 KB, and services/opencloud.nix
+            # calls them the only irreplaceable thing it owns. They sit on the
+            # root SSD, which is btrfs, so sanoid does not cover them either:
+            # this is their only copy.
+            "/persist/var/lib/radicale"
+            # suwayomi's library: what is tracked, and how far it has been read.
+            # Small — database.mv.db is 3.5 MB — but the directory around it is
+            # 1.4 GB of re-downloadable Chromium and page cache, which is what
+            # the excludes below are for. Deliberately without
+            # /persist/var/lib/suwayomi-downloads: those are re-fetchable, and
+            # the download-retry timer refills them unattended.
+            "/persist/var/lib/suwayomi-server"
             "/tank/opencloud"
             "/tank/media/library/images"
             # The tangled knot's repositories. sanoid snapshots these too, but
@@ -143,6 +170,15 @@
             "**/logs.db*"
             "**/*.log"
             "**/Backups/**"
+            # suwayomi keeps 1.4 GB beside its 3.5 MB database, none of it
+            # worth a nightly copy: bin/ is the KCEF Chromium download (1.1 GB,
+            # and kcefEnabled is false anyway), cache/ is fetched page images,
+            # and webUI/ and extensions/ are re-downloaded on demand.
+            "/persist/var/lib/suwayomi-server/.local/share/Tachidesk/bin"
+            "/persist/var/lib/suwayomi-server/.local/share/Tachidesk/cache"
+            "/persist/var/lib/suwayomi-server/.local/share/Tachidesk/webUI"
+            "/persist/var/lib/suwayomi-server/.local/share/Tachidesk/extensions"
+            "/persist/var/lib/suwayomi-server/.cache"
           ];
           description = "Patterns excluded from every path above.";
         };
