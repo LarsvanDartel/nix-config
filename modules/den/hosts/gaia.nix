@@ -70,8 +70,25 @@
       };
 
       # The home connection, so a bad afternoon of poking at these services
-      # cannot lock the only administrator out of the only way in. Dynamic, so
-      # it will drift; the lvdar.nl entry in whitelistFqdns is the durable half.
+      # cannot lock the only administrator out of the only way in. This is not
+      # politeness: the bouncer drops in nftables, so a ban here black-holes the
+      # WireGuard handshake as well as HTTP, and the mesh path to fix it goes
+      # with it.
+      #
+      # Dynamic, so it will drift — and on the day it does this stops covering
+      # this household and starts covering whoever inherits the address. The
+      # previous comment here claimed the lvdar.nl entry in whitelistFqdns was
+      # "the durable half"; it is not, lvdar.nl resolves to gaia rather than to
+      # home, so nothing covered this.
+      #
+      # The replacement is services/ddns.nix on endeavour, which is the host
+      # actually behind this connection: it keeps home.lvdar.nl pointed here and
+      # crowdsec whitelists it by name. That needs a Cloudflare token endeavour
+      # can use (keys/cloudflare/ddns — the acme one is pinned to gaia's
+      # address), so until the secret exists and the record resolves, this
+      # literal stays. Swapping too early is worse than leaving it: an
+      # unresolvable name in whitelistFqdns is evaluated per alert and protects
+      # nothing.
       cosmos.services.crowdsec.whitelistIps = ["86.86.217.11"];
 
       # Mesh interface only. This host has exactly two interfaces — wt0 and the

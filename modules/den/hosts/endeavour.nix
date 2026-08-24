@@ -38,6 +38,10 @@
       services.build-gate
       services.suwayomi
       services.flaresolverr
+      # Keeps home.lvdar.nl pointed at this connection, which is what lets
+      # gaia's crowdsec whitelist name the home address instead of pinning a
+      # literal that drifts. This is the host actually behind that connection.
+      services.ddns
       services.opencloud
       services.typstnique
       services.cdrom
@@ -502,6 +506,8 @@
 
         jellyfin.openFirewall = true;
         immich.mediaDir = "/tank/media/library/images";
+
+        ddns.enable = true;
 
         # Moved here from voyager. The library and downloads do NOT come along
         # with the config — they live in /var/lib/suwayomi-{server,downloads}
