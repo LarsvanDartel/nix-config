@@ -7,6 +7,9 @@
   # screen, and suspend/resume churn would make it noise.
   den.aspects.roles.server.includes = [
     den.aspects.core.notify-failure
+    # Says so when a deploy has staged a new kernel that is not running yet.
+    # Notifies rather than reboots — see the aspect for why.
+    den.aspects.core.reboot-required
     # Host metrics on every server, scraped from endeavour over the mesh.
     den.aspects.services.node-exporter
   ];
