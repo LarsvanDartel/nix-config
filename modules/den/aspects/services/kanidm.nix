@@ -69,7 +69,7 @@
         {
           directory = "/var/lib/kanidm";
           user = "kanidm";
-          group = "kadidm";
+          group = "kanidm";
           mode = "0750";
         }
       ];
