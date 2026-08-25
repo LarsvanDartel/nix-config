@@ -21,8 +21,9 @@
 # Upgrading past 2.1 is a one-way trip for the data directory: 2.3 moves to a
 # newer H2 engine and rewrites the database in place, and the release notes warn
 # that extension repos may not survive the migration to Extension Stores. The
-# library itself is what matters and it does survive — but /var/lib/suwayomi-server
-# is not in restic's paths, so there is no undo unless one is taken by hand.
+# library itself is what matters and it does survive. /persist/var/lib/suwayomi-server
+# is in restic's paths now (services/restic.nix), so there is a nightly undo —
+# the downloads directory next to it is deliberately excluded, being re-fetchable.
 {...}: {
   nixpkgs.overlays = [
     (_final: prev: {
