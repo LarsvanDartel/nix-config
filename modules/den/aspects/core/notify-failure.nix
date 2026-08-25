@@ -147,9 +147,12 @@
           ExecStart = "${lib.getExe notify} %i";
           LoadCredential = "ntfy-password:${config.sops.secrets."keys/ntfy/password".path}";
 
-          # The settle wait plus the retry budget exceed systemd's 90s default
-          # TimeoutStartSec, which would SIGTERM the notifier mid-wait and turn
-          # every alert into a timeout. 90 + 300 + headroom.
+          # systemd disables the start timeout entirely for Type=oneshot, so
+          # this is a bound where there was none: without it a notifier wedged
+          # on a half-open socket waits forever, holding a job slot, and the
+          # unit shows as still "activating" long after the alert is moot.
+          # Sized to fit what the script can legitimately take — the settle
+          # wait plus the retry budget — with headroom.
           TimeoutStartSec = "10min";
 
           # It reaches the internet and reads one credential; nothing else.
