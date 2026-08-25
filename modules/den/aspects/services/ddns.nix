@@ -65,6 +65,17 @@
     config = mkIf cfg.enable {
       sops.secrets.${cfg.secret} = {};
 
+      # Upstream orders this After=network.target, which only means the network
+      # stack has been configured — not that a route exists or that DNS answers.
+      # On the reboot of 2026-08-24 it ran anyway, failed to reach the ipify API,
+      # and the failure notification then failed too because ntfy.lvdar.nl did
+      # not resolve yet. It is a Restart=no oneshot, so nothing retried it until
+      # the timer came round fifteen minutes later.
+      systemd.services.cloudflare-dyndns = {
+        wants = ["network-online.target"];
+        after = ["network-online.target" "nss-lookup.target"];
+      };
+
       services.cloudflare-dyndns = {
         enable = true;
         apiTokenFile = config.sops.secrets.${cfg.secret}.path;

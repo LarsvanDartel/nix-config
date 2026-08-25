@@ -400,6 +400,16 @@
       # application" over a black screen.
       #
       # This, not proof keys, is why editing never worked.
+      # Same reboot, same cause as services/ddns.nix: opencloud is only ordered
+      # After=network.target, so at boot its `collaboration` service cannot
+      # resolve docs.lvdar.nl, the `search` subservice trips the supervisor's
+      # five-failure threshold, and the whole unit exits 1. Restart=always puts
+      # it back within a second — but not before it has fired an alert.
+      systemd.services.opencloud = {
+        wants = ["network-online.target"];
+        after = ["network-online.target" "nss-lookup.target"];
+      };
+
       systemd.services.opencloud.serviceConfig.RestrictAddressFamilies = lib.mkForce [
         "AF_UNIX"
         "AF_INET"
