@@ -48,7 +48,7 @@
     nix-minecraft.url = "github:Infinidoge/nix-minecraft";
     nix-secrets.url = "git+ssh://git@github.com/LarsvanDartel/nix-secrets.git?shallow=1";
     nix-wrapper-modules = {
-      url = "github:BirdeeHub/nix-wrapper-modules/f318ea7274683aa1af36cff22f7b40420807324a";
+      url = "github:BirdeeHub/nix-wrapper-modules";
       inputs.nixpkgs.follows = "nixpkgs";
     };
     nixos-facter-modules.url = "github:nix-community/nixos-facter-modules";
