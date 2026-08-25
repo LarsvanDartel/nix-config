@@ -71,15 +71,33 @@
       ++ lib.optional (themedTargets ? ${n}) {stylix.targets.${themedTargets.${n}}.enable = true;};
   };
 in {
-  # Pin `nix-wrapper-modules` to the last rev BEFORE upstream renamed
-  # `extraPackages`→`runtimePkgs` (BirdeeHub#540, 2026-05-19), and have
-  # hm-wrapper-modules follow it. The pinned adapter still calls `extraPackages`;
-  # on any newer rev that emits a deprecation warning which `abort-on-warn` turns
-  # fatal (breaking `nix build`/`flake check` of the wrappers). 3abe4c9a has every
-  # API the adapter needs, warning-free. (flake-file can't URL-pin a transitive
-  # input, so nix-wrapper-modules is a top-level input followed by hm-wrapper-
-  # modules.) Revisit before 2026-08-31, when `extraPackages` is removed and
-  # hm-wrapper-modules must migrate to `runtimePkgs`.
+  # nix-wrapper-modules used to be pinned to the last rev before upstream renamed
+  # `extraPackages`→`runtimePkgs` (BirdeeHub#540, 2026-05-19), because newer revs
+  # warn on the old name and `abort-on-warn` makes that fatal. The pin is gone:
+  # the warning only fires when `extraPackages` is non-empty, and the adapter
+  # only fills it from a wrapped module's `home.packages`, which none of the
+  # programs below declare. Verified by building voyager — both specialisations,
+  # so niri and noctalia too — under `--option abort-on-warn true`, clean.
+  #
+  # That is a reprieve, not a fix, and it expires on 2026-08-31.
+  #
+  # On that date `extraPackages` is *removed*, and hm-wrapper-modules
+  # (lib/hm-adapter.nix:401) defines it unconditionally as
+  # `lib.mkIf (extracted != []) extracted`. A `mkIf false` on an option that does
+  # not exist is still a hard "unknown option" error — checked, it does not get
+  # filtered out first — so this breaks whether or not anything uses the value,
+  # and `extractPackages = false` does not help either: it empties the list
+  # without removing the definition.
+  #
+  # Nobody upstream is going to fix it. hm-wrapper-modules' last commit is
+  # 2026-03-26 and there is no PR or issue for the rename. The choice is ours:
+  # fork the adapter for the one-line change, re-pin nix-wrapper-modules and
+  # accept a frozen wrapper lib against a moving nixpkgs, or drop the adapter and
+  # keep only the direct `wrappers.<x>.wrap` calls (niri, noctalia), which do not
+  # touch it.
+  #
+  # (flake-file can't URL-pin a transitive input, so nix-wrapper-modules stays a
+  # top-level input that hm-wrapper-modules follows.)
   flake-file.inputs = {
     hm-wrapper-modules = {
       url = "github:sini/hm-wrapper-modules";
@@ -90,7 +108,7 @@ in {
       };
     };
     nix-wrapper-modules = {
-      url = "github:BirdeeHub/nix-wrapper-modules/f318ea7274683aa1af36cff22f7b40420807324a";
+      url = "github:BirdeeHub/nix-wrapper-modules";
       inputs.nixpkgs.follows = "nixpkgs";
     };
   };
