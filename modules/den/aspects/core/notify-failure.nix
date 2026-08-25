@@ -25,7 +25,7 @@
     ...
   }: let
     inherit (lib.options) mkOption mkEnableOption;
-    inherit (lib.types) str;
+    inherit (lib.types) int str;
     inherit (lib.modules) mkIf;
 
     cfg = config.cosmos.system.notifyFailure;
@@ -35,6 +35,27 @@
       runtimeInputs = with pkgs; [curl systemd coreutils];
       text = ''
         unit="''${1:?usage: notify-failure <unit>}"
+
+        # Wait, then ask again whether the unit is still down.
+        #
+        # systemd runs OnFailure= the moment a unit enters the failed state,
+        # which is *before* its own Restart= brings it back. attic-watch-store
+        # panics on an upstream bug and is healthy again 30 seconds later;
+        # opencloud loses a subservice at boot and recovers on the next
+        # restart. Both pushed a high-priority alert about a machine that was
+        # fine by the time the phone buzzed, and an alert that is usually
+        # wrong is one you learn to swipe away — including the night it is
+        # right.
+        #
+        # The default covers the restart delays actually configured here
+        # (RestartSec is 30s at the longest) with room to spare. A unit that is
+        # still failed after that is failed in the sense worth waking up for.
+        sleep ${toString cfg.settleSeconds}
+        if ! systemctl is-failed --quiet "$unit"; then
+          echo "$unit recovered on its own; not notifying"
+          exit 0
+        fi
+
         password="$(cat "$CREDENTIALS_DIRECTORY/ntfy-password")"
 
         # The last few lines are what makes the notification actionable rather
@@ -48,9 +69,16 @@
         # It passed a hand test only because the unit under test was running.
         body="$( { systemctl status --no-pager --lines=15 "$unit" || true; } 2>&1 | head -c 3000 )"
 
-        # --max-time so a hung edge cannot wedge the unit, and no --fail-early
-        # retry storm: one attempt, and the failure itself lands in the journal.
+        # Retry, bounded. The failures worth reporting correlate with the
+        # network being unwell, so the first POST is exactly when delivery is
+        # least likely to work: two alerts were lost that way, one to a
+        # two-minute uplink outage and one to DNS not being up yet after a
+        # reboot. --retry-max-time caps the whole thing at five minutes so a
+        # dead edge still cannot wedge the unit, and --retry-all-errors is
+        # needed because curl otherwise treats a connect failure or a timeout
+        # as not worth retrying.
         curl -sS --max-time 20 \
+          --retry 5 --retry-all-errors --retry-delay 20 --retry-max-time 300 \
           -u "${cfg.user}:$password" \
           -H "Title: ${config.networking.hostName}: $unit failed" \
           -H "Priority: high" \
@@ -72,6 +100,18 @@
           The ntfy server. Public rather than the mesh address on purpose: the
           outages worth hearing about include "the mesh is down", and a sink
           only reachable over the mesh cannot report those.
+        '';
+      };
+
+      settleSeconds = mkOption {
+        type = int;
+        default = 90;
+        description = ''
+          How long to wait before deciding a failed unit is really down.
+
+          Trades alert latency for accuracy. Raise it on a host whose services
+          use a long RestartSec; lowering it below the longest RestartSec on
+          the host reintroduces the false alarms this exists to stop.
         '';
       };
 
@@ -106,6 +146,11 @@
           Type = "oneshot";
           ExecStart = "${lib.getExe notify} %i";
           LoadCredential = "ntfy-password:${config.sops.secrets."keys/ntfy/password".path}";
+
+          # The settle wait plus the retry budget exceed systemd's 90s default
+          # TimeoutStartSec, which would SIGTERM the notifier mid-wait and turn
+          # every alert into a timeout. 90 + 300 + headroom.
+          TimeoutStartSec = "10min";
 
           # It reaches the internet and reads one credential; nothing else.
           DynamicUser = true;
