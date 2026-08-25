@@ -76,13 +76,6 @@
   niri = inputs.nix-wrapper-modules.wrappers.niri.wrap {
     inherit pkgs;
 
-    # nixpkgs-unstable's niri 26.04 does not build: it vendors
-    # libdisplay-info-sys 0.3.0, which requires `libdisplay-info < 0.4.0`, while
-    # unstable ships 0.4.0. The stable channel pairs niri 25.11 with
-    # libdisplay-info 0.3.0, and is in the binary cache.
-    # TODO: drop this pin once nixpkgs-unstable's niri builds again.
-    package = pkgs.stable.niri;
-
     # Opt out of the v1 compatibility layer: it warns on the legacy `null` /
     # `_attrs` idioms, and this flake runs with abort-on-warn.
     v2-settings = true;
