@@ -154,6 +154,21 @@
         }) (lib.range 1 9)
       );
 
+      # Global blur tuning. Blur itself needs no switch here: niri honours any
+      # surface that asks for it over `ext-background-effect` — which is how
+      # noctalia's bar, panels and launcher get theirs — and the window rule
+      # below turns it on for foot, which cannot ask.
+      #
+      # `passes` and `noise` are matched to the Hyprland session's
+      # `decoration.blur` so the two sessions look like the same desktop.
+      # `offset` and `saturation` are left at niri's defaults: Hyprland's
+      # `size` and `vibrancy` are not the same quantities, so copying the
+      # numbers across would be false precision rather than parity.
+      blur = {
+        passes = 4;
+        noise = 0.01;
+      };
+
       prefer-no-csd = true;
       screenshot-path = "~/Pictures/screenshots/%Y-%m-%d %H-%M-%S.png";
       hotkey-overlay.skip-at-startup = [];
@@ -318,6 +333,21 @@
           # left flat on purpose — they tile, so they need no separating.
           shadow.on = _: {};
         }
+        # foot is translucent (stylix.opacity.terminal), and without this it
+        # would be translucent onto whatever happens to be behind it. A
+        # terminal cannot request blur for itself the way noctalia can — there
+        # is no `ext-background-effect` support in foot — so niri is told to
+        # blur it from this side.
+        #
+        # `xray` is left at its default, meaning on: the blur is computed once
+        # against the wallpaper and reused, rather than recomputed every time
+        # anything underneath moves. `xray false` would blur the actual windows
+        # below, but upstream still marks that experimental — it drops out
+        # during open/close animations and while dragging a tiled window.
+        {
+          matches = [{app-id = "^foot$";}];
+          background-effect.blur = true;
+        }
         # The calculator pops up floating, rofi-calc style.
         {
           matches = [{app-id = "^calculator$";}];
@@ -374,6 +404,31 @@
           ];
           block-out-from = "screencast";
         }
+        # There is deliberately NO `background-effect { blur }` rule here, and
+        # it is not an omission — it was tried and reverted.
+        #
+        # noctalia blurs its bar, panels and launcher itself, through
+        # `ext-background-effect` (`general.enableBlurBehind`). Those surfaces
+        # hand the compositor an explicit blur *region*, so the blur lands on
+        # the card and nothing else. Its notifications, toasts, OSDs and popup
+        # menus do not: each is a `color: "transparent"` PanelWindow that
+        # declares no region, and notifications and toasts are additionally
+        # padded by `shadowPadding` on every edge, so the layer surface is
+        # strictly larger than the card drawn inside it.
+        #
+        # A layer-rule can only say "blur this surface", meaning the whole
+        # rectangle. Since xray is on by default, that rectangle fills with
+        # blurred *wallpaper* — which showed up as a large blue box around
+        # every notification, the wallpaper being a photo of sky.
+        #
+        # The Hyprland session gets away with the equivalent rule
+        # (_hyprland/rules.nix) because mako's layer surface *is* the
+        # notification, with no transparent padding around it.
+        #
+        # So these stay translucent (stylix.opacity.popups) and unblurred.
+        # Fixing it properly is noctalia's side of the fence: those windows
+        # would have to attach a BackgroundEffect with a blurRegion the way
+        # MainScreen, Dock and LauncherOverlayWindow already do.
       ];
     };
   };

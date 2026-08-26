@@ -15,6 +15,13 @@
 
   cfg = config.cosmos.desktops.noctalia;
   fonts = config.cosmos.desktops.common.styling.fonts;
+
+  # Set once in _styling/default.nix. stylix's own noctalia-shell target would
+  # apply these, but it is gated on `options.programs ? noctalia-shell` and this
+  # noctalia is a wrapped package rather than that home-manager module, so the
+  # target never fires and the values are threaded through by hand — same as the
+  # colours and fonts above and below.
+  opacity = config.stylix.opacity;
   wallpapers = config.cosmos.desktops.wallpapers;
 
   widget = id: {inherit id;};
@@ -49,10 +56,11 @@
         barType = "simple";
         inherit (cfg.bar) position density;
 
-        # flat + edge-to-edge: no capsule pills, no rounding, no margins
+        # flat + edge-to-edge: no capsule pills, no rounding, no margins.
+        # Still flat, but no longer opaque — see `enableBlurBehind` below.
         showCapsule = false;
         showOutline = false;
-        backgroundOpacity = 1.0;
+        backgroundOpacity = opacity.desktop;
         marginVertical = 0;
         marginHorizontal = 0;
         frameRadius = 0;
@@ -180,10 +188,23 @@
         useWallpaperColors = false;
       };
 
-      # Minimal chrome: flat, no shadows or blur, no faux screen corners.
+      # Minimal chrome: flat, no shadows, no faux screen corners.
+      #
+      # Blur is the exception, and it is what makes the translucency above
+      # legible rather than noisy. noctalia asks for it through the
+      # `ext-background-effect` protocol (Quickshell's BackgroundEffect), which
+      # means the compositor blurs exactly the shape noctalia asked for —
+      # corner radii included — instead of us approximating it with a rule.
+      # niri 26.04 implements that protocol, so nothing else is needed on the
+      # niri side for the bar, the panels and the launcher.
+      #
+      # It reaches only those three surfaces though: notifications, OSDs and
+      # toasts are separate windows with no BackgroundEffect attached, so they
+      # are blurred by a niri layer-rule instead (see _niri/system.nix). Under
+      # Hyprland the equivalent is already in _hyprland/rules.nix.
       general = {
         enableShadows = false;
-        enableBlurBehind = false;
+        enableBlurBehind = true;
         showScreenCorners = false;
         showChangelogOnStartup = false;
 
@@ -211,7 +232,10 @@
         # DejaVu across the same screen is what made the shell look off.
         fontDefault = fonts.interface.name;
         fontFixed = fonts.monospace.name;
-        panelBackgroundOpacity = 1.0;
+        panelBackgroundOpacity = opacity.desktop;
+        # The panel *background* is translucent; the widgets drawn on it are
+        # not. Stacking two levels of transparency is what turns frosted glass
+        # into an unreadable smear.
         translucentWidgets = false;
       };
 
@@ -286,7 +310,13 @@
 
       idle.enabled = cfg.widgets.idleInhibitor;
 
-      notifications.enabled = cfg.notifications.enable;
+      notifications = {
+        enabled = cfg.notifications.enable;
+        backgroundOpacity = opacity.popups;
+      };
+
+      # Volume/brightness popups, same treatment as notifications.
+      osd.backgroundOpacity = opacity.popups;
 
       # Backgrounds the wallpaper picker browses (see home.wallpapers).
       wallpaper.directory = wallpapers.directory;
