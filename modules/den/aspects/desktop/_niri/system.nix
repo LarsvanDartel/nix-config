@@ -237,6 +237,18 @@
           "Mod+S".screenshot = _: {};
           "Mod+Shift+S".screenshot-window = _: {};
 
+          # Screencasting. The plumbing already works — programs.niri ships the
+          # gnome portal and desktop.audio the pipewire stack — so what is
+          # bound here is niri's own casting feature: a stream that appears in
+          # the portal picker as "niri Dynamic Cast Target". Share it once,
+          # then re-aim it from the keyboard without going back through the
+          # sharing dialog. Each new cast starts out empty regardless of where
+          # this last pointed, so selecting it can never reveal something by
+          # accident.
+          "Mod+C".set-dynamic-cast-window = _: {};
+          "Mod+Ctrl+C".set-dynamic-cast-monitor = _: {};
+          "Mod+Ctrl+Shift+C".clear-dynamic-cast-target = _: {};
+
           # The Print key keeps working too (niri's own defaults).
           "Print".screenshot = _: {};
           "Ctrl+Print".screenshot-screen = _: {};
@@ -288,6 +300,57 @@
         {
           matches = [{app-id = "^calculator$";}];
           open-floating = true;
+        }
+        # Drawn as a solid black rectangle in screencasts. Deliberately
+        # "screencast" and not "screen-capture": the latter would also blank
+        # these in screenshots, and a screenshot is something you took on
+        # purpose.
+        #
+        # The app-ids are each package's StartupWMClass, read off the desktop
+        # file rather than guessed — a wrong id here fails *silently* and the
+        # window is shared anyway, which is the one failure mode this rule
+        # exists to prevent.
+        {
+          matches = [
+            {app-id = "^signal$";}
+            {app-id = "^discord$";}
+          ];
+          block-out-from = "screencast";
+        }
+        # Whatever is actually being cast turns red, so there is never a
+        # question about which window the far end can see. Matches only the
+        # target of a *window* cast (the dynamic target above included); a
+        # whole-monitor cast has no window to mark and cannot be indicated
+        # this way.
+        {
+          matches = [{is-window-cast-target = true;}];
+          focus-ring = {
+            active-color = colors.base08;
+            inactive-color = "${colors.base08}80";
+          };
+          tab-indicator = {
+            active-color = colors.base08;
+            inactive-color = "${colors.base08}80";
+          };
+        }
+      ];
+
+      # Layer-shell surfaces — noctalia's bar, panels and notifications — are
+      # not windows, so no window rule above ever sees them.
+      layer-rules = [
+        # Notification and toast popups carry message previews, and blocking
+        # them out covers the case the window rule above cannot: the
+        # notification for a Signal message is drawn by noctalia, not by
+        # Signal, so blocking Signal's window does nothing for it.
+        #
+        # noctalia namespaces its surfaces `noctalia-<kind>-<output>`, hence
+        # matching the prefix including the trailing dash.
+        {
+          matches = [
+            {namespace = "^noctalia-notifications-";}
+            {namespace = "^noctalia-toast-";}
+          ];
+          block-out-from = "screencast";
         }
       ];
     };
