@@ -1,12 +1,16 @@
-# home.wallpapers — the background collection, recoloured to the active stylix
-# palette and linked into a directory the wallpaper picker (noctalia's
-# WallpaperSelector / control centre) browses.
+# home.wallpapers — the background collection, linked into a directory the
+# wallpaper picker (noctalia's WallpaperSelector / control centre) browses.
 #
 # The images come from their own git repo on the knot (the `wallpapers` flake
-# input, declared below) rather than being fetched one file at a time. They are binary, they change as
-# a set, and the previous shape needed a URL and a hash per image — adding one
-# meant editing nix, and there was nowhere to put a picture that was not also a
-# nix expression.
+# input, declared below) rather than being fetched one file at a time. They are
+# binary, they change as a set, and the previous shape needed a URL and a hash
+# per image — adding one meant editing nix, and there was nowhere to put a
+# picture that was not also a nix expression.
+#
+# `ranking.txt` in that repo is the collection in preference order, best first,
+# and it is what this file is built around: it decides which files are
+# backgrounds at all, what order they appear in, and which one is the default.
+# Re-rank, push, bump the input, and all three follow.
 #
 # `theme.enable` will run them through imagemagick's `-remap` against a swatch
 # strip built from the 16 base16 colours, with Floyd-Steinberg dithering, so a
@@ -14,15 +18,10 @@
 # heavy hand on a photograph, and the collection is photographs now rather than
 # the handful of flat illustrations it was built for.
 #
-# (The single stylix wallpaper — `stylix.image` — is themed separately by
-# _styling/wallpaper.nix, which uses gowall. That one drives colour *generation*;
-# these are just pictures, so plain imagemagick is enough.)
-#
-# The directory is assembled with linkFarm rather than copied into $HOME, so the
-# images stay in the store and cost nothing to "install". Drop your own files
-# into `cosmos.desktops.wallpapers.directory` and they show up alongside these —
-# the picker is pointed at that writable directory, with the defaults symlinked
-# in on activation.
+# Images stay in the store and are symlinked into the picker directory, so they
+# cost nothing to "install". Drop your own files in alongside them — the picker
+# reads that writable directory, and activation only ever touches symlinks it
+# put there itself.
 {...}: {
   # The collection itself, as a non-flake input so the revision is pinned in
   # flake.lock with everything else (and picked up by flake-bump) rather than
@@ -57,27 +56,45 @@
 
     repo = inputs.wallpapers;
 
-    # Which files in the repo are backgrounds, resolved by globbing it at BUILD
-    # time rather than reading it during evaluation.
+    # `ranking.txt` is one filename per line and nothing else, which is the
+    # whole reason it is a bare list: this reads it without parsing anything.
     #
-    # `builtins.readDir` on a fetched store path would force the fetch at eval
-    # (import-from-derivation), so every `nix flake check` — the servers
-    # included, which have no desktop at all — would have to download the whole
-    # picture collection to answer a question about something else.
+    # `inputs.wallpapers` is a fetched source path rather than a derivation
+    # output, so this is an ordinary file read during evaluation — not
+    # import-from-derivation, and not a reason to build anything.
+    ranking =
+      lib.filter (l: l != "")
+      (lib.splitString "\n" (builtins.readFile "${repo}/ranking.txt"));
+
+    # Which subdirectory a name lives in is not knowable from the name alone,
+    # and guessing wrong would produce a path that silently does not exist — so
+    # look, and fail loudly at eval if it is in neither.
+    resolve = name: let
+      dir =
+        lib.findFirst
+        (d: builtins.pathExists "${repo}/${d}/${name}")
+        null ["frieren" "defaults"];
+    in
+      assert lib.assertMsg (dir != null) ''
+        cosmos.desktops.wallpapers: ranking.txt names "${name}", which is in
+        neither frieren/ nor defaults/ of the wallpapers input.
+      ''; "${repo}/${dir}/${name}";
+
+    # Every background, in rank order, with its rank baked into the filename.
     #
-    # `stylix-source-logo.png` is excluded: it is in the repo because
-    # _styling/wallpaper.nix derives the colour scheme from it, not because it
-    # is a background to choose.
-    imageList = pkgs.runCommand "wallpaper-list" {} ''
-      shopt -s nullglob
-      touch $out
-      for _img in ${repo}/defaults/* ${repo}/frieren/*; do
-        case "$(basename "$_img")" in
-          stylix-source-logo.png) continue ;;
-          *.jpg | *.jpeg | *.png) printf '%s\n' "$_img" >> $out ;;
-        esac
-      done
-    '';
+    # The prefix is the point: the picker sorts by name and has no idea a
+    # ranking exists, so numbering the files is what makes it list them best
+    # first. It also gives the rotation below a trivial way to say "the top
+    # eight" — `sort | head -8`.
+    ordered =
+      lib.imap1 (i: name: {
+        inherit name;
+        file = "${lib.fixedWidthNumber 3 i}-${name}";
+        src = resolve name;
+      })
+      ranking;
+
+    favourite = builtins.head ordered;
 
     # A 16x1 swatch strip of the base16 palette — imagemagick's `-remap` takes
     # its target colours from an image, not a list.
@@ -105,26 +122,32 @@
         magick ${lib.concatMapStringsSep " " (c: "'xc:${c}'") colors} +append png:$out
       '';
 
+    # "<source> <destination name>" per line. Neither store paths nor these
+    # filenames contain spaces, so a plain word split is enough.
+    pairs =
+      pkgs.writeText "wallpaper-pairs"
+      (lib.concatMapStrings (w: "${w.src} ${w.file}\n") ordered);
+
     # Dithering matters: a flat 16-colour remap posterises photographs into
     # banded blobs, Floyd–Steinberg keeps the gradients readable.
     #
-    # Run in parallel: this is a hundred-odd images and it reruns in full
-    # whenever the palette changes, which makes it comfortably the slowest step
-    # of a rebuild if done one at a time.
+    # Run in parallel: this is ninety images and it reruns in full whenever the
+    # palette changes, which would make it comfortably the slowest step of a
+    # rebuild if done one at a time.
     themed =
       pkgs.runCommand "wallpapers-themed" {nativeBuildInputs = [pkgs.imagemagick];}
       ''
         mkdir -p $out
-        xargs -a ${imageList} -P "$NIX_BUILD_CORES" -I% \
-          sh -c 'magick "$1" -dither FloydSteinberg -remap "$2" "$3/$(basename "$1")"' _ % ${palette} $out
+        export OUT=$out PALETTE=${palette}
+        xargs -a ${pairs} -L1 -P "$NIX_BUILD_CORES" \
+          sh -c 'magick "$1" -dither FloydSteinberg -remap "$PALETTE" "$OUT/$2"' _
       '';
 
     # Symlinks rather than copies — the originals are already in the store.
     plain = pkgs.runCommand "wallpapers-plain" {} ''
       mkdir -p $out
-      while IFS= read -r _img; do
-        ln -s "$_img" "$out/$(basename "$_img")"
-      done < ${imageList}
+      export OUT=$out
+      xargs -a ${pairs} -L1 sh -c 'ln -s "$1" "$OUT/$2"' _
     '';
   in {
     options.cosmos.desktops.wallpapers = {
@@ -132,8 +155,8 @@
         type = str;
         default = "${config.home.homeDirectory}/Pictures/wallpapers";
         description = ''
-          Directory the wallpaper picker browses. Seeded with the default
-          backgrounds; your own images can be added freely.
+          Directory the wallpaper picker browses. Seeded with the ranked
+          collection; your own images can be added freely.
         '';
       };
 
@@ -142,10 +165,24 @@
 
       defaultWallpaper = mkOption {
         type = str;
-        default = "${cfg.directory}/birds-in-the-sky.jpg";
+        default = "${cfg.directory}/${favourite.file}";
         description = ''
           Background used when the shell has no wallpaper picked yet. Must be a
           path inside `directory` so the picker shows it as selected.
+
+          Defaults to the top of the ranking, so re-ranking the collection and
+          pushing it is enough to change what a fresh shell comes up with.
+        '';
+      };
+
+      favourite = mkOption {
+        type = str;
+        readOnly = true;
+        default = favourite.src;
+        description = ''
+          Store path of the top-ranked background. home.styling points
+          `stylix.image` at this, which is what hyprpaper, hyprlock and the
+          greeter display.
         '';
       };
 
@@ -156,22 +193,36 @@
           if cfg.theme.enable
           then themed
           else plain;
-        description = "Store directory holding the bundled default backgrounds.";
+        description = "Store directory holding the ranked backgrounds.";
       };
     };
 
     config = {
       cosmos.system.impermanence.persist.directories = ["Pictures/wallpapers"];
 
-      # Symlink the defaults into the (writable) picker directory. Existing
-      # symlinks are re-pointed (the store path changes whenever the palette
-      # does), dangling ones are pruned, and real files the user dropped in are
-      # never touched.
+      # Symlink the collection into the (writable) picker directory.
+      #
+      # The pruning pass is not optional bookkeeping: filenames carry the rank,
+      # so they change whenever the ranking does, and an image dropped from the
+      # collection would otherwise stay in the picker forever. Testing for a
+      # *dangling* link is not enough either — the superseded store path is
+      # still there until it is garbage collected, so the stale link resolves
+      # perfectly well. Hence: remove any symlink pointing into the store that
+      # is not part of the current set, and never touch a real file.
       home.activation.defaultWallpapers = lib.hm.dag.entryAfter ["writeBoundary"] ''
         run mkdir -p ${lib.escapeShellArg cfg.directory}
+
         for _wp in ${lib.escapeShellArg cfg.directory}/*; do
-          if [ -L "$_wp" ] && [ ! -e "$_wp" ]; then run rm -- "$_wp"; fi
+          [ -L "$_wp" ] || continue
+          case "$(readlink -- "$_wp")" in
+            /nix/store/*) ;;
+            *) continue ;;
+          esac
+          if [ ! -e ${cfg.defaults}/"$(basename "$_wp")" ]; then
+            run rm -- "$_wp"
+          fi
         done
+
         for _wp in ${cfg.defaults}/*; do
           _dest=${lib.escapeShellArg cfg.directory}/"$(basename "$_wp")"
           if [ ! -e "$_dest" ] || [ -L "$_dest" ]; then

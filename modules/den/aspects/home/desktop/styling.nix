@@ -2,11 +2,7 @@
 # font/theme/wallpaper values (was home/profiles/desktop.nix). The stylix HM
 # module is auto-imported by the nixos desktop styling (homeManagerIntegration).
 {...}: {
-  den.aspects.home.styling.homeManager = {
-    config,
-    inputs,
-    ...
-  }: {
+  den.aspects.home.styling.homeManager = {config, ...}: {
     imports = [./_styling];
 
     cosmos.desktops.common.styling = {
@@ -37,14 +33,17 @@
       # of the same `wallpapers` input, so the desktop's colours and the picture
       # they came from cannot drift apart.
       #
-      # This overrides the module's own default, which is why that default
-      # being a different image never showed up anywhere.
+      # Whatever sits at the top of the collection's ranking, so the desktop
+      # background and the picker's default are the same picture without
+      # naming it twice. This overrides the module's own default, which is why
+      # that default being a different image never showed up anywhere.
+      #
       # `themed` would push it through gowall onto the base16 palette first.
       # Off, for the same reason the collection is no longer remapped: this is
       # a photograph, and it is what hyprpaper, hyprlock and the greeter all
       # display, so recolouring it is very visible.
       wallpaper = {
-        src = "${inputs.wallpapers}/defaults/birds-in-the-sky.jpg";
+        src = config.cosmos.desktops.wallpapers.favourite;
         themed = false;
       };
     };
