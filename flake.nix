@@ -83,6 +83,10 @@
     };
     typstnique.url = "github:LarsvanDartel/typstnique";
     vpn-confinement.url = "github:Maroka-chan/VPN-Confinement";
+    wallpapers = {
+      url = "git+https://knot.lvdar.nl/did:plc:nmkqw2d6qov4smqqvovwmwof?shallow=1";
+      flake = false;
+    };
     zen-browser = {
       url = "github:0xc000022070/zen-browser-flake";
       inputs = {

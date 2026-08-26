@@ -4,7 +4,7 @@
 {...}: {
   den.aspects.home.styling.homeManager = {
     config,
-    pkgs,
+    inputs,
     ...
   }: {
     imports = [./_styling];
@@ -32,11 +32,15 @@
         darkMode = true;
       };
 
+      # The image the whole scheme is generated from, and also the background
+      # `home.wallpapers` hands the picker as its default — the same file, out
+      # of the same `wallpapers` input, so the desktop's colours and the picture
+      # they came from cannot drift apart.
+      #
+      # This overrides the module's own default, which is why that default
+      # being a different image never showed up anywhere.
       wallpaper = {
-        src = pkgs.fetchurl {
-          url = "https://raw.githubusercontent.com/dharmx/walls/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/digital/a_group_of_birds_flying_in_the_sky.jpg";
-          hash = "sha256-v6KVInk5JJZPLkOAfC8yuDQtnZtT1DWQI7u6UfG59WY=";
-        };
+        src = "${inputs.wallpapers}/defaults/birds-in-the-sky.jpg";
         themed = true;
       };
     };

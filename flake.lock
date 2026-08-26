@@ -1316,6 +1316,7 @@
         "treefmt-nix": "treefmt-nix_3",
         "typstnique": "typstnique",
         "vpn-confinement": "vpn-confinement",
+        "wallpapers": "wallpapers",
         "zen-browser": "zen-browser"
       }
     },
@@ -1785,6 +1786,23 @@
         "owner": "Maroka-chan",
         "repo": "VPN-Confinement",
         "type": "github"
+      }
+    },
+    "wallpapers": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1787759806,
+        "narHash": "sha256-czZGmHJuA9gXsYXe1Tvsty5ldcYqHL1KMrE9f2v8mA4=",
+        "ref": "refs/heads/main",
+        "rev": "0f3cc55d182235330f9ba61f3f843f28263bfa3d",
+        "shallow": true,
+        "type": "git",
+        "url": "https://knot.lvdar.nl/did:plc:nmkqw2d6qov4smqqvovwmwof"
+      },
+      "original": {
+        "shallow": true,
+        "type": "git",
+        "url": "https://knot.lvdar.nl/did:plc:nmkqw2d6qov4smqqvovwmwof"
       }
     },
     "zen-browser": {
