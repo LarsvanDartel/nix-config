@@ -1,5 +1,6 @@
 {
   config,
+  inputs,
   pkgs,
   lib,
   ...
@@ -15,11 +16,11 @@ in {
   options.cosmos.desktops.common.styling.wallpaper = {
     themed = mkEnableOption "themed background";
     inverted = mkEnableOption "invert background";
+    # The image `stylix.image` derives the whole colour scheme from — so this
+    # one is not interchangeable with the backgrounds in the picker, and it
+    # lives in the repo's `defaults/` under a name that says as much.
     src = mkOption {
-      default = pkgs.fetchurl {
-        url = "https://raw.githubusercontent.com/dharmx/walls/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/nord/a_blue_and_grey_logo.png";
-        hash = "sha256-jB7q1PAMKS0tfk0Ck6pGkbsfwO+7FHwI83dUHO86ftM=";
-      };
+      default = "${inputs.wallpapers}/defaults/stylix-source-logo.png";
     };
     path = mkOption {
       type = str;

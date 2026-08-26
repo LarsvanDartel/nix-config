@@ -1,6 +1,12 @@
-# home.wallpapers — a small set of default backgrounds, recoloured to the active
-# stylix palette and linked into a directory the wallpaper picker (noctalia's
+# home.wallpapers — the background collection, recoloured to the active stylix
+# palette and linked into a directory the wallpaper picker (noctalia's
 # WallpaperSelector / control centre) browses.
+#
+# The images come from their own git repo on the knot (the `wallpapers` flake
+# input, declared below) rather than being fetched one file at a time. They are binary, they change as
+# a set, and the previous shape needed a URL and a hash per image — adding one
+# meant editing nix, and there was nowhere to put a picture that was not also a
+# nix expression.
 #
 # The images are run through imagemagick's `-remap` against a swatch strip built
 # from the 16 base16 colours, with Floyd–Steinberg dithering. The result uses
@@ -18,8 +24,28 @@
 # the picker is pointed at that writable directory, with the defaults symlinked
 # in on activation.
 {...}: {
+  # The collection itself, as a non-flake input so the revision is pinned in
+  # flake.lock with everything else (and picked up by flake-bump) rather than
+  # in a hash next to a `fetchgit` call.
+  #
+  # Fetched over the knot's *public HTTPS* rather than `git@knot.lvdar.nl:` on
+  # purpose: this is built on voyager and, through build-gate, on endeavour, and
+  # neither should need an SSH credential in order to produce a wallpaper. The
+  # `did:plc:` path is the repo's persistent name — it survives a rename, where
+  # `lvdar.nl/wallpapers` would not — and is the same shape comin uses to reach
+  # nix-config (see services/comin.nix).
+  #
+  # `shallow=1` because this is ~20 MB of pictures and no history is wanted.
+  #
+  # Remember `nix run .#write-flake` after touching this.
+  flake-file.inputs.wallpapers = {
+    url = "git+https://knot.lvdar.nl/did:plc:nmkqw2d6qov4smqqvovwmwof?shallow=1";
+    flake = false;
+  };
+
   den.aspects.home.wallpapers.homeManager = {
     config,
+    inputs,
     lib,
     pkgs,
     ...
@@ -29,30 +55,29 @@
 
     cfg = config.cosmos.desktops.wallpapers;
 
-    rev = "6bf4d733ebf2b484a37c17d742eb47e5139e6a14";
-    fromWalls = name: hash:
-      pkgs.fetchurl {
-        inherit hash;
-        url = "https://raw.githubusercontent.com/dharmx/walls/${rev}/digital/${name}";
-      };
+    repo = inputs.wallpapers;
 
-    sources = {
-      "birds-in-the-sky.jpg" =
-        fromWalls "a_group_of_birds_flying_in_the_sky.jpg"
-        "sha256-v6KVInk5JJZPLkOAfC8yuDQtnZtT1DWQI7u6UfG59WY=";
-      "road-orange-clouds.jpg" =
-        fromWalls "a_car_on_a_road_with_orange_clouds_in_the_sky.jpg"
-        "sha256-etcAxuS/sHme2jkiG/DAc4ZQxaiRBW02lWu0Z4i4SWo=";
-      "road-purple-clouds.png" =
-        fromWalls "a_car_on_a_road_with_purple_clouds_in_the_sky.png"
-        "sha256-hO+qoDONQ7OCIfqSIqtuBANxHIDrggIp3UziYySXbfU=";
-      "road-at-night.png" =
-        fromWalls "a_car_driving_on_a_road_at_night.png"
-        "sha256-Z82sql3x0W5+ppco2S0vRJC6tY+iTQuXGDyem5K0WGg=";
-      "house-on-a-cliff.png" =
-        fromWalls "a_cartoon_of_a_house_on_a_cliff.png"
-        "sha256-W8A8io3hVRufXWko86BJC2bm+DliLT7l/3UKwFmMpQs=";
-    };
+    # Which files in the repo are backgrounds, resolved by globbing it at BUILD
+    # time rather than reading it during evaluation.
+    #
+    # `builtins.readDir` on a fetched store path would force the fetch at eval
+    # (import-from-derivation), so every `nix flake check` — the servers
+    # included, which have no desktop at all — would have to download the whole
+    # picture collection to answer a question about something else.
+    #
+    # `stylix-source-logo.png` is excluded: it is in the repo because
+    # _styling/wallpaper.nix derives the colour scheme from it, not because it
+    # is a background to choose.
+    imageList = pkgs.runCommand "wallpaper-list" {} ''
+      shopt -s nullglob
+      touch $out
+      for _img in ${repo}/defaults/* ${repo}/frieren/*; do
+        case "$(basename "$_img")" in
+          stylix-source-logo.png) continue ;;
+          *.jpg | *.jpeg | *.png) printf '%s\n' "$_img" >> $out ;;
+        esac
+      done
+    '';
 
     # A 16x1 swatch strip of the base16 palette — imagemagick's `-remap` takes
     # its target colours from an image, not a list.
@@ -82,19 +107,25 @@
 
     # Dithering matters: a flat 16-colour remap posterises photographs into
     # banded blobs, Floyd–Steinberg keeps the gradients readable.
+    #
+    # Run in parallel: this is a hundred-odd images and it reruns in full
+    # whenever the palette changes, which makes it comfortably the slowest step
+    # of a rebuild if done one at a time.
     themed =
       pkgs.runCommand "wallpapers-themed" {nativeBuildInputs = [pkgs.imagemagick];}
       ''
         mkdir -p $out
-        ${lib.concatStringsSep "\n" (lib.mapAttrsToList (name: src: ''
-            magick ${src} -dither FloydSteinberg -remap ${palette} "$out/${name}"
-          '')
-          sources)}
+        xargs -a ${imageList} -P "$NIX_BUILD_CORES" -I% \
+          sh -c 'magick "$1" -dither FloydSteinberg -remap "$2" "$3/$(basename "$1")"' _ % ${palette} $out
       '';
 
-    plain = pkgs.linkFarm "wallpapers-plain" (
-      lib.mapAttrsToList (name: path: {inherit name path;}) sources
-    );
+    # Symlinks rather than copies — the originals are already in the store.
+    plain = pkgs.runCommand "wallpapers-plain" {} ''
+      mkdir -p $out
+      while IFS= read -r _img; do
+        ln -s "$_img" "$out/$(basename "$_img")"
+      done < ${imageList}
+    '';
   in {
     options.cosmos.desktops.wallpapers = {
       directory = mkOption {
