@@ -181,13 +181,23 @@
 
       # noctalia owns the background under niri; hyprpaper under Hyprland.
       # Whichever is not running simply fails, so try one and fall back.
+      #
+      # Failing loudly matters here. An earlier version swallowed both attempts
+      # and exited 0, so a unit that could not find either binary still looked
+      # perfectly healthy in `systemctl --user status` and left nothing in the
+      # journal to explain a background that never changed.
       if command -v noctalia-shell >/dev/null 2>&1 &&
          noctalia-shell ipc call wallpaper set "$path" all >/dev/null 2>&1; then
+        echo "set $pick via noctalia"
         exit 0
       fi
-      if command -v hyprctl >/dev/null 2>&1; then
-        hyprctl hyprpaper reload ",$path" >/dev/null 2>&1 || true
+      if command -v hyprctl >/dev/null 2>&1 &&
+         hyprctl hyprpaper reload ",$path" >/dev/null 2>&1; then
+        echo "set $pick via hyprpaper"
+        exit 0
       fi
+      echo "could not set $pick: no running shell accepted it" >&2
+      exit 1
     '';
   in {
     options.cosmos.desktops.wallpapers = {
@@ -306,10 +316,15 @@
             Type = "oneshot";
             ExecStart = "${rotate}";
             # The user manager's PATH is not the session's. coreutils for the
-            # script itself; the system and user profiles for whichever of
-            # hyprctl and noctalia-shell turns out to be there.
+            # script itself, /run/current-system/sw/bin for hyprctl, and the
+            # home-manager profile for noctalia-shell.
+            #
+            # `home.profileDirectory` rather than a literal: this profile is
+            # ~/.local/state/nix/profile, and the ~/.nix-profile this first
+            # guessed at does not exist, so nothing was ever found and the
+            # rotation silently did nothing.
             Environment = [
-              "PATH=${lib.makeBinPath [pkgs.coreutils]}:/run/current-system/sw/bin:%h/.nix-profile/bin"
+              "PATH=${lib.makeBinPath [pkgs.coreutils]}:/run/current-system/sw/bin:${config.home.profileDirectory}/bin"
             ];
           };
         };
@@ -320,7 +335,11 @@
             PartOf = ["graphical-session.target"];
           };
           Timer = {
-            OnActiveSec = cfg.rotate.interval;
+            # A minute after the session comes up, then every interval. Not
+            # `interval` for the first one too: that left a fresh session
+            # sitting on the same image for half an hour, which is
+            # indistinguishable from the rotation being broken.
+            OnActiveSec = "1min";
             OnUnitActiveSec = cfg.rotate.interval;
           };
           Install.WantedBy = ["graphical-session.target"];
