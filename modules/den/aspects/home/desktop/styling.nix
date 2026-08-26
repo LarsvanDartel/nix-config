@@ -39,9 +39,13 @@
       #
       # This overrides the module's own default, which is why that default
       # being a different image never showed up anywhere.
+      # `themed` would push it through gowall onto the base16 palette first.
+      # Off, for the same reason the collection is no longer remapped: this is
+      # a photograph, and it is what hyprpaper, hyprlock and the greeter all
+      # display, so recolouring it is very visible.
       wallpaper = {
         src = "${inputs.wallpapers}/defaults/birds-in-the-sky.jpg";
-        themed = true;
+        themed = false;
       };
     };
   };
