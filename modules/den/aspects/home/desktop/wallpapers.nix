@@ -8,11 +8,11 @@
 # meant editing nix, and there was nowhere to put a picture that was not also a
 # nix expression.
 #
-# The images are run through imagemagick's `-remap` against a swatch strip built
-# from the 16 base16 colours, with Floyd–Steinberg dithering. The result uses
-# *only* theme colours, so every background matches the bar, terminal and app
-# theming instead of clashing with them. Set `theme.enable = false` for the
-# untouched originals.
+# `theme.enable` will run them through imagemagick's `-remap` against a swatch
+# strip built from the 16 base16 colours, with Floyd-Steinberg dithering, so a
+# background uses *only* theme colours. It is off: a sixteen-colour remap is a
+# heavy hand on a photograph, and the collection is photographs now rather than
+# the handful of flat illustrations it was built for.
 #
 # (The single stylix wallpaper — `stylix.image` — is themed separately by
 # _styling/wallpaper.nix, which uses gowall. That one drives colour *generation*;
@@ -138,8 +138,7 @@
       };
 
       theme.enable =
-        mkEnableOption "recolouring the bundled backgrounds to the stylix palette"
-        // {default = true;};
+        mkEnableOption "recolouring the bundled backgrounds to the stylix palette";
 
       defaultWallpaper = mkOption {
         type = str;
