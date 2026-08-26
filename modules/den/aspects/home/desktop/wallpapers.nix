@@ -9,8 +9,9 @@
 #
 # `ranking.txt` in that repo is the collection in preference order, best first,
 # and it is what this file is built around: it decides which files are
-# backgrounds at all, what order they appear in, and which one is the default.
-# Re-rank, push, bump the input, and all three follow.
+# backgrounds at all, what order they appear in, which one is the default, and
+# which ones the rotation cycles through. Re-rank, push, bump the input, and all
+# four follow.
 #
 # `theme.enable` will run them through imagemagick's `-remap` against a swatch
 # strip built from the 16 base16 colours, with Floyd-Steinberg dithering, so a
@@ -50,7 +51,8 @@
     ...
   }: let
     inherit (lib.options) mkOption mkEnableOption;
-    inherit (lib.types) str path;
+    inherit (lib.types) str path ints;
+    inherit (lib.modules) mkIf;
 
     cfg = config.cosmos.desktops.wallpapers;
 
@@ -149,6 +151,44 @@
       export OUT=$out
       xargs -a ${pairs} -L1 sh -c 'ln -s "$1" "$OUT/$2"' _
     '';
+
+    # Cycles the background through the top of the ranking.
+    #
+    # Not noctalia's own automation, which can only shuffle a whole directory
+    # and only runs under niri anyway. This drives whichever shell is actually
+    # up, so the Hyprland session gets the same behaviour.
+    #
+    # The index lives in XDG_RUNTIME_DIR, so a reboot starts again from the
+    # favourite rather than resuming mid-cycle — which is the nicer of the two
+    # behaviours, and means there is no state to persist.
+    rotate = pkgs.writeShellScript "wallpaper-rotate" ''
+      set -eu
+      dir=${lib.escapeShellArg cfg.directory}
+      n=${toString cfg.rotate.count}
+      state="''${XDG_RUNTIME_DIR:-/tmp}/wallpaper-rotate.index"
+
+      i=0
+      if [ -r "$state" ]; then i=$(cat "$state" 2>/dev/null || echo 0); fi
+      case "$i" in ''' | *[!0-9]*) i=0 ;; esac
+      i=$(( (i + 1) % n ))
+      printf '%s\n' "$i" > "$state"
+
+      # Filenames are rank-prefixed, so sorting by name sorts by rank.
+      pick=$(ls -1 "$dir" 2>/dev/null | sort | head -n "$n" | sed -n "$((i + 1))p")
+      [ -n "$pick" ] || exit 0
+      path="$dir/$pick"
+      [ -e "$path" ] || exit 0
+
+      # noctalia owns the background under niri; hyprpaper under Hyprland.
+      # Whichever is not running simply fails, so try one and fall back.
+      if command -v noctalia-shell >/dev/null 2>&1 &&
+         noctalia-shell ipc call wallpaper set "$path" all >/dev/null 2>&1; then
+        exit 0
+      fi
+      if command -v hyprctl >/dev/null 2>&1; then
+        hyprctl hyprpaper reload ",$path" >/dev/null 2>&1 || true
+      fi
+    '';
   in {
     options.cosmos.desktops.wallpapers = {
       directory = mkOption {
@@ -184,6 +224,30 @@
           `stylix.image` at this, which is what hyprpaper, hyprlock and the
           greeter display.
         '';
+      };
+
+      rotate = {
+        enable =
+          mkEnableOption ''
+            cycling the background through the best-ranked images on a timer
+          ''
+          // {default = true;};
+
+        count = mkOption {
+          type = ints.positive;
+          default = 8;
+          description = ''
+            How many of the top-ranked backgrounds to cycle through. Kept well
+            below the size of the collection on purpose — the point of ranking
+            it was to stop seeing the ones that lost.
+          '';
+        };
+
+        interval = mkOption {
+          type = str;
+          default = "30min";
+          description = "systemd time span between changes.";
+        };
       };
 
       defaults = mkOption {
@@ -230,6 +294,38 @@
           fi
         done
       '';
+
+      systemd.user = mkIf cfg.rotate.enable {
+        services.wallpaper-rotate = {
+          Unit = {
+            Description = "Advance the background to the next of the top ${toString cfg.rotate.count}";
+            PartOf = ["graphical-session.target"];
+            After = ["graphical-session.target"];
+          };
+          Service = {
+            Type = "oneshot";
+            ExecStart = "${rotate}";
+            # The user manager's PATH is not the session's. coreutils for the
+            # script itself; the system and user profiles for whichever of
+            # hyprctl and noctalia-shell turns out to be there.
+            Environment = [
+              "PATH=${lib.makeBinPath [pkgs.coreutils]}:/run/current-system/sw/bin:%h/.nix-profile/bin"
+            ];
+          };
+        };
+
+        timers.wallpaper-rotate = {
+          Unit = {
+            Description = "Cycle the background through the top ${toString cfg.rotate.count}";
+            PartOf = ["graphical-session.target"];
+          };
+          Timer = {
+            OnActiveSec = cfg.rotate.interval;
+            OnUnitActiveSec = cfg.rotate.interval;
+          };
+          Install.WantedBy = ["graphical-session.target"];
+        };
+      };
     };
   };
 }
