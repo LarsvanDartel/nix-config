@@ -37,6 +37,33 @@
           }
         }
 
+        // kdeconnectd probes for peers over mDNS on every interface it can
+        // see, twice a second. One of those is wt0, NetBird's WireGuard
+        // interface, where no peer's AllowedIPs cover the mDNS multicast group
+        // 224.0.0.251 — so the kernel refuses the send with ENOKEY and
+        // kdeconnect logs "Failed to send mDNS query: Required key not
+        // available". Verified by hand: the same send succeeds on the LAN
+        // interface and returns ENOKEY on wt0.
+        //
+        // Nothing is broken. Discovery works over the LAN, which is the only
+        // place it could ever work, and a mesh peer is not a thing mDNS is
+        // meant to find. It is ~50k identical lines a day that bury everything
+        // else this host says.
+        //
+        // Dropped here because there is nowhere else to drop it: kdeconnect
+        // offers no way to restrict which interfaces it probes. If it ever
+        // gains one, this goes. The count survives as
+        // `loki_process_dropped_lines_total{reason=...}`, so the noise stays
+        // measurable even though the lines are gone.
+        loki.process "denoise" {
+          forward_to = [loki.write.default.receiver]
+
+          stage.drop {
+            expression          = "Failed to send mDNS query: Required key not available"
+            drop_counter_reason = "kdeconnect_mdns_on_wireguard"
+          }
+        }
+
         // Kept to a small fixed set on purpose: labels are what loki indexes,
         // and a high-cardinality one (a pid, a request id) is how a loki
         // install becomes unusably slow. `unit` answers the first question
@@ -56,7 +83,7 @@
         }
 
         loki.source.journal "read" {
-          forward_to    = [loki.write.default.receiver]
+          forward_to    = [loki.process.denoise.receiver]
           relabel_rules = loki.relabel.journal.rules
           labels        = {
             job  = "systemd-journal",
