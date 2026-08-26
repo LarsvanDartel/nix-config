@@ -150,9 +150,28 @@
           # Compositor
           "Mod+Shift+Q".quit = _: {};
           "Mod+Shift+C".close-window = _: {};
-          "Mod+F".fullscreen-window = _: {};
           "Mod+T".toggle-window-floating = _: {};
           # (Hyprland's Mod+D toggle_swallow has no niri equivalent.)
+
+          # Three different things in niri, where Hyprland had one. Mod+F keeps
+          # Hyprland's meaning; the other two take the keys niri itself uses.
+          #
+          #   Mod+F        fullscreen — covers the screen, bar and gaps gone
+          #   Mod+M        maximize the WINDOW to the edges of the working
+          #                area: the bar stays, struts/gaps/borders do not,
+          #                and the window is *told* it is maximized so it
+          #                squares its own corners like it would anywhere else
+          #   Mod+Shift+M  maximize the COLUMN — full width, gaps and borders
+          #                kept, and it can still hold several windows
+          "Mod+F".fullscreen-window = _: {};
+          "Mod+M".maximize-window-to-edges = _: {};
+          "Mod+Shift+M".maximize-column = _: {};
+
+          # Tells a window it is fullscreen without making it fullscreen. A
+          # browser drops its chrome for a slide deck while staying a normal
+          # resizable window, so a screencast can frame it next to the notes
+          # instead of surrendering the whole monitor to it.
+          "Mod+Ctrl+F".toggle-windowed-fullscreen = _: {};
 
           # Move focus
           "Mod+L".focus-column-right = _: {};
