@@ -125,6 +125,23 @@
           inactive-color = colors.base02;
         };
         border.off = _: {};
+
+        # Tuning only — deliberately no `on`, so nothing casts a shadow by
+        # default. The floating-window rule below is what switches it on, and
+        # it is the only rule that does.
+        shadow = {
+          softness = 20;
+          spread = 2;
+          offset = _: {
+            props = {
+              x = 0;
+              y = 4;
+            };
+          };
+          # Tinted with the scheme's darkest background rather than pure black,
+          # so it reads as depth in the palette instead of a grey smudge.
+          color = "${colors.base00}a0";
+        };
       };
 
       # Nine permanent workspaces, like Hyprland's. niri's workspaces are
@@ -295,6 +312,11 @@
           matches = [{is-floating = true;}];
           geometry-corner-radius = 6.0;
           clip-to-geometry = true;
+          # Depth, where the rest of the layout is flat. A floating window sits
+          # *on top of* the tiled columns with nothing else to separate the
+          # two, and the shadow is what says which is which. Tiled windows are
+          # left flat on purpose — they tile, so they need no separating.
+          shadow.on = _: {};
         }
         # The calculator pops up floating, rofi-calc style.
         {
