@@ -44,6 +44,7 @@
       services.ddns
       services.opencloud
       services.typstnique
+      services.site
       services.cdrom
       hardware.ipmi-fancontrol
       services.arr.vpn
@@ -382,6 +383,7 @@
           9980 # collabora   docs.lvdar.nl
 
           3030 # typstnique  typstnique.lvdar.nl
+          3031 # site        lvdar.nl + www.lvdar.nl
           8084 # open-webui  chat.lvdar.nl
           8086 # mc control  minecraft.lvdar.nl
 

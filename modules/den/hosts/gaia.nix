@@ -366,6 +366,28 @@
           targets = endeavour 3030;
         };
 
+        # The homepage, and the only entry here that claims the apex rather
+        # than a subdomain. Ungated for the plainest reason on this page: it
+        # is the front door, and an identity check on lvdar.nl would mean
+        # nobody outside this fleet could read a public blog.
+        #
+        # acme.nix already covers this — the wildcard cert carries lvdar.nl
+        # itself in extraDomainNames, so the apex needs no certificate work.
+        site = {
+          domain = "lvdar.nl";
+          bearerAuth.enable = false;
+          targets = endeavour 3031;
+        };
+
+        # Same target. The app answers this with a 301 to the apex; the entry
+        # exists so the name resolves to the site at all rather than falling
+        # through to netbird-proxy's default vhost.
+        www = {
+          domain = "www.lvdar.nl";
+          bearerAuth.enable = false;
+          targets = endeavour 3031;
+        };
+
         # Open WebUI. Ungated, and for the sharper of the two reasons already
         # on this page: it is an SPA whose chat responses stream over SSE, so a
         # lapsed gate session answers a long-lived streaming request with a 302
