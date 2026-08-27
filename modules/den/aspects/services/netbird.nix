@@ -1138,6 +1138,40 @@
           '';
         };
 
+        localVhosts = mkOption {
+          type = attrsOf (submodule {
+            options.upstream = mkOption {
+              type = str;
+              example = "http://100.68.151.172:3031";
+              description = ''
+                Where to forward, as a mesh address. A literal, for the same
+                reason every other target here is one: den cannot read another
+                host's config.
+              '';
+            };
+          });
+          default = {};
+          description = ''
+            Domains this host's nginx serves itself, instead of handing them to
+            netbird-proxy.
+
+            The reason this exists is a hard limit in the proxy rather than a
+            preference: its cluster domain *is* baseDomain, and the management
+            API rejects any service whose domain is not a label beneath it —
+            `domain lvdar.nl requires a subdomain label`, HTTP 422. So the apex
+            cannot be published through the proxy at all, however it is spelled.
+
+            The cost of coming in this way is that CrowdSec and the NetBird
+            identity gate are both bypassed, because the request never reaches
+            the proxy that implements them. Only put a domain here that is meant
+            to be entirely public, and note that services/gatus.nix probing it
+            is then the only thing watching it.
+
+            oidc.idp is the same mechanism with a different justification (a
+            bootstrap deadlock rather than a naming rule) and predates this.
+          '';
+        };
+
         localTlsPort = mkOption {
           type = port;
           default = 4443;
@@ -1670,7 +1704,31 @@
                 proxy_ssl_verify off;
               '';
             };
-          };
+          }
+          # Domains the proxy cannot carry — see localVhosts for why the apex is
+          # one of them. Plain HTTP over the mesh to the peer that serves them;
+          # the hop is inside WireGuard, and terminating here is the whole point.
+          // lib.mapAttrs (_: vhost: {
+            onlySSL = true;
+            useACMEHost = "lvdar.nl";
+            listen = [
+              {
+                addr = "127.0.0.1";
+                port = cfg.localTlsPort;
+                ssl = true;
+                proxyProtocol = true;
+              }
+            ];
+            locations."/" = {
+              proxyPass = vhost.upstream;
+              proxyWebsockets = true;
+            };
+            extraConfig = ''
+              set_real_ip_from 127.0.0.1;
+              real_ip_header proxy_protocol;
+            '';
+          })
+          cfg.localVhosts;
 
         # Backing store for the bootstrap cache above. inactive is a year
         # because the entry has to still be there after an outage of arbitrary
@@ -1691,6 +1749,10 @@
             ${cfg.domain}  127.0.0.1:${toString cfg.localTlsPort};
             ${lib.optionalString (cfg.oidc.idp.domain != null)
             "${cfg.oidc.idp.domain}  127.0.0.1:${toString cfg.localTlsPort};"}
+            ${lib.concatStringsSep "\n            " (lib.mapAttrsToList (
+              domain: _: "${domain}  127.0.0.1:${toString cfg.localTlsPort};"
+            )
+            cfg.localVhosts)}
             default        127.0.0.1:${toString cfg.proxyPort};
           }
 

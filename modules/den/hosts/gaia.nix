@@ -230,6 +230,17 @@
         upstream = "https://100.68.151.172:8443";
       };
 
+      # lvdar.nl itself, which netbird-proxy cannot serve (see the note in the
+      # services list above). Same bypass as the IdP directly overhead, and the
+      # same literal mesh address for endeavour, for the same reason: den cannot
+      # read another host's config.
+      #
+      # This means the site gets no CrowdSec and no NetBird gate. Both are fine
+      # here and neither would have been wanted: it is a public blog, and the
+      # gate would have made the front page unreadable to everyone without an
+      # account on this fleet.
+      cosmos.services.netbird.localVhosts."lvdar.nl".upstream = "http://100.68.151.172:3031";
+
       # Every peer resolves through endeavour's unbound, which carries the oisd
       # blocklist — so ad-blocking DNS follows a roaming laptop or phone around
       # instead of stopping at the front door. Addresses are looked up at
@@ -365,24 +376,21 @@
           targets = endeavour 3030;
         };
 
-        # The homepage, and the only entry here that claims the apex rather
-        # than a subdomain. Ungated for the plainest reason on this page: it
-        # is the front door, and an identity check on lvdar.nl would mean
-        # nobody outside this fleet could read a public blog.
+        # The apex is deliberately absent from this list and cannot be added.
+        # netbird-proxy's cluster domain *is* lvdar.nl, and management rejects
+        # any service that is not a label beneath it:
         #
-        # acme.nix already covers this — the wildcard cert carries lvdar.nl
-        # itself in extraDomainNames, so the apex needs no certificate work.
-        site = {
-          domain = "lvdar.nl";
-          bearerAuth.enable = false;
-          targets = endeavour 3031;
-        };
-
-        # Same target. The app answers this with a 301 to the apex; the entry
-        # exists so the name resolves to the site at all rather than falling
-        # through to netbird-proxy's default vhost.
+        #   {"message":"domain lvdar.nl requires a subdomain label","code":422}
+        #
+        # The reconciler retried every five minutes and logged only its generic
+        # "domain or listen port already taken" guess, while the proxy answered
+        # the apex with `unknown domain` and a TLS internal error — a service
+        # that looked configured and was never created. It is served by this
+        # host's nginx instead, via netbird.localVhosts below.
+        #
+        # www can be a proxy service, because it is a subdomain like any other.
+        # The app answers it with a 301 to the apex.
         www = {
-          domain = "www.lvdar.nl";
           bearerAuth.enable = false;
           targets = endeavour 3031;
         };
