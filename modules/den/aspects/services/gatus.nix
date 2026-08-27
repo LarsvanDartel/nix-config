@@ -70,6 +70,9 @@
         endpoints = mkOption {
           type = listOf str;
           default = [
+            # The front door. Dotted, so it is probed as written rather than
+            # as a subdomain — see the mapping below.
+            "lvdar.nl"
             "jellyfin"
             "immich"
             "traccar"
@@ -80,9 +83,13 @@
             "auth"
           ];
           description = ''
-            Subdomains of lvdar.nl to probe. The published surface, not the
-            internals: this is the half of the stack that has to keep working
-            when endeavour does not, so it checks what a person would.
+            Names to probe. A bare label is taken as a subdomain of lvdar.nl;
+            a name containing a dot is used as the hostname as written, which
+            is what lets the apex appear here alongside the rest.
+
+            The published surface, not the internals: this is the half of the
+            stack that has to keep working when endeavour does not, so it
+            checks what a person would.
 
             `auth` is worth its place — kanidm failing takes grafana, opencloud
             and the netbird gate with it, and that is one alert rather than
@@ -135,7 +142,16 @@
               password = "\${NTFY_PASSWORD}";
             };
 
-            endpoints = map (n: endpoint n "https://${n}.lvdar.nl") cfg.endpoints;
+            endpoints =
+              map (
+                n:
+                  endpoint n "https://${
+                    if lib.hasInfix "." n
+                    then n
+                    else "${n}.lvdar.nl"
+                  }"
+              )
+              cfg.endpoints;
           };
         };
 
