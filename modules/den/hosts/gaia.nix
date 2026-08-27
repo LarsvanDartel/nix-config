@@ -144,7 +144,6 @@
           "/persist/var/lib/netbird-proxy"
           "/persist/var/lib/crowdsec"
           "/persist/var/lib/acme"
-          "/persist/var/lib/typstnique"
           "/persist/var/lib/unbound"
           # The uid/gid map. Small, and without it a rebuilt host hands out
           # different numeric owners than the files being restored expect.

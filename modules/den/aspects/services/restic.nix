@@ -102,6 +102,10 @@
             # only part of the LLM stack worth backing up — the models it talks
             # to are a re-download and are deliberately excluded.
             "/persist/var/lib/open-webui"
+            # typstnique's leaderboard. Tiny, and the only thing that host runs
+            # which cannot be rebuilt from the flake — the scores are the one
+            # part not derivable from source.
+            "/persist/var/lib/typstnique"
             "/persist/home"
             # The whole of /etc, not just /etc/opencloud as this used to say —
             # 20 KB in total, and the ssh host key inside it is what makes any

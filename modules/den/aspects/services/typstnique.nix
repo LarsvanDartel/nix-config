@@ -10,14 +10,12 @@
     services.typstnique = {
       enable = true;
       port = 3030;
-      # netbird-proxy reaches this over the mesh, as it does every other
-      # published service — even though it happens to run on the same host, so
-      # the request leaves and re-enters through WireGuard. Uniformity is worth
-      # that: the vhost, certificate and CrowdSec check are the ones every
-      # other service gets, rather than a second, hand-written path.
+      # Bound to the mesh rather than loopback: this runs on endeavour, which
+      # is edgeTerminated, so the connection arrives from gaia's netbird-proxy
+      # over WireGuard and a loopback bind would refuse it.
       #
       # The firewall is what limits reach: 3030 is opened on the netbird
-      # interface alone (netbird.client.exposedPorts in hosts/gaia.nix).
+      # interface alone (netbird.client.exposedPorts in hosts/endeavour.nix).
       address = "0.0.0.0";
     };
   };
