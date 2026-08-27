@@ -25,6 +25,7 @@
       desktop.keyd
       services.containers
       services.netbird.client
+      services.eduvpn
       # Ships its journal to loki. Not node-exporter: a laptop that sleeps
       # would sit permanently "target down". Logs have no such problem —
       # they simply stop and resume.
@@ -56,6 +57,7 @@
         home.proton.mail-desktop
         home.proton.pass-cli
         home.proton.vpn-cli
+        home.eduvpn
       ];
 
       # voyager-specific home settings.
