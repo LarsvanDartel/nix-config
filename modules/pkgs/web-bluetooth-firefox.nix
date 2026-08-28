@@ -143,15 +143,13 @@
 
             nativeBuildInputs = [zip];
 
-            postPatch = ''
-              substituteInPlace webbluetooth-firefox-extension/manifest.json \
-                --replace-fail '"version": "1.1"' '"version": "1.1.1"'
-
-              substituteInPlace webbluetooth-firefox-extension/polyfill.js \
-                --replace-fail \
-                  "d.dispatchEvent(new CustomEvent('advertisementreceived', { detail }));" \
-                  "const _ev = new CustomEvent('advertisementreceived', { detail }); Object.assign(_ev, detail, { device: d }); d.dispatchEvent(_ev);"
-            '';
+            # Same treatment as the host's patch, and for the same reason: the
+            # change spans several lines whose exact text matters, which a
+            # substituteInPlace expresses badly. The version bump rides along
+            # because Firefox will not replace an installed extension with the
+            # same id at the same version — without it the AMO build simply
+            # stays.
+            patches = [./_web-bluetooth/advertisement-event-shape.patch];
 
             # Laid out the way home-manager's firefox addon packages are, so
             # profiles.<p>.extensions.packages can install it: the xpi named
