@@ -46,22 +46,32 @@
         repository = "https://tangled.org/lvdar.nl/blog";
         branch = "main";
 
-        # A poll that finds the same revision costs one shallow fetch and skips
-        # the compile entirely, so this is cheap to run often. It is also the
-        # ceiling on how stale the site can be, since refreshTokenFile below is
-        # unset and nothing pushes at us.
+        # The ceiling on staleness, not the usual path — refPath below
+        # publishes within about a second. A poll that finds the same revision
+        # costs one shallow fetch and skips the compile entirely, so leaving it
+        # this short is nearly free and is what makes the watch optional.
         interval = 60;
+
+        # The blog repository's ref file on the knot, whose mtime moves on
+        # every push. A systemd.path watches it and reloads the service, which
+        # works only because the knot and this service run on the same host:
+        # it is an inotify watch on a local file, not a network call. No
+        # credential, no open port, nothing listening.
+        #
+        # services.build-gate triggers the same way and its comment calls this
+        # the fragile part, correctly — the DID and the knot's on-disk layout
+        # are hardcoded here and knowable from nowhere else. If a push stops
+        # publishing within a second, this is the first thing to check, and the
+        # symptom is mild: the poll above still picks it up within a minute.
+        refPath = "/tank/git/did:plc:fpotkfjfgnqg2jiskgfcyjx5/refs/heads/main";
       };
 
-      # POST /api/refresh publishes immediately instead of waiting up to
-      # `interval`. It stays off until there is a secret to gate it with: an
-      # unauthenticated endpoint that runs a git fetch and a Typst compile on
-      # demand is a free way to load the box.
-      #
-      # To turn it on, add a key to nix-secrets and point this at it:
-      #   sops.secrets."keys/site/refresh-token".sopsFile = ...;
-      #   refreshTokenFile = config.sops.secrets."keys/site/refresh-token".path;
-      # then have the knot's post-receive hook curl the endpoint with it.
+      # POST /api/refresh does the same thing over HTTP. Left off: refPath
+      # above already publishes within a second without a secret, an open
+      # endpoint, or anything to rotate. It would only earn its keep if the
+      # site moved to a host that is not the knot, where the file watch cannot
+      # work — see the option's own documentation for the three lines that
+      # enable it.
       refreshTokenFile = null;
     };
   };
