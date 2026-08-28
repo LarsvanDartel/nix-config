@@ -64,7 +64,7 @@
       options.cosmos.services.attic.client = {
         serverUrl = mkOption {
           type = str;
-          default = "http://endeavour.nb.lvdar.nl:8090";
+          example = "http://cache.example.org:8090";
           description = ''
             The attic server, without a cache name.
 
@@ -254,7 +254,7 @@
 
         dataDir = mkOption {
           type = path;
-          default = "/tank/atticd";
+          example = "/srv/atticd";
           description = ''
             NAR storage, on the array. See the header for why it is not
             persisted.

@@ -58,7 +58,7 @@
       options.cosmos.services.comin = {
         repository = mkOption {
           type = str;
-          default = "https://knot.lvdar.nl/did:plc:a3erncqfgkcxu3yl6fpjfmwf";
+          example = "https://git.example.org/me/nix-config";
           description = ''
             The repository to pull, as the knot serves it over HTTPS.
 

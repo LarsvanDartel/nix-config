@@ -77,7 +77,7 @@
 
         stateDir = mkOption {
           type = str;
-          default = "/tank/git";
+          example = "/srv/git";
           description = ''
             Repositories and the knot's SQLite database.
 
@@ -294,7 +294,7 @@
 
         stateDir = mkOption {
           type = str;
-          default = "/tank/spindle";
+          example = "/srv/spindle";
           description = ''
             Repository checkouts only. The VM images and overlays deliberately
             do NOT live here — see below.

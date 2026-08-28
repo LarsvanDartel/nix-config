@@ -343,7 +343,7 @@
 
         proxyAddress = mkOption {
           type = str;
-          default = "100.68.242.26";
+          example = "100.68.0.1";
           description = ''
             netbird-proxy's own mesh address, and the only source this vhost
             accepts.

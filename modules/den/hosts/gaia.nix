@@ -252,6 +252,10 @@
       # publishing the BMC away from endeavour.
       cosmos.services.unbound.localRecords."idrac.lvdar.nl" = "100.68.78.148";
 
+      # The knot, over public HTTPS. The arrow points inward: comin pulls, so
+      # no credential here grants anything on the fleet.
+      cosmos.services.comin.repository = "https://knot.lvdar.nl/did:plc:a3erncqfgkcxu3yl6fpjfmwf";
+
       # The published surface worth probing, listed here rather than defaulted
       # in services/gatus.nix: what matters to watch is a fact about this
       # deployment, not about a status page.

@@ -203,6 +203,12 @@
       # people who look after the whole thing are in.
       cosmos.services.minecraft.control = {
         enable = true;
+
+        # netbird-proxy's own embedded client peer, which is a different
+        # address from gaia's agent. A literal because den cannot read another
+        # host's config, and the page is served only to that one address.
+        proxyAddress = "100.68.242.26";
+
         access = {
           smp = ["netbird-minecraft-smp" "netbird-minecraft-control"];
           hardcore = ["netbird-minecraft-hardcore" "netbird-minecraft-control"];
@@ -350,6 +356,43 @@
       # name keeps resolving when either is down, which is the entire point of
       # publishing the BMC away from endeavour.
       cosmos.services.unbound.localRecords."idrac.lvdar.nl" = "100.68.78.148";
+
+      # Deployment facts that used to sit in aspect defaults. They describe
+      # this machine — its pool layout, its git remote, where its data lives —
+      # so they belong with the machine, not with the modules.
+      cosmos.services = {
+        attic.dataDir = "/tank/atticd";
+        loki.dataDir = "/tank/monitoring/loki";
+        ollama.modelsDir = "/tank/ollama/models";
+
+        # The offsite repository. Its password and the storage-box key are
+        # themselves sops secrets — see docs/RESTORE.md before needing them.
+        restic.repository = "sftp:u649268@u649268.your-storagebox.de:/endeavour";
+
+        # This host is the knot, so it holds the repositories it also deploys
+        # itself from.
+        tangled = {
+          stateDir = "/tank/git";
+          spindle.stateDir = "/tank/spindle";
+        };
+
+        # The gate and the lock-bumper both push to the knot over SSH. The
+        # watchPath is a literal into the knot's on-disk layout and hardcodes a
+        # DID — the fragile part, and the first thing to check when a push
+        # stops triggering a build.
+        build-gate = {
+          repository = "git@knot.lvdar.nl:lvdar.nl/nix-config";
+          watchPath = "/tank/git/did:plc:a3erncqfgkcxu3yl6fpjfmwf/refs/heads/main";
+        };
+        flake-bump = {
+          repository = "git@knot.lvdar.nl:lvdar.nl/nix-config";
+          gitEmail = "flake-bump@lvdar.nl";
+        };
+      };
+
+      # The knot, over public HTTPS. The arrow points inward: comin pulls, so
+      # no credential here grants anything on the fleet.
+      cosmos.services.comin.repository = "https://knot.lvdar.nl/did:plc:a3erncqfgkcxu3yl6fpjfmwf";
 
       # What on this host cannot be rebuilt from the flake. Listed here rather
       # than defaulted in services/restic.nix: which paths hold irreplaceable
