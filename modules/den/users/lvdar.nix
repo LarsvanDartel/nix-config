@@ -37,8 +37,13 @@
       # the host already standing in front of it.
       programs.ssh.settings."idrac" = lib.hm.dag.entryBefore ["*"] {
         HostName = "192.168.2.111";
-        User = "root";
         ProxyJump = "pioneer";
+
+        # No User on purpose. The BMC account has the same name as the local
+        # one, so ssh's default — the local username — is already right, and
+        # naming it here would only be a second place to keep in step. The
+        # servers need theirs set because their account is `nixos`; this does
+        # not.
         IdentityFile = "~/.ssh/id_idrac";
         IdentitiesOnly = true;
 
