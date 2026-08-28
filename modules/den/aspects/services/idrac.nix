@@ -71,11 +71,18 @@
 
         port = mkOption {
           type = port;
-          default = 8443;
+          default = 443;
           description = ''
-            Not 443. This is a Pi that may later publish something else, and
-            binding the obvious port for a service reachable only over the mesh
-            buys nothing.
+            443, and it has to be. The BMC builds its own redirects from the
+            Host header's *name* and assumes the standard port, so behind
+            anything else it answers / with
+
+              location: https://idrac.lvdar.nl/start.html
+
+            and the browser lands on a port with nothing on it. This was 8443
+            on the reasoning that the obvious port buys nothing for a
+            mesh-only service; it buys working redirects and a URL with no
+            port in it.
           '';
         };
       };
@@ -84,6 +91,30 @@
         # Opened on the netbird interface alone. Nothing on the LAN side needs
         # this — a machine on the LAN can reach the BMC directly.
         cosmos.services.netbird.client.exposedPorts = [cfg.port];
+
+        # Every request was paying a fresh TLS handshake to the BMC —
+        # measured at 0.53-0.70s time-to-first-byte against 0.03s for the
+        # client's own TLS to this host. The UI pulls about eighty files, so
+        # that is most of a minute of pure handshaking. A keepalive pool makes
+        # it once.
+        services.nginx.upstreams.idrac = {
+          servers."${cfg.address}:443" = {};
+          extraConfig = ''
+            keepalive 16;
+            keepalive_timeout 300s;
+            keepalive_requests 1000;
+          '';
+        };
+
+        # Keepalive needs `Connection:` empty, while a websocket needs it set to
+        # `upgrade`; nginx's stock $connection_upgrade map sends `close` for
+        # ordinary requests, which defeats the pool. This keeps both working.
+        services.nginx.appendHttpConfig = ''
+          map $http_upgrade $idrac_connection {
+            default upgrade;
+            ""      "";
+          }
+        '';
 
         services.nginx.virtualHosts.${cfg.domain} = {
           onlySSL = true;
@@ -97,9 +128,11 @@
           ];
 
           locations."/" = {
-            proxyPass = "https://${cfg.address}";
-            # The console and the telemetry the dashboard polls are websockets.
-            proxyWebsockets = true;
+            proxyPass = "https://idrac";
+            # Not proxyWebsockets: it pins Connection to a map that closes the
+            # upstream connection on every ordinary request. The equivalent
+            # headers are set below, against a map that does not.
+            proxyWebsockets = false;
             extraConfig = ''
               # The BMC's certificate is self-signed and names a service tag,
               # so there is nothing here that could verify. The hop is one
@@ -124,6 +157,46 @@
               # server presents, which is the real wildcard and unaffected — and
               # that hop is one switch away on the LAN, to a device whose
               # certificate could never be verified anyway.
+              # This firmware ships its web UI as pre-gzipped files only, and
+              # serves them solely to a client that says it accepts gzip:
+              #
+              #   plain                  /start.html -> 404
+              #   Accept-Encoding: gzip  /start.html -> 200
+              #
+              # NixOS's recommendedProxySettings sets `Accept-Encoding ""` so
+              # that nginx can transform responses, which here meant the BMC
+              # 404'd every page and the UI looked broken rather than
+              # unreachable. `gunzip on` lets nginx decompress again for any
+              # client that would not have asked for gzip itself.
+              proxy_set_header Accept-Encoding gzip;
+
+              # The console and the telemetry the dashboard polls are
+              # websockets, so an upgrade still has to pass through.
+              proxy_http_version 1.1;
+              proxy_set_header Upgrade $http_upgrade;
+              proxy_set_header Connection $idrac_connection;
+
+              # gunzip is deliberately absent: it would have this Pi decompress
+              # every response for the benefit of a client that did not ask for
+              # gzip, and every browser does.
+
+              # The original Host is forwarded unchanged, which matters: the
+              # BMC builds its redirects and its CSRF checks from it. Overriding
+              # it to the BMC's own address made it see two host values — the
+              # override plus X-Forwarded-Host from the recommended settings —
+              # and emit a redirect with both joined by a comma:
+              #
+              #   location: https://192.168.2.111, idrac.lvdar.nl/login.html
+              #
+              # which the browser cannot follow, so a successful login bounced
+              # straight back to the login page.
+
+              # The BMC also emits absolute URLs naming its own LAN address in
+              # some responses; rewrite those back to this vhost so a client
+              # that cannot route to the LAN still follows them.
+              proxy_redirect https://${cfg.address}/ /;
+              proxy_redirect http://${cfg.address}/ /;
+
               proxy_ssl_ciphers "DEFAULT:@SECLEVEL=0";
               proxy_ssl_protocols TLSv1 TLSv1.1 TLSv1.2;
 
