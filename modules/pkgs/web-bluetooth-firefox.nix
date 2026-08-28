@@ -131,16 +131,27 @@
                   "const _ev = new CustomEvent('advertisementreceived', { detail }); Object.assign(_ev, detail, { device: d }); d.dispatchEvent(_ev);"
             '';
 
-            # The id inside manifest.json is what the native host's
-            # allowed_extensions names and what the install policy keys on, so
-            # it has to survive the rebuild unchanged.
+            # Laid out the way home-manager's firefox addon packages are, so
+            # profiles.<p>.extensions.packages can install it: the xpi named
+            # for the extension id, under the Firefox application id, with
+            # passthru.addonId alongside. That mechanism symlinks it straight
+            # into the profile, which is how the other add-ons here arrive —
+            # and unlike an ExtensionSettings policy it replaces what is
+            # already there.
+            #
+            # The id inside manifest.json is also what the native host's
+            # allowed_extensions names, so it has to survive the rebuild
+            # unchanged.
             installPhase = ''
               runHook preInstall
-              mkdir -p $out/share/mozilla-extensions
+              dir="$out/share/mozilla/extensions/{ec8030f7-c20a-464f-9b0e-13a3a9e97384}"
+              mkdir -p "$dir"
               cd webbluetooth-firefox-extension
-              zip -qr $out/share/mozilla-extensions/webbluetooth@rfvx.github.io.xpi .
+              zip -qr "$dir/webbluetooth@rfvx.github.io.xpi" .
               runHook postInstall
             '';
+
+            passthru.addonId = "webbluetooth@rfvx.github.io";
 
             meta = {
               description = "Web Bluetooth polyfill extension for Firefox, with the advertisement-event fix";

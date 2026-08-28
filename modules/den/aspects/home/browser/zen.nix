@@ -73,31 +73,6 @@
       setAsDefaultBrowser = true;
 
       policies = {
-        # The page half of Web Bluetooth, paired with the native host above.
-        # Installed by policy rather than by hand so it survives a fresh
-        # profile — ~/.config/zen is impermanent and nothing migrates a
-        # manually installed add-on into it.
-        #
-        # Our own build rather than the AMO one: upstream nests the
-        # advertisement event's payload under CustomEvent's `detail`, where the
-        # spec puts it on the event, so a page reading
-        # event.manufacturerData gets undefined. cstimer.net needs it to
-        # recover a GAN cube's MAC and fails without it. pkgs/
-        # web-bluetooth-firefox.nix carries the one-line fix.
-        #
-        # Unsigned, which loads because Zen is built MOZ_REQUIRE_SIGNING=false
-        # and defaults xpinstall.signatures.required to false. A stock Firefox
-        # would refuse it and would have to take the AMO build with the bug.
-        # force_installed rather than normal_installed: install_url is only
-        # consulted when the id is absent, so with the AMO build already
-        # present the policy had nothing to do and the old copy stayed at 1.1.
-        # force_installed also stops it being replaced by an AMO update, which
-        # would silently reintroduce the bug.
-        ExtensionSettings."webbluetooth@rfvx.github.io" = {
-          installation_mode = "force_installed";
-          install_url = "file://${pkgs.web-bluetooth-firefox-extension}/share/mozilla-extensions/webbluetooth@rfvx.github.io.xpi";
-        };
-
         AppAutoUpdate = false;
         BlockAboutAddons = false;
         BlockAboutConfig = false;
@@ -125,11 +100,24 @@
 
         search.default = "ddg";
 
-        extensions.packages = with pkgs.nur.repos.rycee.firefox-addons; [
-          ublock-origin
-          proton-pass
-          zotero-connector
-        ];
+        extensions.packages =
+          (with pkgs.nur.repos.rycee.firefox-addons; [
+            ublock-origin
+            proton-pass
+            zotero-connector
+          ])
+          ++ [
+            # The page half of Web Bluetooth, paired with the native host
+            # above. Installed here rather than by ExtensionSettings policy:
+            # install_url is only consulted when the id is absent, so with a
+            # copy already in the profile the policy did nothing and the old
+            # build stayed. This mechanism symlinks the xpi into the profile
+            # and replaces what is there.
+            #
+            # Our own build rather than AMO's — pkgs/web-bluetooth-firefox.nix
+            # explains the one-line fix it carries.
+            pkgs.web-bluetooth-firefox-extension
+          ];
 
         settings = {
           "browser.tabs.inTitlebar" = 0;
