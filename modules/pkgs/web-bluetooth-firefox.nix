@@ -57,8 +57,16 @@
                 $out/share/web-bluetooth-firefox/webbluetooth_host.py
 
               mkdir -p $out/bin
+              # The host logs to stderr, which the browser discards — so when
+              # something fails between the page and the Bluetooth stack there
+              # is nothing to read. Redirect it to a file under the state
+              # directory, truncated per launch so it stays the size of one
+              # session rather than growing without bound.
               cat > $out/bin/webbluetooth-host <<EOF
               #!${runtimeShell}
+              log="\''${XDG_STATE_HOME:-\$HOME/.local/state}/webbluetooth-firefox"
+              mkdir -p "\$log"
+              exec 2>"\$log/host.log"
               exec ${python}/bin/python3 $out/share/web-bluetooth-firefox/webbluetooth_host.py "\$@"
               EOF
               chmod +x $out/bin/webbluetooth-host
