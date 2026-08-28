@@ -49,15 +49,23 @@
 
       secret = mkOption {
         type = str;
-        default = "keys/cloudflare/ddns";
+        default = "keys/cloudflare/dns";
         description = ''
           sops key holding the Cloudflare API token.
 
-          Deliberately NOT keys/cloudflare/dns, which acme uses: that token is
-          restricted to gaia's address and would be refused from here. This one
-          needs Zone:DNS:Edit on lvdar.nl and must be usable from the home
-          connection. Keeping them separate also means a token leaked from
-          either host cannot rewrite the other's records.
+          The same key acme reads, and deliberately so now: sops secrets are
+          per host, so `keys/cloudflare/dns` means "the Cloudflare token this
+          machine can use" rather than one shared credential. Each host holds
+          its own, scoped to the address it actually calls from, and a token
+          leaked from one still cannot act as another.
+
+          This used to be a separate `ddns` key, because endeavour's copy of
+          the acme token was pinned to gaia's address and refused from home —
+          so the host carried two tokens, one of which silently could not work.
+          That also broke acme on endeavour, which reads the acme key and had
+          no usable token in it. One per host fixes both.
+
+          Needs Zone:DNS:Edit on the zone, which covers this and acme's DNS-01.
         '';
       };
     };

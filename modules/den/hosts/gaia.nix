@@ -84,11 +84,11 @@
       # The replacement is services/ddns.nix on endeavour, which is the host
       # actually behind this connection: it keeps home.lvdar.nl pointed here and
       # crowdsec whitelists it by name. That needs a Cloudflare token endeavour
-      # can use (keys/cloudflare/ddns — the acme one is pinned to gaia's
-      # address), so until the secret exists and the record resolves, this
-      # literal stays. Swapping too early is worse than leaving it: an
-      # unresolvable name in whitelistFqdns is evaluated per alert and protects
-      # nothing.
+      # can use — keys/cloudflare/dns, which is now per host rather than one
+      # shared credential, so endeavour's is scoped to the home connection and
+      # gaia's to this address. Until the record resolves, this literal stays.
+      # Swapping too early is worse than leaving it: an unresolvable name in
+      # whitelistFqdns is evaluated per alert and protects nothing.
       cosmos.services.crowdsec.whitelistIps = ["86.86.217.11"];
 
       # Mesh interface only. This host has exactly two interfaces — wt0 and the
