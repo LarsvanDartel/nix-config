@@ -1460,11 +1460,11 @@
         "rust-overlay": "rust-overlay"
       },
       "locked": {
-        "lastModified": 1787871445,
-        "narHash": "sha256-4R1bur/nV4WX8EIQT7/E3D8ur39CsnSZoOEQtyhOK6M=",
+        "lastModified": 1787917691,
+        "narHash": "sha256-az8xveIkKyCItr+6QpkWWGL7uOuz9ksorR39UnBTiHM=",
         "ref": "refs/heads/main",
-        "rev": "dbc93f2c629e9262395d74f07ccdd4c6de30c66d",
-        "revCount": 4,
+        "rev": "26b8d48c784fde4b7fc54e9170413cdfa44d15cd",
+        "revCount": 5,
         "type": "git",
         "url": "https://tangled.org/lvdar.nl/site"
       },
