@@ -88,8 +88,13 @@
         # Unsigned, which loads because Zen is built MOZ_REQUIRE_SIGNING=false
         # and defaults xpinstall.signatures.required to false. A stock Firefox
         # would refuse it and would have to take the AMO build with the bug.
+        # force_installed rather than normal_installed: install_url is only
+        # consulted when the id is absent, so with the AMO build already
+        # present the policy had nothing to do and the old copy stayed at 1.1.
+        # force_installed also stops it being replaced by an AMO update, which
+        # would silently reintroduce the bug.
         ExtensionSettings."webbluetooth@rfvx.github.io" = {
-          installation_mode = "normal_installed";
+          installation_mode = "force_installed";
           install_url = "file://${pkgs.web-bluetooth-firefox-extension}/share/mozilla-extensions/webbluetooth@rfvx.github.io.xpi";
         };
 
