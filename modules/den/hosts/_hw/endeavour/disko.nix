@@ -62,6 +62,19 @@
                       "noatime"
                     ];
                   };
+                  # Swap has to be its own subvolume because / is wiped on
+                  # every boot by core/impermanence.nix — a swapfile under /
+                  # would be destroyed and recreated each time, which is both a
+                  # 32 GiB write per boot and useless, since it would not exist
+                  # during the early boot where it is most needed.
+                  #
+                  # No compress= here, deliberately: a btrfs swapfile must be
+                  # nodatacow and uncompressed. `btrfs filesystem mkswapfile`
+                  # sets that up, and disko does the same at install time.
+                  "/swap" = {
+                    mountpoint = "/.swapvol";
+                    swap.swapfile.size = "32G";
+                  };
                 };
               };
             };
