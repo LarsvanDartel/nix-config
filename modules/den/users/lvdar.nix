@@ -12,7 +12,11 @@
       den.aspects.roles.home-base
     ];
 
-    homeManager = {osConfig, ...}: {
+    homeManager = {
+      osConfig,
+      lib,
+      ...
+    }: {
       # The default is just this host's own key, which is ed25519 — and the
       # iDRAC runs OpenSSH 6.6 and offers only ssh-rsa, ssh-dss and
       # ecdsa-sha2-nistp256, so it cannot parse one. Hence a second, RSA
@@ -26,6 +30,25 @@
       # Named for what it is for rather than for a host, unlike the others:
       # every existing key identifies a machine, this identifies a purpose.
       cosmos.cli.programs.ssh.identities = [osConfig.networking.hostName "idrac"];
+
+      # `ssh idrac` reaches the BMC through pioneer. Deliberately a jump
+      # rather than another proxy: services/idrac.nix forwards HTTPS only, and
+      # the BMC's sshd has no business being reachable from anywhere except
+      # the host already standing in front of it.
+      programs.ssh.settings."idrac" = lib.hm.dag.entryBefore ["*"] {
+        HostName = "192.168.2.111";
+        User = "root";
+        ProxyJump = "pioneer";
+        IdentityFile = "~/.ssh/id_idrac";
+        IdentitiesOnly = true;
+
+        # OpenSSH 6.6 on the BMC predates rsa-sha2 (7.2), so it can only sign
+        # with SHA-1 ssh-rsa, which every current client disables by default.
+        # Without these the key is never offered and it looks like the BMC
+        # rejected it.
+        PubkeyAcceptedAlgorithms = "+ssh-rsa";
+        HostKeyAlgorithms = "+ssh-rsa";
+      };
     };
   };
 }
