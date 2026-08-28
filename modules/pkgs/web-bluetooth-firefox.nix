@@ -112,13 +112,19 @@
         }:
           stdenvNoCC.mkDerivation {
             pname = "web-bluetooth-firefox-extension";
-            version = "1.1";
+            # Upstream is 1.1. Bumped in the manifest below, because Firefox
+            # will not replace an installed extension with the same id at the
+            # same version — the AMO build would simply stay, fix and all.
+            version = "1.1.1";
 
             inherit (final.web-bluetooth-firefox-host) src;
 
             nativeBuildInputs = [zip];
 
             postPatch = ''
+              substituteInPlace webbluetooth-firefox-extension/manifest.json \
+                --replace-fail '"version": "1.1"' '"version": "1.1.1"'
+
               substituteInPlace webbluetooth-firefox-extension/polyfill.js \
                 --replace-fail \
                   "d.dispatchEvent(new CustomEvent('advertisementreceived', { detail }));" \
