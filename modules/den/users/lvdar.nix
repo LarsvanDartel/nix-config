@@ -53,6 +53,24 @@
         # rejected it.
         PubkeyAcceptedAlgorithms = "+ssh-rsa";
         HostKeyAlgorithms = "+ssh-rsa";
+
+        # OpenSSH 10 warns on every connection that the key exchange is not
+        # post-quantum. It is right and it will never stop being right: this
+        # BMC's OpenSSH 6.6 predates the idea by a decade and no firmware is
+        # coming. `no-pq-kex` silences that one warning and leaves the rest of
+        # the weak-crypto warnings in place, which matters — the whole reason
+        # this host needs special handling is that its crypto is old, and
+        # blanket `no` would hide the next surprise too.
+        WarnWeakCrypto = "no-pq-kex";
+
+        # Two hops of handshake — through pioneer, then a 2015 BMC doing RSA
+        # on an embedded CPU — for every `ssh idrac racadm ...`. Reusing one
+        # connection makes the second and later commands close to instant.
+        # The global block turns multiplexing off; this turns it back on for
+        # the one host where it is worth it, reusing the ControlPath already
+        # defined there.
+        ControlMaster = "auto";
+        ControlPersist = "10m";
       };
     };
   };
