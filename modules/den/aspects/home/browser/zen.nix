@@ -122,6 +122,22 @@
         settings = {
           "browser.tabs.inTitlebar" = 0;
           "extensions.autoDisableScopes" = 0;
+
+          # The web bluetooth extension is built from source with a fix
+          # upstream has not shipped, so it carries no AMO signature and Zen
+          # disables it as "could not be verified". The build permits turning
+          # the check off — it is compiled MOZ_REQUIRE_SIGNING=false and
+          # already defaults this pref to false — but something sets it back,
+          # so it is stated here.
+          #
+          # This lowers a real protection for the whole profile, so it is worth
+          # being clear about what it does and does not cost here: every other
+          # add-on in this profile comes from nur.repos.rycee.firefox-addons,
+          # which repackages the signed AMO builds, and all of them arrive
+          # through the nix store rather than by browsing to a download. The
+          # check this disables guards against installing an unsigned add-on
+          # from the web, which is not how anything gets in here.
+          "xpinstall.signatures.required" = false;
           "devtools.chrome.enabled" = true;
           "devtools.debugger.remote-enabled" = true;
           "toolkit.legacyUserProfileCustomizations.stylesheets" = true;
