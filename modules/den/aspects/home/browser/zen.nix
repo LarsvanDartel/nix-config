@@ -39,7 +39,19 @@
     # messaging hosts through the XREUserNativeManifests directory, which on
     # Linux is ~/.mozilla/native-messaging-hosts regardless of where the
     # profile lives — Zen keeps its profile in ~/.config/zen but looks here.
-    mozilla.firefoxNativeMessagingHosts = [pkgs.web-bluetooth-firefox-host];
+    #
+    # Linked by hand rather than through `mozilla.firefoxNativeMessagingHosts`,
+    # the option home-manager's own firefox module uses. That option links the
+    # whole directory with `ignorelinks = true`, which makes each manifest a
+    # symlink straight into the host package's store path instead of into
+    # home-manager-files. checkLinkTargets decides a file is home-manager's by
+    # resolving it under home-manager-files, so the moment the host derivation
+    # changes, the previous generation's symlink reads as an unmanaged file and
+    # activation aborts with "would be clobbered" — every rebuild that touches
+    # the host, which during this work was most of them. Linking the one
+    # manifest ourselves keeps it inside home-manager-files, where home-manager
+    # can replace it like anything else.
+    home.file.".mozilla/native-messaging-hosts/webbluetooth_host.json".source = "${pkgs.web-bluetooth-firefox-host}/lib/mozilla/native-messaging-hosts/webbluetooth_host.json";
 
     # xdg.mimeApps.enable is set here rather than relied on: setAsDefaultBrowser
     # writes defaultApplications but does not enable the module itself, so
@@ -59,11 +71,10 @@
       # The manifest names the extension in allowed_extensions, so no other
       # add-on can reach the Bluetooth stack through it.
       #
-      # Also declared through mozilla.firefoxNativeMessagingHosts below. This
-      # option alone is not enough on Linux: the module feeds it into the
-      # package wrapper rather than writing a manifest, and Zen looks the host
-      # up at runtime through XREUserNativeManifests — ~/.mozilla — where
-      # nothing had put it.
+      # Not sufficient on its own, which is why the manifest is also linked
+      # above: this option feeds the host into the package wrapper rather than
+      # writing a manifest, and Zen looks the host up at runtime through
+      # XREUserNativeManifests — ~/.mozilla — where nothing had put it.
       nativeMessagingHosts = [pkgs.web-bluetooth-firefox-host];
 
       # Claims http/https, the html/xhtml types, and BROWSER in the session
