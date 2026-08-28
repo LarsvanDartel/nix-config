@@ -6,13 +6,14 @@
 # catalog: the normal home-manager install stays the authoritative daily driver;
 # these are extra `nix run/build .#<prog>` outputs.
 #
-# We register programs explicitly via a curated `wrapNames` list rather than
-# `autoWrap`. `modules/meta/module-classes.nix` wraps every `flake.modules.*`
-# entry in an attrs (`{key; _file; imports;}`), which defeats hm-wrapper's
-# arg-sniffing `isWrappable` (it would treat every aggregate as wrappable), so an
-# explicit list is safer than a fragile all-encompassing `exclude`. Programs that
-# need injected context (e.g. git identity) register themselves in their own
-# feature file with `extraSpecialArgs`.
+# We drive hm-wrapper-modules' library directly instead of importing its
+# flake module -- see the comment on `mkPackage` for why. That also means the
+# catalog is a curated `wrapNames` list rather than the flake module's
+# `autoWrap`, which would not have worked here anyway:
+# `modules/meta/module-classes.nix` wraps every `flake.modules.*` entry in an
+# attrs (`{key; _file; imports;}`), defeating the arg-sniffing `isWrappable`
+# that auto-discovery filters on -- it would treat every aggregate as
+# wrappable.
 {
   inputs,
   den,
@@ -22,6 +23,15 @@
   # Bridge to den: each wrapped program's home module is the den aspect's
   # homeManager class content (den.aspects.home.<n>.homeManager).
   hm = builtins.mapAttrs (_: a: a.homeManager) den.aspects.home;
+
+  # The full nix-wrapper-modules API plus this flake's HM adapter, the same
+  # value its flakeModules.default is built from.
+  wlib = inputs.hm-wrapper-modules.lib;
+
+  # Theming + cross-cutting option stubs applied to every wrapped program.
+  baseModules = [hm.wrapper-stylix hm.wrapper-stubs];
+
+  stateVersion = "26.11";
 
   # Tier 1 programs wrapped as portable, stylix-themed packages. Grown as
   # per-program modules are split out of the common/desktop aggregates.
@@ -67,35 +77,69 @@
 
   mkProgram = n: {
     homeModules =
-      [hm.${n}]
+      baseModules
+      ++ [hm.${n}]
       ++ lib.optional (themedTargets ? ${n}) {stylix.targets.${themedTargets.${n}}.enable = true;};
   };
+
+  # The upstream flake module's job, done here instead. parts.nix generates
+  # `perSystem.packages` by calling `wlib.wrapHomeModule` with its default
+  # `extractPackages = true`, which routes each module's `home.packages` into
+  # the wrapper's *deprecated* `extraPackages`. That option warns when non-empty
+  # — and `abort-on-warn` makes a warning fatal — so every program whose HM
+  # module puts anything in `home.packages` (which `programs.<x>.enable`
+  # generally does, with the program itself) fails to evaluate. It is removed
+  # outright on 2026-08-31.
+  #
+  # parts.nix exposes no way to reach `extractPackages`, and upstream is not
+  # going to add one: hm-wrapper-modules' last commit is 2026-03-26 and there is
+  # no PR or issue for the rename. So we skip parts.nix — 30 lines, reproduced
+  # below — and call the same public `wlib.wrapHomeModule` ourselves with
+  # extraction off, feeding `home.packages` into `runtimePkgs`, the successor
+  # option, by hand. Same packages on the wrapper's PATH, none of the deprecated
+  # surface.
+  hmEval = pkgs: homeModules:
+    (inputs.home-manager.lib.homeManagerConfiguration {
+      inherit pkgs;
+      modules =
+        homeModules
+        ++ [
+          {
+            home.username = "wrapper-user";
+            home.homeDirectory = "/homeless-shelter";
+            home.stateVersion = stateVersion;
+          }
+        ];
+    })
+    .config;
+
+  mkPackage = pkgs: name: program: let
+    base = wlib.wrapHomeModule {
+      inherit pkgs stateVersion;
+      inherit (program) homeModules;
+      home-manager = inputs.home-manager;
+      programName = name;
+      extractPackages = false;
+    };
+  in
+    base.wrap ({config, ...}: {
+      imports = [wlib.modules.bwrapConfig];
+      bwrapConfig.binds.ro = wlib.mkBinds base.passthru.hmAdapter;
+      env.XDG_CONFIG_HOME = lib.mkIf config.bwrapConfig.enable (lib.mkForce null);
+
+      # The adapter already evaluated exactly this, and hands it back as
+      # `base.passthru.hmAdapter.hmConfig` — but reading anything under
+      # `passthru` merges it through nix-wrapper-modules' `attrsRecursive`
+      # type, whose `lazyAttrsOf` is documented as "less lazy": it forces
+      # `optionalValue` for *every* key it descends. Walking a whole
+      # home-manager config that way reaches `home.sessionVariableSetter`,
+      # which home-manager removed, and `mkRemovedOptionModule` throws the
+      # moment its value is read. So this evaluates the modules a second time
+      # rather than touching passthru. It costs an extra HM eval per wrapped
+      # program and is the reason `hmEval` exists.
+      runtimePkgs = (hmEval pkgs program.homeModules).home.packages;
+    });
 in {
-  # nix-wrapper-modules used to be pinned to the last rev before upstream renamed
-  # `extraPackages`→`runtimePkgs` (BirdeeHub#540, 2026-05-19), because newer revs
-  # warn on the old name and `abort-on-warn` makes that fatal. The pin is gone:
-  # the warning only fires when `extraPackages` is non-empty, and the adapter
-  # only fills it from a wrapped module's `home.packages`, which none of the
-  # programs below declare. Verified by building voyager — both specialisations,
-  # so niri and noctalia too — under `--option abort-on-warn true`, clean.
-  #
-  # That is a reprieve, not a fix, and it expires on 2026-08-31.
-  #
-  # On that date `extraPackages` is *removed*, and hm-wrapper-modules
-  # (lib/hm-adapter.nix:401) defines it unconditionally as
-  # `lib.mkIf (extracted != []) extracted`. A `mkIf false` on an option that does
-  # not exist is still a hard "unknown option" error — checked, it does not get
-  # filtered out first — so this breaks whether or not anything uses the value,
-  # and `extractPackages = false` does not help either: it empties the list
-  # without removing the definition.
-  #
-  # Nobody upstream is going to fix it. hm-wrapper-modules' last commit is
-  # 2026-03-26 and there is no PR or issue for the rename. The choice is ours:
-  # fork the adapter for the one-line change, re-pin nix-wrapper-modules and
-  # accept a frozen wrapper lib against a moving nixpkgs, or drop the adapter and
-  # keep only the direct `wrappers.<x>.wrap` calls (niri, noctalia), which do not
-  # touch it.
-  #
   # (flake-file can't URL-pin a transitive input, so nix-wrapper-modules stays a
   # top-level input that hm-wrapper-modules follows.)
   flake-file.inputs = {
@@ -113,20 +157,10 @@ in {
     };
   };
 
-  imports = [inputs.hm-wrapper-modules.flakeModules.default];
-
-  hmWrappers = {
-    home-manager = inputs.home-manager;
-    stateVersion = "26.11";
-
-    # Theming + cross-cutting option stubs applied to every wrapped program.
-    baseModules = [hm.wrapper-stylix hm.wrapper-stubs];
-  };
-
   # NOTE: git is omitted too — den's home.git bakes in ssh commit signing that
   # reads cosmos.user.home (host-specific), which isn't portable/present in an
   # isolated wrap. The deployed git (on every host) is unaffected.
-  perSystem = _: {
-    hmWrappers.programs = lib.genAttrs wrapNames mkProgram;
+  perSystem = {pkgs, ...}: {
+    packages = lib.mapAttrs (mkPackage pkgs) (lib.genAttrs wrapNames mkProgram);
   };
 }
