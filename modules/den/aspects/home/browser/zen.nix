@@ -35,6 +35,12 @@
     # the old profile across, so history and logins start empty.
     cosmos.system.impermanence.persist.directories = [".config/zen"];
 
+    # Where Zen actually reads the manifest from. Firefox resolves native
+    # messaging hosts through the XREUserNativeManifests directory, which on
+    # Linux is ~/.mozilla/native-messaging-hosts regardless of where the
+    # profile lives — Zen keeps its profile in ~/.config/zen but looks here.
+    mozilla.firefoxNativeMessagingHosts = [pkgs.web-bluetooth-firefox-host];
+
     # xdg.mimeApps.enable is set here rather than relied on: setAsDefaultBrowser
     # writes defaultApplications but does not enable the module itself, so
     # without this it only works by accident, via whichever other aspect happens
@@ -44,6 +50,22 @@
     programs.zen-browser = {
       enable = true;
 
+      # Firefox has never implemented Web Bluetooth, so anything talking to a
+      # BLE device from a page — a smart cube on cstimer.net — works in Chrome
+      # and nowhere else. This host provides `navigator.bluetooth` over stdio,
+      # driving BlueZ through bleak; the extension below is the other half and
+      # is useless without it.
+      #
+      # The manifest names the extension in allowed_extensions, so no other
+      # add-on can reach the Bluetooth stack through it.
+      #
+      # Also declared through mozilla.firefoxNativeMessagingHosts below. This
+      # option alone is not enough on Linux: the module feeds it into the
+      # package wrapper rather than writing a manifest, and Zen looks the host
+      # up at runtime through XREUserNativeManifests — ~/.mozilla — where
+      # nothing had put it.
+      nativeMessagingHosts = [pkgs.web-bluetooth-firefox-host];
+
       # Claims http/https, the html/xhtml types, and BROWSER in the session
       # environment. Everything it writes is mkDefault, so an aspect that wants
       # one of those types back only has to state it -- which is how
@@ -51,6 +73,15 @@
       setAsDefaultBrowser = true;
 
       policies = {
+        # The page half of Web Bluetooth, paired with the native host above.
+        # Installed by policy rather than by hand so it survives a fresh
+        # profile — ~/.config/zen is impermanent and nothing migrates a
+        # manually installed add-on into it.
+        ExtensionSettings."webbluetooth@rfvx.github.io" = {
+          installation_mode = "normal_installed";
+          install_url = "https://addons.mozilla.org/firefox/downloads/latest/web-bluetooth-firefox-linux/latest.xpi";
+        };
+
         AppAutoUpdate = false;
         BlockAboutAddons = false;
         BlockAboutConfig = false;
