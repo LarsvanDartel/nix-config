@@ -1,17 +1,40 @@
 --- a/webbluetooth_host.py
 +++ b/webbluetooth_host.py
-@@ -196,6 +196,14 @@
+@@ -196,6 +196,17 @@
              async with get_lock(address):
                  if address in connected_clients and connected_clients[address].is_connected:
                      return {"status": "success", "message": "Already connected", "address": address}
-+                # handle_command already declares advertisement_scanner global.
-+                if advertisement_scanner is not None:
++                # BlueZ refuses StartDiscovery and Connect at the same time, so
++                # pause any running scan for the duration of the connect and put
++                # it back afterwards. handle_command already declares
++                # advertisement_scanner global.
++                paused_scanner = advertisement_scanner
++                if paused_scanner is not None:
 +                    logging.info("Pausing advertisement scanner to connect.")
 +                    try:
-+                        await advertisement_scanner.stop()
++                        await paused_scanner.stop()
 +                    except Exception as stop_err:
-+                        logging.warning(f"Could not stop scanner: {stop_err}")
-+                    advertisement_scanner = None
++                        logging.warning(f"Could not pause scanner: {stop_err}")
                  client = BleakClient(address, disconnected_callback=on_disconnection, timeout=20.0)
                  try:
                      await client.connect()
+@@ -209,6 +220,19 @@
+                     if client.is_connected:
+                         await client.disconnect()
+                     return {"status": "error", "message": str(e)}
++                finally:
++                    # The extension tracks scanning with a single boolean and only
++                    # sends watch_advertisements on a false->true edge, so a scanner
++                    # left stopped here is never restarted: every later
++                    # requestDevice() picker sits empty until something makes that
++                    # boolean flip. Restart it rather than clearing the global.
++                    if paused_scanner is not None:
++                        try:
++                            await paused_scanner.start()
++                            logging.info("Resumed advertisement scanner.")
++                        except Exception as start_err:
++                            logging.warning(f"Could not resume scanner: {start_err}")
++                            advertisement_scanner = None
+
+         elif command == "disconnect_device":
+             is_valid, error_msg = validate_param("address", address, required=True, custom_validation=lambda x: re.match(r"^([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}$", x))

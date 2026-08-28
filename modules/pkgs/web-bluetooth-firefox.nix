@@ -57,8 +57,17 @@
             # A page is entitled to do exactly that — Web Bluetooth allows
             # watchAdvertisements() to continue across a connect and Chrome
             # permits it — so the host has to reconcile the two rather than the
-            # page. Pausing discovery for the duration of the connect is
-            # enough.
+            # page. The patch pauses discovery for the duration of the connect
+            # and restarts it afterwards.
+            #
+            # Restarting is the load-bearing half. The extension tracks scanning
+            # with one boolean and only sends `watch_advertisements` on its
+            # false->true edge, so a scanner the host quietly left stopped is
+            # never asked for again: every subsequent requestDevice() picker
+            # comes up empty, and the only way back is to revoke the device in
+            # the extension's options page, which drops the last subscriber and
+            # lets the boolean flip. That reads as "a device can only be paired
+            # with one site at a time", which is not a rule Web Bluetooth has.
             patches = [./_web-bluetooth/pause-scan-on-connect.patch];
 
             # The manifest's `name` is what the extension asks for over stdio
