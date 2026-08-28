@@ -340,6 +340,37 @@
       # by name any more, only by peer and port.
       cosmos.networking.edgeTerminated = true;
 
+      # roles/server.nix sets 20s, which is too tight for the host that builds
+      # the fleet. On 2026-08-28 flake-bump's nixpkgs bump rebuilt obs-studio,
+      # mcrl2 and the nvidia stack at once; every local service stalled for
+      # seconds (loki timing out to its own ingester on 127.0.0.1, nats
+      # readloops at 7.6s), PID 1 missed the 20s deadline, and iTCO_wdt reset
+      # the box mid-build. The journal simply stops at 05:41:33; the SEL
+      # recorded `Watchdog2 | Hard reset` at 05:42:29.
+      #
+      # 60s, matching hosts/pioneer.nix, which raised it for exactly the same
+      # reason — a host that legitimately stalls under IO should not be reset
+      # for surviving it slowly. This does not paper over the hang: max-jobs
+      # below is what stops the machine getting there.
+      systemd.settings.Manager.RuntimeWatchdogSec = lib.mkForce "60s";
+
+      # 72 threads meant `max-jobs = auto` resolved to 72, and `cores = 0`
+      # gives each of those every core — so nix was free to run 72 concurrent
+      # derivations with no bound on total compiler processes. Memory is what
+      # ran out first, and with no swap and an uncapped ARC there was no
+      # reclaim path: the kernel livelocked instead of OOM-killing anything,
+      # which is why the journal has no OOM entry.
+      #
+      # 8 x 8 bounds it to 64 concurrent compilers, close to the same CPU
+      # utilisation with a fraction of the peak RSS. It slows a cold rebuild of
+      # the whole fleet, which is a fair trade against a host that stops
+      # answering: build-gate and flake-bump both already run at Nice 10 with
+      # idle IO precisely because finishing quickly is not the point here.
+      nix.settings = {
+        max-jobs = 8;
+        cores = 8;
+      };
+
       cosmos.services.netbird.client = {
         # A stable port for the agent's resolver, so unbound has something to
         # forward the mesh domain to. Without it the agent picks an ephemeral
@@ -456,6 +487,18 @@
 
       boot = {
         kernelParams = ["nohibernate"];
+
+        # Cap the ZFS ARC at 16 GiB of the 62 GiB installed.
+        #
+        # ARC defaults to half of RAM and is reclaimable only slowly and
+        # asynchronously — a build that allocates fast can outrun ARC eviction,
+        # and on 2026-08-28 that ended with the machine hung and the hardware
+        # watchdog hard-resetting it (SEL entry 0x92). Handing 15 GiB back to
+        # the page cache and to builds costs some read cache on a pool that is
+        # mostly cold media anyway.
+        extraModprobeConfig = ''
+          options zfs zfs_arc_max=17179869184
+        '';
         supportedFilesystems = ["vfat" "zfs"];
         zfs = {
           extraPools = ["tank"];
