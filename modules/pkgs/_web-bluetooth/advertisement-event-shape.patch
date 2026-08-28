@@ -1,0 +1,27 @@
+--- a/webbluetooth-firefox-extension/polyfill.js
++++ b/webbluetooth-firefox-extension/polyfill.js
+@@ -577,7 +577,12 @@
+                     manufacturerData: mDataMap,
+                     serviceData: sDataMap
+                 };
+-                d.dispatchEvent(new CustomEvent('advertisementreceived', { detail }));
++                const ev = new CustomEvent('advertisementreceived', { detail });
++                // BluetoothAdvertisingEvent exposes these on the event itself;
++                // leaving them only under `detail` makes event.manufacturerData
++                // undefined for every page that follows the spec.
++                Object.assign(ev, detail, { device: d });
++                d.dispatchEvent(ev);
+             }
+         }
+     });
+--- a/webbluetooth-firefox-extension/manifest.json
++++ b/webbluetooth-firefox-extension/manifest.json
+@@ -1,7 +1,7 @@
+ {
+   "manifest_version": 3,
+   "name": "WebBluetooth for Firefox",
+-  "version": "1.1",
++  "version": "1.1.1",
+   "description": "Enables the Web Bluetooth API in Firefox on Linux, bridging the browser to Bluetooth hardware via a native messaging host.",
+   "permissions": [
+     "nativeMessaging",
