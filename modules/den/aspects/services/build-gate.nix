@@ -130,7 +130,7 @@
       options.cosmos.services.build-gate = {
         repository = mkOption {
           type = str;
-          default = "git@knot.lvdar.nl:lvdar.nl/nix-config";
+          example = "git@git.example.org:me/nix-config";
           description = ''
             Pushed over SSH to the knot rather than written into the bare repo
             on disk, even though this host *is* the knot host. Writing to
@@ -173,7 +173,7 @@
 
         watchPath = mkOption {
           type = path;
-          default = "/tank/git/did:plc:a3erncqfgkcxu3yl6fpjfmwf/refs/heads/main";
+          example = "/srv/git/<repo>/refs/heads/main";
           description = ''
             The knot's ref file for the source branch. A plain file whose mtime
             moves on every push, which is what makes this event-driven rather

@@ -156,7 +156,7 @@
       options.cosmos.services.flake-bump = {
         repository = mkOption {
           type = str;
-          default = "git@knot.lvdar.nl:lvdar.nl/nix-config";
+          example = "git@git.example.org:me/nix-config";
           description = ''
             Push target. SSH rather than the HTTPS URL comin reads, because
             this end writes — and it goes through the knot's own receive path
@@ -229,7 +229,7 @@
 
         gitEmail = mkOption {
           type = str;
-          default = "flake-bump@lvdar.nl";
+          example = "flake-bump@example.org";
           description = "Author email on the generated commit.";
         };
       };

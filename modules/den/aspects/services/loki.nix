@@ -36,7 +36,7 @@
 
         dataDir = mkOption {
           type = path;
-          default = "/tank/monitoring/loki";
+          example = "/srv/monitoring/loki";
           description = "On the array. See the header for why it is not persisted.";
         };
 

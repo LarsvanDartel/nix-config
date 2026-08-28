@@ -74,7 +74,7 @@
       options.cosmos.services.restic = {
         repository = mkOption {
           type = str;
-          default = "sftp:u649268@u649268.your-storagebox.de:/endeavour";
+          example = "sftp:user@backup.example.org:/host";
           description = ''
             The restic repository URL.
 

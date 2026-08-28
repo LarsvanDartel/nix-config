@@ -34,7 +34,7 @@
 
       modelsDir = mkOption {
         type = str;
-        default = "/tank/ollama/models";
+        example = "/srv/ollama/models";
         description = ''
           Where the weights live. On /tank because they are tens of gigabytes
           and the system SSD has ~144 G free against the pool's 1.4 T.
