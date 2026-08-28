@@ -1,0 +1,17 @@
+--- a/webbluetooth_host.py
++++ b/webbluetooth_host.py
+@@ -196,6 +196,14 @@
+             async with get_lock(address):
+                 if address in connected_clients and connected_clients[address].is_connected:
+                     return {"status": "success", "message": "Already connected", "address": address}
++                # handle_command already declares advertisement_scanner global.
++                if advertisement_scanner is not None:
++                    logging.info("Pausing advertisement scanner to connect.")
++                    try:
++                        await advertisement_scanner.stop()
++                    except Exception as stop_err:
++                        logging.warning(f"Could not stop scanner: {stop_err}")
++                    advertisement_scanner = None
+                 client = BleakClient(address, disconnected_callback=on_disconnection, timeout=20.0)
+                 try:
+                     await client.connect()

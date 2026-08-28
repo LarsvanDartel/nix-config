@@ -47,6 +47,20 @@
 
             dontBuild = true;
 
+            # BlueZ refuses to open a connection while a discovery scan is
+            # running, and the host lets the two overlap:
+            #
+            #   watch_advertisements  -> Starting advertisement scanner
+            #   connect_device        -> [org.bluez.Error.InProgress]
+            #                            Operation already in progress
+            #
+            # A page is entitled to do exactly that — Web Bluetooth allows
+            # watchAdvertisements() to continue across a connect and Chrome
+            # permits it — so the host has to reconcile the two rather than the
+            # page. Pausing discovery for the duration of the connect is
+            # enough.
+            patches = [./_web-bluetooth/pause-scan-on-connect.patch];
+
             # The manifest's `name` is what the extension asks for over stdio
             # and has to match the file's own basename; `allowed_extensions` is
             # what stops any other extension talking to it.
