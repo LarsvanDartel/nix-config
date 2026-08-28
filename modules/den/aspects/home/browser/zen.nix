@@ -77,9 +77,20 @@
         # Installed by policy rather than by hand so it survives a fresh
         # profile — ~/.config/zen is impermanent and nothing migrates a
         # manually installed add-on into it.
+        #
+        # Our own build rather than the AMO one: upstream nests the
+        # advertisement event's payload under CustomEvent's `detail`, where the
+        # spec puts it on the event, so a page reading
+        # event.manufacturerData gets undefined. cstimer.net needs it to
+        # recover a GAN cube's MAC and fails without it. pkgs/
+        # web-bluetooth-firefox.nix carries the one-line fix.
+        #
+        # Unsigned, which loads because Zen is built MOZ_REQUIRE_SIGNING=false
+        # and defaults xpinstall.signatures.required to false. A stock Firefox
+        # would refuse it and would have to take the AMO build with the bug.
         ExtensionSettings."webbluetooth@rfvx.github.io" = {
           installation_mode = "normal_installed";
-          install_url = "https://addons.mozilla.org/firefox/downloads/latest/web-bluetooth-firefox-linux/latest.xpi";
+          install_url = "file://${pkgs.web-bluetooth-firefox-extension}/share/mozilla-extensions/webbluetooth@rfvx.github.io.xpi";
         };
 
         AppAutoUpdate = false;
