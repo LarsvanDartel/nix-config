@@ -31,9 +31,9 @@
   }: let
     inherit (lib.options) mkEnableOption mkOption;
     inherit (lib.modules) mkIf mkMerge;
-    inherit (lib.types) port str nullOr bool listOf;
+    inherit (lib.types) port str nullOr bool listOf attrsOf;
     inherit (lib.lists) optional;
-    inherit (lib.attrsets) genAttrs;
+    inherit (lib.attrsets) genAttrs mapAttrsToList;
     inherit (lib.strings) splitString concatStringsSep;
     inherit (lib.lists) filter uniqueStrings;
 
@@ -41,6 +41,20 @@
     netbird = config.cosmos.services.netbird;
   in {
     options.cosmos.services.unbound = {
+      localRecords = mkOption {
+        type = attrsOf str;
+        default = {};
+        example = {"printer.example.org" = "10.0.0.4";};
+        description = ''
+          Names this resolver answers itself, as name -> IPv4.
+
+          For a name that must resolve differently here than in public DNS, or
+          that must keep resolving when the host normally serving it is down.
+          Set per host: the answers are deployment facts, not properties of a
+          resolver.
+        '';
+      };
+
       port = mkOption {
         type = port;
         default = 53;
@@ -193,6 +207,17 @@
             };
             remote-control.control-enable = true;
           }
+          (mkIf (cfg.localRecords != {}) {
+            server = {
+              # `static` per name rather than `transparent`: transparent falls
+              # through to the public answer when the local one does not match,
+              # and the public answer here is the wildcard pointing at the edge
+              # — the wrong address, returned confidently, which is the failure
+              # the mesh forward-zone below is already commented about.
+              local-zone = mapAttrsToList (name: _: ''"${name}." static'') cfg.localRecords;
+              local-data = mapAttrsToList (name: addr: ''"${name}. IN A ${addr}"'') cfg.localRecords;
+            };
+          })
           (mkIf cfg.mesh.enable {
             # The mesh domain is not in public DNS and is not DNSSEC-signed,
             # while its parent lvdar.nl is. Without domain-insecure the

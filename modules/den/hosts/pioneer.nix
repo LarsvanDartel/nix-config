@@ -15,6 +15,11 @@
     includes = with den.aspects; [
       roles.server
       services.netbird.client
+      # The BMC's only route in. This host earns its place here by sharing
+      # nothing with endeavour but a switch: out-of-band management proxied by
+      # the machine it exists to recover is not out-of-band, which is what a
+      # seven-hour outage on 2026-08-28 demonstrated.
+      services.idrac
     ];
 
     nixos = {...}: {
@@ -39,6 +44,16 @@
           # roles.server's default is too aggressive for the Pi 3: the SD card
           # can stall long enough under IO for the watchdog to reset the board.
           systemd.settings.Manager.RuntimeWatchdogSec = lib.mkForce "60s";
+
+          # The BMC this host publishes. Its address is a DHCP reservation on
+          # the home LAN, and the name is served to mesh peers by the two hosts
+          # running unbound — see their localRecords, which must point at this
+          # host's mesh address.
+          cosmos.services.idrac = {
+            address = "192.168.2.111";
+            domain = "idrac.lvdar.nl";
+            certificate = "lvdar.nl";
+          };
 
           # 16G SD card sitting at 89% full, of which the journal was 575M. The
           # default 10% rule is doubly wrong here: the card is small, and every
