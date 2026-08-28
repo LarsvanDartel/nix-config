@@ -108,6 +108,25 @@
               proxy_ssl_verify off;
               proxy_ssl_server_name on;
 
+              # The BMC negotiates a Diffie-Hellman key smaller than modern
+              # OpenSSL will accept, and nginx refuses the handshake outright:
+              #
+              #   SSL_do_handshake() failed (SSL: error:0A00018A:
+              #   SSL routines::dh key too small) while SSL handshaking to
+              #   upstream
+              #
+              # curl on this host fails against it the same way, so it is the
+              # firmware and not nginx. Dell will not be fixing an iDRAC of this
+              # vintage, and the alternative to lowering the level is no access
+              # to the BMC at all.
+              #
+              # Scoped to this proxy hop only — it does not touch the TLS this
+              # server presents, which is the real wildcard and unaffected — and
+              # that hop is one switch away on the LAN, to a device whose
+              # certificate could never be verified anyway.
+              proxy_ssl_ciphers "DEFAULT:@SECLEVEL=0";
+              proxy_ssl_protocols TLSv1 TLSv1.1 TLSv1.2;
+
               # Dell's web UI uploads firmware images and virtual media, and
               # the default 1m body limit truncates both with a 413 that the
               # interface reports as a generic failure.
