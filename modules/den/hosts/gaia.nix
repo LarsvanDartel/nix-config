@@ -241,6 +241,41 @@
       # account on this fleet.
       cosmos.services.netbird.localVhosts."lvdar.nl".upstream = "http://100.68.151.172:3031";
 
+      # idrac.lvdar.nl is deliberately absent from public DNS: the wildcard
+      # sends every lvdar.nl name to the edge, so off the mesh it resolves to
+      # gaia and finds nothing. The BMC is reachable from the mesh and nowhere
+      # else — services/idrac.nix on pioneer explains why.
+      #
+      # A literal peer address, like every other cross-host reference here.
+      # This must match the other resolver's copy; both hosts answer it so the
+      # name keeps resolving when either is down, which is the entire point of
+      # publishing the BMC away from endeavour.
+      cosmos.services.unbound.localRecords."idrac.lvdar.nl" = "100.68.78.148";
+
+      # The published surface worth probing, listed here rather than defaulted
+      # in services/gatus.nix: what matters to watch is a fact about this
+      # deployment, not about a status page.
+      #
+      # A dotted name is probed as written, a bare label as a subdomain — which
+      # is how the apex appears alongside the rest. lvdar.nl is the front door
+      # and now the only thing watching services.site, which comes in past
+      # netbird-proxy and so past CrowdSec.
+      #
+      # `auth` earns its place: kanidm failing takes grafana, opencloud and the
+      # NetBird gate with it, and that is one alert rather than three confusing
+      # ones.
+      cosmos.services.gatus.endpoints = [
+        "lvdar.nl"
+        "jellyfin"
+        "immich"
+        "traccar"
+        "seerr"
+        "cloud"
+        "grafana"
+        "ntfy"
+        "auth"
+      ];
+
       # Every peer resolves through endeavour's unbound, which carries the oisd
       # blocklist — so ad-blocking DNS follows a roaming laptop or phone around
       # instead of stopping at the front door. Addresses are looked up at

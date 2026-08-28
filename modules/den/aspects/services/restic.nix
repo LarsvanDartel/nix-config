@@ -60,7 +60,7 @@
       ...
     }: let
       inherit (lib.options) mkOption;
-      inherit (lib.types) bool listOf str path;
+      inherit (lib.types) bool listOf str;
 
       cfg = config.cosmos.services.restic;
 
@@ -86,76 +86,13 @@
         };
 
         paths = mkOption {
-          type = listOf path;
-          default = [
-            pgBackupDir
-            "/persist/var/lib/kanidm"
-            "/persist/var/lib/traccar"
-            "/persist/var/lib/arr"
-            "/persist/var/lib/grafana"
-            # The ATProto identity. Small, and the highest-value path in this
-            # list per byte: the PLC rotation key in here is what proves control
-            # of the DID, and no amount of the rest reconstructs it.
-            "/persist/var/lib/pds"
-            "/persist/var/lib/opencloud"
-            # Open WebUI: chats, accounts and knowledge bases. Small, and the
-            # only part of the LLM stack worth backing up — the models it talks
-            # to are a re-download and are deliberately excluded.
-            "/persist/var/lib/open-webui"
-            # typstnique's leaderboard. Tiny, and the only thing that host runs
-            # which cannot be rebuilt from the flake — the scores are the one
-            # part not derivable from source.
-            "/persist/var/lib/typstnique"
-            "/persist/home"
-            # The whole of /etc, not just /etc/opencloud as this used to say —
-            # 20 KB in total, and the ssh host key inside it is what makes any
-            # of the rest restorable. sops decrypts with
-            # /persist/etc/ssh/ssh_host_ed25519_key (core/sops.nix), and one of
-            # the secrets it guards is keys/zfs/tank, which unlocks the array
-            # (hosts/endeavour.nix). Without this path a rebuilt endeavour can
-            # decrypt nothing, so the /tank entries below would restore into a
-            # pool that cannot be opened and every credential would have to be
-            # re-keyed by hand. gaia has backed this up all along and says why
-            # in hosts/gaia.nix; endeavour did not. Subsumes the old
-            # /persist/etc/opencloud entry, and carries machine-id too.
-            "/persist/etc"
-            # The uid/gid map. Same reasoning as gaia's copy: without it a
-            # rebuilt host hands out different numeric owners than the restored
-            # files expect.
-            "/persist/var/lib/nixos"
-            # radicale's CalDAV/CardDAV trees — 32 KB, and services/opencloud.nix
-            # calls them the only irreplaceable thing it owns. They sit on the
-            # root SSD, which is btrfs, so sanoid does not cover them either:
-            # this is their only copy.
-            "/persist/var/lib/radicale"
-            # suwayomi's library: what is tracked, and how far it has been read.
-            # Small — database.mv.db is 3.5 MB — but the directory around it is
-            # 1.4 GB of re-downloadable Chromium and page cache, which is what
-            # the excludes below are for. Deliberately without
-            # /persist/var/lib/suwayomi-downloads: those are re-fetchable, and
-            # the download-retry timer refills them unattended.
-            "/persist/var/lib/suwayomi-server"
-            "/tank/opencloud"
-            "/tank/media/library/images"
-            # The tangled knot's repositories. sanoid snapshots these too, but
-            # snapshots live inside the pool they protect — if the knot is where
-            # the code actually lives, this is the only copy that survives the
-            # array.
-            "/tank/git"
-            # Minecraft worlds. Same argument as the knot: sanoid covers the
-            # accidents, this covers the array.
-            "/tank/minecraft"
-          ];
+          type = listOf str;
+          default = [];
+          example = ["/persist/var/lib/some-service" "/persist/home"];
           description = ''
-            What to copy. Read through /persist rather than /var/lib on
-            purpose: those are the same bytes, but the persist path is the one
-            that survives a root rollback, so a backup taken from it cannot
-            silently capture something impermanence was about to discard.
-
-            /persist/etc/opencloud carries opencloud.yaml — the JWT signing
-            key, the machine-auth key and the LDAP bind passwords. Without it
-            every account and every blob under dataDir is orphaned, which makes
-            a 4 KB file the single highest-value entry in this list.
+            What to back up. Empty by default: which paths hold irreplaceable
+            state is a fact about a host, not about restic, and a default here
+            silently decides it for every host that includes this.
           '';
         };
 
@@ -315,7 +252,11 @@
           ];
 
         services.restic.backups.stardust = {
-          inherit (cfg) repository paths exclude;
+          inherit (cfg) repository exclude;
+          # The dump directory is appended rather than asked of the host: this
+          # module is what creates it, so a host listing it would be repeating
+          # a detail it does not own.
+          paths = cfg.paths ++ lib.optional cfg.postgresDump pgBackupDir;
 
           passwordFile = config.sops.secrets."keys/stardust/password".path;
           initialize = true;

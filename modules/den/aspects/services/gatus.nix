@@ -69,31 +69,15 @@
 
         endpoints = mkOption {
           type = listOf str;
-          default = [
-            # The front door. Dotted, so it is probed as written rather than
-            # as a subdomain — see the mapping below.
-            "lvdar.nl"
-            "jellyfin"
-            "immich"
-            "traccar"
-            "seerr"
-            "cloud"
-            "grafana"
-            "ntfy"
-            "auth"
-          ];
+          default = [];
+          example = ["status.example.org" "auth"];
           description = ''
-            Names to probe. A bare label is taken as a subdomain of lvdar.nl;
-            a name containing a dot is used as the hostname as written, which
-            is what lets the apex appear here alongside the rest.
+            Names to probe. A bare label is taken as a subdomain of the
+            deployment's base domain; a name containing a dot is used as the
+            hostname as written, which is what lets an apex be probed.
 
-            The published surface, not the internals: this is the half of the
-            stack that has to keep working when endeavour does not, so it
-            checks what a person would.
-
-            `auth` is worth its place — kanidm failing takes grafana, opencloud
-            and the netbird gate with it, and that is one alert rather than
-            three confusing ones.
+            Empty by default: what is worth watching is a property of a
+            deployment, not of a status page.
           '';
         };
       };
