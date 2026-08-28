@@ -86,8 +86,70 @@
             };
           })
       ) {};
+
+      # The extension, rebuilt from source with one fix.
+      #
+      # Upstream dispatches the advertisement event with everything nested
+      # under CustomEvent's `detail`:
+      #
+      #   d.dispatchEvent(new CustomEvent('advertisementreceived', { detail }));
+      #
+      # The Web Bluetooth spec puts manufacturerData, rssi, uuids and the rest
+      # directly on the event. cstimer.net reads event.manufacturerData to
+      # recover a GAN cube's MAC — the cube's protocol needs it — gets
+      # undefined, and fails with "can't access property has, ua is undefined".
+      # The data is all present and correctly shaped, one level too deep.
+      #
+      # Shipped unsigned, which works because Zen is built with
+      # MOZ_REQUIRE_SIGNING false and defaults xpinstall.signatures.required to
+      # false. On a stock Firefox this would need signing and the AMO build
+      # would have to be used instead, bug and all.
+      web-bluetooth-firefox-extension = final.callPackage (
+        {
+          lib,
+          stdenvNoCC,
+          zip,
+        }:
+          stdenvNoCC.mkDerivation {
+            pname = "web-bluetooth-firefox-extension";
+            version = "1.1";
+
+            inherit (final.web-bluetooth-firefox-host) src;
+
+            nativeBuildInputs = [zip];
+
+            postPatch = ''
+              substituteInPlace webbluetooth-firefox-extension/polyfill.js \
+                --replace-fail \
+                  "d.dispatchEvent(new CustomEvent('advertisementreceived', { detail }));" \
+                  "const _ev = new CustomEvent('advertisementreceived', { detail }); Object.assign(_ev, detail, { device: d }); d.dispatchEvent(_ev);"
+            '';
+
+            # The id inside manifest.json is what the native host's
+            # allowed_extensions names and what the install policy keys on, so
+            # it has to survive the rebuild unchanged.
+            installPhase = ''
+              runHook preInstall
+              mkdir -p $out/share/mozilla-extensions
+              cd webbluetooth-firefox-extension
+              zip -qr $out/share/mozilla-extensions/webbluetooth@rfvx.github.io.xpi .
+              runHook postInstall
+            '';
+
+            meta = {
+              description = "Web Bluetooth polyfill extension for Firefox, with the advertisement-event fix";
+              homepage = "https://github.com/rfvx/web-bluetooth-firefox-linux";
+              license = lib.licenses.mit;
+              platforms = lib.platforms.linux;
+            };
+          }
+      ) {};
     })
   ];
 
-  perSystem = {pkgs, ...}: {packages.web-bluetooth-firefox-host = pkgs.web-bluetooth-firefox-host;};
+  perSystem = {pkgs, ...}: {
+    packages = {
+      inherit (pkgs) web-bluetooth-firefox-host web-bluetooth-firefox-extension;
+    };
+  };
 }
