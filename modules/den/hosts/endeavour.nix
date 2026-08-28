@@ -340,6 +340,79 @@
       # by name any more, only by peer and port.
       cosmos.networking.edgeTerminated = true;
 
+      # idrac.lvdar.nl is deliberately absent from public DNS: the wildcard
+      # sends every lvdar.nl name to the edge, so off the mesh it resolves to
+      # gaia and finds nothing. The BMC is reachable from the mesh and nowhere
+      # else — services/idrac.nix on pioneer explains why.
+      #
+      # A literal peer address, like every other cross-host reference here.
+      # This must match the other resolver's copy; both hosts answer it so the
+      # name keeps resolving when either is down, which is the entire point of
+      # publishing the BMC away from endeavour.
+      cosmos.services.unbound.localRecords."idrac.lvdar.nl" = "100.68.78.148";
+
+      # What on this host cannot be rebuilt from the flake. Listed here rather
+      # than defaulted in services/restic.nix: which paths hold irreplaceable
+      # state is a fact about this machine, and a default there decided it
+      # silently for every host including the aspect.
+      #
+      # The postgres dump directory is absent on purpose — restic creates it
+      # and appends it itself.
+      cosmos.services.restic.paths = [
+        "/persist/var/lib/kanidm"
+        "/persist/var/lib/traccar"
+        "/persist/var/lib/arr"
+        "/persist/var/lib/grafana"
+        # The ATProto identity. Small, and the highest-value path in this list
+        # per byte: the PLC rotation key in here is what proves control of the
+        # DID, and no amount of the rest reconstructs it.
+        "/persist/var/lib/pds"
+        "/persist/var/lib/opencloud"
+        # Open WebUI: chats, accounts and knowledge bases. Small, and the only
+        # part of the LLM stack worth backing up — the models it talks to are a
+        # re-download and are deliberately excluded.
+        "/persist/var/lib/open-webui"
+        # typstnique's leaderboard. Tiny, and the only thing this host runs
+        # which cannot be rebuilt from the flake — the scores are the one part
+        # not derivable from source.
+        "/persist/var/lib/typstnique"
+        "/persist/home"
+        # The whole of /etc. 20 KB in total, and the ssh host key inside it is
+        # what makes any of the rest restorable. sops decrypts with
+        # /persist/etc/ssh/ssh_host_ed25519_key (core/sops.nix), and one of the
+        # secrets it guards is keys/zfs/tank, which unlocks the array below.
+        # Without this path a rebuilt endeavour can decrypt nothing, so the
+        # /tank entries would restore into a pool that cannot be opened and
+        # every credential would have to be re-keyed by hand. Carries
+        # machine-id too.
+        "/persist/etc"
+        # The uid/gid map. Without it a rebuilt host hands out different
+        # numeric owners than the restored files expect.
+        "/persist/var/lib/nixos"
+        # radicale's CalDAV/CardDAV trees — 32 KB, and services/opencloud.nix
+        # calls them the only irreplaceable thing it owns. They sit on the root
+        # SSD, which is btrfs, so sanoid does not cover them either: this is
+        # their only copy.
+        "/persist/var/lib/radicale"
+        # suwayomi's library: what is tracked, and how far it has been read.
+        # Small — database.mv.db is 3.5 MB — but the directory around it is
+        # 1.4 GB of re-downloadable Chromium and page cache, which is what the
+        # excludes are for. Deliberately without
+        # /persist/var/lib/suwayomi-downloads: those are re-fetchable, and the
+        # download-retry timer refills them unattended.
+        "/persist/var/lib/suwayomi-server"
+        "/tank/opencloud"
+        "/tank/media/library/images"
+        # The tangled knot's repositories. sanoid snapshots these too, but
+        # snapshots live inside the pool they protect — if the knot is where
+        # the code actually lives, this is the only copy that survives the
+        # array.
+        "/tank/git"
+        # Minecraft worlds. Same argument as the knot: sanoid covers the
+        # accidents, this covers the array.
+        "/tank/minecraft"
+      ];
+
       # roles/server.nix sets 20s, which is too tight for the host that builds
       # the fleet. On 2026-08-28 flake-bump's nixpkgs bump rebuilt obs-studio,
       # mcrl2 and the nvidia stack at once; every local service stalled for
