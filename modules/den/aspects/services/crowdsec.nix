@@ -347,6 +347,40 @@
       # queries for as long as it takes to come back, to refresh an index.
       systemd.services.crowdsec.serviceConfig.ExecReload = "${getExe' pkgs.coreutils "kill"} -HUP $MAINPID";
 
+      # nixpkgs' `crowdsec-setup` ExecStartPre runs `cscli hub update`, which
+      # needs to reach cdn-hub.crowdsec.net, and the unit is `Restart=no`. A
+      # single failed lookup there therefore leaves crowdsec down permanently —
+      # and because netbird-proxy asks the LAPI about every request and fails
+      # *closed* when it cannot, "crowdsec did not start" means every published
+      # service answers 403. The whole edge, not just the protected part.
+      #
+      # That is not hypothetical. On 2026-08-29 a comin switch restarted both
+      # crowdsec and unbound; crowdsec's ExecStartPre ran at 04:37:01 and lost
+      # the race by six seconds:
+      #
+      #   04:37:02 crowdsec-setup: lookup cdn-hub.crowdsec.net: no such host
+      #   04:37:08 unbound: active
+      #
+      # crowdsec stayed failed, and jellyfin, immich, grafana, the status page
+      # and the knot all served 403 for the next six hours. comin could not pull
+      # either — it fetches through that same edge — so the fleet could not
+      # deploy its way out.
+      #
+      # Two independent guards, because either one alone still leaves a way in:
+      #
+      #   after/wants nss-lookup.target  don't start before name resolution
+      #                                  exists. unbound sits Before= it, so
+      #                                  this is the ordering that was missing.
+      #   Restart = on-failure           and if the update fails anyway — the
+      #                                  CDN is down, the network flaps — retry
+      #                                  at RestartSec (60s) instead of leaving
+      #                                  the ingress dark until someone notices.
+      systemd.services.crowdsec = {
+        after = ["nss-lookup.target"];
+        wants = ["nss-lookup.target"];
+        serviceConfig.Restart = "on-failure";
+      };
+
       systemd.services.crowdsec-update-hub = {
         serviceConfig.ExecStartPost = lib.mkForce [];
         unitConfig.OnSuccess = ["crowdsec-reload.service"];
