@@ -79,7 +79,19 @@
       lib,
       pkgs,
       ...
-    }: {
+    }: let
+      # The Arc A310, addressed by PCI slot rather than by render node number.
+      #
+      # renderD12x is handed out in probe order across every DRM device on the
+      # host, so it names a card only by accident: this box also has a Tesla
+      # P100, and on the boot of 2026-08-28 the Arc failed to bind and the
+      # Tesla inherited renderD128 — at which point everything pointed at that
+      # number was silently talking to a card with no VAAPI at all. by-path is
+      # tied to the slot the card is in, so it either resolves to the Arc or is
+      # absent, and a service that wanted the Arc fails loudly instead of
+      # quietly encoding against the wrong GPU.
+      arcRenderNode = "/dev/dri/by-path/pci-0000:07:00.0-render";
+    in {
       imports = [
         inputs.nixos-facter-modules.nixosModules.facter
         {
@@ -680,7 +692,10 @@
         opencloud.dataDir = "/tank/opencloud";
 
         jellyfin.openFirewall = true;
-        immich.mediaDir = "/tank/media/library/images";
+        immich = {
+          mediaDir = "/tank/media/library/images";
+          accelerationDevices = [arcRenderNode];
+        };
 
         ddns.enable = true;
 
@@ -743,6 +758,7 @@
         transcode = {
           dryRun = false;
           maxPerRun = 8;
+          device = arcRenderNode;
         };
 
         arr = {

@@ -6,13 +6,28 @@
     ...
   }: let
     inherit (lib.options) mkOption;
-    inherit (lib.types) str;
+    inherit (lib.types) listOf path str;
 
     cfg = config.cosmos.services.immich;
   in {
-    options.cosmos.services.immich.mediaDir = mkOption {
-      type = str;
-      default = "/var/lib/immich";
+    options.cosmos.services.immich = {
+      mediaDir = mkOption {
+        type = str;
+        default = "/var/lib/immich";
+      };
+
+      accelerationDevices = mkOption {
+        type = listOf path;
+        default = ["/dev/dri/renderD128"];
+        description = ''
+          Render nodes to hand immich's transcoder.
+
+          Which card this is, is a fact about the host, so a host with more
+          than one GPU should name its by-path symlink here — renderD12x
+          numbering follows probe order and moves between cards when one fails
+          to bind. See the same option on services.transcode.
+        '';
+      };
     };
 
     config = {
@@ -66,7 +81,7 @@
           };
           passwordLogin.enabled = false;
         };
-        accelerationDevices = ["/dev/dri/renderD128"];
+        inherit (cfg) accelerationDevices;
         user = "immich";
         group = "media";
       };
