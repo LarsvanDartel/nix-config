@@ -367,6 +367,25 @@
             hostname = sCfg.hostname;
             listenAddr = "0.0.0.0:${toString sCfg.port}";
             repoDir = "${sCfg.stateDir}/repos";
+
+            # Upstream defaults this to 127.0.0.1:9091, which on endeavour is
+            # already transmission's — nginx bridges it out of the VPN network
+            # namespace and binds 0.0.0.0:9091, so the spindle loses the bind
+            # and exits 255. It restarts five times, hits the start limit, and
+            # stays down: no CI runs, while the knot next to it keeps serving
+            # git, so pushes look entirely healthy.
+            #
+            # Arrived with a lock bump rather than a change here (tangled
+            # eab1f12, 2026-08-29), which is the awkward kind — a new upstream
+            # default colliding with a port this host already used.
+            #
+            # 9501 by the same reasoning as node-exporter's 9500, documented at
+            # length in services/node-exporter.nix: opencloud sprawls across
+            # most of 9091-9304 on this host, and endeavour holds nothing else
+            # between 9304 and 9696. Nothing scrapes this yet — prometheus.nix
+            # has jobs for node, netbird and itself only — so it is a listener
+            # kept alive for when something does, not a metric in use.
+            metricsListenAddr = "127.0.0.1:9501";
           };
 
           pipelines.microvm = {
