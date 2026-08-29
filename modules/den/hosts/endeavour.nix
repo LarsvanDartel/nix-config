@@ -594,7 +594,21 @@
           };
         };
         intelgpu = {
-          driver = "xe";
+          # i915, not xe, for the Arc A310 (DG2/G11, 8086:56a6).
+          #
+          # xe declines DG2 on this kernel unless force_probe says otherwise
+          # ("Your graphics device 56a6 is not officially supported"), so with
+          # driver = "xe" the only module in the initrd was one that refuses
+          # the card. Whether i915 got loaded afterwards was then up to udev's
+          # modalias autoload — it won the race on some boots and lost it on
+          # others. On the boot of 2026-08-28 21:04 it lost: the Arc came up
+          # with no driver bound at all, /dev/dri/renderD128 was reassigned to
+          # the Tesla, and the nightly transcode died on libva loading
+          # nvidia_drv_video.so against a card that has no VAAPI.
+          #
+          # i915 supports DG2 outright and, listed here, is loaded in stage 1,
+          # so it claims the card before anything else can decline it.
+          driver = "i915";
           vaapiDriver = "intel-media-driver";
           enableHybridCodec = true;
         };
