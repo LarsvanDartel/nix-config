@@ -9,7 +9,7 @@
   }: let
     inherit (lib.options) mkOption;
     inherit (lib.lists) optional;
-    inherit (lib.types) bool port;
+    inherit (lib.types) bool path port;
     inherit (lib.modules) mkIf;
 
     cfg = config.cosmos.services.jellyfin;
@@ -28,6 +28,20 @@
       openFirewall = mkOption {
         type = bool;
         default = false;
+      };
+
+      vaapiDevice = mkOption {
+        type = path;
+        default = "/dev/dri/renderD128";
+        description = ''
+          The render node jellyfin transcodes on.
+
+          Jellyfin keeps this in its own encoding.xml, so before jellarr drove
+          it the value was whatever the setup wizard guessed — and it guessed a
+          renderD12x number, which on a multi-GPU host names a card only by
+          probe order. Set this to the `/dev/dri/by-path/pci-<addr>-render`
+          symlink on such a host; see the same option on services.transcode.
+        '';
       };
     };
 
@@ -79,6 +93,7 @@
           encoding = {
             enableHardwareEncoding = true;
             hardwareAccelerationType = "vaapi";
+            inherit (cfg) vaapiDevice;
             enableDecodingColorDepth10Hevc = true;
             allowHevcEncoding = true;
             allowAv1Encoding = true;

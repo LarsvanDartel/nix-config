@@ -691,7 +691,10 @@
         # purpose — the pool is the durable thing.
         opencloud.dataDir = "/tank/opencloud";
 
-        jellyfin.openFirewall = true;
+        jellyfin = {
+          openFirewall = true;
+          vaapiDevice = arcRenderNode;
+        };
         immich = {
           mediaDir = "/tank/media/library/images";
           accelerationDevices = [arcRenderNode];
