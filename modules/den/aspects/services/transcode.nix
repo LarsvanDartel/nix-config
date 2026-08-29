@@ -178,7 +178,18 @@
         device = mkOption {
           type = path;
           default = "/dev/dri/renderD128";
-          description = "The render node to encode on — the Arc, not the Tesla.";
+          description = ''
+            The render node to encode on.
+
+            On a host with more than one GPU, set this to the
+            `/dev/dri/by-path/pci-<addr>-render` symlink rather than leaving it
+            at the default. renderD12x numbering is assigned in probe order, so
+            it is not stable across boots: if one card fails to bind, the
+            number it used to hold silently moves to another card and the
+            encode is attempted on whatever answers. by-path either resolves to
+            the card that was meant or does not exist, which is the failure
+            worth having.
+          '';
         };
 
         unmonitor = mkOption {
