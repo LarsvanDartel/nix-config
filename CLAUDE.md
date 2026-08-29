@@ -34,7 +34,7 @@ There are no tests beyond `nix flake check`; correctness is eval + build.
 - **`flake.nix` is generated — never edit it.** Inputs are declared as `flake-file.inputs.*` inside the module that actually uses them (feature-local), then `nix run .#write-flake`. The `check-flake-file` check enforces sync.
 - **`abort-on-warn = true`.** Any nixpkgs/HM eval warning (deprecation, etc.) is a hard build failure, not a warning. Upgrades that introduce a deprecation warning break the build.
 - **`git add` before building.** The flake is a `git+file://` source, so unstaged new files are invisible to `nix build`/`nix flake check` and produce confusing "option does not exist" errors.
-- **Files and directories prefixed with `_` are skipped by import-tree.** That's how `_hw/`, `_facter/`, `_niri/`, `_greetd/`, `_styling/`, `_hyprland/`, `_noctalia/`, `_nvim/`, `_minecraft/`, `_unbound/`, `_ssh-keys/` hold plain modules that are `import`ed explicitly (e.g. from a specialisation body) instead of being auto-loaded as flake-parts modules.
+- **Files and directories prefixed with `_` are skipped by import-tree.** That's how `_hw/`, `_facter/`, `_niri/`, `_greetd/`, `_styling/`, `_hyprland/`, `_noctalia/`, `_nvim/`, `_minecraft/`, `_minecraft-control/`, `_unbound/`, `_ssh-keys/`, `_web-bluetooth/` hold plain modules that are `import`ed explicitly (e.g. from a specialisation body) instead of being auto-loaded as flake-parts modules.
 
 ## Layout
 
@@ -42,6 +42,11 @@ There are no tests beyond `nix flake check`; correctness is eval + build.
 - `modules/pkgs/` — local packages. Each file self-registers into the `nixpkgs.overlays` aggregator option; `modules/den/overlays.nix` composes them into `flake.overlays.default`, which hosts consume via `inputs.self.overlays.default`.
 - `modules/den/aspects/` — the actual configuration, ~200 files, grouped `core/ desktop/ hardware/ home/ roles/ services/`.
 - `modules/den/hosts/` — one file per host; `modules/den/users/` — one per user.
+- `modules/den/deployment.nix` — facts about *this* deployment, applied to every
+  host via `den.default.nixos`. Values that would otherwise sit as option
+  defaults inside an aspect, making it unusable by anyone else and hiding real
+  configuration where nobody looks. Only options that exist on *every* host
+  belong here; anything narrower goes in that host's own file.
 
 ## den model
 
@@ -71,9 +76,9 @@ Custom options live under the **`cosmos.*`** namespace (`cosmos.system.impermane
 | host | arch | role |
 |---|---|---|
 | `voyager` | x86_64 | ThinkPad P1 gen3 laptop, nvidia, Hyprland + Zen browser. Compositor choice is a **boot-time** switch: the base config and a labelled `hyprland` specialisation are identical, and a `niri`/noctalia specialisation is a separate GRUB entry |
-| `endeavour` | x86_64 | the workhorse. jellyfin, immich, kanidm, traccar, opencloud/collabora, suwayomi + flaresolverr, ollama + open-webui on a Tesla P100, tangled (knot + spindle), a PDS, minecraft, attic, the VPN-confined `*arr` stack, and the prometheus/grafana/loki/alloy monitoring. ZFS `tank` with sanoid/zed; restic offsite |
-| `gaia` | x86_64 | public VPS and the fleet's only ingress. Runs the self-hosted **NetBird control plane**, and `netbird-proxy` terminates TLS and forwards to endeavour over the mesh. Also crowdsec, ntfy, unbound, and the gatus status page. (Pangolin used to be the ingress and is **decommissioned** — do not reintroduce it) |
-| `pioneer` | aarch64 | Raspberry Pi 3; built locally under voyager's binfmt emulation, never on the Pi |
+| `endeavour` | x86_64 | the workhorse. jellyfin, immich, kanidm, traccar, opencloud/collabora, suwayomi + flaresolverr, ollama + open-webui on a Tesla P100, tangled (knot + spindle), a PDS, minecraft, attic, `services.site` (lvdar.nl), the VPN-confined `*arr` stack, and the prometheus/grafana/loki/alloy monitoring. ZFS `tank` with sanoid/zed; restic offsite |
+| `gaia` | x86_64 | public VPS and the fleet's only ingress. Runs the self-hosted **NetBird control plane**, and `netbird-proxy` terminates TLS and forwards to endeavour over the mesh. Also crowdsec, ntfy, unbound, the gatus status page, and the handful of vhosts its own nginx serves directly (`localVhosts`). (Pangolin used to be the ingress and is **decommissioned** — do not reintroduce it) |
+| `pioneer` | aarch64 | Raspberry Pi 3; built locally under voyager's binfmt emulation, never on the Pi. Publishes endeavour's **iDRAC** (`services.idrac`) to the mesh — it shares nothing with endeavour but a switch, which is the whole point: out-of-band management proxied by the machine it exists to recover is not out-of-band |
 
 Hardware comes from committed **nixos-facter** reports (`hosts/_facter/<host>.facter.json`, regenerate with `sudo nixos-facter -o …` on the host) plus **disko** layouts in `hosts/_hw/<host>/`. Most hosts use impermanence; persisted paths are declared via `cosmos.system.impermanence.persist.directories`.
 
@@ -105,11 +110,21 @@ push to main  ->  build-gate builds all three x86_64 hosts at that revision
   endeavour hosts the git remote it deploys itself from. If the knot is down,
   nothing deploys anywhere — which is the intended failure, but it means a change
   that breaks tangled or gaia's proxy can cut off the path used to fix it.
+  That is not theoretical: comin fetches over public HTTPS, so it goes through
+  netbird-proxy like any visitor, and the proxy fails **closed** when crowdsec's
+  LAPI is unreachable. On 2026-08-29 a crowdsec that lost a DNS race at startup
+  therefore 403'd the whole published surface *and* comin, for six hours — the
+  fleet could not deploy its way out of a one-line fix. Check `curl -I` against
+  a published service before concluding the knot itself is at fault.
 - `services.flake-bump` is a timer on endeavour that refreshes the lock, and
   commits and pushes when green. **The knot therefore gains commits on its own**
   — always pull before pushing, or the push is rejected.
 - deploy-rs remains for manual/out-of-band deploys and for hosts that do not run
   comin (voyager, pioneer). voyager is switched locally with `nh os switch`.
+- **The blog does not go through any of this.** `services.site` polls its own
+  content repository and recompiles when the revision moves, so publishing a
+  post is a push, not a deploy. Only the site's *code* arrives through the flake
+  input.
 
 Git remotes: `origin` is the knot (`knot.lvdar.nl`, the source of truth that comin
 watches) and also lists GitHub as a second **push** URL. Only the knot is a fetch
@@ -124,8 +139,15 @@ URL, so a partial push can leave the two out of sync.
   (open, because the app runs its own login). Gated: `suwayomi`, `sabnzbd`,
   `prowlarr`, `radarr`, `sonarr`, `lidarr`, `bazarr`, `minecraft-control`.
   Everything else — jellyfin, immich, cloud/docs/wopi, chat, grafana, traccar,
-  status, ntfy, pds, knot, spindle — is open by design; the reasoning for each is
-  in the comments there and is worth reading before changing one.
+  status, ntfy, pds, knot, spindle, seerr, typstnique, www, the minecraft
+  entries — is open by design; the reasoning for each is in the comments there
+  and is worth reading before changing one.
+- `cosmos.services.netbird.localVhosts` on `gaia.nix` is the escape hatch for
+  domains netbird-proxy *cannot* carry. The proxy's cluster domain is
+  `baseDomain`, and management rejects any service whose domain is not a label
+  beneath it — so the apex `lvdar.nl` returns 422 and is served by gaia's own
+  nginx instead, forwarding over the mesh. (A side effect worth knowing when
+  debugging: the apex keeps working when the proxy does not.)
 - `cosmos.networking.edgeTerminated` is per-host and means "TLS for my published
   services is terminated somewhere else". **endeavour is `true`** — gaia
   terminates and forwards over the mesh to each app's own port, so an app there
