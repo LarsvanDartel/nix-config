@@ -13,6 +13,7 @@ import logging
 import os
 import subprocess
 import sys
+import threading
 import time
 import xml.etree.ElementTree as ET
 from pathlib import Path
@@ -28,6 +29,7 @@ MIN_SIZE = int(os.environ["MIN_SIZE_MIB"]) * 1024 * 1024
 MIN_FREE = int(os.environ["MIN_FREE_GIB"]) * 1024 ** 3
 MIN_SAVING = float(os.environ["MIN_SAVING"])
 MAX_PER_RUN = int(os.environ["MAX_PER_RUN"])
+PARALLEL = int(os.environ["PARALLEL"])
 QUALITY = os.environ["QUALITY"]
 DRY_RUN = os.environ["DRY_RUN"] == "1"
 UNMONITOR = os.environ["UNMONITOR"] == "1"
@@ -292,6 +294,111 @@ def notify_arr(path):
         LOGGER.warning("%s: could not notify: %s", entry["name"], exc)
 
 
+class Budget:
+    """Free-space bookkeeping shared by the encode threads.
+
+    Every in-flight encode writes a whole second copy of its source before
+    the rename frees anything, so the headroom check has to account for the
+    encodes already running and not just the one about to start. statvfs
+    already reflects the bytes those encodes have written so far, so adding
+    the full source size for each of them double-counts — deliberately.
+    Erring toward "not enough room" is the safe direction on a pool that
+    also holds opencloud and the download scratch dirs.
+    """
+
+    def __init__(self):
+        self.lock = threading.Lock()
+        self.reserved = 0
+        self.stopped = False
+
+    def claim(self, path, size):
+        with self.lock:
+            if self.stopped:
+                return False
+            free = free_bytes(path.parent)
+            if free - self.reserved - size < MIN_FREE:
+                LOGGER.warning("stopping: %.0f GiB free, need headroom for %s",
+                               free / 1024 ** 3, path.name)
+                # Sticky: once the pool is this full the run is over, rather
+                # than skipping the big files and quietly carrying on with
+                # small ones nobody asked it to prioritise.
+                self.stopped = True
+                return False
+            self.reserved += size
+            return True
+
+    def release(self, size):
+        with self.lock:
+            self.reserved -= size
+
+
+def process_one(size, path, info, state, state_lock, arr_lock, budget):
+    """Encode one file and, if it earns it, put it in place.
+
+    Returns True if the file got a verdict that counts against MAX_PER_RUN —
+    replaced, or encoded and rejected for not shrinking enough. An encode
+    that simply failed does not count, so a run is not spent on a file the
+    encoder cannot open.
+    """
+
+    def record(entry):
+        with state_lock:
+            state[str(path)] = entry
+            save_state(state)
+
+    if not budget.claim(path, size):
+        return False
+
+    try:
+        tmp = encode(path, info)
+        if tmp is None:
+            record({"id": identity(path.stat()), "status": "failed"})
+            return False
+
+        new_size = tmp.stat().st_size
+        if not acceptable(tmp, info):
+            tmp.unlink(missing_ok=True)
+            record({"id": identity(path.stat()), "status": "failed"})
+            return False
+
+        saving = 1 - new_size / size
+        if saving < MIN_SAVING:
+            tmp.unlink(missing_ok=True)
+            LOGGER.info("%s: only %.0f%% smaller, keeping the original",
+                        path.name, saving * 100)
+            record({"id": identity(path.stat()), "status": "no-gain",
+                    "codec": info["codec"]})
+            return True
+
+        links = path.stat().st_nlink
+        if links > 1:
+            # Almost certainly a hardlink to still-seeding torrent data.
+            # Renaming over it breaks the link rather than corrupting
+            # the torrent, which is what we want — but the old blocks
+            # stay allocated until that torrent is removed.
+            LOGGER.info("%s: had %d links, space returns when the "
+                        "torrent goes", path.name, links)
+
+        os.chmod(tmp, 0o664)
+        os.replace(tmp, path)
+        LOGGER.info("%s: %.1f -> %.1f GiB (%.0f%% smaller)", path.name,
+                    size / 1024 ** 3, new_size / 1024 ** 3, saving * 100)
+
+        record({"id": identity(path.stat()), "status": "done",
+                "codec": "av1", "was": info["codec"]})
+
+        if UNMONITOR:
+            # Serialised across threads on purpose. Two encodes from the
+            # same series would otherwise have sonarr rescanning it twice
+            # at once, and these calls take milliseconds — there is nothing
+            # to gain by overlapping them.
+            with arr_lock:
+                notify_arr(path)
+        return True
+    finally:
+        budget.release(size)
+
+
 def main():
     logging.basicConfig(
         level=logging.INFO, stream=sys.stdout,
@@ -320,69 +427,48 @@ def main():
         LOGGER.info("dry run, nothing changed")
         return 0
 
-    done = 0
-    for size, path, info in found:
-        if done >= MAX_PER_RUN:
-            break
+    state_lock = threading.Lock()
+    arr_lock = threading.Lock()
+    budget = Budget()
 
-        free = free_bytes(path.parent)
-        # ZFS is copy-on-write: the new file exists in full alongside
-        # the old one before the rename frees anything.
-        if free - size < MIN_FREE:
-            LOGGER.warning("stopping: %.0f GiB free, need headroom for %s",
-                           free / 1024 ** 3, path.name)
-            break
+    # `running` is counted alongside `done` so that N threads cannot
+    # collectively overshoot MAX_PER_RUN: the cap is on files processed,
+    # and a thread must be able to see the work already in flight before
+    # it claims more.
+    progress = {"done": 0, "running": 0, "lock": threading.Lock()}
+    queue = list(found)
 
-        tmp = encode(path, info)
-        if tmp is None:
-            state[str(path)] = {"id": identity(path.stat()),
-                                "status": "failed"}
-            save_state(state)
-            continue
+    def worker():
+        while True:
+            with progress["lock"]:
+                if budget.stopped or not queue:
+                    return
+                if progress["done"] + progress["running"] >= MAX_PER_RUN:
+                    return
+                size, path, info = queue.pop(0)
+                progress["running"] += 1
 
-        new_size = tmp.stat().st_size
-        if not acceptable(tmp, info):
-            tmp.unlink(missing_ok=True)
-            state[str(path)] = {"id": identity(path.stat()),
-                                "status": "failed"}
-            save_state(state)
-            continue
+            counted = False
+            try:
+                counted = process_one(size, path, info, state,
+                                      state_lock, arr_lock, budget)
+            except Exception:
+                # One unhandled failure should cost one file, not the run.
+                LOGGER.exception("%s: unhandled error", path.name)
+            finally:
+                with progress["lock"]:
+                    progress["running"] -= 1
+                    if counted:
+                        progress["done"] += 1
 
-        saving = 1 - new_size / size
-        if saving < MIN_SAVING:
-            tmp.unlink(missing_ok=True)
-            LOGGER.info("%s: only %.0f%% smaller, keeping the original",
-                        path.name, saving * 100)
-            state[str(path)] = {"id": identity(path.stat()),
-                                "status": "no-gain", "codec": info["codec"]}
-            save_state(state)
-            done += 1
-            continue
+    workers = [threading.Thread(target=worker, name=f"encode-{i}")
+               for i in range(max(1, PARALLEL))]
+    for t in workers:
+        t.start()
+    for t in workers:
+        t.join()
 
-        links = path.stat().st_nlink
-        if links > 1:
-            # Almost certainly a hardlink to still-seeding torrent data.
-            # Renaming over it breaks the link rather than corrupting
-            # the torrent, which is what we want — but the old blocks
-            # stay allocated until that torrent is removed.
-            LOGGER.info("%s: had %d links, space returns when the "
-                        "torrent goes", path.name, links)
-
-        os.chmod(tmp, 0o664)
-        os.replace(tmp, path)
-        LOGGER.info("%s: %.1f -> %.1f GiB (%.0f%% smaller)", path.name,
-                    size / 1024 ** 3, new_size / 1024 ** 3, saving * 100)
-
-        state[str(path)] = {"id": identity(path.stat()),
-                            "status": "done", "codec": "av1",
-                            "was": info["codec"]}
-        save_state(state)
-
-        if UNMONITOR:
-            notify_arr(path)
-        done += 1
-
-    LOGGER.info("processed %d file(s) this run", done)
+    LOGGER.info("processed %d file(s) this run", progress["done"])
     return 0
 
 

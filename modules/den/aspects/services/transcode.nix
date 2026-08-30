@@ -14,8 +14,10 @@
 #   * it never churns for nothing. A file that does not actually shrink by
 #     `minSaving` is put back and marked so it is not tried again. That is what
 #     makes it safe to point at HEVC, which often has nothing left to give.
-#   * it does bounded work. `maxPerRun` files a night, and it stops early if
-#     the pool is filling up.
+#   * it does bounded work. `maxPerRun` files a night, at most `parallel` at
+#     a time, and it stops early if the pool is filling up — counting the
+#     encodes already in flight, each of which is holding a second copy of
+#     its source.
 #
 # The encoder is the Arc A310's, via jellyfin-ffmpeg — deliberately, and not
 # nixpkgs' ffmpeg. intel-media-driver 26.1.6 exports __vaDriverInit_1_24, which
@@ -165,6 +167,29 @@
           description = "Files to process per run, largest first.";
         };
 
+        parallel = mkOption {
+          type = ints.positive;
+          default = 1;
+          description = ''
+            How many files to encode at once.
+
+            The Arc has one encode engine, so this does not multiply encoder
+            throughput — what it recovers is the time each job spends *not*
+            encoding. A single ffmpeg here runs at roughly six cores of demux,
+            filter and hwupload against one GPU, so the engine idles in gaps
+            that a second job can fill.
+
+            Every concurrent job also holds a whole second copy of its source
+            on the pool until it is renamed into place, so this multiplies the
+            transient space requirement — see `minFreeGiB`, which accounts for
+            the jobs in flight.
+
+            Keep it low. Past two or three the jobs contend for the same engine
+            and the array, and the wall clock stops improving while jellyfin's
+            own transcodes get slower.
+          '';
+        };
+
         minFreeGiB = mkOption {
           type = ints.positive;
           default = 200;
@@ -252,6 +277,7 @@
             MIN_FREE_GIB = toString cfg.minFreeGiB;
             MIN_SAVING = toString cfg.minSaving;
             MAX_PER_RUN = toString cfg.maxPerRun;
+            PARALLEL = toString cfg.parallel;
             QUALITY = toString cfg.quality;
             DRY_RUN =
               if cfg.dryRun
