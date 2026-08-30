@@ -234,6 +234,49 @@ def api_key(name):
     return ET.fromstring(cred.read_text()).findtext("ApiKey")
 
 
+def wait_for_command(base, key, command, timeout=180):
+    """Block until an arr has finished a command it accepted.
+
+    RescanSeries and RefreshMovie return as soon as the command is *queued*,
+    not when the library has been re-read. That was harmless while this ran
+    one file at a time. With concurrent encodes it is not: a second file from
+    the same series looks up its episode by episodeFileId while the first
+    one's rescan is still rewriting exactly those rows, matches nothing, and
+    unmonitors nothing — leaving the episode monitored for sonarr to
+    re-acquire, which is the one outcome notify_arr exists to prevent.
+    """
+    if not isinstance(command, dict) or "id" not in command:
+        return
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        try:
+            status = api(base, key, f"command/{command['id']}")
+        except (error.URLError, error.HTTPError):
+            return
+        if (status or {}).get("status") in ("completed", "failed", "aborted"):
+            return
+        time.sleep(2)
+    LOGGER.warning("command %s still running after %ds, not waiting further",
+                   command["id"], timeout)
+
+
+def episode_file(base, key, series_id, path, tries=6, delay=5):
+    """The arr's record of this file, retried while a rescan settles.
+
+    Even with wait_for_command, a rescan can be triggered by something other
+    than this script — an import, or the arr's own scheduled scan — so the
+    lookup is retried rather than trusted on the first miss.
+    """
+    for attempt in range(tries):
+        files = api(base, key, f"episodefile?seriesId={series_id}")
+        found = next((f for f in files if f.get("path") == str(path)), None)
+        if found is not None:
+            return found
+        if attempt + 1 < tries:
+            time.sleep(delay)
+    return None
+
+
 def notify_arr(path):
     """Unmonitor the item, then rescan it.
 
@@ -262,8 +305,9 @@ def notify_arr(path):
                 return
             movie["monitored"] = False
             api(entry["url"], key, f"movie/{movie['id']}", "PUT", movie)
-            api(entry["url"], key, "command", "POST",
-                {"name": "RefreshMovie", "movieIds": [movie["id"]]})
+            cmd = api(entry["url"], key, "command", "POST",
+                      {"name": "RefreshMovie", "movieIds": [movie["id"]]})
+            wait_for_command(entry["url"], key, cmd)
             LOGGER.info("radarr: unmonitored and rescanned %s", movie["title"])
         else:
             all_series = api(entry["url"], key, "series")
@@ -272,9 +316,7 @@ def notify_arr(path):
             if series is None:
                 LOGGER.warning("sonarr does not know %s", path)
                 return
-            files = api(entry["url"], key,
-                        f"episodefile?seriesId={series['id']}")
-            ef = next((f for f in files if f.get("path") == str(path)), None)
+            ef = episode_file(entry["url"], key, series["id"], path)
             episodes = api(entry["url"], key,
                            f"episode?seriesId={series['id']}")
             # The episode, never the series: unmonitoring the series
@@ -284,8 +326,15 @@ def notify_arr(path):
             if ids:
                 api(entry["url"], key, "episode/monitor", "PUT",
                     {"episodeIds": ids, "monitored": False})
-            api(entry["url"], key, "command", "POST",
-                {"name": "RescanSeries", "seriesId": series["id"]})
+            else:
+                # Loud, because the file is already replaced: the episode is
+                # still monitored and sonarr may now read the AV1 copy as a
+                # downgrade and re-download the original.
+                LOGGER.warning("%s: sonarr has no episode for this file, "
+                               "left monitored", path.name)
+            cmd = api(entry["url"], key, "command", "POST",
+                      {"name": "RescanSeries", "seriesId": series["id"]})
+            wait_for_command(entry["url"], key, cmd)
             LOGGER.info("sonarr: unmonitored %d episode(s) of %s",
                         len(ids), series["title"])
     except (error.URLError, error.HTTPError, ET.ParseError, OSError) as exc:
