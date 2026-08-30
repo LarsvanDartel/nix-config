@@ -205,11 +205,29 @@ in {
       # unit instead of leaving a stale success behind. Ordering it before
       # local-fs.target puts it ahead of the services that will want those
       # directories.
+      #
+      # The ordering is systemd-tmpfiles-setup.service's own, deliberately:
+      # after local-fs.target, before sysinit.target, DefaultDependencies off.
+      # The obvious shape — wantedBy + before local-fs.target — is a cycle, and
+      # it took endeavour's switch down on 2026-08-30 with
+      #
+      #   Failed to start sysinit.target: Transaction order is cyclic.
+      #
+      # because a service gets an implicit After=sysinit.target, sysinit.target
+      # is already ordered after local-fs.target, and Before=local-fs.target
+      # closes the loop. systemd refuses such a transaction at runtime, which
+      # is the loud failure; at boot it instead breaks the cycle by dropping an
+      # edge it picks itself, which is the quiet one.
       systemd.services.impermanence-tmpfiles = {
         description = "Re-create tmpfiles entries under the persisted mounts";
-        wantedBy = ["local-fs.target"];
-        before = ["local-fs.target"];
-        unitConfig.RequiresMountsFor = persistedPaths;
+        wantedBy = ["sysinit.target"];
+        after = ["local-fs.target"];
+        before = ["sysinit.target" "shutdown.target"];
+        conflicts = ["shutdown.target"];
+        unitConfig = {
+          DefaultDependencies = "no";
+          RequiresMountsFor = persistedPaths;
+        };
         serviceConfig = {
           Type = "oneshot";
           RemainAfterExit = true;
