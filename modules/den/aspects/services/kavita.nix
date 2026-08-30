@@ -11,13 +11,20 @@
 # Two things about the upstream module are worth knowing before changing
 # anything here:
 #
-#   * it rewrites config/appsettings.json from the Nix store on *every* start.
-#     Kavita's own UI writes OIDC settings into that same file, so anything
-#     configured through the web interface that lands there is silently lost at
-#     the next restart. That is why Authority/ClientId/Secret are set below
-#     rather than in the UI — they are the three that live in appsettings.json.
-#     The behavioural OIDC toggles (auto-provision, role sync) live in Kavita's
-#     database instead and are safe to set in the UI.
+#   * it rewrites config/appsettings.json from the Nix store on *every* start,
+#     so anything configured through the web interface that lands in that file
+#     is silently lost at the next restart. Authority/ClientId/Secret are
+#     therefore set below rather than clicked in.
+#
+#     The behavioural OIDC toggles are a second copy, in ServerSetting row 40
+#     of kavita.db, as one JSON blob — and they are NOT safe to set in the UI,
+#     which is what an earlier version of this comment claimed. Turning on
+#     "disable password authentication" there on 2026-08-30 locked the only
+#     account out of the only way in: the OIDC identity provisioned with no
+#     roles (DefaultRoles was empty and kanidm sent no roles claim), Kavita
+#     answered "You do not have the required roles to access this application",
+#     and the local login form was gone. Recovery was a sqlite UPDATE with the
+#     service stopped. Set them here instead.
 #
 #   * it substitutes only the TokenKey into that file, via replace-secret. The
 #     client secret needs the same treatment, so this appends a second
@@ -102,6 +109,26 @@
               Authority = "https://auth.lvdar.nl/oauth2/openid/kavita";
               ClientId = "kavita";
               Secret = "@OIDC_SECRET@";
+
+              # The claim kanidm is told to emit below. Kavita's default is
+              # .NET's schema URI, which kanidm cannot produce — claim names
+              # there are bare identifiers — so the two have to be met in the
+              # middle on a name both can express.
+              RolesClaim = "kavita_roles";
+
+              # A floor, not the policy: the claim carries the real roles, and
+              # this is what a provisioned account gets if it arrives without
+              # one. Without at least Login, a new user is created and then
+              # refused with "You do not have the required roles to access this
+              # application", which is a lockout that looks like a bug.
+              DefaultRoles = ["Login"];
+              ProvisionAccounts = true;
+
+              # Break-glass, deliberately, and the same call paperless makes:
+              # kanidm runs on this host, so an OIDC-only Kavita is unreachable
+              # exactly when kanidm is. Turning this on in the UI on
+              # 2026-08-30 locked the only account out of the only way in.
+              DisablePasswordAuthentication = false;
             };
           };
           tokenKeyFile = config.sops.secrets."keys/kavita/token".path;
@@ -158,9 +185,29 @@
             members = ["lvdar"];
           };
 
+          groups.kavita-admins = {
+            overwriteMembers = false;
+            members = ["lvdar"];
+          };
+
           systems.oauth2.kavita = {
             displayName = "Kavita";
             basicSecretFile = config.sops.secrets."keys/kavita/oauth-client-secret".path;
+
+            # Kavita matches these against its own role names exactly, so the
+            # values are Kavita's spelling rather than anything of ours. Only
+            # single-word roles are used: Kavita also has "Change Password",
+            # "Change Restriction" and "Read Only", and a claim value with a
+            # space in it is not worth the risk for permissions an SSO user
+            # does not need.
+            supplementaryScopeMaps.kavita-users = ["kavita_roles"];
+            claimMaps.kavita_roles = {
+              joinType = "array";
+              valuesByGroup = {
+                kavita-users = ["Login" "Download" "Bookmark"];
+                kavita-admins = ["Admin"];
+              };
+            };
 
             # Both legs of the ASP.NET Core OIDC handler. The sign-out callback
             # is not optional decoration: without it registered, logging out
