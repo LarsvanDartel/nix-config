@@ -27,6 +27,7 @@
       services.unbound
       services.kanidm
       services.jellyfin
+      services.kavita
       services.immich
       services.traccar
       services.tile-traccar
@@ -524,6 +525,7 @@
           8082 # traccar     traccar.lvdar.nl
           5055 # traccar     osmand tracker protocol, published L4 on :5055
           8080 # suwayomi    suwayomi.lvdar.nl
+          5000 # kavita      kavita.lvdar.nl
           4055 # jellyseerr  seerr.lvdar.nl     (via the netns bridge)
           6336 # sabnzbd     sabnzbd.lvdar.nl   (via the netns bridge)
 
