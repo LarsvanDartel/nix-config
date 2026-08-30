@@ -701,6 +701,12 @@
           openFirewall = true;
           vaapiDevice = arcRenderNode;
         };
+
+        # ollama is on this host, so the model is a local call over loopback.
+        paperless.ai = {
+          enable = true;
+          model = "qwen3:14b";
+        };
         immich = {
           mediaDir = "/tank/media/library/images";
           accelerationDevices = [arcRenderNode];

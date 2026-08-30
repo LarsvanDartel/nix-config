@@ -63,6 +63,44 @@
           '';
         };
 
+        ai = {
+          enable = mkOption {
+            type = bool;
+            default = false;
+            description = ''
+              Offer LLM-generated suggestions when a document is opened.
+
+              Off by default because it needs a model to talk to, which is a
+              fact about the host rather than about paperless.
+            '';
+          };
+
+          endpoint = mkOption {
+            type = str;
+            default = "http://127.0.0.1:11434";
+            description = ''
+              Where the model lives. Loopback works because paperless-web —
+              the only unit that makes this call — runs with
+              PrivateNetwork=no. The consumer and scheduler are in their own
+              network namespace, where this address would mean something else
+              entirely and reach nothing.
+            '';
+          };
+
+          model = mkOption {
+            type = str;
+            default = "qwen3:14b";
+            description = ''
+              A starting point, not a recommendation for every host — what is
+              actually available is a property of that host's ollama.
+
+              If suggestions come back malformed, this model's thinking mode
+              leaking into the structured output is the first thing to
+              suspect; a plainer instruct model is a one-word change.
+            '';
+          };
+        };
+
         ocrLanguage = mkOption {
           type = str;
           default = "nld+eng";
@@ -102,45 +140,72 @@
 
           passwordFile = config.sops.secrets."keys/paperless/admin-password".path;
 
-          settings = {
-            PAPERLESS_OCR_LANGUAGE = cfg.ocrLanguage;
+          settings =
+            {
+              PAPERLESS_OCR_LANGUAGE = cfg.ocrLanguage;
 
-            # Give the archive a shape on disk rather than a pile of hashes, so
-            # the files remain usable if paperless ever is not.
-            PAPERLESS_FILENAME_FORMAT = "{created_year}/{correspondent}/{title}";
+              # Give the archive a shape on disk rather than a pile of hashes, so
+              # the files remain usable if paperless ever is not.
+              PAPERLESS_FILENAME_FORMAT = "{created_year}/{correspondent}/{title}";
 
-            PAPERLESS_APPS = "allauth.socialaccount.providers.openid_connect";
+              PAPERLESS_APPS = "allauth.socialaccount.providers.openid_connect";
 
-            # Create the local account on first OIDC login instead of making
-            # every user exist twice.
-            PAPERLESS_SOCIAL_AUTO_SIGNUP = true;
+              # Create the local account on first OIDC login instead of making
+              # every user exist twice.
+              PAPERLESS_SOCIAL_AUTO_SIGNUP = true;
 
-            # ...and give it permissions, which auto-signup does not. Without
-            # this a new account is created with none at all and every request
-            # it makes is refused — including /api/ui_settings/, so the SPA
-            # fails to load and shows a bare 403 rather than anything about
-            # permissions. That is what the first OIDC login did on
-            # 2026-08-30.
-            #
-            # The SOCIAL_ one, not PAPERLESS_ACCOUNT_DEFAULT_GROUPS: that is
-            # the local-signup path, which is unused here. Comma-separated if
-            # more are ever wanted.
-            #
-            # "Users" is a Django group, so it lives in paperless's database
-            # rather than here — like the libraries in kavita and the
-            # superuser flag. It carries full rights over documents, notes,
-            # tags, correspondents, document types, storage paths, saved
-            # views, custom fields, share links, UI settings and one's own
-            # MFA, plus read-only visibility of the task queue. It withholds
-            # what administers the server rather than uses it: workflows,
-            # application configuration, the mail accounts (which hold
-            # credentials), and the guardian/session/socialaccount internals.
-            PAPERLESS_SOCIAL_ACCOUNT_DEFAULT_GROUPS = "Users";
+              # ...and give it permissions, which auto-signup does not. Without
+              # this a new account is created with none at all and every request
+              # it makes is refused — including /api/ui_settings/, so the SPA
+              # fails to load and shows a bare 403 rather than anything about
+              # permissions. That is what the first OIDC login did on
+              # 2026-08-30.
+              #
+              # The SOCIAL_ one, not PAPERLESS_ACCOUNT_DEFAULT_GROUPS: that is
+              # the local-signup path, which is unused here. Comma-separated if
+              # more are ever wanted.
+              #
+              # "Users" is a Django group, so it lives in paperless's database
+              # rather than here — like the libraries in kavita and the
+              # superuser flag. It carries full rights over documents, notes,
+              # tags, correspondents, document types, storage paths, saved
+              # views, custom fields, share links, UI settings and one's own
+              # MFA, plus read-only visibility of the task queue. It withholds
+              # what administers the server rather than uses it: workflows,
+              # application configuration, the mail accounts (which hold
+              # credentials), and the guardian/session/socialaccount internals.
+              PAPERLESS_SOCIAL_ACCOUNT_DEFAULT_GROUPS = "Users";
+            }
+            // lib.optionalAttrs cfg.ai.enable {
+              # Suggestions only — a title, tags, correspondents, a document
+              # type, storage paths and up to three dates, which paperless then
+              # matches by name against objects that already exist. They are
+              # offered on the document view and cached, NOT applied during
+              # consumption, so a slow model costs a wait when opening a
+              # document rather than a stalled ingest queue.
+              #
+              # Distinct from the scikit-learn classifier, which is already on
+              # and needs nothing: that one learns from corrections and can only
+              # propose tags you already have. This one reads the document and
+              # can propose a title and a date, which the classifier cannot.
+              PAPERLESS_AI_ENABLED = true;
+              PAPERLESS_AI_LLM_BACKEND = "ollama";
+              PAPERLESS_AI_LLM_ENDPOINT = cfg.ai.endpoint;
+              PAPERLESS_AI_LLM_MODEL = cfg.ai.model;
 
-            # PAPERLESS_SOCIALACCOUNT_PROVIDERS is deliberately NOT here: it
-            # carries the client secret and settings goes to the store. It
-            # arrives through environmentFile below.
-          };
+              # PAPERLESS_AI_LLM_OUTPUT_LANGUAGE is deliberately unset. It adds
+              # a second pass that translates the suggestions, and matching is
+              # by name — so forcing a language is a way to stop suggested tags
+              # from matching the tags that exist.
+              #
+              # Embeddings are likewise unset: they power the chat-over-
+              # documents feature, not these suggestions, and would mean pulling
+              # another model for something nobody has asked for yet.
+
+              # PAPERLESS_SOCIALACCOUNT_PROVIDERS is deliberately NOT here: it
+              # carries the client secret and settings goes to the store. It
+              # arrives through environmentFile below.
+            };
 
           environmentFile = config.sops.templates."paperless.env".path;
         };
