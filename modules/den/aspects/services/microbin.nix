@@ -223,6 +223,18 @@
         # for oauth2-proxy to filter on.
         email.domains = ["*"];
 
+        # PKCE is opt-in here and off by default, which kanidm — which enforces
+        # it — rejects at the authorise step:
+        #
+        #   No PKCE code challenge was provided with client in enforced PKCE
+        #   mode | o2rs.name: "microbin"
+        #
+        # surfacing to the browser as a bare invalid_request. The aspect
+        # deliberately does not set allowInsecureClientDisablePkce the way
+        # jellyfin, traccar and open-webui each had to; this is the other way
+        # to satisfy that requirement, and the better one.
+        extraConfig.code-challenge-method = "S256";
+
         nginx = {
           domain = cfg.domain;
           virtualHosts.${cfg.domain} = {};
