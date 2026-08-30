@@ -28,6 +28,7 @@
       services.kanidm
       services.jellyfin
       services.kavita
+      services.microbin
       services.immich
       services.traccar
       services.tile-traccar
@@ -526,6 +527,7 @@
           5055 # traccar     osmand tracker protocol, published L4 on :5055
           8080 # suwayomi    suwayomi.lvdar.nl
           5000 # kavita      kavita.lvdar.nl
+          8087 # microbin    bin.lvdar.nl  (nginx + oauth2-proxy, NOT microbin's own 8081)
           4055 # jellyseerr  seerr.lvdar.nl     (via the netns bridge)
           6336 # sabnzbd     sabnzbd.lvdar.nl   (via the netns bridge)
 
