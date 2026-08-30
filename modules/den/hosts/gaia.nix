@@ -446,6 +446,10 @@
         immich = shared 2283;
         seerr = shared 4055;
 
+        # Kavita runs its own kanidm OIDC, so a gate here would be the same
+        # login twice — the reasoning that already covers cloud and chat.
+        kavita = shared 5000;
+
         # The tangled knot's HTTP half. Ungated: git clients send basic auth or
         # nothing at all and cannot complete an interactive IdP redirect, the
         # same constraint that keeps the *arr suite's API consumers working.
