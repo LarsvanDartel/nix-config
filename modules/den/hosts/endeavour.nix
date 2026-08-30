@@ -29,6 +29,7 @@
       services.jellyfin
       services.kavita
       services.microbin
+      services.paperless
       services.immich
       services.traccar
       services.tile-traccar
@@ -528,6 +529,7 @@
           8080 # suwayomi    suwayomi.lvdar.nl
           5000 # kavita      kavita.lvdar.nl
           8087 # microbin    bin.lvdar.nl  (nginx + oauth2-proxy, NOT microbin's own 8081)
+          28981 # paperless   paperless.lvdar.nl
           4055 # jellyseerr  seerr.lvdar.nl     (via the netns bridge)
           6336 # sabnzbd     sabnzbd.lvdar.nl   (via the netns bridge)
 
