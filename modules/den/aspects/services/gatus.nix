@@ -30,6 +30,8 @@
       cfg = config.cosmos.services.gatus;
       ntfy = config.cosmos.services.ntfy;
 
+      stateDir = "/var/lib/gatus";
+
       endpoint = name: url: {
         inherit name url;
         group = "published";
@@ -98,22 +100,52 @@
         # netbird-proxy dials this over the mesh like any other target.
         cosmos.services.netbird.client.exposedPorts = [cfg.port];
 
+        # A static user, not the module's DynamicUser — the precondition for
+        # keeping history at all on an impermanent host. Under DynamicUser,
+        # StateDirectory lives at /var/lib/private/gatus behind a symlink, so
+        # persisting /var/lib/gatus would persist the symlink and lose the
+        # database on every boot.
+        users.users.gatus = {
+          isSystemUser = true;
+          group = "gatus";
+          home = stateDir;
+        };
+        users.groups.gatus = {};
+
+        systemd.services.gatus.serviceConfig = {
+          DynamicUser = lib.mkForce false;
+          User = "gatus";
+          Group = "gatus";
+          StateDirectory = "gatus";
+        };
+
+        cosmos.system.impermanence.persist.directories = [
+          {
+            directory = stateDir;
+            user = "gatus";
+            group = "gatus";
+            mode = "0750";
+          }
+        ];
+
         services.gatus = {
           enable = true;
           settings = {
             web.port = cfg.port;
 
-            # In memory, not sqlite on disk. nixpkgs runs gatus under
-            # DynamicUser, which relocates a StateDirectory to
-            # /var/lib/private — and an impermanence entry over that path is
-            # the EBUSY that has already broken ntfy, crowdsec and
-            # tile-traccar here.
+            # On disk, so uptime history survives a restart.
             #
-            # Nothing is lost that matters: this exists to say what is up now
-            # and to alert on the transition. Uptime history over months is a
-            # nice-to-have, and not worth the third instance of a trap this
-            # repo keeps documenting.
-            storage.type = "memory";
+            # This used to be `memory`, because nixpkgs runs gatus under
+            # DynamicUser, which relocates StateDirectory to /var/lib/private
+            # and turns an impermanence entry over the visible path into the
+            # EBUSY that has already broken ntfy, crowdsec and tile-traccar on
+            # this host. The answer is not to give up the history but to stop
+            # using DynamicUser, which is what open-webui and microbin already
+            # do for the same reason — see the static user below.
+            storage = {
+              type = "sqlite";
+              path = "${stateDir}/data.db";
+            };
 
             alerting.ntfy = {
               # Scheme included: gatus takes a base URL, not a hostname.
