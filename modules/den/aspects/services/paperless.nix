@@ -75,6 +75,14 @@
       };
 
       config = {
+        # Note, if you reach for it: `paperless-manage` is broken as nixpkgs
+        # ships it here. The wrapper composes
+        #
+        #   sudo -u paperless -g paperless  -g redis-paperless -E
+        #
+        # and sudo accepts only one -g, so it exits with its own usage message
+        # before running anything. Working around it means invoking the command
+        # as the paperless user so the wrapper takes its `sudo=exec` branch.
         services.paperless = {
           enable = true;
           inherit (cfg) port domain;
@@ -129,9 +137,21 @@
 
         # json.loads'd straight out of the environment by paperless
         # (settings/__init__.py), so this is allauth's provider dict as-is.
+        #
+        # Single-quoted, which systemd strips when it reads an EnvironmentFile
+        # and which the shell needs. The service works either way — systemd
+        # takes the value literally — but `paperless-manage` *sources* this
+        # same file, and an unquoted JSON object comes apart in the shell:
+        #
+        #   json.decoder.JSONDecodeError: Expecting property name enclosed in
+        #   double quotes: line 1 column 2 (char 1)
+        #
+        # which makes every management command unusable while OIDC is
+        # configured. The JSON contains double quotes and no single ones, so
+        # wrapping it this way is safe.
         sops.templates."paperless.env" = {
           content = ''
-            PAPERLESS_SOCIALACCOUNT_PROVIDERS=${builtins.toJSON {
+            PAPERLESS_SOCIALACCOUNT_PROVIDERS='${builtins.toJSON {
               openid_connect = {
                 OAUTH_PKCE_ENABLED = true;
                 APPS = [
@@ -148,7 +168,7 @@
                   }
                 ];
               };
-            }}
+            }}'
           '';
           owner = "paperless";
         };
