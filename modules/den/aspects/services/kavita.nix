@@ -17,14 +17,22 @@
 #     therefore set below rather than clicked in.
 #
 #     The behavioural OIDC toggles are a second copy, in ServerSetting row 40
-#     of kavita.db, as one JSON blob — and they are NOT safe to set in the UI,
-#     which is what an earlier version of this comment claimed. Turning on
-#     "disable password authentication" there on 2026-08-30 locked the only
-#     account out of the only way in: the OIDC identity provisioned with no
-#     roles (DefaultRoles was empty and kanidm sent no roles claim), Kavita
-#     answered "You do not have the required roles to access this application",
-#     and the local login form was gone. Recovery was a sqlite UPDATE with the
-#     service stopped. Set them here instead.
+#     of kavita.db, as one JSON blob — and *that copy wins*. Measured, not
+#     assumed: on 2026-08-30 appsettings.json read
+#     "DisablePasswordAuthentication": false while the running server reported
+#     it true, because the UI had written the database. The fields below other
+#     than Authority/ClientId/Secret are therefore a first-run seed, not a
+#     setting — declaring them does not hold a running server to them, and
+#     saving the OIDC form in the UI rewrites the whole blob including fields
+#     you did not touch.
+#
+#     Which makes the UI the dangerous place to change them. Turning on
+#     "disable password authentication" there locked the only account out of
+#     the only way in: the OIDC identity provisioned with no roles
+#     (DefaultRoles was empty and kanidm sent no roles claim), Kavita answered
+#     "You do not have the required roles to access this application", and the
+#     local login form was gone. Recovery was a sqlite UPDATE against
+#     ServerSetting row 40 with the service stopped.
 #
 #   * it substitutes only the TokenKey into that file, via replace-secret. The
 #     client secret needs the same treatment, so this appends a second
@@ -124,10 +132,12 @@
               DefaultRoles = ["Login"];
               ProvisionAccounts = true;
 
-              # Break-glass, deliberately, and the same call paperless makes:
-              # kanidm runs on this host, so an OIDC-only Kavita is unreachable
-              # exactly when kanidm is. Turning this on in the UI on
-              # 2026-08-30 locked the only account out of the only way in.
+              # A seed for a fresh install, not a guarantee — the database
+              # overrides this once it exists (see the header). The intent is
+              # the same call paperless makes: kanidm runs on this host, so an
+              # OIDC-only Kavita is unreachable exactly when kanidm is. If the
+              # running server disagrees with this line, the server wins and
+              # the UI is what changed it.
               DisablePasswordAuthentication = false;
             };
           };
