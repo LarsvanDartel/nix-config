@@ -451,6 +451,10 @@
         # creating a pasta needs MICROBIN_UPLOADER_PASSWORD.
         bin = shared 8087;
 
+        # Paperless runs its own kanidm OIDC, so a gate here would be the
+        # same login twice.
+        paperless = shared 28981;
+
         # Kavita runs its own kanidm OIDC, so a gate here would be the same
         # login twice — the reasoning that already covers cloud and chat.
         kavita = shared 5000;
