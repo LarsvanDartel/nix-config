@@ -611,16 +611,66 @@
               "$@"
           }
 
-          # Readiness gate. On a fresh control plane management is still coming
-          # up and the API token is a placeholder, and while the mesh is being
-          # built peers appear one at a time. None of that is an error, and
-          # exiting non-zero for it makes switch-to-configuration fail, which
-          # deploy-rs turns into a rollback — so this converges quietly and
-          # leaves the rest for the next timer tick.
-          if ! peers="$(req "$api/peers" 2>/dev/null)"; then
-            echo "netbird: management not reachable or API token not accepted yet; nothing to do"
-            exit 0
+          # Readiness gate. On a fresh control plane management is still
+          # coming up and the API token is a placeholder, and while the mesh is
+          # being built peers appear one at a time. None of that is an error,
+          # so this converges quietly and leaves the rest for the next tick.
+          #
+          # But "management is not up yet" and "management is up and refusing
+          # this credential" are different things, and collapsing them into one
+          # tolerated branch cost a day on 2026-08-29. The PAT expired,
+          # management logged `token invalid` every five minutes, and this
+          # script answered each tick with "nothing to do" and exited 0 — so
+          # core.notify-failure, which pushes on any non-zero exit and would
+          # have said so within five minutes, was never handed anything to
+          # report. Nothing new could be published for the whole day while
+          # everything already in the control plane kept working, which is
+          # precisely what made it quiet.
+          #
+          # A refusal is therefore only benign while the token is not yet
+          # shaped like a PAT — which is exactly the fresh-install case this
+          # gate exists for. Once it looks like a real credential, management
+          # rejecting it is a fault and is worth waking someone for.
+          #
+          # Safe to exit non-zero here: this unit is started by its timer and
+          # by hand, never by switch-to-configuration, so a failure cannot turn
+          # into a rolled-back deploy.
+          body="$(mktemp)"
+          trap 'rm -f "$body"' EXIT
+
+          if ! code="$(curl -sS -o "$body" -w '%{http_code}' \
+            -H "Authorization: Token $token" \
+            -H "Content-Type: application/json" \
+            "$api/peers")"; then
+            code=000
           fi
+
+          case "$code" in
+            2*)
+              peers="$(cat "$body")"
+              ;;
+            401 | 403)
+              case "$token" in
+                nbp_*)
+                  echo "netbird: management refused the API token (HTTP $code)." >&2
+                  echo "netbird: keys/netbird/api-token is invalid or expired. Nothing can be published until it is replaced — existing services keep working, so this does not show up as an outage." >&2
+                  exit 1
+                  ;;
+                *)
+                  echo "netbird: no API token yet; nothing to do"
+                  exit 0
+                  ;;
+              esac
+              ;;
+            000)
+              echo "netbird: management not reachable yet; nothing to do"
+              exit 0
+              ;;
+            *)
+              echo "netbird: management returned HTTP $code; nothing to do"
+              exit 0
+              ;;
+          esac
 
           # Group membership is only meaningful if NetBird is actually reading
           # the IdP's claim, and that is an account setting rather than
