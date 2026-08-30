@@ -278,6 +278,12 @@
         "grafana"
         "ntfy"
         "auth"
+        # All three answer a bare GET without credentials — 200 for kavita, a
+        # redirect to kanidm for paperless and to oauth2-proxy for bin — so the
+        # existing `[STATUS] < 400` covers them without special-casing.
+        "kavita"
+        "paperless"
+        "bin"
       ];
 
       # Every peer resolves through endeavour's unbound, which carries the oisd
