@@ -753,14 +753,22 @@
           downloadRetry.enable = true;
         };
 
-        # Sized to the nightly window rather than to the backlog. The first
-        # file took 24 min for 27 GiB, so eight is roughly 03:00 to 06:00 —
-        # done before anyone watches anything, and the GPU is shared with
-        # jellyfin's transcoder. Raising this does not make the job finish
-        # sooner so much as make it run later into the morning.
+        # Sized to the nightly window rather than to the backlog, but the
+        # backlog is winning: it went from 120 files / 85 GiB on 2026-08-28 to
+        # 155 / 140 GiB on 2026-08-30, because the arrs acquire new h264
+        # material faster than eight a night clears it.
+        #
+        # There is room to take that on. The run of 2026-08-30 did its eight
+        # files in 24 minutes of a roughly three-hour window, and spent 2h26m
+        # of CPU doing it — about six cores against one GPU, which is the shape
+        # of a job that is waiting on something other than the encoder. So:
+        # three times the files, two at a time. The big ones still dominate (27
+        # GiB took 24 minutes on its own), so this is sized to finish before
+        # anyone is awake rather than to be exactly full.
         transcode = {
           dryRun = false;
-          maxPerRun = 8;
+          maxPerRun = 24;
+          parallel = 2;
           device = arcRenderNode;
         };
 
