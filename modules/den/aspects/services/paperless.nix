@@ -115,6 +115,28 @@
             # every user exist twice.
             PAPERLESS_SOCIAL_AUTO_SIGNUP = true;
 
+            # ...and give it permissions, which auto-signup does not. Without
+            # this a new account is created with none at all and every request
+            # it makes is refused — including /api/ui_settings/, so the SPA
+            # fails to load and shows a bare 403 rather than anything about
+            # permissions. That is what the first OIDC login did on
+            # 2026-08-30.
+            #
+            # The SOCIAL_ one, not PAPERLESS_ACCOUNT_DEFAULT_GROUPS: that is
+            # the local-signup path, which is unused here. Comma-separated if
+            # more are ever wanted.
+            #
+            # "Users" is a Django group, so it lives in paperless's database
+            # rather than here — like the libraries in kavita and the
+            # superuser flag. It carries full rights over documents, notes,
+            # tags, correspondents, document types, storage paths, saved
+            # views, custom fields, share links, UI settings and one's own
+            # MFA, plus read-only visibility of the task queue. It withholds
+            # what administers the server rather than uses it: workflows,
+            # application configuration, the mail accounts (which hold
+            # credentials), and the guardian/session/socialaccount internals.
+            PAPERLESS_SOCIAL_ACCOUNT_DEFAULT_GROUPS = "Users";
+
             # PAPERLESS_SOCIALACCOUNT_PROVIDERS is deliberately NOT here: it
             # carries the client secret and settings goes to the store. It
             # arrives through environmentFile below.
