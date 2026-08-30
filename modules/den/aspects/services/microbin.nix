@@ -258,6 +258,17 @@
           # matters here.
           "/upload/" = publicRead;
 
+          # The create POST, authenticated. This exact-match location is not
+          # redundant with `location /`: defining the `/upload/` prefix above
+          # makes nginx answer a request for bare `/upload` with its own 301
+          # to `/upload/`, and it does that *before* auth_request runs. The
+          # form posts to `/upload`, so without this every submission — signed
+          # in or not — is redirected, downgraded to GET by the browser's 301
+          # handling, and lands on a path that only permits reads. Safe, in
+          # that no unauthenticated write ever succeeded, but the paste button
+          # did not work either.
+          "= /upload".proxyPass = backend;
+
           "/auth/" = publicForm;
           "/auth_raw/" = publicForm;
           "/auth_file/" = publicForm;
@@ -275,6 +286,13 @@
         # to an http:// URL that gaia does not serve.
         extraConfig = ''
           proxy_set_header X-Forwarded-Proto https;
+
+          # nginx builds absolute redirects from its own listen address, which
+          # here is a mesh port behind the edge — so a redirect it generates
+          # names http://bin.lvdar.nl:8087/, which is both a dead link for the
+          # visitor and a needless disclosure of where this actually runs.
+          # Relative redirects resolve against the public URL instead.
+          absolute_redirect off;
         '';
       };
 
