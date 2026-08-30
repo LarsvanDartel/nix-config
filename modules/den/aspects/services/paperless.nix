@@ -153,12 +153,27 @@
           owner = "paperless";
         };
 
-        systemd.tmpfiles.rules = [
-          "d '${config.services.paperless.mediaDir}'      0775 paperless media - -"
-          "d '${config.services.paperless.consumptionDir}' 0775 paperless media - -"
-        ];
-
         users.users.paperless.extraGroups = ["media"];
+
+        # Override the module's own rules rather than shadowing them with a
+        # second set. Both create these paths, and systemd-tmpfiles takes the
+        # first file it reads and logs "Duplicate line ... ignoring" for the
+        # rest — which happened to resolve in our favour, but silently, and
+        # only because of how the two filenames sort.
+        #
+        # `media` and group-write so scans can be dropped into the inbox by
+        # something other than paperless itself; the module's default would
+        # make both directories paperless:paperless.
+        systemd.tmpfiles.settings."10-paperless" = let
+          shared = lib.mkForce {
+            user = "paperless";
+            group = "media";
+            mode = "0775";
+          };
+        in {
+          ${config.services.paperless.mediaDir}.d = shared;
+          ${config.services.paperless.consumptionDir}.d = shared;
+        };
 
         cosmos.system.impermanence.persist.directories = [
           {
