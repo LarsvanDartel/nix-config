@@ -241,6 +241,28 @@
         };
       };
 
+      # oauth2-proxy performs OIDC discovery once, at startup, and exits if it
+      # fails. The issuer is the *public* name, so that request has to leave
+      # this host, cross the mesh, pass gaia's proxy and land back on kanidm —
+      # none of which is true in the first seconds of a boot. On 2026-08-30 it
+      # got nginx's 502, and because the module sets Restart=always while
+      # leaving RestartSec at its 100ms default, systemd spent NixOS's whole
+      # five-restart budget inside half a second and gave up for good. microbin
+      # then served 500s until someone restarted it by hand.
+      #
+      # So: retry slowly, and for long enough that the rest of the fleet can
+      # finish coming up. Ordering after kanidm removes the most common part of
+      # the race; the retry budget covers the rest, which is not local to this
+      # host and cannot be ordered against.
+      systemd.services.oauth2-proxy = {
+        after = ["kanidm.service"];
+        serviceConfig.RestartSec = "10s";
+        unitConfig = {
+          StartLimitIntervalSec = "15min";
+          StartLimitBurst = 60;
+        };
+      };
+
       services.nginx.virtualHosts.${cfg.domain} = {
         # Plain HTTP on the mesh: gaia terminates TLS and forwards here.
         listen = [
