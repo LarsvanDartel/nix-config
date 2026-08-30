@@ -446,6 +446,11 @@
         immich = shared 2283;
         seerr = shared 4055;
 
+        # A paste exists to be handed to someone, so a gate in front would
+        # mean the recipient needs an account here first. Reads are open;
+        # creating a pasta needs MICROBIN_UPLOADER_PASSWORD.
+        bin = shared 8087;
+
         # Kavita runs its own kanidm OIDC, so a gate here would be the same
         # login twice — the reasoning that already covers cloud and chat.
         kavita = shared 5000;
