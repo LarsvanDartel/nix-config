@@ -1176,8 +1176,91 @@
           done
         '';
       };
+
+      # Warn before the PAT lapses, rather than only once it has.
+      #
+      # The alerting fix in netbird-reconcile-services turns an expired token
+      # into a page within one tick, but by then publishing is already frozen.
+      # Management exposes everything needed to see it coming: /users marks the
+      # caller's own account with is_current, and /users/<id>/tokens carries
+      # expiration_date.
+      tokenExpiry = pkgs.writeShellApplication {
+        name = "netbird-token-expiry";
+        runtimeInputs = with pkgs; [curl jq coreutils];
+        text = ''
+          api="http://127.0.0.1:${toString mgmtPort}/api"
+          token="$(cat "$CREDENTIALS_DIRECTORY/api-token")"
+
+          req() {
+            curl -sSf \
+              -H "Authorization: Token $token" \
+              -H "Content-Type: application/json" \
+              "$@"
+          }
+
+          # Unreachable management, or a token already refused, is not this
+          # unit's job to report — netbird-services runs every five minutes and
+          # says so. Staying quiet here keeps one fault to one alert.
+          if ! users="$(req "$api/users" 2>/dev/null)"; then
+            echo "netbird: management not reachable or token refused; expiry not checked"
+            exit 0
+          fi
+
+          uid="$(jq -r 'map(select(.is_current == true)) | .[0].id // empty' <<<"$users")"
+          if [ -z "$uid" ]; then
+            echo "netbird: no is_current user in /users; cannot tell which account this token belongs to"
+            exit 0
+          fi
+
+          tokens="$(req "$api/users/$uid/tokens")"
+
+          # Which PAT is ours, when the account holds several: the one used
+          # most recently. This script authenticated with it moments ago, so
+          # its last_used is the newest unless something else is calling the
+          # API in the same breath — in which case the worst case is warning
+          # about the wrong token of the same account, not missing one.
+          latest="$(jq -r 'sort_by(.last_used) | last' <<<"$tokens")"
+          exp="$(jq -r '.expiration_date // empty' <<<"$latest")"
+          name="$(jq -r '.name // "?"' <<<"$latest")"
+
+          if [ -z "$exp" ]; then
+            echo "netbird: token '$name' carries no expiration_date; nothing to warn about"
+            exit 0
+          fi
+
+          # Management emits nanosecond precision, which GNU date will not parse.
+          exp_clean="$(sed -E 's/\.[0-9]+//' <<<"$exp")"
+          days=$(( ( $(date -d "$exp_clean" +%s) - $(date +%s) ) / 86400 ))
+
+          if [ "$days" -lt 0 ]; then
+            echo "netbird: API token '$name' EXPIRED $(( -days )) day(s) ago ($exp_clean)." >&2
+            exit 1
+          fi
+
+          if [ "$days" -le ${toString cfg.tokenExpiryWarnDays} ]; then
+            echo "netbird: API token '$name' expires in $days day(s), on $exp_clean." >&2
+            echo "netbird: mint a replacement and put it in keys/netbird/api-token. Once it lapses nothing new can be published while everything already published keeps working — so there is no outage to notice." >&2
+            exit 1
+          fi
+
+          echo "netbird: API token '$name' expires in $days day(s); nothing to do"
+        '';
+      };
     in {
       options.cosmos.services.netbird = {
+        tokenExpiryWarnDays = mkOption {
+          type = lib.types.ints.positive;
+          default = 21;
+          description = ''
+            Start warning this many days before the management API token
+            expires.
+
+            Wide on purpose. Replacing it means minting a PAT by hand in the
+            dashboard, editing sops and moving the flake pin, which is not a
+            thing to be told about the evening it stops working.
+          '';
+        };
+
         baseDomain = mkOption {
           type = str;
           default = "lvdar.nl";
@@ -1982,6 +2065,34 @@
             OnBootSec = "2min";
             OnUnitActiveSec = "5min";
             Unit = "netbird-services.service";
+          };
+        };
+
+        systemd.services.netbird-token-expiry = {
+          description = "Warn before the NetBird API token expires";
+          after = ["netbird-management.service"];
+          wants = ["netbird-management.service"];
+
+          serviceConfig = {
+            Type = "oneshot";
+            ExecStart = lib.getExe tokenExpiry;
+            LoadCredential = [
+              "api-token:${config.sops.secrets."keys/netbird/api-token".path}"
+            ];
+          };
+        };
+
+        # Daily, not on the reconciler's five-minute tick: this is a date
+        # comparison that cannot change faster than once a day, and a warning
+        # repeated every five minutes for three weeks is one nobody reads.
+        systemd.timers.netbird-token-expiry = {
+          description = "Periodically check the NetBird API token's expiry";
+          wantedBy = ["timers.target"];
+          timerConfig = {
+            OnCalendar = "daily";
+            RandomizedDelaySec = "1h";
+            Persistent = true;
+            Unit = "netbird-token-expiry.service";
           };
         };
       };
