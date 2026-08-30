@@ -105,6 +105,19 @@
         # StateDirectory lives at /var/lib/private/gatus behind a symlink, so
         # persisting /var/lib/gatus would persist the symlink and lose the
         # database on every boot.
+        #
+        # Switching an already-running service this way needs one manual step,
+        # because the symlink systemd made under DynamicUser outlives the
+        # change and a bind mount will not accept it:
+        #
+        #   var-lib-gatus.mount: Mount path /var/lib/gatus is not canonical
+        #   (contains a symlink).
+        #
+        # which fails the mount, fails gatus by dependency, and takes the
+        # status page down. Removing /var/lib/gatus and letting the mount
+        # create a real directory is the whole fix; there is nothing to
+        # migrate, since the old storage was in memory. A host built from
+        # scratch never sees this.
         users.users.gatus = {
           isSystemUser = true;
           group = "gatus";
