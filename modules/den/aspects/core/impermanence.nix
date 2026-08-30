@@ -28,6 +28,14 @@ in {
 
     cfg = config.cosmos.system.impermanence;
 
+    # persist.directories takes either a bare path or an attrset carrying
+    # ownership, so both shapes have to be reduced to the path.
+    persistedPaths = map (d:
+      if builtins.isAttrs d
+      then d.directory
+      else d)
+    cfg.persist.directories;
+
     # The systemd .device unit for the root device, e.g.
     # dev-disk-by\x2dlabel-nixos.device. escapeSystemdPath lives in NixOS's
     # `utils`, not in lib.
@@ -170,6 +178,45 @@ in {
             # the boot it is already in the middle of.
             "/var/lib/systemd/timers"
           ];
+      };
+
+      # Re-create tmpfiles entries once the persist bind mounts are up.
+      #
+      # NixOS activation runs `systemd-tmpfiles --create` before it starts
+      # units, and an impermanence bind mount is a unit. So on the switch that
+      # *first* persists a directory, tmpfiles creates that directory's
+      # subdirectories on the root subvolume, and the bind mount then covers
+      # them with the empty copy from /persist. Anything the service expected
+      # to find is gone — not missing permissions, missing directory.
+      #
+      # It cost two services on 2026-08-30. kavita died on
+      #   install: cannot create '/var/lib/kavita/config/appsettings.json'
+      # and paperless on
+      #   FileNotFoundError: '/var/lib/paperless/index'
+      # both of which are tmpfiles rules their own modules declare. A reboot
+      # would have hidden it, because at boot the mounts are established before
+      # systemd-tmpfiles-setup runs — which is exactly what makes this worth a
+      # unit rather than a note: it only ever bites on first deploy, so it is
+      # never fresh in anyone's mind when it does.
+      #
+      # RequiresMountsFor is what makes this correct rather than hopeful: it
+      # orders this after every persist mount, and it changes whenever the
+      # persisted set changes, so a switch that adds a directory restarts this
+      # unit instead of leaving a stale success behind. Ordering it before
+      # local-fs.target puts it ahead of the services that will want those
+      # directories.
+      systemd.services.impermanence-tmpfiles = {
+        description = "Re-create tmpfiles entries under the persisted mounts";
+        wantedBy = ["local-fs.target"];
+        before = ["local-fs.target"];
+        unitConfig.RequiresMountsFor = persistedPaths;
+        serviceConfig = {
+          Type = "oneshot";
+          RemainAfterExit = true;
+          ExecStart = "${config.systemd.package}/bin/systemd-tmpfiles --create";
+          StandardOutput = "journal";
+          StandardError = "journal";
+        };
       };
 
       systemd.services."persist-home-create-root-paths" = let
