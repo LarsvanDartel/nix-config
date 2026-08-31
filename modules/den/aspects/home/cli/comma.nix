@@ -11,10 +11,18 @@
 # programs.command-not-found is already off here, so nothing fights over
 # command_not_found_handler.
 #
-# 101 MB of database, which is why this is in roles.desktop-home rather than
-# roles.home-base: home-base reaches every host through the user aspects,
-# including pioneer, whose 16 GB SD card is 89% full and which has no
-# interactive user to type `,` in the first place.
+# 100 MiB of database, which is why nothing here is in roles.home-base:
+# home-base reaches every host through the user aspects, including pioneer,
+# whose 16 GB SD card is 89% full and which has no interactive user to type `,`
+# in the first place. So it is included one host at a time — roles.desktop-home
+# for voyager, and provides.to-users on endeavour and gaia, which have the room
+# and are exactly where you end up wanting a tool you did not install.
+#
+# Each host keeps its own copy of the store path rather than sharing one: the
+# index is mmap-read on every lookup, so mounting it over the mesh would trade
+# 100 MiB of disk for a network round trip on the one command whose whole point
+# is being faster than looking the package up by hand — and it would leave gaia
+# unable to answer `,` whenever endeavour or the mesh is down.
 {...}: {
   flake-file.inputs.nix-index-database = {
     url = "github:nix-community/nix-index-database";

@@ -16,6 +16,14 @@
   den.hosts.x86_64-linux.gaia.users.nixos = {};
 
   den.aspects.gaia = {
+    # `, <cmd>` and nix-index's command-not-found suggestions for the `nixos`
+    # user. Reaches the user through the host rather than through
+    # roles.home-base because the prebuilt index is 100 MiB and pioneer has no
+    # room for it — see the aspect. Via provides.to-users because this host's
+    # only user is named `nixos`, which collides with the aspect's own `nixos`
+    # (NixOS module) key, so the per-user block voyager uses is unavailable.
+    provides.to-users.includes = [den.aspects.home.comma];
+
     includes = with den.aspects; [
       roles.server
       core.boot
