@@ -14,6 +14,12 @@
   den.hosts.x86_64-linux.endeavour.users.nixos = {};
 
   den.aspects.endeavour = {
+    # `, <cmd>` and nix-index's command-not-found suggestions for the `nixos`
+    # user. Reaches the user through the host rather than through
+    # roles.home-base because the prebuilt index is 100 MiB and pioneer has no
+    # room for it — see the aspect.
+    provides.to-users.includes = [den.aspects.home.comma];
+
     # host provides this home config to its users (just `nixos` here).
     provides.to-users.homeManager = {...}: {
       cosmos.system.impermanence.persist.directories = ["dev"];
