@@ -154,6 +154,13 @@
         ];
 
         cli.programs.nh.flake-dir = "/home/lvdar/nix-config";
+
+        # Sync against endeavour's taskchampion-sync-server over the mesh,
+        # rather than through gaia at task.lvdar.nl the way the phone does.
+        # Same history either way — this path just declines to leave the mesh
+        # and come back in to reach a machine two rooms away. The id and the
+        # encryption secret come from sops; see the aspect.
+        programs.taskwarrior.sync.serverUrl = "http://endeavour.nb.lvdar.nl:10222";
       };
 
       # nixos-facter puts every detected GPU driver into the initrd. Here that

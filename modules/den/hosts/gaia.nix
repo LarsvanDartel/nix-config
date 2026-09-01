@@ -399,6 +399,18 @@
           ];
         };
 
+        # Taskwarrior sync, ungated because it cannot be gated: its clients
+        # are native apps (taskwarrior itself, TaskStrider on the phone) that
+        # speak the TaskChampion protocol and nothing else — a browser
+        # redirect gets them a parse error, not a login.
+        #
+        # What stands in for a gate is the client id, which the server treats
+        # as an allow-list and which is a sops secret for exactly that reason
+        # (services/taskchampion.nix). And what protects the contents is not
+        # this hop at all: the replicas encrypt before they send, so a
+        # successful attacker here reads ciphertext.
+        task = shared 10222;
+
         # The alert sink. Ungated deliberately: the ntfy app authenticates
         # with a username and password and cannot complete an interactive
         # browser login, and gating it would also make the one service you
