@@ -81,6 +81,7 @@
       services.minecraft
       services.minecraft.control
       services.ollama.webui
+      services.taskchampion
     ];
 
     nixos = {
@@ -440,6 +441,11 @@
         # which cannot be rebuilt from the flake — the scores are the one part
         # not derivable from source.
         "/persist/var/lib/typstnique"
+        # The TaskChampion sync history. Kilobytes, and convenience rather
+        # than survival: every Taskwarrior replica holds the full task list, so
+        # this only saves re-initialising sync on each client. Encrypted with a
+        # key this host does not have, so the backup is opaque here too.
+        "/persist/var/lib/taskchampion-sync-server"
         "/persist/home"
         # The whole of /etc. 20 KB in total, and the ssh host key inside it is
         # what makes any of the rest restorable. sops decrypts with
@@ -562,6 +568,11 @@
           # unlike every other port in this list, publishing this one would
           # expose an unauthenticated API that runs arbitrary inference.
           11434 # ollama     (no public service)
+
+          # Taskwarrior's sync server. Mesh-only for the same reason and absent
+          # from gaia.nix too: a client-id is the whole of its authentication,
+          # so the NetBird ACL is what actually guards it.
+          10222 # taskchampion (no public service)
         ];
 
         # Simple Voice Chat on the hardcore server. UDP because it carries
