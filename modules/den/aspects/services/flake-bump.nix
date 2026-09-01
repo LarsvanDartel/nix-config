@@ -142,10 +142,20 @@
           # lines: an indented Nix string would otherwise have to contain
           # column-zero lines, which the formatter reindents — silently
           # rewriting the commit message every time anyone runs `nix fmt`.
+          #
+          # The host name is interpolated at eval time, not read with
+          # `hostname` at run time. It was the latter until now, and every
+          # commit the timer has ever made says "on ." — `hostname` is not in
+          # runtimeInputs and the unit's PATH does not supply it, so the
+          # substitution expanded to nothing. `set -e` cannot catch that: the
+          # status of a substitution inside an argument is discarded, so the
+          # run stayed green and wrote a message missing the one fact it
+          # existed to record. This form cannot fail that way — a typo here is
+          # an eval error, not a blank.
           git -c user.name="${cfg.gitName}" -c user.email="${cfg.gitEmail}" \
             commit flake.lock \
             -m "chore(flake): update lock" \
-            -m "Automated by services.flake-bump on $(hostname)." \
+            -m "Automated by services.flake-bump on ${config.networking.hostName}." \
             -m "${lib.concatStringsSep ", " cfg.hosts} all built green against this lock before it was committed."
 
           git push origin ${cfg.branch}
