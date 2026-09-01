@@ -416,6 +416,14 @@
       # no credential here grants anything on the fleet.
       cosmos.services.comin.repository = "https://knot.lvdar.nl/did:plc:a3erncqfgkcxu3yl6fpjfmwf";
 
+      # The one task history this server accepts, and the whole of what it
+      # checks: TaskChampion has no other authentication and the port is
+      # published, so this id is a credential rather than a name. From
+      # hosts/common in nix-secrets because voyager needs the same value to put
+      # in its taskrc.
+      cosmos.services.taskchampion.clientIdFile =
+        config.sops.secrets."keys/taskwarrior/client-id".path;
+
       # What on this host cannot be rebuilt from the flake. Listed here rather
       # than defaulted in services/restic.nix: which paths hold irreplaceable
       # state is a fact about this machine, and a default there decided it
@@ -682,6 +690,9 @@
       sops.secrets = {
         "keys/zfs/tank" = {};
         "keys/proton/private-key" = {};
+
+        # Read by systemd as a credential, so it needs no owner of its own.
+        "keys/taskwarrior/client-id".sopsFile = "${builtins.toString inputs.nix-secrets}/hosts/common/secrets.yaml";
         "keys/eweka".owner = config.cosmos.services.arr.sabnzbd.user;
       };
 
