@@ -976,9 +976,27 @@
               || echo "netbird: WARNING could not enable ssh on $peer_name"
           done
 
-          # Point every peer at the fleet resolver. A "primary" nameserver
-          # group in NetBird means "use this for all domains", which is why it
-          # carries no domain list — the two are mutually exclusive in the API.
+          # Point every peer at the fleet resolver for the mesh domain, and
+          # only for it.
+          #
+          # This group used to be `primary: true` with an empty domain list —
+          # NetBird's "use this for all domains" — so that endeavour's oisd
+          # blocklist followed a roaming laptop or phone around instead of
+          # stopping at the front door. That is a real thing to want, and this
+          # is a real loss. It is also what made voyager unusable on TU/e's
+          # tue-wpa2: the fleet resolvers live at 100.68.x.x and are reachable
+          # over the mesh alone, peers only ever connect by direct UDP :51820
+          # (no relay is deployed — the agent logs `do not switch to Relay`),
+          # and campus does not pass that UDP. A mesh that cannot carry packets
+          # therefore took *all* name resolution on the machine down with it:
+          # `2/2 upstreams failed ... timeout after 2.5s` for every domain, for
+          # hours. Primary makes the mesh a hard dependency of DNS itself, on
+          # exactly the machine most likely to be somewhere the mesh does not
+          # work.
+          #
+          # Scoped to the mesh domain, losing the mesh costs mesh names and
+          # nothing else. Ad-blocking comes back the moment there is a relay to
+          # fall back to and this can go primary again.
           #
           # The address is looked up rather than configured: NetBird assigns it
           # at enrollment, so a re-enrolled peer would otherwise leave the whole
@@ -997,14 +1015,15 @@
                 --arg name "$ns_name" \
                 --argjson ips "$dns_ips" \
                 --arg group "$all_group" \
-                --arg peers "${lib.concatStringsSep ", " cfg.dnsPeers}" '{
+                --arg peers "${lib.concatStringsSep ", " cfg.dnsPeers}" \
+                --arg domain ${lib.escapeShellArg cfg.dnsDomain} '{
                   name: $name,
                   description: ("unbound on " + $peers),
                   nameservers: [$ips[] | {ip: ., ns_type: "udp", port: 53}],
                   enabled: true,
                   groups: [$group],
-                  primary: true,
-                  domains: [],
+                  primary: false,
+                  domains: [$domain],
                   search_domains_enabled: false,
                 }')"
 
