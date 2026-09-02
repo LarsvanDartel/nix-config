@@ -102,8 +102,19 @@
           accel-profile = "flat";
           accel-speed = 0.0;
         };
-        # Hyprland's follow_mouse = 2.
-        focus-follows-mouse = _: {};
+        # Deliberately absent: focus-follows-mouse.
+        #
+        # It was on here to mirror the Hyprland input block, which still sets
+        # `follow_mouse = 2`. The two are not the same thing. Hyprland's 2
+        # detaches pointer focus from keyboard focus — the cursor crossing a
+        # window does not steal typing — whereas niri's node is the plain
+        # thing: cross a window and it takes focus, keyboard included. Mirroring
+        # the number rather than the behaviour is what made niri feel like it
+        # was switching windows on its own.
+        #
+        # niri has no equivalent of Hyprland's detached mode, so the honest
+        # mirror of `follow_mouse = 2` is to leave this off and let clicks move
+        # focus.
       };
 
       layout = {
