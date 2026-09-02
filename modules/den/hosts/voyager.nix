@@ -198,6 +198,32 @@
         };
       };
 
+      # DNS on a laptop that roams onto networks it does not control.
+      #
+      # The global default pins 9.9.9.9 as resolvconf's `static` entry, which
+      # makes it the *first* nameserver everywhere and, because
+      # `nameservers != []`, also flips NetworkManager to `dns = "none"` — so NM
+      # never installs the DNS the network itself handed out. On TU/e's
+      # tue-wpa2 that is fatal: Quad9's :53 does not answer from campus, and the
+      # resolvers that would (131.155.3.3/131.155.2.3) only reached resolv.conf
+      # at all because dhcpcd was *also* running on the wifi interface. Empty
+      # here means NM owns DNS and the local network's resolvers are used, which
+      # is the only thing that works on a network that filters egress :53.
+      cosmos.networking.nameservers = [];
+
+      # ...and with NM owning DHCP, dhcpcd must not also be. dhcpcd was leasing
+      # wlp0s20f3 alongside NetworkManager's internal DHCP client — two clients
+      # leasing, writing resolv.conf and adding routes on one interface. It only
+      # ever looked harmless because dhcpcd happened to win the resolv.conf
+      # race, which is also the only reason DNS worked at all while
+      # `nameservers` above forced NM to `dns = "none"`.
+      #
+      # Disabled here rather than via `networking.useDHCP`: the facter module
+      # declares `networking.interfaces.wlp0s20f3.useDHCP = true` per-interface,
+      # and dhcpcd's own default is the *or* of the global flag and every
+      # interface's, so clearing the global one changes nothing.
+      networking.dhcpcd.enable = false;
+
       networking.networkmanager.wifi.powersave = false;
       environment.etc."NetworkManager/conf.d/wifi.conf".text = ''
         [connection]
