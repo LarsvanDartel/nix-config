@@ -51,7 +51,19 @@
     # the host, which during this work was most of them. Linking the one
     # manifest ourselves keeps it inside home-manager-files, where home-manager
     # can replace it like anything else.
-    home.file.".mozilla/native-messaging-hosts/webbluetooth_host.json".source = "${pkgs.web-bluetooth-firefox-host}/lib/mozilla/native-messaging-hosts/webbluetooth_host.json";
+    #
+    # `force` because that migration left survivors and activation still trips
+    # over them: ~/.mozilla is not persisted, but a switch mid-session finds
+    # whatever the running generation put there, and anything that does not
+    # resolve under home-manager-files — a manifest linked straight into the
+    # host package by the old `ignorelinks` layout, or a plain file — aborts
+    # the whole activation, taking every other home file with it. The file is
+    # generated from the host derivation and holds nothing a user wrote, so
+    # there is nothing here worth failing a rebuild to protect.
+    home.file.".mozilla/native-messaging-hosts/webbluetooth_host.json" = {
+      source = "${pkgs.web-bluetooth-firefox-host}/lib/mozilla/native-messaging-hosts/webbluetooth_host.json";
+      force = true;
+    };
 
     # xdg.mimeApps.enable is set here rather than relied on: setAsDefaultBrowser
     # writes defaultApplications but does not enable the module itself, so
