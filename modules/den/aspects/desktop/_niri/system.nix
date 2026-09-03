@@ -167,8 +167,9 @@
 
       # Global blur tuning. Blur itself needs no switch here: niri honours any
       # surface that asks for it over `ext-background-effect` — which is how
-      # noctalia's bar, panels and launcher get theirs — and the window rule
-      # below turns it on for foot, which cannot ask.
+      # noctalia's bar, panels and launcher get theirs. Nothing else opts in:
+      # foot is opaque (stylix.opacity.terminal is 1.0), so it has nothing to
+      # blur behind it.
       #
       # `passes` and `noise` are matched to the Hyprland session's
       # `decoration.blur` so the two sessions look like the same desktop.
@@ -343,21 +344,6 @@
           # two, and the shadow is what says which is which. Tiled windows are
           # left flat on purpose — they tile, so they need no separating.
           shadow.on = _: {};
-        }
-        # foot is translucent (stylix.opacity.terminal), and without this it
-        # would be translucent onto whatever happens to be behind it. A
-        # terminal cannot request blur for itself the way noctalia can — there
-        # is no `ext-background-effect` support in foot — so niri is told to
-        # blur it from this side.
-        #
-        # `xray` is left at its default, meaning on: the blur is computed once
-        # against the wallpaper and reused, rather than recomputed every time
-        # anything underneath moves. `xray false` would blur the actual windows
-        # below, but upstream still marks that experimental — it drops out
-        # during open/close animations and while dragging a tiled window.
-        {
-          matches = [{app-id = "^foot$";}];
-          background-effect.blur = true;
         }
         # The calculator pops up floating, rofi-calc style.
         {

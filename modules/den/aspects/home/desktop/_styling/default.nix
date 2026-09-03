@@ -41,9 +41,12 @@ in {
       #
       # stylix reaches only some of it directly — foot and alacritty from
       # `terminal`, and off that same value it flips btop's and helix's
-      # `transparent` flags, which is load-bearing rather than incidental: a
-      # TUI that paints its own opaque background punches a solid rectangle
-      # through the translucent terminal it runs in. The niri shell's surfaces
+      # `transparent` flags. That coupling is why `terminal` is 1.0: a
+      # translucent terminal makes every TUI that paints its own background
+      # punch a solid rectangle through it, and text over a moving wallpaper
+      # is the one place the effect costs more legibility than it buys. The
+      # shells still get their translucency from `desktop`/`popups`, which
+      # carry no text you read for minutes at a time. The niri shell's surfaces
       # are wired up by hand in _noctalia/home.nix, because stylix's
       # noctalia-shell target is gated on `options.programs ? noctalia-shell`
       # and ours is a wrapped package, not that home-manager module — so the
@@ -53,7 +56,7 @@ in {
       # and a translucent PDF is simply harder to read, while a translucent
       # browser chrome wrapped around opaque page content just looks broken.
       opacity = {
-        terminal = 0.8;
+        terminal = 1.0;
         desktop = 0.8;
         popups = 0.8;
       };
