@@ -87,6 +87,13 @@
 
           desktops.hyprland.animations.enable = false;
 
+          # Rotate through the top 20 of the ranked collection rather than the
+          # default 8. This is the machine the collection was ranked on and the
+          # one it is looked at all day, so the cycle can afford to be longer
+          # before it starts repeating; 20 of 90 still leaves the ones that lost
+          # out of it, which was the point of ranking them.
+          desktops.wallpapers.rotate.count = 20;
+
           gaming.launchers.minecraft.mcsr.enable = true;
 
           programs = {
