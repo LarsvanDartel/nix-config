@@ -92,12 +92,24 @@
         enable = true;
         package = pkgs.taskwarrior3;
 
+        # The default theme's color.overdue (fg only) and color.scheduled
+        # (bg only) are individually sane, but rule.color.merge=1 combines
+        # colors from *every* matching rule rather than just the
+        # highest-precedence one — so an overdue+scheduled task gets
+        # color.overdue's red foreground stapled onto color.scheduled's dark
+        # navy background, and comes out unreadable. Turning merge off makes
+        # the highest-precedence rule win outright.
+        #
         # Last line of taskrc, and taskwarrior lets a later definition win — so
         # anything set by hand with `task config` earlier in the file is
         # overridden by what sops rendered, rather than silently shadowing it.
-        extraConfig = lib.optionalString (sync.serverUrl != null) ''
-          include ${osConfig.sops.templates."taskwarrior-sync.conf".path}
-        '';
+        extraConfig =
+          ''
+            rule.color.merge=0
+          ''
+          + lib.optionalString (sync.serverUrl != null) ''
+            include ${osConfig.sops.templates."taskwarrior-sync.conf".path}
+          '';
       };
 
       home.packages = [pkgs.taskwarrior-tui];
