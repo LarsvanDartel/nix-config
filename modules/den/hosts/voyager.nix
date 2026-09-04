@@ -48,6 +48,7 @@
         home.thunderbird
         home.libreoffice
         home.zotero
+        home.process-mining
         home.obs-studio
         home.which-key
         home.freecad
