@@ -705,10 +705,17 @@
           settings="$(jq '.settings
             | .jwt_groups_enabled = true
             | .jwt_groups_claim_name = "groups"
-            | .extra.peer_approval_enabled = true' <<<"$account")"
+            | .extra.peer_approval_enabled = true
+            # Lets netbird expose publish a service straight from a peer CLI,
+            # without a nix-declared entry in cfg.services. Off by default
+            # account-wide, hence turning it on here rather than leaving it
+            # to be found later as a dashboard toggle nobody set. No group
+            # restriction: peer_expose_groups stays empty, so this applies to
+            # every enrolled peer.
+            | .peer_expose_enabled = true' <<<"$account")"
 
           if [ "$(jq -rS . <<<"$settings")" != "$(jq -rS .settings <<<"$account")" ]; then
-            echo "netbird: updating account settings (JWT group sync, peer approval)"
+            echo "netbird: updating account settings (JWT group sync, peer approval, peer expose)"
             req -X PUT -d "$(jq -n --argjson s "$settings" '{settings: $s}')" \
               "$api/accounts/$account_id" >/dev/null \
               || echo "netbird: WARNING could not update account settings"
