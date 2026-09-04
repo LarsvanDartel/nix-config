@@ -111,6 +111,13 @@
               collectionType = "tvshows";
               libraryOptions.pathInfos = [{path = "/tank/media/library/shows";}];
             }
+            {
+              # No movie/show metadata to scrape here, so "homevideos" — plain
+              # video files, no online identification.
+              name = "Lectures";
+              collectionType = "homevideos";
+              libraryOptions.pathInfos = [{path = "/tank/media/library/lectures";}];
+            }
           ];
 
           users = [
