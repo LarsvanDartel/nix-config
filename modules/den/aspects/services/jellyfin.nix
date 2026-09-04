@@ -118,6 +118,11 @@
               collectionType = "homevideos";
               libraryOptions.pathInfos = [{path = "/tank/media/library/lectures";}];
             }
+            {
+              name = "Anime";
+              collectionType = "tvshows";
+              libraryOptions.pathInfos = [{path = "/tank/media/library/anime";}];
+            }
           ];
 
           users = [
