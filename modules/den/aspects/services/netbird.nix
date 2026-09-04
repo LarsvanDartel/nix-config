@@ -702,17 +702,30 @@
           # With this on, their peer is created but stays pending and carries no
           # access until it is approved here. Approving a person to read a web
           # page no longer decides anything about the mesh.
-          settings="$(jq '.settings
+          groups="$(req "$api/groups")"
+
+          # peer_expose_enabled needs this: the API refuses to enable it with
+          # an empty peer_expose_groups ("peer expose requires at least one
+          # group", accounts_handler.go), so unlike peer_approval_enabled it
+          # cannot just be flipped on. "All" is the built-in group holding
+          # every peer, so gating on it is the same as no restriction.
+          all_gid_for_expose="$(jq -r '.[] | select(.name == "All") | .id' <<<"$groups" | head -n1)"
+
+          settings="$(jq --arg allid "$all_gid_for_expose" '.settings
             | .jwt_groups_enabled = true
             | .jwt_groups_claim_name = "groups"
             | .extra.peer_approval_enabled = true
             # Lets netbird expose publish a service straight from a peer CLI,
             # without a nix-declared entry in cfg.services. Off by default
             # account-wide, hence turning it on here rather than leaving it
-            # to be found later as a dashboard toggle nobody set. No group
-            # restriction: peer_expose_groups stays empty, so this applies to
-            # every enrolled peer.
-            | .peer_expose_enabled = true' <<<"$account")"
+            # to be found later as a dashboard toggle nobody set.
+            | if $allid != "" then
+                .peer_expose_enabled = true | .peer_expose_groups = [$allid]
+              else . end' <<<"$account")"
+
+          if [ -z "$all_gid_for_expose" ]; then
+            echo "netbird: waiting on group All before enabling peer expose"
+          fi
 
           if [ "$(jq -rS . <<<"$settings")" != "$(jq -rS .settings <<<"$account")" ]; then
             echo "netbird: updating account settings (JWT group sync, peer approval, peer expose)"
@@ -720,8 +733,6 @@
               "$api/accounts/$account_id" >/dev/null \
               || echo "netbird: WARNING could not update account settings"
           fi
-
-          groups="$(req "$api/groups")"
 
           # A distribution group MUST have been created by JWT sync — this
           # reconciler must never create one, however tempting it looks.
