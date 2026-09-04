@@ -57,13 +57,31 @@
       };
     };
 
-    # Only `default_session` — that is the greeter. `initial_session` is greetd's
-    # *autologin* slot; pointing it at the same value registered the greeter twice.
-    config.services.greetd = {
-      enable = true;
-      settings.default_session = {
-        inherit (cfg) command user;
+    config = {
+      # Only `default_session` — that is the greeter. `initial_session` is
+      # greetd's *autologin* slot; pointing it at the same value registered
+      # the greeter twice.
+      services.greetd = {
+        enable = true;
+        settings.default_session = {
+          inherit (cfg) command user;
+        };
       };
+
+      # greetd's own PAM service sets `useDefaultRules = false` and substacks
+      # /etc/pam.d/login for auth/password and includes it for session (see
+      # nixos/modules/services/display-managers/greetd.nix), so setting
+      # enableGnomeKeyring on `security.pam.services.greetd` itself is a no-op
+      # — that whole generic-rules machinery is bypassed. `login` is the stack
+      # that actually runs, so pam_gnome_keyring has to go there.
+      #
+      # Without this, PAM never unlocks the login gnome-keyring with the
+      # password typed into the greeter, so home.keyring's gnome-keyring-daemon
+      # starts locked every boot. Any secret written to it (Proton Pass,
+      # browser saved passwords, ssh-agent) is then unreadable on the next
+      # login — indistinguishable from having been wiped, even though the
+      # persisted keyring file on disk is untouched.
+      security.pam.services.login.enableGnomeKeyring = true;
     };
   };
 
