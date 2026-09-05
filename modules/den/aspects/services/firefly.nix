@@ -145,6 +145,17 @@
           };
         };
 
+        # Both phpfpm sockets are 0660, group-owned by their own service
+        # user — upstream's module only widens that to the "nginx" group
+        # when enableNginx is on, which it isn't here (the custom vhosts
+        # above need the auth_request gate the module's own vhost has
+        # nowhere to hang). Without this, nginx gets a bare "13: Permission
+        # denied" connecting to the socket — on firefly-iii specifically,
+        # only once an actual authenticated request reaches the php
+        # location, since auth_request intercepts every anonymous one first
+        # and never gets there.
+        users.users.nginx.extraGroups = ["firefly-iii" "firefly-iii-data-importer"];
+
         # Peer auth over the unix socket, same as paperless/immich's own
         # database.createLocally: the postgres role name matches the OS user
         # each service already runs as, so nothing here needs a password.
