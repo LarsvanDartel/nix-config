@@ -189,6 +189,13 @@
         # share that group. systemd (root) reads the credential file itself
         # and hands the content to the service privately, regardless of the
         # original file's owner.
+        #
+        # --whitelist-domain is required, not decorative: --reverse-proxy
+        # validates every redirect target it's asked to honour (including
+        # the X-Auth-Request-Redirect header the /oauth2/ location below
+        # sets) against this list, and an unset list means an empty one —
+        # rejecting every redirect with "domain / port not in whitelist"
+        # rather than the permissive default the flag's absence might imply.
         systemd.services.oauth2-proxy-firefly = {
           description = "oauth2-proxy for Firefly III";
           after = ["network.target" "kanidm.service"];
@@ -210,6 +217,7 @@
                 --redirect-url=https://${cfg.domain}/oauth2/callback \
                 --upstream=static://202 \
                 --email-domain=* \
+                --whitelist-domain=${cfg.domain} \
                 --set-xauthrequest \
                 --reverse-proxy \
                 --trusted-proxy-ip=127.0.0.1/32 \
@@ -281,7 +289,13 @@
             };
 
             "/oauth2/" = {
-              proxyPass = "http://127.0.0.1:4181/";
+              # No trailing slash on the proxy_pass target: with one, nginx
+              # replaces the matched "/oauth2/" prefix with it, so a request
+              # for /oauth2/start reaches oauth2-proxy as bare /start —
+              # observed directly as "Rejecting invalid redirect /start...".
+              # Without the trailing slash the full URI, prefix included,
+              # passes through unchanged.
+              proxyPass = "http://127.0.0.1:4181";
               extraConfig = ''
                 auth_request off;
                 proxy_set_header X-Scheme https;
