@@ -37,6 +37,7 @@
       services.microbin
       services.paperless
       services.immich
+      services.firefly
       services.traccar
       services.tile-traccar
       services.netbird.client

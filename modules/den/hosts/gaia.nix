@@ -380,6 +380,12 @@
         docs = shared 9980;
         wopi = shared 9300;
 
+        # Firefly III speaks no OIDC of its own, but authenticates through
+        # kanidm anyway via oauth2-proxy + remote_user_guard (firefly.nix) —
+        # a real login, same as the apps above, so it belongs in `shared`
+        # rather than behind a second, redundant NetBird check.
+        firefly = shared 8097;
+
         # The status page, ungated for the same reason as ntfy and then some.
         # Gating it would put kanidm in front — and kanidm runs on endeavour,
         # so a page whose entire job is to tell you endeavour is down would
