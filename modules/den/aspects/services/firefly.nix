@@ -45,6 +45,113 @@
       inherit (lib.types) port str;
 
       cfg = config.cosmos.services.firefly;
+      importerCfg = config.services.firefly-iii-data-importer;
+      notify = config.cosmos.system.notifyFailure;
+
+      # Where a saved import configuration (config.json, downloaded from the
+      # importer's own web UI after a manual run) has to be placed by hand for
+      # the auto-import timer below to find it — there's no API to generate
+      # one, since it's meant to capture choices ("import everything since
+      # 2019", "connection reused across runs") only a human makes once.
+      importDir = "${importerCfg.dataDir}/import";
+
+      autoImport = pkgs.writeShellApplication {
+        name = "firefly-auto-import";
+        runtimeInputs = [pkgs.coreutils];
+        text = ''
+          config="${importDir}/config.json"
+          if [ ! -f "$config" ]; then
+            echo "No $config yet: run an import once through the web UI, download its" \
+                 "configuration there, and place it at that path to enable this timer."
+            exit 0
+          fi
+
+          # Each of these is consumed by the artisan subprocess below via
+          # `set -a`, not read directly in this script — shellcheck can't see
+          # that, hence a disable per line rather than one at the top.
+          set -a
+          # shellcheck disable=SC2034
+          APP_ENV=production
+          # shellcheck disable=SC2034
+          TZ=Europe/Amsterdam
+          # shellcheck disable=SC2034
+          FIREFLY_III_URL=https://${cfg.domain}
+          # shellcheck disable=SC2034
+          IMPORT_DIR_ALLOWLIST=${importDir}
+          # shellcheck disable=SC2034
+          ENABLE_BANKING_APP_ID="$(< "$CREDENTIALS_DIRECTORY/eb-app-id")"
+          # shellcheck disable=SC2034
+          ENABLE_BANKING_PRIVATE_KEY="$(< "$CREDENTIALS_DIRECTORY/eb-private-key")"
+          # shellcheck disable=SC2034
+          FIREFLY_III_ACCESS_TOKEN="$(< "$CREDENTIALS_DIRECTORY/access-token")"
+          set +a
+
+          exec ${importerCfg.package}/artisan importer:import "$config"
+        '';
+      };
+
+      # The saved config.json carries an enable_banking_sessions id — the
+      # same "session" the browser flow authorised — so the real consent
+      # expiry (Enable Banking's GET /sessions/{id}, access.valid_until) can
+      # be checked directly rather than guessed from ASPSP ceilings. Verified
+      # live once by hand: Rabobank's actual grant for this connection is 90
+      # days from authorisation, not the 180-day maximum the bank allows.
+      checkConsent = pkgs.writeShellApplication {
+        name = "firefly-consent-check";
+        runtimeInputs = with pkgs; [curl jq openssl coreutils];
+        text = ''
+          config="${importDir}/config.json"
+          if [ ! -f "$config" ]; then
+            echo "No $config yet; nothing to check."
+            exit 0
+          fi
+
+          session_id="$(jq -r '.enable_banking_sessions[0] // empty' "$config")"
+          if [ -z "$session_id" ]; then
+            echo "config.json has no enable_banking_sessions; nothing to check."
+            exit 0
+          fi
+
+          app_id="$(cat "$CREDENTIALS_DIRECTORY/eb-app-id")"
+          now=$(date +%s)
+
+          b64url() { base64 -w0 | tr '+/' '-_' | tr -d '='; }
+
+          header=$(printf '{"typ":"JWT","alg":"RS256","kid":"%s"}' "$app_id" | b64url)
+          payload=$(printf '{"iss":"enablebanking.com","aud":"api.enablebanking.com","iat":%d,"exp":%d}' "$now" "$((now + 300))" | b64url)
+          signing_input="''${header}.''${payload}"
+          signature=$(printf '%s' "$signing_input" | openssl dgst -sha256 -sign "$CREDENTIALS_DIRECTORY/eb-private-key" | b64url)
+          jwt="''${signing_input}.''${signature}"
+
+          response=$(curl -sS --max-time 20 -H "Authorization: Bearer $jwt" \
+            "https://api.enablebanking.com/sessions/$session_id")
+          valid_until=$(echo "$response" | jq -r '.access.valid_until // empty')
+          status=$(echo "$response" | jq -r '.status // empty')
+
+          if [ -z "$valid_until" ]; then
+            echo "Could not read session expiry from Enable Banking: $response" >&2
+            exit 1
+          fi
+
+          days_left=$(( ($(date -d "$valid_until" +%s) - now) / 86400 ))
+          echo "session $session_id: status=$status, $days_left day(s) left ($valid_until)"
+
+          # 14 days of runway: enough to notice and re-authorise by hand
+          # (the same manual, browser-driven flow that created the session
+          # in the first place — there is no way to renew it headlessly)
+          # before the automatic import above starts silently doing nothing.
+          if [ "$status" != "AUTHORIZED" ] || [ "$days_left" -le 14 ]; then
+            password="$(cat "$CREDENTIALS_DIRECTORY/ntfy-password")"
+            curl -sS --max-time 20 --retry 3 --retry-all-errors --retry-delay 10 \
+              -u "${notify.user}:$password" \
+              -H "Title: Firefly III: bank connection needs re-authorising" \
+              -H "Priority: default" \
+              -H "Tags: bank" \
+              -d "Enable Banking session status is $status, valid_until $valid_until (~$days_left days left). Re-authorise it from https://${cfg.domain} (Automation > Import data) to keep the automatic import working." \
+              "${notify.url}/${notify.topic}"
+          fi
+        '';
+      };
 
       phpLocation = {
         socket,
@@ -181,6 +288,71 @@
             # https://${cfg.importerDomain}/eb-callback.
             ENABLE_BANKING_APP_ID_FILE = config.sops.secrets."keys/firefly/enable-banking-app-id".path;
             ENABLE_BANKING_PRIVATE_KEY_FILE = config.sops.secrets."keys/firefly/enable-banking-private-key".path;
+
+            # Lets the CLI (`artisan importer:import`, used by the auto-import
+            # timer below) read a config.json placed there — the same
+            # allowlist the web UI's own file-upload path is restricted to.
+            IMPORT_DIR_ALLOWLIST = importDir;
+          };
+        };
+
+        systemd.tmpfiles.rules = [
+          "d ${importDir} 0750 firefly-iii-data-importer firefly-iii-data-importer -"
+        ];
+
+        systemd.services.firefly-auto-import = {
+          description = "Re-run Firefly III's saved Enable Banking import";
+          after = ["network-online.target" "phpfpm-firefly-iii-data-importer.service"];
+          wants = ["network-online.target"];
+          serviceConfig = {
+            Type = "oneshot";
+            User = "firefly-iii-data-importer";
+            Group = "firefly-iii-data-importer";
+            WorkingDirectory = importerCfg.package;
+            ReadWritePaths = [importerCfg.dataDir];
+            LoadCredential = [
+              "eb-app-id:${config.sops.secrets."keys/firefly/enable-banking-app-id".path}"
+              "eb-private-key:${config.sops.secrets."keys/firefly/enable-banking-private-key".path}"
+              "access-token:${config.sops.secrets."keys/firefly/importer-access-token".path}"
+            ];
+            ExecStart = lib.getExe autoImport;
+          };
+        };
+
+        systemd.timers.firefly-auto-import = {
+          description = "Daily automatic Firefly III bank import";
+          wantedBy = ["timers.target"];
+          timerConfig = {
+            OnCalendar = "03:15";
+            Persistent = true;
+            RandomizedDelaySec = "10min";
+          };
+        };
+
+        systemd.services.firefly-consent-check = {
+          description = "Check Firefly III's Enable Banking session expiry";
+          after = ["network-online.target"];
+          wants = ["network-online.target"];
+          serviceConfig = {
+            Type = "oneshot";
+            User = "firefly-iii-data-importer";
+            Group = "firefly-iii-data-importer";
+            LoadCredential = [
+              "eb-app-id:${config.sops.secrets."keys/firefly/enable-banking-app-id".path}"
+              "eb-private-key:${config.sops.secrets."keys/firefly/enable-banking-private-key".path}"
+              "ntfy-password:${config.sops.secrets."keys/ntfy/password".path}"
+            ];
+            ExecStart = lib.getExe checkConsent;
+          };
+        };
+
+        systemd.timers.firefly-consent-check = {
+          description = "Weekly Firefly III bank consent expiry check";
+          wantedBy = ["timers.target"];
+          timerConfig = {
+            OnCalendar = "weekly";
+            Persistent = true;
+            RandomizedDelaySec = "1h";
           };
         };
 
