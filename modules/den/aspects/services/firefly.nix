@@ -48,14 +48,21 @@
 
       phpLocation = {
         socket,
-        extraFastcgiParams ? "",
+        extraConfig ? "",
+        # $request_filename is right for the "~ \.php$" location (it always
+        # matches the literal /index.php that tryFiles rewrote to), but wrong
+        # for a prefix location like /api/ that never goes through tryFiles —
+        # there $request_filename would resolve to <root>/api/v1/whatever, a
+        # file that doesn't exist. Those pass the real front controller path
+        # explicitly instead.
+        scriptFilename ? "$request_filename",
       }: {
         extraConfig = ''
           include ${config.services.nginx.package}/conf/fastcgi_params;
-          fastcgi_param SCRIPT_FILENAME $request_filename;
+          fastcgi_param SCRIPT_FILENAME ${scriptFilename};
           fastcgi_param modHeadersAvailable true;
           fastcgi_pass unix:${socket};
-          ${extraFastcgiParams}
+          ${extraConfig}
         '';
       };
     in {
@@ -297,10 +304,27 @@
 
             "~ \\.php$" = phpLocation {
               socket = config.services.phpfpm.pools.firefly-iii.socket;
-              extraFastcgiParams = ''
+              extraConfig = ''
                 fastcgi_param REMOTE_USER $auth_user;
                 fastcgi_param REMOTE_USER_EMAIL $auth_email;
               '';
+            };
+
+            # Firefly's REST API authenticates its own callers with a Bearer
+            # token (OAuth personal access token or client) and was never
+            # meant to sit behind a browser SSO gate — the data importer's
+            # server-to-server calls have no session cookie to present, and
+            # got the same 307-to-login redirect a browser would, which is a
+            # login page rather than the JSON /api/v1/about was expecting.
+            # This can't just be "/" with auth_request off: tryFiles rewrites
+            # every request to /index.php internally, which then re-enters
+            # the same "~ \.php$" location regardless of the original path,
+            # so the exemption has to live on a location that calls fastcgi
+            # directly rather than falling through to that shared one.
+            "/api/" = phpLocation {
+              socket = config.services.phpfpm.pools.firefly-iii.socket;
+              scriptFilename = "$document_root/index.php";
+              extraConfig = "auth_request off;";
             };
 
             # The three locations below are what oauth2-proxy-nginx.nix
