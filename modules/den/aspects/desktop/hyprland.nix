@@ -26,6 +26,10 @@
         name = "hyprland.desktop";
         path = "${config.programs.hyprland.package}/share/wayland-sessions/hyprland-uwsm.desktop";
       };
+
+      # Same "only when this compositor is actually the active one" gating as
+      # the greetd session entry above — see core.yubikey for the consumer.
+      cosmos.profiles.desktop.lockCommand = lib.mkIf config.programs.hyprland.enable "hyprlock";
     };
   };
 }

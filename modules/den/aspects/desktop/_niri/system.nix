@@ -486,4 +486,9 @@ in {
       path = "${config.programs.niri.package}/share/wayland-sessions/niri.desktop";
     }
   ];
+
+  # This module only exists loaded as the active compositor (see the header
+  # comment), so no gating is needed here the way hyprland.nix gates on
+  # programs.hyprland.enable — see core.yubikey for the consumer.
+  cosmos.profiles.desktop.lockCommand = noctalia "lockScreen" "lock";
 }
