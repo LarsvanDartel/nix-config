@@ -128,6 +128,14 @@
             AUTHENTICATION_GUARD = "remote_user_guard";
             AUTHENTICATION_GUARD_HEADER = "REMOTE_USER";
             AUTHENTICATION_GUARD_EMAIL = "REMOTE_USER_EMAIL";
+
+            MAIL_MAILER = "smtp";
+            MAIL_HOST = "smtp.protonmail.ch";
+            MAIL_PORT = 587;
+            MAIL_ENCRYPTION = "tls";
+            MAIL_USERNAME = "firefly@lvdar.nl";
+            MAIL_FROM = "firefly@lvdar.nl";
+            MAIL_PASSWORD_FILE = config.sops.secrets."keys/firefly/smtp-token".path;
           };
         };
 
@@ -182,6 +190,7 @@
           "keys/firefly/app-key" = {owner = "firefly-iii";};
           "keys/firefly/oauth-client-secret".owner = "kanidm";
           "keys/firefly/cookie-secret" = {};
+          "keys/firefly/smtp-token".owner = "firefly-iii";
           # Created from Firefly's own UI (Profile → OAuth → Personal Access
           # Tokens) after the first SSO login — necessarily a manual,
           # after-the-fact step, since the token cannot exist before the
