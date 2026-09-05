@@ -113,6 +113,14 @@
             DB_DATABASE = "firefly-iii";
             DB_USERNAME = "firefly-iii";
 
+            # gaia terminates TLS and forwards plain HTTP to this vhost (see
+            # the X-Forwarded-Proto override below), so without this Laravel
+            # doesn't trust that header and generates http:// links for
+            # everything — including, concretely, the setup wizard's own
+            # form action, which then fails to load entirely since nothing
+            # here answers on port 80.
+            TRUSTED_PROXIES = "**";
+
             # oauth2-proxy's X-Auth-Request-User/-Email land in these two
             # PHP $_SERVER keys via the fastcgi_params below — plain names,
             # not HTTP_-prefixed, matching Apache's mod_auth convention that
