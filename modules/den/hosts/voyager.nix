@@ -55,7 +55,6 @@
         home.orca-slicer
         home.simplelogin
         home.proton.mail-bridge
-        home.proton.mail-desktop
         home.proton.pass-cli
         home.proton.vpn-cli
         home.eduvpn
