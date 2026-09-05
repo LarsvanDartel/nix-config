@@ -62,6 +62,17 @@
           fastcgi_param SCRIPT_FILENAME ${scriptFilename};
           fastcgi_param modHeadersAvailable true;
           fastcgi_pass unix:${socket};
+
+          # Neither app queues work — QUEUE_CONNECTION=sync in both — so an
+          # import runs to completion inside the one request that started
+          # it. Confirmed directly: a 373-transaction import took 33-37
+          # minutes and *did* finish successfully server-side every time,
+          # well past nginx's 60s default fastcgi_read_timeout — which had
+          # already cut the client off, so the only visible symptom was a
+          # progress bar that looked permanently stuck.
+          fastcgi_read_timeout 3600s;
+          fastcgi_send_timeout 3600s;
+
           ${extraConfig}
         '';
       };
