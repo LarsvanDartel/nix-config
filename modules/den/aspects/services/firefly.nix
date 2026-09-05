@@ -85,7 +85,12 @@
 
         importerPort = mkOption {
           type = port;
-          default = 8096;
+          # Not 8096: that's jellyfin's own port (jellyfin.nix), and having
+          # two different services try to bind it broke both — nginx won the
+          # bind for this vhost's SSL socket, and jellyfin's own listener (or
+          # the routing that reaches it) came apart as a result. Found only
+          # because jellyfin itself started 400ing.
+          default = 8098;
           description = ''
             Mesh-facing port for the data importer's own nginx vhost. Not
             proxied through gaia — see the header for why.
