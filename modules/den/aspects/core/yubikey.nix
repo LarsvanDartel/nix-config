@@ -82,30 +82,8 @@
       security.pam.services = {
         swaylock.u2fAuth = true;
         hyprlock.u2fAuth = true;
+        login.u2fAuth = true;
         sudo.u2fAuth = true;
-
-        login = {
-          u2fAuth = true;
-
-          # u2f is `sufficient`, so a YubiKey touch satisfies auth and PAM
-          # skips every later module in the stack outright — including
-          # gnome_keyring's own auth hook further down, which never runs and
-          # so never gets a chance to even attempt an unlock. Its session
-          # module (home.keyring's auto_start) then finds no login keyring it
-          # can use and creates a brand new, empty one instead of prompting —
-          # indistinguishable from the real one having been wiped, even
-          # though it's untouched on disk. Moving gnome_keyring's auth hook
-          # ahead of u2f/fprintd fixes this for every short-circuiting method
-          # at once: `optional` doesn't gate success or fail the stack, so it
-          # doesn't affect login itself, and it doesn't prompt on its own
-          # (see enableGnomeKeyring's own description) — it just registers a
-          # (typically empty, this early) unlock attempt for the session
-          # module to use, which is exactly what unlocks a keyring whose
-          # password was blanked out per home.keyring's own comment. Offset
-          # from u2f's own order rather than a literal number, per this
-          # option's own warning about built-in order values changing.
-          rules.auth.gnome_keyring.order = config.security.pam.services.login.rules.auth.u2f.order - 10;
-        };
       };
 
       # A pam_u2f mapping is a key handle + public key, not a credential — the
