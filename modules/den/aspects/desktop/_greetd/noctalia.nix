@@ -9,7 +9,7 @@
 # that renders greetd's login prompt in noctalia's visual language. It runs
 # inside cage, started by the `noctalia-greeter-session` wrapper.
 #
-# Three things it hardcodes, and how they are satisfied here:
+# Two things it hardcodes, and how they are satisfied here:
 #
 #   * Sessions come from /usr/share/wayland-sessions and
 #     /usr/local/share/wayland-sessions only — no XDG_DATA_DIRS, no NixOS
@@ -18,10 +18,25 @@
 #   * `noctalia-greeter-session` shells out to cage, wlr-randr and
 #     dbus-run-session by name, and greetd's unit has no PATH to speak of, so
 #     the package is re-wrapped with them.
-#   * Theming comes from /var/lib/noctalia-greeter/appearance.json, normally
-#     written by noctalia-shell v5's "sync to greeter" polkit action. Shell
-#     4.7.7 has no such action, so the manifest is generated from the stylix
-#     palette and symlinked in — no runtime sync, no admin prompt.
+#
+# Theming (palette, wallpaper, default session) goes through
+# `services.displayManager.noctalia-greeter.settings`, which the upstream
+# NixOS module force-symlinks into /var/lib/noctalia-greeter/greeter.toml on
+# every activation — the ONE file the greeter documents as "declarative;
+# Nix-safe; UI and Sync never write this". Do not be tempted back to writing
+# /var/lib/noctalia-greeter/appearance.json by hand: pre-1.3.0 that file was
+# read on every launch, but 1.3.0 added a separate, mutable
+# /var/lib/noctalia-greeter/sync.toml ("UI + Sync; not managed by Nix") and
+# only *migrates* legacy appearance.json into it once, the first time sync.toml
+# doesn't exist yet. After that one migration the greeter never looks at
+# appearance.json again — a `C+` tmpfiles rule can force-refresh it every
+# deploy and the greeter will keep rendering whatever palette/wallpaper got
+# baked into sync.toml on day one, silently, forever (this is exactly how the
+# background went black: the themed wallpaper is a content-addressed store
+# path that changes on every stylix/wallpaper rebuild, sync.toml pinned the
+# very first one, and that generation was eventually garbage-collected out
+# from under it). greeter.toml doesn't have this problem — it is re-read by
+# the greeter on every launch, not migrated-and-forgotten.
 {}: {
   config,
   lib,
@@ -53,49 +68,6 @@
   };
 
   sessionDir = pkgs.linkFarm "greetd-wayland-sessions" greetd.sessions;
-
-  # noctalia's own colour roles, mapped off the base16 scheme stylix is themed
-  # with. The key names are the greeter's (snake_case), not the shell's.
-  appearance = pkgs.writeText "noctalia-greeter-appearance.json" (builtins.toJSON {
-    version = 1;
-    theme_mode = "dark";
-    palette = with config.lib.stylix.colors.withHashtag; {
-      primary = base07;
-      on_primary = base00;
-      secondary = base0C;
-      on_secondary = base00;
-      tertiary = base0F;
-      on_tertiary = base00;
-      error = base08;
-      on_error = base00;
-      surface = base00;
-      on_surface = base06;
-      surface_variant = base01;
-      on_surface_variant = base04;
-      outline = base03;
-      shadow = base00;
-      hover = base0F;
-      on_hover = base00;
-    };
-    wallpaper = lib.optionalAttrs (cfg.wallpaper != null) {
-      path = "${cfg.wallpaper}";
-      fill_mode = "crop";
-    };
-  });
-
-  # Seeded, not managed: the greeter rewrites this file to remember the last
-  # session and scheme, so it is copied in once and then left alone. `scheme`
-  # must say "Synced" or the palette above is ignored in favour of a built-in.
-  greeterConf = pkgs.writeText "noctalia-greeter.conf" (
-    ''
-      # noctalia-greeter greeter.conf
-      greeter_user = ${cfg.user}
-      scheme = Synced
-    ''
-    + lib.optionalString (cfg.defaultSession != null) ''
-      default_session = ${cfg.defaultSession}
-    ''
-  );
 in {
   options.cosmos.profiles.desktop.addons.greetd.noctalia = {
     user = mkOption {
@@ -171,6 +143,41 @@ in {
           inherit (config.services.xserver.xkb) layout variant options;
         };
         cursor.size = cursor.size;
+
+        session = lib.optionalAttrs (cfg.defaultSession != null) {
+          default = cfg.defaultSession;
+        };
+
+        # noctalia's own colour roles, mapped off the base16 scheme stylix is
+        # themed with. The key names are the greeter's (snake_case), not the
+        # shell's. `scheme = "Synced"` is what makes the greeter render this
+        # table instead of a built-in preset.
+        appearance = {
+          scheme = "Synced";
+          theme_mode = "dark";
+          palette = with config.lib.stylix.colors.withHashtag; {
+            primary = base07;
+            on_primary = base00;
+            secondary = base0C;
+            on_secondary = base00;
+            tertiary = base0F;
+            on_tertiary = base00;
+            error = base08;
+            on_error = base00;
+            surface = base00;
+            on_surface = base06;
+            surface_variant = base01;
+            on_surface_variant = base04;
+            outline = base03;
+            shadow = base00;
+            hover = base0F;
+            on_hover = base00;
+          };
+          wallpaper = lib.optionalAttrs (cfg.wallpaper != null) {
+            path = "${cfg.wallpaper}";
+            fill_mode = "crop";
+          };
+        };
       };
     };
 
@@ -181,8 +188,9 @@ in {
     # helper work by hand if you ever want to override the generated palette.
     security.polkit.enable = true;
 
-    # The greeter remembers the last session and colour scheme in greeter.conf;
-    # without this it forgets them on every boot.
+    # greeter.toml above is Nix-managed and rewritten every activation, but
+    # sync.toml (last-used session, output layout) is the greeter's own
+    # mutable state and must survive reboots.
     cosmos.system.impermanence.persist.directories = [stateDir];
 
     systemd.tmpfiles.rules = [
@@ -193,15 +201,6 @@ in {
       "L+ /usr/share/wayland-sessions - - - - ${sessionDir}"
 
       "d ${stateDir} 0755 ${cfg.user} ${cfg.user} -"
-      "L+ ${stateDir}/appearance.json - - - - ${appearance}"
-      # `C+`, not `C`. Plain `C` copies only when the destination does not
-      # exist, so this file was seeded on the very first boot and every change
-      # to it since has been silently ignored — the deploy succeeds, the
-      # greeter keeps its original copy. `+` forces the copy each activation,
-      # which is what makes the setting declarative rather than a one-time
-      # seed. The greeter records mutable state in sync.toml, not here, so
-      # overwriting costs nothing.
-      "C+ ${stateDir}/greeter.conf 0644 ${cfg.user} ${cfg.user} - ${greeterConf}"
       "f ${stateDir}/greeter.log 0664 ${cfg.user} ${cfg.user} -"
       "f /var/log/noctalia-greeter.log 0664 ${cfg.user} ${cfg.user} -"
     ];
