@@ -181,7 +181,7 @@
 
       # Hibernate
       boot = {
-        kernelParams = ["resume_offset=533760"];
+        kernelParams = ["resume_offset=533760" "quiet"];
         resumeDevice = "/dev/disk/by-uuid/c2dc9bb7-f815-4c9c-bd96-68bebb100aef";
         extraModprobeConfig = ''
           options iwlwifi power_save=0 uapsd_disable=1
@@ -191,6 +191,14 @@
           # act as plain F1-F12 without needing Fn, fixing Fn key combos.
           options hid_apple fnmode=0
         '';
+
+        # Without this the LUKS FIDO2 "confirm presence on security token" cue
+        # is just one more plain-text line racing kernel/systemd boot spam on
+        # the console — easy to miss, with no visual sign of when to touch the
+        # key. Plymouth gives systemd-ask-password a real UI to route that
+        # prompt through instead. `quiet` above keeps kernel log lines from
+        # fighting the splash for the console.
+        plymouth.enable = true;
       };
 
       hardware.nvidia = {
