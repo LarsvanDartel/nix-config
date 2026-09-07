@@ -148,6 +148,12 @@ in {
           default = cfg.defaultSession;
         };
 
+        # Without this the greeter refuses to start the PAM conversation on an
+        # empty password field, so pam_u2f's touch prompt (auth sufficient,
+        # first in the stack — see core.yubikey) never even fires: you have to
+        # type something and hit enter before FIDO gets a chance to run.
+        auth.allow_empty_password = true;
+
         # noctalia's own colour roles, mapped off the base16 scheme stylix is
         # themed with. The key names are the greeter's (snake_case), not the
         # shell's. `scheme = "Synced"` is what makes the greeter render this
