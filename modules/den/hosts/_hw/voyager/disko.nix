@@ -29,7 +29,10 @@
               passwordFile = "/tmp/secret.key";
               settings = {
                 allowDiscards = true;
-                crypttabExtraOpts = ["fido2-device=auto" "token-timeout=10"];
+                # 10s was too tight: the FIDO2 attempt would time out before the
+                # touch registered, silently falling back to the passphrase
+                # prompt — indistinguishable from the key just not working.
+                crypttabExtraOpts = ["fido2-device=auto" "token-timeout=30"];
               };
               content = {
                 type = "btrfs";
