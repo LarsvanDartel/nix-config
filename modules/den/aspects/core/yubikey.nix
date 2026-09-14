@@ -60,7 +60,7 @@
       services = {
         pcscd.enable = true;
         udev.packages = with pkgs; [yubikey-personalization];
-        dbus.packages = [pkgs.gcr];
+        dbus.packages = [pkgs.gcr_4];
 
         # lock session on yubikey removal.
         #
