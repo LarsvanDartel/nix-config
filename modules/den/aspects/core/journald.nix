@@ -64,11 +64,11 @@
       };
     };
 
-    config.services.journald.extraConfig = ''
-      SystemMaxUse=${cfg.maxUse}
-      MaxRetentionSec=${cfg.maxRetention}
-      MaxFileSec=${cfg.maxFileSec}
-    '';
+    config.services.journald.settings.Journal = {
+      SystemMaxUse = cfg.maxUse;
+      MaxRetentionSec = cfg.maxRetention;
+      MaxFileSec = cfg.maxFileSec;
+    };
 
     # Rate limiting is deliberately left at the default (10000 entries per 30s
     # per service). The loudest thing in the fleet is ipmi-fancontrol, which
