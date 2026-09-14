@@ -49,6 +49,21 @@
           export NTFY_PASSWORD
           NTFY_PASSWORD="$(cat "$CREDENTIALS_DIRECTORY/password")"
 
+          # The state directory is not persisted (see below), so every restart
+          # recreates the auth database from nothing, and this races the main
+          # `ntfy serve` process for it: ExecStartPost starts as soon as the
+          # process is forked, not once it has finished initializing, so
+          # `ntfy user list` can run before the auth-file exists at all. That
+          # failure was being swallowed — `user list` errored, the grep found
+          # no match, `user add` then *also* failed silently under `|| true`
+          # for the same reason — so the account was never created and every
+          # publish 401'd until the next restart happened to win the race.
+          # Poll instead of trusting the first attempt.
+          for _ in $(seq 30); do
+            ntfy user list >/dev/null 2>&1 && break
+            sleep 1
+          done
+
           # `ntfy user list` prints "user alerts (role: user, tier: none)", not
           # a bare name, so anchoring on '^user <name>$' never matched and this
           # always took the `add` branch. That only worked once: every restart
