@@ -148,6 +148,12 @@
                 members = ["lvdar"];
               };
               grafana-admin.members = ["lvdar"];
+
+              tino-users = {
+                overwriteMembers = false;
+                members = ["lvdar"];
+              };
+              tino-admin.members = ["lvdar"];
             }
             # One group per gated service, plus the baseline. overwriteMembers is
             # off so members added by hand in kanidm survive a redeploy — these
@@ -285,6 +291,25 @@
               claimMaps.immich_groups = {
                 joinType = "array";
                 valuesByGroup.immich-admin = ["admin"];
+              };
+            };
+
+            # Confidential: TINO exchanges the code server-side, same shape
+            # as grafana. TINO reads its own group membership from the plain
+            # `groups` claim (TINO_OIDC_GROUPS_CLAIM) rather than a
+            # service-specific claim name, and checks it against
+            # TINO_ADMIN_GROUPS (default "admins") to decide who is a global
+            # admin — everyone else's access is per-bucket ACLs set inside
+            # the app itself, so tino-users needs no claim value of its own.
+            tino = {
+              displayName = "TINO";
+              originUrl = ["https://tino.lvdar.nl/oidc/callback"];
+              originLanding = "https://tino.lvdar.nl";
+              basicSecretFile = config.sops.secrets."keys/tino/oidc-client-secret".path;
+              scopeMaps.tino-users = ["openid" "profile" "email"];
+              claimMaps.groups = {
+                joinType = "array";
+                valuesByGroup.tino-admin = ["admins"];
               };
             };
           };

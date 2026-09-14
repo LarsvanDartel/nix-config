@@ -447,6 +447,14 @@
           targets = endeavour 3030;
         };
 
+        # Ungated for the same reason as grafana/opencloud/immich: TINO does
+        # its own kanidm OIDC login, so a gate in front would mean logging in
+        # twice.
+        tino = {
+          bearerAuth.enable = false;
+          targets = endeavour 3040;
+        };
+
         # The apex is deliberately absent from this list and cannot be added.
         # netbird-proxy's cluster domain *is* lvdar.nl, and management rejects
         # any service that is not a label beneath it:
