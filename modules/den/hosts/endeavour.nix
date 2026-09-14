@@ -54,6 +54,7 @@
       services.ddns
       services.opencloud
       services.typstnique
+      services.tino
       services.site
       services.cdrom
       hardware.ipmi-fancontrol
@@ -570,6 +571,7 @@
 
           3030 # typstnique  typstnique.lvdar.nl
           3031 # site        lvdar.nl + www.lvdar.nl
+          3040 # tino        tino.lvdar.nl
           8084 # open-webui  chat.lvdar.nl
           8086 # mc control  minecraft.lvdar.nl
 
