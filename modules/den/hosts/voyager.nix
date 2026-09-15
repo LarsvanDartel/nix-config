@@ -136,7 +136,20 @@
 
         programs.ssh.settings."es-pynq047.ics.ele.tue.nl".setEnv = "TERM=xterm-256color";
 
-        home.packages = [pkgs.mcrl2];
+        # The kanidm CLI, for managing accounts/groups without going through
+        # the web UI — see e.g. tino's kanidm.nix setup for what it gates.
+        # Pinned to _1_11 to match services/kanidm.nix's server package
+        # (kanidmWithSecretProvisioning_1_11) — the CLI and server speak a
+        # versioned protocol.
+        home.packages = [pkgs.mcrl2 pkgs.kanidm_1_11];
+
+        # Points the CLI at the public endpoint by default so `kanidm ...`
+        # works with no flags. Plain `verify_ca` (the default) is fine —
+        # auth.lvdar.nl is a normal ACME cert via gaia's netbird-proxy, not
+        # kanidm's own self-signed one.
+        xdg.configFile."kanidm/config".text = ''
+          uri = "https://auth.lvdar.nl"
+        '';
       };
     };
 
