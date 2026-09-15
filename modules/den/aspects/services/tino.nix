@@ -120,6 +120,15 @@
             TINO_BASE_URL = "https://${cfg.domain}";
             TINO_OIDC_DISCOVERY_URL = "https://auth.lvdar.nl/oauth2/openid/tino/.well-known/openid-configuration";
             TINO_OIDC_CLIENT_ID = "tino";
+            # kanidm's own "groups" claim (tied to granting the "groups"
+            # scope tino's own client hardcodes requesting) is the
+            # identity's entire raw kanidm group membership fleet-wide —
+            # see services/kanidm.nix. TINO stores the whole userinfo
+            # response in its session cookie, and that pushed Set-Cookie
+            # over the ~4KB browsers silently cap it at, so login always
+            # completed server-side and never actually stuck client-side.
+            # tino_groups is the small claim kanidm.nix maps instead.
+            TINO_OIDC_GROUPS_CLAIM = "tino_groups";
             GIT_CONFIG_SYSTEM = toString gitConfig;
             XDG_CACHE_HOME = "/var/lib/tino/.cache";
           };
