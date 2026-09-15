@@ -16,7 +16,7 @@
       ...
     }: let
       inherit (lib.options) mkOption;
-      inherit (lib.types) port str;
+      inherit (lib.types) port str enum;
 
       cfg = config.cosmos.services.tino;
       user = "tino";
@@ -70,6 +70,34 @@
           type = str;
           default = "tino.lvdar.nl";
           description = "Public name, which must match the published service and the kanidm OAuth2 client's originUrl.";
+        };
+
+        accentColour = mkOption {
+          type = enum [
+            "grey"
+            "cold-grey"
+            "warm-grey"
+            "red"
+            "orange"
+            "yellow"
+            "olive"
+            "lime"
+            "green"
+            "sea-green"
+            "blue"
+            "azure"
+            "violet"
+            "purple"
+            "fuchsia"
+            "rose"
+          ];
+          default = "orange";
+          description = ''
+            TINO_ACCENT_COLOUR — the UI accent colour family (login button,
+            highlights). Must match a family from the confirm design
+            colours TINO's own vendored colours.css defines (see
+            pkgs/tino.nix). "red" is GEWIS's brand colour.
+          '';
         };
       };
 
@@ -129,6 +157,7 @@
             # completed server-side and never actually stuck client-side.
             # tino_groups is the small claim kanidm.nix maps instead.
             TINO_OIDC_GROUPS_CLAIM = "tino_groups";
+            TINO_ACCENT_COLOUR = cfg.accentColour;
             GIT_CONFIG_SYSTEM = toString gitConfig;
             XDG_CACHE_HOME = "/var/lib/tino/.cache";
           };
