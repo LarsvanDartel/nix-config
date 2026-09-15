@@ -43,8 +43,9 @@
         name = "tino-server";
         runtimeInputs = [pythonEnv pkgs.gitMinimal pkgs.git-lfs pkgs.typst];
         text = ''
-          export TINO_OIDC_CLIENT_SECRET
+          export TINO_OIDC_CLIENT_SECRET TINO_SECRET_KEY
           TINO_OIDC_CLIENT_SECRET="$(cat "$CREDENTIALS_DIRECTORY/oidc-client-secret")"
+          TINO_SECRET_KEY="$(cat "$CREDENTIALS_DIRECTORY/session-secret-key")"
           exec gunicorn \
             -k uvicorn.workers.UvicornWorker \
             -w 1 \
@@ -97,6 +98,17 @@
         # ownership check would apply.
         sops.secrets."keys/tino/oidc-client-secret".owner = "kanidm";
 
+        # Left unset, TINO generates a random session-signing key on every
+        # process start (its own config.py says so explicitly) — and gunicorn
+        # respawning the worker for any reason (a slow upstream OIDC call
+        # hitting the default worker timeout, a crash, a deploy) silently
+        # invalidates every existing session cookie mid-flight. That reads
+        # exactly like "log in successfully, land back on the login page":
+        # the callback sets a session against one secret, the next request
+        # hits a worker signed with a different one. A stable key removes the
+        # respawn as a variable entirely.
+        sops.secrets."keys/tino/session-secret-key".owner = user;
+
         systemd.services.tino = {
           description = "TINO — collaborative Typst editor";
           wantedBy = ["multi-user.target"];
@@ -116,7 +128,10 @@
             User = user;
             Group = user;
             WorkingDirectory = "/tmp";
-            LoadCredential = "oidc-client-secret:${config.sops.secrets."keys/tino/oidc-client-secret".path}";
+            LoadCredential = [
+              "oidc-client-secret:${config.sops.secrets."keys/tino/oidc-client-secret".path}"
+              "session-secret-key:${config.sops.secrets."keys/tino/session-secret-key".path}"
+            ];
             ExecStart = lib.getExe server;
             Restart = "on-failure";
             RestartSec = 10;
