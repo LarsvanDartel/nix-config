@@ -312,7 +312,12 @@
               # authorize request with "No PKCE code challenge was provided
               # with client in enforced PKCE mode" otherwise.
               allowInsecureClientDisablePkce = true;
-              scopeMaps.tino-users = ["openid" "profile" "email"];
+              # TINO's own OAuth client hardcodes "groups" as a *requested
+              # scope*, not just a claim name (its authorize request reads
+              # `scope=openid+email+profile+groups`) — kanidm refuses a
+              # token for any scope the identity's scopeMaps doesn't grant,
+              # same as opencloud/immich's own custom-claim-named scope.
+              scopeMaps.tino-users = ["openid" "profile" "email" "groups"];
               claimMaps.groups = {
                 joinType = "array";
                 valuesByGroup.tino-admin = ["admins"];
