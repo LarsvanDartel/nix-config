@@ -76,10 +76,6 @@
   niri = inputs.nix-wrapper-modules.wrappers.niri.wrap {
     inherit pkgs;
 
-    # Opt out of the v1 compatibility layer: it warns on the legacy `null` /
-    # `_attrs` idioms, and this flake runs with abort-on-warn.
-    v2-settings = true;
-
     settings = {
       # Mirrors the Hyprland input block (_hyprland/settings.nix).
       input = {
