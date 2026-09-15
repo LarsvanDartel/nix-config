@@ -328,9 +328,21 @@
               # with that rather than replacing it, and TINO simply never
               # reads the raw one.
               scopeMaps.tino-users = ["openid" "profile" "email" "groups"];
+              # Each entry an identity map (kanidm group name -> itself),
+              # not just the admin flag: TINO's bucket ACLs match
+              # `entry.group in user.groups` against exactly these claim
+              # values, so a kanidm group has to be listed here before any
+              # bucket ACL can reference it at all. tino-users existing here
+              # is what makes a "tino-users" ACL entry usable in TINO's own
+              # bucket-settings UI; a one-off single-member group for
+              # individual access needs the same treatment before TINO can
+              # see it.
               claimMaps.tino_groups = {
                 joinType = "array";
-                valuesByGroup.tino-admin = ["admins"];
+                valuesByGroup = {
+                  tino-admin = ["admins"];
+                  tino-users = ["tino-users"];
+                };
               };
             };
           };
