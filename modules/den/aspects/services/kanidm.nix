@@ -295,12 +295,18 @@
             };
 
             # Confidential: TINO exchanges the code server-side, same shape
-            # as grafana. TINO reads its own group membership from the plain
-            # `groups` claim (TINO_OIDC_GROUPS_CLAIM) rather than a
-            # service-specific claim name, and checks it against
-            # TINO_ADMIN_GROUPS (default "admins") to decide who is a global
-            # admin — everyone else's access is per-bucket ACLs set inside
-            # the app itself, so tino-users needs no claim value of its own.
+            # as grafana. TINO's admin check reads whatever claim
+            # TINO_OIDC_GROUPS_CLAIM names — set to tino_groups below rather
+            # than kanidm's own "groups", which is not just a scope name:
+            # granting it makes kanidm return the identity's *entire* raw
+            # kanidm group membership (every netbird-*/jellyfin-*/grafana-*
+            # group lvdar is in, fleet-wide) as the claim value. TINO stores
+            # the whole userinfo response client-side in its session cookie,
+            # and that raw list alone pushed Set-Cookie past 9KB — browsers
+            # silently drop any cookie over ~4KB, so the session never
+            # actually persisted and every login bounced straight back to
+            # /login with no error. tino_groups mirrors opencloud_groups/
+            # immich_groups: a small, TINO-specific claim instead.
             tino = {
               displayName = "TINO";
               originUrl = ["https://tino.lvdar.nl/oidc/callback"];
@@ -315,10 +321,14 @@
               # TINO's own OAuth client hardcodes "groups" as a *requested
               # scope*, not just a claim name (its authorize request reads
               # `scope=openid+email+profile+groups`) — kanidm refuses a
-              # token for any scope the identity's scopeMaps doesn't grant,
-              # same as opencloud/immich's own custom-claim-named scope.
+              # token for any scope the identity's scopeMaps doesn't grant.
+              # Granting the scope is unavoidable (TINO's own code, not
+              # configurable) and it makes kanidm add its own raw "groups"
+              # claim to the token regardless — tino_groups below coexists
+              # with that rather than replacing it, and TINO simply never
+              # reads the raw one.
               scopeMaps.tino-users = ["openid" "profile" "email" "groups"];
-              claimMaps.groups = {
+              claimMaps.tino_groups = {
                 joinType = "array";
                 valuesByGroup.tino-admin = ["admins"];
               };
