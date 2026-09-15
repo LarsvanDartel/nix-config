@@ -147,6 +147,8 @@
       # nothing and rebuild them inside the microVM the next morning.
       cosmos.services.attic.client.watchStore.enable = true;
 
+      cosmos.services.tino.accentColour = "red";
+
       # The Tesla P100 finally has something to do. See services/ollama.nix for
       # why the package is overridden — a stock ollama-cuda would run on the
       # CPU here without saying so.
