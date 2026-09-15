@@ -15,24 +15,79 @@
 # packaging it natively costs nothing that "unsupported" actually protects
 # against, and keeps it in the same shape as every other service here rather
 # than being this fleet's first Docker container.
+#
+# Two assets upstream's own `make build` vendors in are NOT part of the git
+# source and therefore not covered by a plain `buildPythonPackage` over it:
+#
+#   - tino/static/css/vendor/colours.css, curled from a corporate design URL
+#     at build time (`make vendor-css`). Every `--cd-*` and `--accent-*` CSS
+#     custom property the whole UI is styled with — including the login
+#     button — comes from this file. Without it those variables are simply
+#     undefined, which is exactly "the login button is invisible": white
+#     text on an unset (transparent) background.
+#   - tino/static/js/vendor/codemirror.js, an esbuild bundle of the editor's
+#     CodeMirror dependencies (`make vendor-js` / `npm run build`).
+#
+# Both are fetched/built here and spliced into the source tree before the
+# Python package is built, so `tool.setuptools.package-data`'s existing
+# `static/**/*` glob picks them up like any other static file.
 {...}: {
   nixpkgs.overlays = [
-    (final: prev: {
+    (final: prev: let
+      version = "1.20.1";
+
+      src = final.fetchFromGitHub {
+        owner = "confirm";
+        repo = "tino";
+        tag = version;
+        hash = "sha256-EnFlCeX0QGNfuTPKF8kveg1Z7ryAsqQbUoQv1BRZw1I=";
+      };
+
+      # https://github.com/confirm/tino/blob/1.20.1/Makefile — vendor-css.
+      coloursCss = final.fetchurl {
+        url = "https://assets.confirm.ch/colours.css";
+        hash = "sha256-QIMWQAGqD1V15fCZ8vUjGL6QE+BiHrFVdkbRnejvQE4=";
+      };
+
+      # package-lock.json is gitignored upstream (never committed), so
+      # `fetchNpmDeps` has nothing to lock against in `src` itself. Generated
+      # once against this tag's package.json (`npm install
+      # --package-lock-only`) and carried here rather than regenerated on
+      # every eval — bump it by hand alongside `version`.
+      srcWithNpmLock = final.runCommand "tino-src-with-npm-lock" {} ''
+        cp -r ${src} $out
+        chmod -R u+w $out
+        install -Dm444 ${./_tino/package-lock.json} $out/package-lock.json
+      '';
+
+      # esbuild's npm package normally downloads a prebuilt binary for its
+      # own platform in a postinstall script, which has no network access
+      # under the Nix sandbox. ESBUILD_BINARY_PATH is esbuild's own escape
+      # hatch for exactly this: point it at nixpkgs' own (Go-built) esbuild
+      # instead, and skip npm's install scripts entirely.
+      codemirrorBundle = final.buildNpmPackage {
+        pname = "tino-codemirror-bundle";
+        inherit version;
+        src = srcWithNpmLock;
+        npmDepsHash = "sha256-m/Hewi8AMEVFdGLkt1yKiFGP2Xhjlkh3FtulvNMYBIs=";
+        npmFlags = ["--ignore-scripts"];
+        env.ESBUILD_BINARY_PATH = "${final.esbuild}/bin/esbuild";
+        installPhase = ''
+          runHook preInstall
+          mkdir -p $out
+          cp tino/static/js/vendor/codemirror.js $out/codemirror.js
+          runHook postInstall
+        '';
+      };
+
       pythonPackagesExtensions =
         prev.pythonPackagesExtensions
         ++ [
           (pyFinal: _pyPrev: {
             tino = pyFinal.buildPythonPackage rec {
               pname = "tino";
-              version = "1.20.1";
+              inherit version src;
               pyproject = true;
-
-              src = final.fetchFromGitHub {
-                owner = "confirm";
-                repo = "tino";
-                tag = version;
-                hash = "sha256-EnFlCeX0QGNfuTPKF8kveg1Z7ryAsqQbUoQv1BRZw1I=";
-              };
 
               build-system = with pyFinal; [setuptools setuptools-scm wheel];
 
@@ -59,9 +114,10 @@
                 uvicorn
               ];
 
-              # setuptools_scm derives the version from git metadata, which
-              # fetchFromGitHub does not provide.
-              SETUPTOOLS_SCM_PRETEND_VERSION = version;
+              postPatch = ''
+                install -Dm444 ${coloursCss} tino/static/css/vendor/colours.css
+                install -Dm444 ${codemirrorBundle}/codemirror.js tino/static/js/vendor/codemirror.js
+              '';
 
               # gitattributes ships at the repo root (routes bucket git repos
               # through git-lfs — see services/tino.nix), not inside the
@@ -71,6 +127,10 @@
               postInstall = ''
                 install -Dm444 tino/gitattributes $out/share/tino/gitattributes
               '';
+
+              # setuptools_scm derives the version from git metadata, which
+              # fetchFromGitHub does not provide.
+              SETUPTOOLS_SCM_PRETEND_VERSION = version;
 
               pythonImportsCheck = ["tino"];
 
@@ -82,6 +142,8 @@
             };
           })
         ];
+    in {
+      inherit pythonPackagesExtensions;
     })
   ];
 }

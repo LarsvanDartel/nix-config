@@ -306,6 +306,12 @@
               originUrl = ["https://tino.lvdar.nl/oidc/callback"];
               originLanding = "https://tino.lvdar.nl";
               basicSecretFile = config.sops.secrets."keys/tino/oidc-client-secret".path;
+              # TINO's authlib-based authorization-code flow doesn't send a
+              # PKCE code_challenge — kanidm enforces PKCE on every client by
+              # default regardless of confidentiality, and rejects the bare
+              # authorize request with "No PKCE code challenge was provided
+              # with client in enforced PKCE mode" otherwise.
+              allowInsecureClientDisablePkce = true;
               scopeMaps.tino-users = ["openid" "profile" "email"];
               claimMaps.groups = {
                 joinType = "array";
