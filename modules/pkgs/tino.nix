@@ -118,6 +118,16 @@
                 install -Dm444 ${coloursCss} tino/static/css/vendor/colours.css
                 install -Dm444 ${codemirrorBundle}/codemirror.js tino/static/js/vendor/codemirror.js
 
+                # GEWIS's own crest (github.com/gewis/aurora's
+                # infoscherm/public_html/images/gewislogo.svg), recoloured
+                # from white — meant to sit on their brand-red background —
+                # to that same red, so it reads on TINO's light login card
+                # instead of vanishing into it. Wrapped as a <symbol id="logo">
+                # because that's what login.html/index.html's
+                # <use xlink:href="/img/logo.svg#logo"/> expects; the source
+                # file is just the crest's <g>, not a symbol.
+                install -Dm444 ${./_tino/logo.svg} tino/static/img/logo.svg
+
                 # tino stores the whole raw OIDC id_token in its
                 # (client-side, single signed-cookie) session purely to pass
                 # as id_token_hint on RP-initiated logout — a UX nicety that
