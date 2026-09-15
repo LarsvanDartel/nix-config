@@ -117,6 +117,25 @@
               postPatch = ''
                 install -Dm444 ${coloursCss} tino/static/css/vendor/colours.css
                 install -Dm444 ${codemirrorBundle}/codemirror.js tino/static/js/vendor/codemirror.js
+
+                # tino stores the whole raw OIDC id_token in its
+                # (client-side, single signed-cookie) session purely to pass
+                # as id_token_hint on RP-initiated logout — a UX nicety that
+                # skips kanidm's own re-confirmation, nothing auth-relevant
+                # depends on it. kanidm bakes the identity's full group
+                # membership into every id_token it issues once the "groups"
+                # scope is granted (unavoidable — see services/kanidm.nix —
+                # independent of claimMaps), and for a broad admin identity
+                # that JWT alone is 4KB+, over the ~4KB browsers cap a single
+                # cookie at: login completed server-side every time but the
+                # session cookie was silently dropped client-side. Never
+                # storing it removes the ceiling entirely rather than
+                # picking a size threshold that just moves where this breaks
+                # again as group counts grow.
+                substituteInPlace tino/auth.py \
+                  --replace-fail \
+                    "    if token.get('id_token'):" \
+                    "    if False:  # id_token intentionally never kept in the session"
               '';
 
               # gitattributes ships at the repo root (routes bucket git repos
