@@ -21,11 +21,10 @@
 
       xdg.mimeApps = mkIf cfg.defaultApplication {
         enable = true;
-        # A curated subset, not mpv.desktop's full ~80 entries. Reading the
-        # MimeType line out of the package would keep the two in sync, but that
-        # is import-from-derivation — it would force mpv to build during
-        # evaluation of every host. These are the containers that actually turn
-        # up; anything missed still opens from mpv itself.
+        # A curated subset, not mpv.desktop's full ~80 entries: reading the
+        # MimeType from the package would be import-from-derivation, forcing
+        # mpv to build during every host's evaluation. Missed containers
+        # still open from mpv itself.
         defaultApplications = let
           mpv = ["mpv.desktop"];
         in {

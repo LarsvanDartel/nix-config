@@ -1,62 +1,45 @@
 # services.minecraft.control — a web page for running the Minecraft servers,
-# for people who are not administrators of this host: start and stop, who is
-# online, the console, the log, and what each server is costing in memory and
-# CPU.
 #
-# It began as start/stop alone and the shape still shows that: the two commands
-# that need root go through a path unit that never sees input, while everything
-# added since is either a plain read or a line written to the server's own
-# console FIFO. Worth keeping in mind when adding to it — reaching for root is
-# almost never the answer, because nix-minecraft already exposes the console and
+# The two commands that need root go through a path unit that never sees
+# input; everything else added since is a plain read or a line written to
+# the server's own console FIFO. When adding to it, reaching for root is
+# almost never the answer — nix-minecraft already exposes the console and
 # the log to group `minecraft`.
 #
-# Still not a general server panel: nixpkgs has no Crafty/MCSManager/
-# Pterodactyl, and the one general-purpose thing it does have — cockpit — is a
-# systems administration console with a terminal in it. Handing that to somebody
-# so they can restart a survival world is not a smaller grant than root, it *is*
-# root with extra steps. What this does hand out is bounded by two things: the
-# five commands per server below, and the game's own authority model.
-#
-# The console is the part to think twice about. It takes arbitrary input and
-# passes it to the server, so anyone who reaches this page can `op` themselves,
-# `ban` anyone, or `stop` the server — membership of the gating kanidm group is
-# server administration, not merely the power to restart. That is the intended
-# grant here and it is why the group exists separately from every other one.
+# Not a general server panel: nixpkgs' only general-purpose option, cockpit,
+# is a systems-administration console with a terminal in it — handing that
+# to somebody so they can restart a survival world is root with extra
+# steps. What this grants is bounded by the five commands per server below
+# and the game's own authority model. The console is the part to think
+# twice about: anyone who reaches this page can `op` themselves, `ban`
+# anyone, or `stop` the server — membership of the gating kanidm group is
+# server administration, not merely restart power. That is the intended
+# grant, and why the group exists separately from every other one.
 #
 # Three pieces, each doing one thing:
 #
-#   * webhook (nixpkgs' own) turns an HTTP request into one fixed command. It is
-#     bound to loopback and never reached directly.
-#   * nginx serves a static page and proxies /hooks to webhook, so the page and
-#     its API are one origin and the whole thing is one port to publish. The
-#     page itself lives in _minecraft-control/index.html — underscored so
-#     import-tree leaves the directory alone, as with every other _-prefixed
-#     path here.
-#   * a systemd path unit per lifecycle action carries the privilege. The
-#     unprivileged side can only create one specific empty file; a root oneshot
-#     watching for it runs the one command it exists to run. Only start and stop
-#     need this — see SupplementaryGroups below for how the rest gets its
-#     access, and why it is not root.
+#   * webhook (nixpkgs' own), loopback, never reached directly.
+#   * nginx serves a static page (in _minecraft-control/index.html) and
+#     proxies /hooks to webhook — one origin, one port to publish.
+#   * a systemd path unit per lifecycle action carries the privilege: the
+#     unprivileged side can only create one specific empty file; a root
+#     oneshot watching for it runs the one command it exists to run.
 #
-# That last piece was sudo first and could not work. roles/server.nix sets
-# security.sudo.execWheelOnly, so the wrapper is mode 4550 root:wheel and a
-# non-wheel user is refused at exec — before any rule is consulted, and with
-# "Permission denied" rather than anything about permissions policy. Putting
-# this user in wheel to reach a six-command rule is a far larger grant than the
-# rule withholds. polkit is the conventional answer and is unavailable:
-# security.polkit.enable is false on headless hosts, the same wall
-# services/crowdsec.nix hit.
+# That last piece was sudo first and could not work: roles/server.nix sets
+# security.sudo.execWheelOnly, so the wrapper is 4550 root:wheel and a
+# non-wheel user is refused at exec, before any rule — and putting this user
+# in wheel is a far larger grant than the rule withholds. polkit is
+# unavailable (security.polkit.enable is false on headless hosts, the same
+# wall services/crowdsec.nix hit). The path units are the better boundary
+# anyway: no setuid binary, nothing parses an argument, the privileged half
+# never sees input — triggered by the *existence* of a filename fixed at
+# build time.
 #
-# The path units end up being the better boundary anyway. There is no setuid
-# binary, nothing parses an argument, and the privileged half never sees input
-# at all — it is triggered by the *existence* of a filename fixed at build time.
-#
-# Authentication is not implemented here, on purpose. gaia publishes this
-# *gated*, so netbird-proxy demands a NetBird identity, NetBird fills its groups
-# from kanidm's `groups` claim, and kanidm decides membership — the mechanism
-# services/kanidm.nix already drives through `gatedServices`. Adding a person is
-# a group membership in kanidm and nothing else; there is no account, password
-# or session in this aspect at all.
+# Authentication is deliberately not implemented here: gaia publishes this
+# *gated*, netbird-proxy demands the identity, kanidm decides membership
+# via `gatedServices` (services/kanidm.nix). Adding a person is a group
+# membership and nothing else; no account, password or session in this
+# aspect at all.
 {den, ...}: {
   den.aspects.services.minecraft.control = {
     includes = [den.aspects.services.minecraft den.aspects.services.nginx];

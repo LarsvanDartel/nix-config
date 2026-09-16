@@ -1,26 +1,17 @@
 # services.prometheus — the metrics store, its alert rules, and the bridge
-# that turns a firing alert into the same phone notification a failed unit
-# already produces.
 #
-# On endeavour because it is the only host with room: gaia has 3.7 GiB of RAM
-# and 21 GB free, pioneer has 866 MiB and an SD card.
+# On endeavour, the only host with room (gaia: 3.7 GiB RAM / 21 GB free;
+# pioneer: 866 MiB / SD card). Data stays on the SSD, not /tank: 90 days of
+# these series is ~3 GB against 146 GB free, and the nixpkgs module hardcodes
+# --storage.tsdb.path under its StateDirectory — not worth fighting for
+# headroom that is not needed. Loki is the one that will want the array.
+# voyager deliberately absent: see services/node-exporter.nix.
 #
-# Data stays on the system SSD, not /tank, despite /tank being where the
-# terabytes are. Three hosts at a 30s interval is roughly 5000 series, which
-# for 90 days works out around 3 GB — against 146 GB free. Moving it to the
-# pool would mean fighting the nixpkgs module, which hardcodes
-# --storage.tsdb.path under its StateDirectory, to buy headroom that is not
-# needed. Loki is the one that will want the array.
-#
-# Scrapes the three servers over the mesh by name. voyager is deliberately
-# absent: see services/node-exporter.nix.
-#
-# Note the asymmetry with core.notify-failure, which is intentional. That runs
-# on each host and reports a unit *transition* to failed, and keeps working
-# when this host is down. This reports *states* and thresholds — a disk filling
-# up, a pool degrading, a host that stopped answering — which no per-host hook
-# can see. They overlap on "unit failed" and that is fine; the duplicate is
-# cheaper than the gap would be.
+# Intentional asymmetry with core.notify-failure: that reports unit
+# *transitions* per host and survives this host dying; this reports states
+# and thresholds (a disk filling, a pool degrading, a host gone silent),
+# which no per-host hook can see. The overlap on "unit failed" is cheaper
+# than the gap would be.
 {
   den,
   inputs,
@@ -136,9 +127,8 @@
                 cfg.targets;
             }
             {
-              # Already exported, never read until now. Gives peer counts,
-              # login expiry and gRPC health for the control plane the whole
-              # mesh depends on.
+              # Already exported by netbird management: peer counts, login
+              # expiry and gRPC health for the mesh's control plane.
               job_name = "netbird";
               static_configs = [
                 {
@@ -215,12 +205,11 @@
                       };
                     }
                     {
-                      # core.notify-failure catches a backup that *fails*.
-                      # Nothing catches one that stops being attempted — a
-                      # masked unit, a timer that never fires again after a
-                      # bad deploy, a repository that has quietly gone away.
-                      # That failure mode is silent by construction and is
-                      # exactly the one you discover when you need a restore.
+                      # core.notify-failure catches a backup that *fails*;
+                      # this catches one that stops being attempted (masked
+                      # unit, dead timer, repository quietly gone) — silent
+                      # by construction, discovered exactly when a restore
+                      # is needed.
                       alert = "ResticStale";
                       expr = ''
                         time() - node_systemd_timer_last_trigger_seconds{name="restic-backups-stardust.timer"} > 172800

@@ -1,8 +1,6 @@
 # services.arr.prowlarr — indexer manager, feeding the others their searches.
-#
-# Written out rather than built from mkSimpleArr: nixpkgs runs prowlarr under
-# DynamicUser with no way to say where its data lives, so both have to be
-# overridden by hand.
+# Longhand, not mkSimpleArr: nixpkgs runs prowlarr under DynamicUser with no
+# option for its data dir, so User/ExecStart are overridden by hand.
 {den, ...}: let
   inherit (import ./_lib.nix) vpnVhost;
 in {

@@ -16,7 +16,6 @@
 
   cfg = config.cosmos.desktops.common.styling.fonts;
 
-  # Font module type
   fontModule = submodule {
     options = {
       name = mkOption {
@@ -42,7 +41,6 @@
 
   fontModules = nonDefault ./.;
 
-  # Gather enabled fonts.
   enabledFonts =
     [
       cfg.serif.name
@@ -52,7 +50,6 @@
     ]
     ++ map (font: font.name) cfg.extraFonts;
 
-  # Flatten dependencies of fonts
   fontPackages =
     converge
     (
@@ -78,7 +75,6 @@
       )
     );
 
-  # Convert set of fonts to list of packages
   fontNameList = map (font: font.name) (attrsToList fontPackages);
   fontPackageList = map (font: cfg.pkgs.${font}.package) fontNameList;
 in {

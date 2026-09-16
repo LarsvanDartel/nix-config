@@ -74,15 +74,11 @@ in {
         };
         whitelistRanges = mkOption {
           type = listOf str;
-          # sabnzbd's `local_ranges`. Left empty it falls back to RFC1918, and
-          # NetBird hands peers addresses out of the CGNAT range instead — so
-          # once the edge started reaching this over the mesh, every request
-          # was "External internet access denied" from sabnzbd itself, well
-          # past the point where the network was working.
-          #
-          # Setting this replaces that fallback rather than extending it, so
-          # the private ranges have to be repeated here or the LAN loses
-          # access in exchange.
+          # sabnzbd's `local_ranges`. Empty falls back to RFC1918, which
+          # excludes NetBird's CGNAT peer range — once the edge reached this
+          # over the mesh, sabnzbd itself denied every request. Setting this
+          # *replaces* the fallback, so the private ranges must be repeated
+          # here or the LAN loses access.
           default = [
             "127.0.0.0/8"
             "10.0.0.0/8"
@@ -123,21 +119,12 @@ in {
           inherit (cfg) package user secretFiles;
           configFile = null;
 
-          # Without this nixpkgs installs sabnzbd.ini mode 0400, and sabnzbd
-          # wants to write its own config constantly — server tuning, quota
-          # counters, anything changed in the web UI. Every attempt fails with
-          # "Cannot write to INI file", which it reports as an error rather
-          # than a warning; nixpkgs' own comment says as much and settles for
-          # living with it.
-          #
-          # Declarative config survives anyway, because the pre-start merge
-          # feeds it the live ini *first* and the generated settings second,
-          # and later files win. So nix stays authoritative for everything it
-          # states, and sabnzbd keeps whatever it wrote that nix does not.
-          #
-          # The one thing to know: a key nix stops declaring keeps its last
-          # runtime value rather than returning to the default, since the ini
-          # it is merged onto is now its own previous output.
+          # nixpkgs installs sabnzbd.ini mode 0400, but sabnzbd writes its own
+          # config constantly (web UI changes, quota counters) — without this
+          # every write fails. Declarative config still wins: the pre-start
+          # merge feeds the live ini first and generated settings second, and
+          # later files win. Caveat: a key nix stops declaring keeps its last
+          # runtime value rather than the default.
           allowConfigWrite = true;
           group = "media";
           stateDir = removePrefix "/var/lib/" cfg.stateDir;
@@ -145,18 +132,12 @@ in {
             recursiveUpdate
             {
               misc = {
-                # Inside `misc`, where sabnzbd reads it. At the top level it
-                # lands above the first section header and is silently ignored,
-                # leaving sabnzbd's own `[misc] inet_exposure = 0` in force —
-                # so this had never once taken effect.
-                #
-                # 4 is "web UI reachable from outside", which is what a service
-                # published through the edge needs. Anything lower makes
-                # check_access fall through to inspecting X-Forwarded-For, and
-                # netbird-proxy quite correctly puts the visitor's public
-                # address there, so sabnzbd denied every request that had
-                # actually come from a browser. The gate in front is SSO and
-                # CrowdSec, not sabnzbd's opinion of the client address.
+                # Must sit inside `misc` — at top level it lands above the
+                # first section header and is silently ignored. 4 = "web UI
+                # reachable from outside"; anything lower makes check_access
+                # inspect X-Forwarded-For, where netbird-proxy puts the
+                # visitor's public address, so sabnzbd denied browser requests.
+                # The gate in front is SSO and CrowdSec.
                 inet_exposure = 4;
 
                 host =
@@ -173,10 +154,8 @@ in {
                 local_ranges = concatStringsCommaIfExists cfg.whitelistRanges;
                 permissions = "775";
 
-                # The unpackers themselves. sabnzbd defaults these on, but the
-                # whole point here is that unpacking not happening is hard to
-                # see from the outside — an unpacked download and a paused one
-                # both just look like a directory that is not what you wanted.
+                # Defaults-on, but stated explicitly: unpacking silently not
+                # happening is indistinguishable from a paused download.
                 enable_unrar = 1;
                 enable_7zip = 1;
                 enable_filejoin = 1;
@@ -224,20 +203,11 @@ in {
           ];
         };
 
-        # The vhost, plus room for an NZB.
-        #
-        # nixpkgs sets client_max_body_size to 10m globally, and radarr hands an
-        # NZB over by POSTing the file to `/api?mode=addfile` — through this
-        # vhost, because sabnzbd is in the namespace. A UHD remux is thousands
-        # of articles and its NZB runs well past 10m, so nginx answered 413 and
-        # radarr logged "Couldn't add release ... to download queue" for exactly
-        # the largest releases while small ones went through. The queue then
-        # fell through to whatever cheap re-post was left, which is how a
-        # 2160p remux search ends up grabbing a 1080p one.
-        #
-        # Finite rather than 0: this vhost listens on 0.0.0.0 and the port is
-        # published (sabnzbd.lvdar.nl), and nginx spools request bodies to disk.
-        # 256m is well beyond any real NZB.
+        # Room for an NZB POST: radarr uploads NZBs to /api?mode=addfile
+        # through this vhost, and a UHD remux NZB runs well past nixpkgs'
+        # global 10m client_max_body_size — nginx 413'd exactly the largest
+        # releases. Finite (not 0) because the port is published and nginx
+        # spools request bodies to disk.
         services.nginx.virtualHosts = mkIf cfg.vpn.enable (lib.mkMerge [
           (vpnVhost cfg.uiPort)
           {

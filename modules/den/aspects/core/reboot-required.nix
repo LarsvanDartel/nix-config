@@ -1,26 +1,14 @@
 # core.reboot-required — say so when the running kernel is not the built one.
-#
-# comin activates a new system within five minutes of `deploy` moving, but
-# `switch` only replaces userspace: the kernel, initrd and modules that are
-# already running keep running until someone reboots. Nothing in this repo ever
-# reboots anything — there is no system.autoUpgrade, no reboot window, and comin
-# exposes no reboot option — so a kernel security fix lands in the store, is
-# activated, and then sits there indefinitely. endeavour ran for over two months
-# that way.
-#
-# This does NOT reboot. comin has no magic rollback (services/comin.nix), so a
-# kernel that does not come back needs the bootloader — IPMI on endeavour, the
-# provider console on gaia, and a keyboard on pioneer. Rebooting two production
-# hosts unattended on an upstream bump is a worse failure than a stale kernel.
-# So it notifies and leaves the decision to a human.
-#
-# It nags, on purpose. The condition persists until acted on, and a reminder
-# that fires once is a reminder that is missed once.
+# comin's switch replaces userspace only — kernel/initrd/modules keep running
+# until a reboot, and nothing here reboots (no autoUpgrade, no reboot window,
+# no comin reboot option). This does NOT reboot either: comin has no magic
+# rollback (services/comin.nix), so a kernel that does not come back needs the
+# console — IPMI on endeavour, provider console on gaia, keyboard on pioneer.
+# It nags on purpose: the condition persists until acted on.
 {den, ...}: {
   den.aspects.core.reboot-required = {
-    # For the ntfy url/topic/user options and the keys/ntfy/password secret,
-    # which are declared there. Reusing them keeps one notification identity for
-    # the fleet rather than a second copy to keep in step.
+    # For the ntfy options and the keys/ntfy/password secret, keeping one
+    # notification identity for the fleet.
     includes = [den.aspects.core.notify-failure];
 
     nixos = {
@@ -139,8 +127,7 @@
           wantedBy = ["timers.target"];
           timerConfig = {
             OnCalendar = cfg.interval;
-            # Not at the same instant on every host, and not at the same
-            # instant as the backup.
+            # Not at the same instant on every host or as the backup.
             RandomizedDelaySec = "30m";
             Persistent = true;
           };

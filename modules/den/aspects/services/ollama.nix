@@ -1,18 +1,10 @@
 # services.ollama — local LLM inference on endeavour's Tesla P100.
 #
-# The card was already in this host and had never had a job: jellyfin
-# transcodes on the Arc A310 (`renderD128`) and nothing else here speaks CUDA,
-# so `nvidia-smi` reported 0 MiB used and 0% utilisation indefinitely. This is
-# what gives it one.
-#
-# A P100 is a better inference card than its 2016 date suggests, for one
-# reason: token generation is bound by memory bandwidth, and HBM2 gives this
-# 732 GB/s — more than most cards you could buy new today. What it does not
-# have is tensor cores or flash-attention (Ampere and later), so prompt
-# processing is comparatively slow. Expect good generation, mediocre ingest.
-#
-# The whole point of this file is the `cudaArches` override below. Everything
-# else is the usual nixpkgs-module unwiring.
+# Gives the idle P100 a job (jellyfin transcodes on the Arc A310; nothing
+# else here speaks CUDA). HBM2's 732 GB/s makes token generation strong for
+# a 2016 card; no tensor cores or flash-attention (Ampere and later) makes
+# prompt processing comparatively slow — good generation, mediocre ingest.
+# The whole point of this file is the `cudaArches` override below.
 {den, ...}: {
   den.aspects.services.ollama.nixos = {
     config,
@@ -99,28 +91,18 @@
       services.ollama = {
         enable = true;
 
-        # The reason this file exists.
+        # The reason this file exists. nixpkgs builds CUDA for Turing+;
+        # the P100 is 6.0, so stock ollama-cuda contains no kernel this GPU
+        # can run. The failure mode is the dangerous kind: ollama does not
+        # error, it silently falls back to CPU — tokens still appear, just
+        # slowly. Check `nvidia-smi` during generation before believing it.
         #
-        # nixpkgs builds CUDA for `cudaCapabilities`, which is currently
-        # ["7.5" "8.0" "8.6" "8.9" "9.0" "10.0" "10.3" "12.0" "12.1"] — Turing
-        # and newer. A P100 is compute capability 6.0, below every entry, so a
-        # stock `ollama-cuda` contains no kernel this GPU can execute.
-        #
-        # The failure mode is the dangerous kind: ollama does not error, it
-        # quietly falls back to CPU. Tokens still appear, just slowly, so
-        # everything looks like it works and the GPU stays at 0 MiB. Check
-        # `nvidia-smi` during generation before believing any of this.
-        #
-        # Overridden per-package rather than through
-        # `nixpkgs.config.cudaCapabilities`, which would be the obvious global
-        # knob and is the wrong one here: this repo shares a single nixpkgs
-        # instance across all four hosts, so setting it there invalidates the
-        # CUDA closure fleet-wide to fix one card in one machine.
-        #
-        # cudaPackages_12 is pinned, not incidental. CUDA 13 removes Pascal
-        # support entirely and nixpkgs already carries cudaPackages_13, so the
-        # day the default moves this breaks — with a compiler error about an
-        # unsupported architecture rather than anything naming this GPU.
+        # Per-package, not `nixpkgs.config.cudaCapabilities`: this repo
+        # shares one nixpkgs instance across all four hosts, and the global
+        # knob would invalidate the CUDA closure fleet-wide to fix one card.
+        # cudaPackages_12 is pinned deliberately — CUDA 13 drops Pascal, so
+        # the day the default moves this breaks with a compiler error that
+        # never names this GPU.
         package = pkgs.ollama-cuda.override {
           cudaArches = ["sm_60"];
           cudaPackages = pkgs.cudaPackages_12;
@@ -144,17 +126,12 @@
         environmentVariables.OLLAMA_KEEP_ALIVE = cfg.keepAlive;
       };
 
-      # The same nixpkgs trap attic.nix, prometheus.nix and crowdsec.nix each
-      # document: the module sets DynamicUser = true *and* StateDirectory, so
-      # systemd insists on managing state under /var/lib/private. Here it is
-      # the second consequence that bites rather than the EBUSY one — a
-      # dynamic UID means the ownership of /tank/ollama changes out from under
-      # the weights across a reboot, and ollama then cannot read models it
-      # downloaded itself.
-      #
-      # /var/lib/ollama is left ephemeral on purpose. It holds a generated
-      # keypair and nothing else of value; the models are on /tank and the
-      # chats live in LibreChat's MongoDB.
+      # The nixpkgs DynamicUser + StateDirectory trap (see attic.nix,
+      # prometheus.nix, crowdsec.nix), here via its second consequence: a
+      # dynamic UID means ownership of /tank/ollama changes across a reboot,
+      # and ollama cannot read the models it downloaded itself.
+      # /var/lib/ollama stays ephemeral on purpose — a generated keypair;
+      # weights are on /tank, chats live in LibreChat's MongoDB.
       users.users.ollama = {
         isSystemUser = true;
         group = "ollama";
@@ -179,23 +156,17 @@
   };
 
   # services.ollama.librechat — LibreChat, the browser front end for the
-  # engine above and, through OpenRouter, the one cloud provider this fleet
-  # admits. It replaced Open WebUI here: the point of the switch is OpenRouter
-  # access and LibreChat's agent features, and unlike every authlib client in
-  # this fleet its OIDC library sends a PKCE code challenge, so it is the one
-  # oauth2 client that needs no allowInsecureClientDisablePkce concession.
+  # engine above and, via OpenRouter, the one cloud provider this fleet
+  # admits. Replaced Open WebUI for OpenRouter access and agent features;
+  # unlike every authlib client here its OIDC library sends a PKCE code
+  # challenge, so it needs no allowInsecureClientDisablePkce concession.
   #
-  # What the switch gives up, knowingly: Open WebUI's built-in knowledge/RAG
-  # (LibreChat's RAG is a separate rag_api + pgvector pair nixpkgs does not
-  # package), and its model-management UI (LibreChat only lists what the
-  # engine has; pulls happen through cosmos.services.ollama.models or SSH).
-  # The admin panel is likewise unpackaged — the first OIDC login becomes the
-  # ADMIN account, which is all a single-user deployment needs.
-  #
-  # A sub-aspect for the same reason tangled.spindle is one: it is useless
-  # without its parent and always wants it (the local endpoint is half the
-  # point), but the parent is perfectly useful alone (a mesh-exposed API with
-  # no UI is a reasonable thing to run).
+  # Knowingly given up: Open WebUI's built-in RAG (LibreChat's is an
+  # unpackaged rag_api + pgvector pair) and its model-management UI (pulls
+  # happen via cosmos.services.ollama.models or SSH). The admin panel is
+  # likewise unpackaged — the first OIDC login becomes the ADMIN account,
+  # all a single-user deployment needs. A sub-aspect like tangled.spindle:
+  # useless without its parent, which is fine alone.
   den.aspects.services.ollama.librechat = {
     includes = [den.aspects.services.ollama den.aspects.core.sops];
 
@@ -249,10 +220,9 @@
           env = {
             PORT = cfg.port;
 
-            # Loopback would be right if a local nginx fronted this. Under edge
-            # termination netbird-proxy dials `endeavour:8084` across the mesh
-            # and a loopback socket refuses it — the same reasoning, and the
-            # same expression, as services/suwayomi.nix.
+            # Loopback would be right if a local nginx fronted this; under
+            # edge termination netbird-proxy dials across the mesh and a
+            # loopback socket refuses it. Same as services/suwayomi.nix.
             HOST =
               if config.cosmos.networking.edgeTerminated
               then "0.0.0.0"
@@ -263,14 +233,11 @@
             DOMAIN_SERVER = "https://${cfg.domain}";
             DOMAIN_CLIENT = "https://${cfg.domain}";
 
-            # kanidm is the only way in. OIDC logins auto-provision their
-            # users and are not gated by this flag (only the yaml
-            # `registration.allowedDomains` list could gate them, and it is
-            # unset) — this kills email signup, which would need SMTP this
-            # host does not have anyway. The first OIDC login creates the
-            # ADMIN account. A broken OIDC setup would mean no way in at all,
-            # but kanidm OIDC is proven on half this fleet and the fix is a
-            # rebuild away.
+            # kanidm is the only way in. OIDC logins auto-provision users
+            # and are not gated by this flag — this kills email signup, which
+            # would need SMTP this host does not have anyway. The first OIDC
+            # login creates the ADMIN account. A broken OIDC setup would mean
+            # no way in at all, but kanidm OIDC is proven on half this fleet.
             ALLOW_REGISTRATION = false;
 
             # The login button stays hidden without this even when the
@@ -289,11 +256,10 @@
             OPENID_USE_PKCE = true;
           };
 
-          # Delivered via systemd LoadCredential: the unit's script cats each
-          # of these into the environment at start, so the librechat user
-          # never needs to own a sops file and no template is needed
-          # (open-webui needed one because its service user read the env file
-          # itself).
+          # Via systemd LoadCredential: the unit's script cats these into
+          # the environment at start, so the librechat user never owns a
+          # sops file and no template is needed (open-webui needed one
+          # because its service user read the env file itself).
           credentials = {
             # LibreChat's own crypto, generated once (`openssl rand -hex`)
             # and parked in nix-secrets: the CREDS pair encrypts stored
@@ -312,19 +278,17 @@
             OPENROUTER_KEY = config.sops.secrets."keys/openrouter/api-key".path;
           };
 
-          # librechat.yaml. Everything here is re-read on every start —
-          # LibreChat has no equivalent of Open WebUI's ENABLE_PERSISTENT_CONFIG
-          # trap, where settings migrate into the database on first boot and
-          # the environment stops mattering.
+          # librechat.yaml, re-read on every start — no Open WebUI-style
+          # ENABLE_PERSISTENT_CONFIG trap where settings migrate into the
+          # database on first boot.
           settings = {
             version = "1.2.1";
 
             endpoints.custom = [
-              # The local engine, spoken to through its OpenAI-compatible /v1.
-              # LibreChat 0.8.0 has no `noApiKey`, but ollama ignores the
-              # Authorization header entirely, so a dummy satisfies the
-              # schema. `fetch` populates the model picker from the engine's
-              # /models — the same list cosmos.services.ollama.models pulls.
+              # The local engine via its OpenAI-compatible /v1. LibreChat
+              # 0.8.0 has no `noApiKey`; ollama ignores the Authorization
+              # header entirely, so a dummy satisfies the schema. `fetch`
+              # populates the picker from the engine's /models.
               {
                 name = "Ollama";
                 apiKey = "ollama";
@@ -345,13 +309,10 @@
               }
             ];
 
-            # titleConvo is left off on both endpoints on purpose. Titles are
-            # how a conversation is findable later, and LibreChat still makes
-            # them — client-side, from the first message, at no model-call
-            # cost. Enabling titleConvo here would buy back Open WebUI's
-            # behaviour (an extra call per conversation) on endpoints where
-            # that wait is felt; on OpenRouter it is cheap enough to be worth
-            # flipping some day.
+            # titleConvo off on both endpoints on purpose: titles are still
+            # made, client-side from the first message, at no model-call
+            # cost. Enabling it buys back Open WebUI's extra call per
+            # conversation; on OpenRouter it is cheap enough to flip some day.
           };
         };
 

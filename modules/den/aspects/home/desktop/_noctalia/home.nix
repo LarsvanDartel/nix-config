@@ -1,9 +1,7 @@
-# The noctalia home config, as a plain home-manager module *factory*.
-#
-# Imported by BOTH `den.aspects.home.noctalia` (see ../noctalia.nix) and
-# voyager's `specialisation.niri` — specialisation bodies are ordinary NixOS
-# modules and cannot `include` a den aspect, so the shared content lives here.
-# Call it as `import ./_noctalia/home.nix {inherit inputs;}`.
+# The noctalia home config, as a plain home-manager module *factory*: imported
+# by BOTH `den.aspects.home.noctalia` (see ../noctalia.nix) and voyager's
+# `specialisation.niri` — specialisation bodies are ordinary NixOS modules and
+# cannot `include` a den aspect. Call as `import ./_noctalia/home.nix {inherit inputs;}`.
 {inputs}: {
   config,
   lib,
@@ -16,20 +14,18 @@
   cfg = config.cosmos.desktops.noctalia;
   fonts = config.cosmos.desktops.common.styling.fonts;
 
-  # Set once in _styling/default.nix. stylix's own noctalia-shell target would
-  # apply these, but it is gated on `options.programs ? noctalia-shell` and this
-  # noctalia is a wrapped package rather than that home-manager module, so the
-  # target never fires and the values are threaded through by hand — same as the
+  # Set once in _styling/default.nix. stylix's own noctalia-shell target never
+  # fires here — it is gated on `options.programs ? noctalia-shell`, but this is
+  # a wrapped package — so the values are threaded through by hand, same as the
   # colours and fonts above and below.
   opacity = config.stylix.opacity;
   wallpapers = config.cosmos.desktops.wallpapers;
 
   widget = id: {inherit id;};
 
-  # Plugin widgets are addressed as `plugin:<id>` (BarWidgetLoader splits on the
-  # prefix to look the component up in the plugin registry rather than
-  # Modules/Bar/Widgets). Placement has to live here: bar.widgets is part of the
-  # store-owned settings.json, so it cannot be changed from the settings panel.
+  # Plugin widgets are addressed as `plugin:<id>` (BarWidgetLoader looks them
+  # up in the plugin registry). Placement has to live here: bar.widgets is part
+  # of the store-owned settings.json, unchangeable from the settings panel.
   pluginWidget = id: {id = "plugin:${id}";};
 
   # Widgets that can show their value permanently or only on hover. "alwaysShow"
@@ -42,22 +38,19 @@
   noctalia = inputs.nix-wrapper-modules.wrappers.noctalia-shell.wrap {
     inherit pkgs;
 
-    # No `outOfStoreConfig`: supplying only `settings` makes the wrapper point
+    # No `outOfStoreConfig`: settings-only makes the wrapper point
     # NOCTALIA_SETTINGS_FILE straight at the generated store file, so nix is
-    # authoritative and every rebuild applies immediately.
-    #
-    # Trade-off: noctalia's settings panel can no longer save — settings are
-    # changed here, not in the GUI. Everything else it owns (colors.json,
-    # colorschemes/, plugins/) still lives in ~/.config/noctalia and stays
-    # writable, so plugin installs and runtime state keep working.
+    # authoritative and every rebuild applies immediately. Trade-off: the
+    # settings panel can no longer save — settings are changed here, not in the
+    # GUI. colors.json, colorschemes/ and plugins/ stay in ~/.config/noctalia
+    # and writable.
 
     settings = {
       bar = {
         barType = "simple";
         inherit (cfg.bar) position density;
 
-        # flat + edge-to-edge: no capsule pills, no rounding, no margins.
-        # Still flat, but no longer opaque — see `enableBlurBehind` below.
+        # flat + edge-to-edge, but translucent — see `enableBlurBehind` below.
         showCapsule = false;
         showOutline = false;
         backgroundOpacity = opacity.desktop;
@@ -72,39 +65,27 @@
         enableExclusionZoneInset = true;
         rightClickAction = "controlCenter";
 
-        # Three sides, and until recently fourteen widgets were on one of them
-        # while the left held two. Split by what a thing tells you about rather
-        # than by what kind of thing it is:
-        #
-        #   left    what you are looking at — workspace, window, what it is
-        #           playing, whether it is watching you
-        #   center  the clock, alone, because it is the one thing that has to
-        #           sit still
-        #   right   the machine's own state, and the ways into it
+        # Split by what a thing tells you about: left = what you are looking
+        # at, center = the clock alone, right = the machine's own state.
         widgets = {
           left =
             map widget ["Workspace" "ActiveWindow"]
             ++ [
-              # The widest widget on the bar by a distance: it carries a track
-              # title. It belongs next to the window it is playing from, and
-              # moving it here is most of what bought the room.
+              # Widest widget on the bar (carries a track title); sits next to
+              # the window it is playing from.
               (widget "MediaMini")
-              # Only draws itself while the mic, camera or a screencast is
-              # actually live, so it costs nothing at rest.
+              # Only draws while the mic, camera or a screencast is live.
               (pluginWidget "privacy-indicator")
             ];
           center = map widget ["Clock"];
           right =
-            # Percentages are two or three characters and worth having at a
-            # glance, so they stay on screen.
+            # Percentages are worth having at a glance; the reading stays on screen.
             map valueWidget ["Volume" "Brightness"]
-            # An SSID and a paired device name are not: both run to twenty-odd
-            # characters for something that changes a few times a week. Icon
-            # here, reading on hover.
+            # SSID / device names are long and rarely change: icon here,
+            # reading on hover.
             ++ map widget ["Network" "Bluetooth"]
             ++ [
-              # Replaces kdeconnect-indicator's tray icon, which plugins.nix
-              # turns off.
+              # Replaces kdeconnect-indicator's tray icon, off in plugins.nix.
               (pluginWidget "kde-connect")
               # Auto-hides when disconnected.
               (pluginWidget "protonvpn")
@@ -112,9 +93,9 @@
               (pluginWidget "thinkpad-fan")
             ]
             # `icon-always` keeps the pill open, so the charge percentage shows
-            # permanently. `hideIfNotDetected` is what makes the widget vanish
-            # entirely when UPower reports no battery — see desktop.power, which
-            # is what actually makes the battery detectable.
+            # permanently; `hideIfNotDetected` would vanish the widget when
+            # UPower reports no battery — see desktop.power, which is what
+            # makes the battery detectable.
             ++ [
               {
                 id = "Battery";
@@ -125,51 +106,40 @@
             ++ [
               {
                 id = "Tray";
-                # blueman-applet duplicates the Bluetooth widget three slots to
-                # the left. Two rules because noctalia matches on the tooltip
-                # title when there is one and falls back to the item id: the
-                # tooltip is state-dependent ("Bluetooth Disabled", "Bluetooth
-                # Enabled", …), the id is always "blueman". Globs, anchored,
-                # case-insensitive. The applet keeps running — it is also the
-                # pairing agent.
+                # blueman-applet duplicates the Bluetooth widget. Two rules
+                # because noctalia matches on the state-dependent tooltip title
+                # when there is one, else the item id ("blueman"). The applet
+                # keeps running — it is also the pairing agent.
                 blacklist = ["blueman" "Bluetooth*"];
               }
             ]
             ++ map widget ["NotificationHistory" "ControlCenter"];
-          # Night light, keep-awake and the wallpaper picker stay *enabled* —
-          # they just live in the control centre rather than on the bar.
-          #
-          # So do several installed plugins, deliberately kept off the bar:
-          # screen-toolkit is a control-centre shortcut (below); ssh-sessions
-          # and niri-workspaces are launcher providers (type `>ws`);
-          # keybind-cheatsheet, display-settings and plugin-manager are on
-          # keybinds (see _niri/system.nix). battery-monitor-plus and
-          # model-usage have bar widgets but no default slot — add
-          # `plugin:battery-monitor-plus` / `plugin:model-usage` here to
-          # surface them.
+          # Night light, keep-awake and the wallpaper picker stay *enabled*,
+          # just in the control centre rather than on the bar. Deliberately off
+          # the bar: screen-toolkit is a control-centre shortcut; ssh-sessions
+          # and niri-workspaces are launcher providers; keybind-cheatsheet,
+          # display-settings and plugin-manager are on keybinds (see
+          # _niri/system.nix); battery-monitor-plus and model-usage have bar
+          # widgets but no default slot — add `plugin:<id>` here to surface them.
         };
       };
 
-      # FIVE PER SIDE, no more. ShortcutsCard is a fixed-height row of
-      # non-shrinking items in a half-width box with no wrapping, so a sixth
-      # entry renders outside the card's rounded background rather than being
-      # laid out.
-      #
-      # A plugin can only go here if its manifest declares a
-      # `controlCenterWidget` entry point — of the installed set that is
-      # kde-connect, plugin-manager and screen-toolkit, and nothing else.
-      # battery-threshold has only `barWidget`, so it lives on a keybind
-      # (see _niri/system.nix); putting it here renders nothing.
+      # FIVE PER SIDE, no more: ShortcutsCard is a fixed-height, non-wrapping
+      # row, so a sixth entry renders outside the card's background. A plugin
+      # can only go here if its manifest declares a `controlCenterWidget` entry
+      # point — of the installed set that is kde-connect, plugin-manager and
+      # screen-toolkit. battery-threshold has only `barWidget`, so it lives on a
+      # keybind (see _niri/system.nix); putting it here renders nothing.
       controlCenter.shortcuts = {
         left =
           map widget ["Network" "Bluetooth" "WallpaperSelector" "NoctaliaPerformance"]
           ++ [(pluginWidget "screen-toolkit")];
         right =
-          # Notifications (the do-not-disturb toggle) gave up its slot: the
-          # kde-connect bar widget only draws itself when a device is actually
-          # reachable, and its control-centre widget has no such condition, so
-          # this is the only way to reach it with the phone off the network.
-          # DND is still on `notifications toggleDND` over IPC.
+          # Notifications (the DND toggle) gave up its slot: the kde-connect
+          # bar widget only draws when a device is reachable, and its
+          # control-centre widget has no such condition — this is the only way
+          # to reach it with the phone off the network. DND is still on
+          # `notifications toggleDND` over IPC.
           map widget ["PowerProfile" "KeepAwake" "NightLight"]
           ++ [
             (pluginWidget "kde-connect")
@@ -188,34 +158,25 @@
         useWallpaperColors = false;
       };
 
-      # Minimal chrome: flat, no shadows, no faux screen corners.
-      #
-      # Blur is the exception, and it is what makes the translucency above
-      # legible rather than noisy. noctalia asks for it through the
-      # `ext-background-effect` protocol (Quickshell's BackgroundEffect), which
-      # means the compositor blurs exactly the shape noctalia asked for —
-      # corner radii included — instead of us approximating it with a rule.
-      # niri 26.04 implements that protocol, so nothing else is needed on the
-      # niri side for the bar, the panels and the launcher.
-      #
-      # It reaches only those three surfaces though: notifications, OSDs and
-      # toasts are separate windows with no BackgroundEffect attached, so they
-      # are blurred by a niri layer-rule instead (see _niri/system.nix). Under
-      # Hyprland the equivalent is already in _hyprland/rules.nix.
+      # Minimal chrome: flat, no shadows, no faux screen corners. Blur is the
+      # exception — it is what makes the translucency legible. noctalia asks for
+      # it via `ext-background-effect` (Quickshell's BackgroundEffect), so the
+      # compositor blurs exactly the shape asked for, corner radii included;
+      # niri 26.04 implements the protocol, so nothing else is needed on the
+      # niri side. It reaches only bar, panels and launcher: notifications, OSDs
+      # and toasts attach no BackgroundEffect and stay unblurred (see
+      # _niri/system.nix for why no layer-rule can fix that). The Hyprland
+      # equivalent is in _hyprland/rules.nix.
       general = {
         enableShadows = false;
         enableBlurBehind = true;
         showScreenCorners = false;
         showChangelogOnStartup = false;
 
-        # Lock screen.
-        #
-        # `autoStartAuth` begins the PAM conversation as soon as the lock screen
-        # appears, which is what starts the fprintd scan without a keypress, and
-        # `allowPasswordWithFprintd` keeps the password field live while the
-        # reader waits — without it a failed/absent finger locks you out of
-        # typing. `enableLockScreenCountdown` is the auto-dismiss timer on the
-        # session buttons; off, so nothing happens unless you pick it.
+        # `autoStartAuth` starts the PAM conversation (and so the fprintd scan)
+        # as soon as the lock screen appears, and `allowPasswordWithFprintd`
+        # keeps the password field live while the reader waits — without it a
+        # failed/absent finger locks you out of typing.
         autoStartAuth = true;
         allowPasswordWithFprintd = true;
         enableLockScreenMediaControls = true;
@@ -227,22 +188,19 @@
       };
 
       ui = {
-        # The interface font, not stylix's sansSerif: Cozette is what the rest of
-        # the desktop (bar, popups, terminal) is set in, and mixing it with
-        # DejaVu across the same screen is what made the shell look off.
+        # The interface font, not stylix's sansSerif: Cozette matches the rest
+        # of the desktop; mixing in DejaVu is what made the shell look off.
         fontDefault = fonts.interface.name;
         fontFixed = fonts.monospace.name;
         panelBackgroundOpacity = opacity.desktop;
-        # The panel *background* is translucent; the widgets drawn on it are
-        # not. Stacking two levels of transparency is what turns frosted glass
-        # into an unreadable smear.
+        # Only the panel *background* is translucent; stacking a second level
+        # turns frosted glass into an unreadable smear.
         translucentWidgets = false;
       };
 
-      # Deliberately spare: a single-column list with no category headers, no
-      # icon plates and tight rows — the closest noctalia gets to a bare
-      # type-and-enter launcher. The search providers (settings, windows,
-      # sessions, clipboard) cost nothing visually and stay on.
+      # Deliberately spare: single-column list, no category headers, no icon
+      # plates. The search providers (settings, windows, sessions, clipboard)
+      # stay on.
       appLauncher = {
         enableClipboardHistory = cfg.widgets.clipboardHistory;
         terminalCommand = "${config.cosmos.cli.terminals.defaultStandalone} -e";
@@ -330,10 +288,9 @@
     };
   };
 
-  # The wallpaper choice is runtime state, not a setting: noctalia keeps it in
-  # its cache, and `defaultWallpaper` is the fallback used for any screen that
-  # has no pick yet. Seeding the cache is therefore how a *default* wallpaper is
-  # expressed — writing it into settings.json would do nothing.
+  # The wallpaper choice is runtime state noctalia keeps in its cache; seeding
+  # the cache is how a *default* wallpaper is expressed — writing it into
+  # settings.json would do nothing.
   wallpaperCache = builtins.toJSON {
     wallpapers = {};
     usedRandomWallpapers = {};
@@ -418,9 +375,8 @@ in {
       Service = {
         ExecStart = lib.getExe noctalia;
         # Without this the lock screen probes /etc/pam.d at startup to guess a
-        # stack. `login` is what it would land on anyway, and on NixOS that is
-        # the stack `services.fprintd` wires pam_fprintd into — naming it
-        # outright makes the fingerprint path deterministic.
+        # stack. `login` is where it would land anyway, and on NixOS that is
+        # the stack `services.fprintd` wires pam_fprintd into — deterministic.
         Environment = ["NOCTALIA_PAM_SERVICE=login"];
         Restart = "on-failure";
         RestartSec = 2;

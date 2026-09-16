@@ -1,19 +1,12 @@
-# services.ntfy — the alert sink, and deliberately the only piece of the
-# monitoring stack that does not live on endeavour.
+# services.ntfy — the alert sink, deliberately the only monitoring piece not
+# on endeavour: an alert path there cannot report endeavour's own outage, and
+# gaia is independent of it, public, and phone-reachable over the plain
+# internet.
 #
-# endeavour holds the metrics, the logs and the dashboards, because it is the
-# only host with the RAM and the disk for them. But it is also the host whose
-# death is the single most important thing to be told about, and an alerting
-# path that runs there cannot report its own outage. gaia is independent of it,
-# is already the public ingress, and is reachable from a phone over the plain
-# internet — so it still works during exactly the failures worth waking up for:
-# endeavour down, the mesh down, the house offline.
-#
-# Published rather than mesh-only for the same reason, and ungated: the ntfy
-# app authenticates with a username and password, and cannot complete an
-# interactive browser login against kanidm. It carries its own auth instead —
-# `auth-default-access: deny-all` means an anonymous request can neither read
-# nor write, so the topic name is not the secret.
+# Published and ungated on purpose: the ntfy app authenticates with
+# username/password and cannot complete an interactive kanidm login. It
+# carries its own auth — `auth-default-access: deny-all` means the topic name
+# is not the secret.
 {
   den,
   inputs,
@@ -34,11 +27,9 @@
       cfg = config.cosmos.services.ntfy;
       passwordFile = config.sops.secrets."keys/ntfy/password".path;
 
-      # ntfy keeps users in a sqlite auth file, so the account is runtime state
-      # rather than configuration. Reconciled on every start from the sops
-      # value, which makes the secret the source of truth: rotate it there and
-      # the account follows on the next deploy, instead of drifting until
-      # someone remembers there is a database.
+      # ntfy keeps users in a sqlite auth file — runtime state, not config.
+      # Reconciled from the sops value on every start, so the secret is the
+      # source of truth.
       provision = pkgs.writeShellApplication {
         name = "ntfy-provision";
         runtimeInputs = [config.services.ntfy-sh.package pkgs.gnugrep];
@@ -121,23 +112,12 @@
         sops.secrets."keys/ntfy/password".sopsFile =
           builtins.toString inputs.nix-secrets + "/hosts/common/secrets.yaml";
 
-        # Deliberately NOT persisted, which is unusual here and worth the
-        # explanation.
-        #
-        # nixpkgs runs ntfy under DynamicUser with a StateDirectory, and that
-        # pair relocates state to /var/lib/private/ntfy-sh. An impermanence
-        # entry for /var/lib/ntfy-sh bind-mounts the path systemd wants to
-        # manage as a symlink, and the unit dies at STATE_DIRECTORY with
-        # "Device or resource busy" — the same EBUSY that has already bitten
-        # crowdsec and tile-traccar in this repo.
-        #
-        # The usual fix is to turn DynamicUser off. Not needed here, because
-        # none of this state is worth keeping: the auth database holds one
-        # account which is reconciled from sops on every start, and the cache
-        # is undelivered messages for a push-alert topic, which are stale by
-        # the time anything reboots. Reproducible state does not need
-        # persisting, and not persisting it removes the conflict rather than
-        # working around it.
+        # Deliberately NOT persisted. DynamicUser + StateDirectory relocates
+        # state to /var/lib/private/ntfy-sh, where an impermanence entry is the
+        # EBUSY that killed crowdsec and tile-traccar. No workaround needed:
+        # the auth db is one account reconciled from sops on every start, and
+        # the cache is stale push messages. Reproducible state does not need
+        # persisting.
 
         # netbird-proxy reaches it over the mesh like any other target, so the
         # port opens on wt0 and nowhere else.
@@ -149,10 +129,8 @@
             base-url = "https://${cfg.domain}";
             listen-http = ":${toString cfg.port}";
 
-            # TLS is terminated at the edge by netbird-proxy, so ntfy sees
-            # plain HTTP and must be told to trust the forwarded headers —
-            # without this every publisher looks like it came from the proxy
-            # and rate limiting applies to all of them collectively.
+            # TLS ends at netbird-proxy; without behind-proxy every publisher
+            # shares the proxy's address for rate limiting.
             behind-proxy = true;
 
             auth-file = "/var/lib/ntfy-sh/user.db";
@@ -160,20 +138,16 @@
           };
         };
 
-        # Provisioning rides on ntfy's own unit rather than living in one of
-        # its own. Under DynamicUser the uid is allocated per-start, so a
-        # separate unit cannot reliably be the same user or see the same
-        # StateDirectory; ExecStartPost inherits both, plus the credential.
+        # Provisioning rides on ntfy's own unit: under DynamicUser the uid is
+        # allocated per-start, so a separate unit cannot reliably be the same
+        # user or see the same StateDirectory; ExecStartPost inherits both.
         systemd.services.ntfy-sh.serviceConfig = {
           LoadCredential = "password:${passwordFile}";
-          # The `-` prefix makes systemd ignore this step's exit status. That
-          # is deliberate and worth more than it looks: without it, provisioning
-          # is allowed to kill the notification server, and the notification
-          # server is what every other host reports its failures to. It also
-          # takes the whole host down with it, because a unit that fails during
-          # activation makes deploy-rs roll the entire deploy back — which is
-          # exactly what happened here, leaving gaia undeployable until the
-          # provisioning script was fixed. Alerting must degrade, not cascade.
+          # The `-` prefix ignores this step's exit status: provisioning must
+          # not be able to kill the notification server. A unit failing during
+          # activation makes deploy-rs roll the whole deploy back — that
+          # happened, leaving gaia undeployable until the script was fixed.
+          # Alerting must degrade, not cascade.
           ExecStartPost = "-${lib.getExe provision}";
         };
       };

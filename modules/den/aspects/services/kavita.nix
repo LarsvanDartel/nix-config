@@ -1,43 +1,25 @@
 # services.kavita — reading server for the ebook/light-novel library.
 #
-# The counterpart to suwayomi rather than a replacement for it: suwayomi
-# fetches manga from sources and stores CBZ, while this only ever reads what
-# is already on disk. Kavita has no acquisition layer at all — no sources, no
-# extensions, nothing to point at a remote site — so filling the library is
-# always a separate job from serving it. Readarr would have been that job and
-# is retired (archived 2025-06-27, its metadata backend gone), so for now the
-# directory is filled by hand.
+# Reads what is already on disk: Kavita has no acquisition layer (suwayomi
+# is the counterpart that fetches; readarr is retired, archived 2025-06-27),
+# so the library is filled by hand for now.
 #
-# Two things about the upstream module are worth knowing before changing
-# anything here:
+# Two module traps:
 #
-#   * it rewrites config/appsettings.json from the Nix store on *every* start,
-#     so anything configured through the web interface that lands in that file
-#     is silently lost at the next restart. Authority/ClientId/Secret are
-#     therefore set below rather than clicked in.
-#
-#     The behavioural OIDC toggles are a second copy, in ServerSetting row 40
-#     of kavita.db, as one JSON blob — and *that copy wins*. Measured, not
-#     assumed: on 2026-08-30 appsettings.json read
-#     "DisablePasswordAuthentication": false while the running server reported
-#     it true, because the UI had written the database. The fields below other
-#     than Authority/ClientId/Secret are therefore a first-run seed, not a
-#     setting — declaring them does not hold a running server to them, and
-#     saving the OIDC form in the UI rewrites the whole blob including fields
-#     you did not touch.
-#
-#     Which makes the UI the dangerous place to change them. Turning on
-#     "disable password authentication" there locked the only account out of
-#     the only way in: the OIDC identity provisioned with no roles
-#     (DefaultRoles was empty and kanidm sent no roles claim), Kavita answered
-#     "You do not have the required roles to access this application", and the
-#     local login form was gone. Recovery was a sqlite UPDATE against
-#     ServerSetting row 40 with the service stopped.
-#
-#   * it substitutes only the TokenKey into that file, via replace-secret. The
-#     client secret needs the same treatment, so this appends a second
-#     replace-secret pass and a second credential rather than putting the
-#     secret in the store.
+#   * config/appsettings.json is rewritten from the Nix store on *every*
+#     start, so anything clicked in the UI that lands in that file is lost.
+#     Authority/ClientId/Secret are therefore set here, not in the UI. The
+#     behavioural OIDC toggles are a second copy, one JSON blob in
+#     ServerSetting row 40 of kavita.db, and *that copy wins* (measured
+#     2026-08-30): every other OIDC field below is a first-run seed, not a
+#     setting, and saving the OIDC form in the UI rewrites the whole blob.
+#     The UI is the dangerous place to change them — "disable password
+#     authentication" clicked there once locked the only account out
+#     (provisioned identity with no roles, local login gone); recovery was a
+#     sqlite UPDATE against row 40 with the service stopped.
+#   * the module substitutes only the TokenKey; the client secret needs the
+#     same treatment, hence the second replace-secret pass below rather than
+#     a secret in the store.
 {den, ...}: {
   den.aspects.services.kavita = {
     # For the `media` group and mediaDir. The base arr aspect is just those
@@ -100,53 +82,46 @@
         services.kavita = {
           enable = true;
           settings = {
-            # `Port`, capitalised: settings is a freeform submodule, so a
-            # lowercase `port` is accepted silently, written to
-            # appsettings.json, ignored by Kavita, and leaves the real option
-            # sitting at its default.
+            # `Port`, capitalised: settings is a freeform submodule, so
+            # lowercase `port` is accepted silently, written to the file, and
+            # ignored by Kavita.
             Port = cfg.port;
 
-            # Bound to everything by the upstream default, which is what
-            # edge termination needs: netbird-proxy dials `endeavour:5000`
-            # over the mesh, and a loopback socket refuses that. Reach is
-            # governed by the firewall, which opens this on wt0 only.
+            # Bound to everything by the upstream default — what edge
+            # termination needs: netbird-proxy dials `endeavour:5000` over
+            # the mesh and a loopback socket refuses. Reach is governed by
+            # the firewall, which opens this on wt0 only.
             OpenIdConnectSettings = {
-              # kanidm publishes discovery at
-              # <authority>/.well-known/openid-configuration, which is what
-              # Kavita fetches to learn the rest of the endpoints.
               Authority = "https://auth.lvdar.nl/oauth2/openid/kavita";
               ClientId = "kavita";
               Secret = "@OIDC_SECRET@";
 
-              # The claim kanidm is told to emit below. Kavita's default is
-              # .NET's schema URI, which kanidm cannot produce — claim names
-              # there are bare identifiers — so the two have to be met in the
-              # middle on a name both can express.
+              # Kavita's default is .NET's schema URI, which kanidm cannot
+              # produce (its claim names are bare identifiers) — met in the
+              # middle on a name both can express. The claim kanidm is told
+              # to emit below.
               RolesClaim = "kavita_roles";
 
-              # A floor, not the policy: the claim carries the real roles, and
-              # this is what a provisioned account gets if it arrives without
-              # one. Without at least Login, a new user is created and then
-              # refused with "You do not have the required roles to access this
-              # application", which is a lockout that looks like a bug.
+              # A floor, not the policy: what a provisioned account gets if
+              # it arrives without a claim. Without at least Login, a new
+              # user is created and then refused with "You do not have the
+              # required roles" — a lockout that looks like a bug.
               DefaultRoles = ["Login"];
               ProvisionAccounts = true;
 
-              # A seed for a fresh install, not a guarantee — the database
-              # overrides this once it exists (see the header). The intent is
-              # the same call paperless makes: kanidm runs on this host, so an
-              # OIDC-only Kavita is unreachable exactly when kanidm is. If the
-              # running server disagrees with this line, the server wins and
-              # the UI is what changed it.
+              # Seed for a fresh install only — the database overrides it
+              # once it exists (see the header). Same call as paperless:
+              # kanidm runs on this host, so OIDC-only is unreachable
+              # exactly when kanidm is.
               DisablePasswordAuthentication = false;
             };
           };
           tokenKeyFile = config.sops.secrets."keys/kavita/token".path;
         };
 
-        # Read access to the library. Not the primary group — unlike the arrs,
-        # this service never creates a file anyone else has to read, so it has
-        # no reason to own anything under mediaDir.
+        # Read access only. Unlike the arrs, this service never creates a
+        # file anyone else has to read, so it has no reason to own anything
+        # under mediaDir.
         users.users.kavita.extraGroups = ["media"];
 
         systemd.tmpfiles.rules = [
@@ -158,9 +133,8 @@
             "oidc-secret:${config.sops.secrets."keys/kavita/oauth-client-secret".path}"
           ];
 
-          # mkAfter so this lands behind the upstream preStart, which installs
-          # appsettings.json in the first place — there is nothing to
-          # substitute into before it has run.
+          # mkAfter so this lands behind the upstream preStart that installs
+          # appsettings.json — nothing to substitute into before it has run.
           preStart = mkAfter ''
             ${pkgs.replace-secret}/bin/replace-secret '@OIDC_SECRET@' \
               "$CREDENTIALS_DIRECTORY/oidc-secret" \
@@ -204,12 +178,10 @@
             displayName = "Kavita";
             basicSecretFile = config.sops.secrets."keys/kavita/oauth-client-secret".path;
 
-            # Kavita matches these against its own role names exactly, so the
-            # values are Kavita's spelling rather than anything of ours. Only
-            # single-word roles are used: Kavita also has "Change Password",
-            # "Change Restriction" and "Read Only", and a claim value with a
-            # space in it is not worth the risk for permissions an SSO user
-            # does not need.
+            # Kavita matches these against its own role names exactly —
+            # Kavita's spelling, not ours. Only single-word roles: a claim
+            # value with a space in it is not worth the risk for permissions
+            # an SSO user does not need.
             supplementaryScopeMaps.kavita-users = ["kavita_roles"];
             claimMaps.kavita_roles = {
               joinType = "array";
@@ -219,9 +191,9 @@
               };
             };
 
-            # Both legs of the ASP.NET Core OIDC handler. The sign-out callback
-            # is not optional decoration: without it registered, logging out
-            # lands on a kanidm error rather than back on Kavita.
+            # Both legs of the OIDC handler — without the sign-out callback
+            # registered, logging out lands on a kanidm error rather than
+            # back on Kavita.
             originUrl = [
               "https://${cfg.domain}/signin-oidc"
               "https://${cfg.domain}/signout-callback-oidc"
@@ -229,13 +201,12 @@
             originLanding = "https://${cfg.domain}";
             scopeMaps.kavita-users = ["openid" "profile" "email"];
 
-            # Deliberately NOT allowInsecureClientDisablePkce, unlike jellyfin
-            # and traccar. Those needed the concession because their
-            # clients send no code challenge; ASP.NET Core's handler enables
-            # PKCE by default on the authorization code flow, so kanidm's
-            # requirement should be met as-is. If the token exchange fails with
-            # an opaque invalid_request on first login, this is the knob — but
-            # confirm the challenge is really absent before reaching for it.
+            # Deliberately NOT allowInsecureClientDisablePkce, unlike
+            # jellyfin and traccar (their clients send no code challenge):
+            # ASP.NET Core's handler enables PKCE by default on the auth-code
+            # flow. If the token exchange fails with an opaque invalid_request
+            # on first login, this is the knob — confirm the challenge is
+            # really absent before reaching for it.
             preferShortUsername = true;
           };
         };

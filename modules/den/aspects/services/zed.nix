@@ -1,33 +1,12 @@
 # services.zed — make the ZFS event daemon actually say something.
 #
-# zfs-zed.service has been running on endeavour this whole time, from the
-# upstream unit, doing nothing useful: ZED_EMAIL_ADDR is unset, so
-# zed-functions.sh returns early from every notification path it is asked to
-# take. Checksum errors, a vdev degrading, a scrub finding damage — all of it
-# reached /etc/zfs/zed.d, found no way to tell anyone, and went to syslog.
-#
-# This is deliberately not redundant with what already exists, and the seam
-# matters:
-#
-#   prometheus  ZfsPoolUnhealthy watches node_zfs_zpool_state, which only
-#               changes once a pool is ALREADY degraded. It is the alarm for
-#               "you have lost your redundancy".
-#   zed         fires on the individual events that precede that — a disk
-#               throwing checksum errors, a scrub repairing blocks, the hot
-#               spare being pulled in. It is the alarm for "you are about to".
-#   smartd      the disk's own opinion of itself, before ZFS notices anything.
-#
-# Three layers because a raidz1 vdev tolerates exactly one dead disk, and the
-# gap between "degraded" and "dead" is where every recoverable outcome lives.
-#
-# Routed to ntfy through ZED_EMAIL_PROG rather than a real mail stack. ZED's
-# email path is "run this program with the message on stdin"; pointing it at
-# curl uses the hook as intended and costs nothing, where the alternative is
-# a sendmail wrapper and an SMTP credential that exist to be immediately
-# thrown away. Note nixpkgs' `services.zfs.zed.enableMail` is left OFF on
-# purpose — it asserts that a setuid sendmail wrapper exists, which is exactly
-# the thing being avoided; the three settings it would have written are set
-# here directly.
+# Upstream zfs-zed.service ran silently: ZED_EMAIL_ADDR unset makes
+# zed-functions.sh return early from every notification path. Three alarm
+# layers by design: prometheus watches pool state (already degraded), zed
+# fires on the events that precede it (checksum errors, scrub repairs, spare
+# pull-in), smartd is the disk's own opinion. Routed to ntfy via ZED_EMAIL_PROG
+# — `services.zfs.zed.enableMail` is OFF on purpose: it asserts a setuid
+# sendmail wrapper exists, the thing being avoided.
 {inputs, ...}: {
   den.aspects.services.zed.nixos = {
     config,
@@ -92,21 +71,18 @@
 
         ZED_NOTIFY_VERBOSE = cfg.notifyVerbose;
 
-        # Report data corruption ZFS could not repair. This is the event that
-        # means a file is actually gone, and the only one where the answer is
+        # Corruption ZFS could not repair — the one event whose answer is
         # "restore from restic" rather than "replace a disk".
         ZED_NOTIFY_DATA = true;
 
-        # Pull the hot spare in automatically on a fault. The spare has been
-        # sitting AVAIL since the pool was built and nothing was configured to
-        # ever use it — a spare that requires a human to notice and act is not
-        # meaningfully different from an empty bay.
+        # Auto-pull the hot spare on fault: a spare that needs a human to
+        # notice and act is an empty bay.
         ZED_SPARE_ON_CHECKSUM_ERRORS = 10;
         ZED_SPARE_ON_IO_ERRORS = 1;
 
-        # No ZED_USE_ENCLOSURE_LEDS: these are SAS disks behind an HBA in a
-        # Dell R7910 backplane, and the enclosure LED path is not wired up
-        # here. Setting it produces errors in the journal on every event.
+        # No ZED_USE_ENCLOSURE_LEDS: the enclosure LED path is unwired for
+        # these SAS disks behind the HBA; setting it errors in the journal on
+        # every event.
       };
     };
   };

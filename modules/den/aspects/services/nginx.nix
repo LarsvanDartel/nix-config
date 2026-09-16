@@ -19,45 +19,18 @@
         sslCiphers = "AES256+EECDH:AES256+EDH:!aNULL";
       };
 
-      # Ask nginx whether it will accept the configuration, at build time.
+      # Build-time `nginx -t` on the real config. `validateConfigFile` does not
+      # do this: it runs gixy, a security linter with its own parser, which
+      # accepted an invalid map variable name that then killed nginx's own
+      # pre-start parse and every vhost on the host.
       #
-      # `services.nginx.validateConfigFile` does not do this, whatever its name
-      # suggests. It runs pkgs.writers.writeNginxConfig, which is a formatter
-      # plus gixy — a *security* linter looking for SSRF, host-header spoofing
-      # and add_header inheritance. gixy parses with its own parser and has no
-      # opinion on whether a directive is valid.
-      #
-      # The gap is not theoretical. `map $http_x_netbird_groups mc_may_smp {`
-      # (a map assigns to a $variable, so the name needs the $) passed the whole
-      # build and every check, then failed nginx's own parser at start:
-      #
-      #   nginx: [emerg] invalid variable name "mc_may_hardcore"
-      #
-      # A refused config means nginx does not start at all, so on endeavour that
-      # took out jellyfin, immich, opencloud and kanidm's frontend together, and
-      # the first sign of it was a service being down rather than a build going
-      # red.
-      #
-      # Two details make this work in a sandbox, and both are load-bearing:
-      #
-      #   * nginx prints "syntax is ok" as soon as the parse succeeds, before it
-      #     opens the pid file or the logs. Those live outside the sandbox and
-      #     cannot be created — the builder is nixbld, not root — so the exit
-      #     status is failure even for a good config and is worthless here. The
-      #     presence of that line is the signal, and a config nginx rejects
-      #     never produces it. Certificates are NOT in that category; see the
-      #     openssl call below for what they cost.
-      #   * interpolating the config derivation brings its references along, so
-      #     the mime.types, fastcgi.conf and proxy-header snippets it includes
-      #     are in the sandbox. Copying the file in by path instead loses them
-      #     and the test fails on a missing include rather than on the config.
-      #
-      # It comes from environment.etc because upstream's `configFile` is a let
-      # binding with no option in front of it; etc is where the module puts the
-      # same derivation (nginx/default.nix:1694).
-      #
-      # In system.checks rather than the closure proper: it gates the build
-      # without shipping anything to the host.
+      # Sandbox details, all load-bearing: exit status is worthless (pid/log
+      # writes fail after the parse, as nixbld), so "syntax is ok" in the
+      # output is the signal. Interpolating the config derivation — not
+      # copying by path — brings its mime/fastcgi/proxy includes into the
+      # sandbox. It comes from environment.etc because upstream `configFile`
+      # is a let binding with no option. In system.checks so it gates the
+      # build without shipping anything to the host.
       system.checks = [
         (pkgs.runCommand "nginx-config-${config.networking.hostName}" {
             nativeBuildInputs = [config.services.nginx.package pkgs.openssl];

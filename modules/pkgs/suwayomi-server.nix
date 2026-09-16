@@ -1,29 +1,14 @@
-# suwayomi-server — pinned ahead of nixpkgs, because the packaged version can
-# no longer see any extensions at all.
+# suwayomi-server pinned ahead of nixpkgs — a version floor, not a
+# preference: keiyoushi moved to Mihon's Extension Store (extension API v1.6,
+# readable only by Suwayomi >= 2.3.2223; nixpkgs has 2.1.1867 as of
+# 2026-08-19), so on 2.1 the extensions page renders a two-entry tombstone.
+# Cheap to carry: upstream's fat jar means this overrides two strings. Drop
+# once `nix eval nixpkgs#suwayomi-server.version` catches up.
 #
-# nixpkgs ships 2.1.1867 on both stable and unstable (checked 2026-08-19;
-# upstream's newest is 2.3.2243, released 2026-07-13). That gap is not cosmetic:
-#
-#   * keiyoushi migrated to Mihon's Extension Store, extension API v1.6. The old
-#     flat-array `repo/index.min.json` that 2.1 knows how to read is now a
-#     two-entry tombstone — literally just "Outdated App" and "Update to Mihon
-#     0.20.1+", which is exactly what the Browse → Extensions page renders. The
-#     catalogue is not missing, it is being served a sign that says go away.
-#   * Suwayomi gained v1.6 support and the Extension Store in 2.3.2223. There is
-#     no configuration that makes 2.1 read the new format, so this is a version
-#     floor rather than a preference.
-#
-# Cheap to carry: upstream publishes a fat jar and the nixpkgs derivation is a
-# fetchurl plus makeWrapper, so this overrides two strings and builds nothing.
-# Drop it the moment nixpkgs catches up — `nix eval nixpkgs#suwayomi-server.version`
-# is the whole test.
-#
-# Upgrading past 2.1 is a one-way trip for the data directory: 2.3 moves to a
-# newer H2 engine and rewrites the database in place, and the release notes warn
-# that extension repos may not survive the migration to Extension Stores. The
-# library itself is what matters and it does survive. /persist/var/lib/suwayomi-server
-# is in restic's paths now (services/restic.nix), so there is a nightly undo —
-# the downloads directory next to it is deliberately excluded, being re-fetchable.
+# One-way upgrade: 2.3 rewrites the H2 database in place and extension repos
+# may not survive (the library does). /persist/var/lib/suwayomi-server is in
+# restic's paths (services/restic.nix) — the undo; the downloads dir next to
+# it is re-fetchable and deliberately excluded.
 {...}: {
   nixpkgs.overlays = [
     (_final: prev: {

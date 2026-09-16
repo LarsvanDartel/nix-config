@@ -1,19 +1,9 @@
 # home.calculator — qalculate, the engine rofi-calc is built on.
 #
-# noctalia's official `noctalia-calculator` plugin was considered and rejected:
-# it is plain arithmetic over a bundled AdvancedMath.js (button grid, operator
-# precedence) with no unit, currency or number-base conversion. rofi-calc gets
-# those from libqalculate, so we use libqalculate directly.
-#
-# `qalc` handles everything asked for:
-#   3 ft + 2 m to cm       · unit conversion
-#   100 EUR to USD         · currency (exchange rates fetched and cached)
-#   0xff + 0b1011 to hex   · base conversion
-#   sqrt(2)^3, 15% of 80   · the usual maths
-#
-# Exposed two ways: the `qalc` CLI (also aliased as `=`), and a floating
-# terminal window that compositors bind to a key — the closest thing to
-# rofi-calc's pop-up feel.
+# noctalia's `noctalia-calculator` plugin was rejected: plain arithmetic over
+# bundled AdvancedMath.js — no unit, currency or number-base conversion.
+# libqalculate has all of those. Exposed as the `qalc` CLI (aliased `=`) and
+# a floating terminal window for compositor keybinds.
 {...}: {
   den.aspects.home.calculator.homeManager = {
     config,

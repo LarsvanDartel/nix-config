@@ -1,9 +1,9 @@
 # hardware.thinkpad — the sysfs/procfs write access ThinkPad control tools need.
 #
 # Both knobs below are root-owned by default, and the noctalia plugins that use
-# them (battery-threshold, thinkpad-fan) are plain QML running as the user with
-# no privilege escalation — upstream ships shell scripts that set this up by
-# hand. This is the declarative equivalent.
+# them (battery-threshold, thinkpad-fan) run as the user with no privilege
+# escalation — this is the declarative equivalent of upstream's hand-run
+# setup scripts.
 {...}: {
   den.aspects.hardware.thinkpad.nixos = {
     config,

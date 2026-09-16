@@ -7,18 +7,11 @@
   lib,
   ...
 }: let
-  # Where each host actually answers. The bare config name resolves nowhere, so
-  # every host needs an entry or deploy-rs tries the name as a hostname.
-  #
-  # The mesh supplies the rest: peers are addressable by name from anywhere, so
-  # a roaming voyager deploys to endeavour exactly as it does from the LAN, with
-  # no per-network addresses to keep straight. That is the whole point of the
-  # migration, and this is where it shows.
-  #
-  # gaia stays on its public name deliberately. It runs the control plane, so
-  # if the mesh is what needs fixing, the mesh is not how to reach it.
-  #
-  # `--hostname <ip>` overrides any of these when a host is off the mesh.
+  # Every host needs an entry — the bare config name resolves nowhere. Mesh
+  # peers are addressable by name from anywhere; gaia is the exception, on
+  # its public name deliberately: it runs the control plane, so the mesh is
+  # not how to reach it when the mesh is what needs fixing. `--hostname <ip>`
+  # overrides any of these when a host is off the mesh.
   addresses = {
     gaia = "lvdar.nl";
     endeavour = "endeavour.${dnsDomain}";
@@ -26,9 +19,8 @@
     pioneer = "pioneer.${dnsDomain}";
   };
 
-  # Matches cosmos.services.netbird.dnsDomain. Not read from a host config:
-  # this is flake-level, and reaching into a nixosConfiguration from here to
-  # pull one string would make every deploy evaluate a host to find its address.
+  # Matches cosmos.services.netbird.dnsDomain — hand-synced: reading it from
+  # a nixosConfiguration here would evaluate a host on every deploy.
   dnsDomain = "nb.lvdar.nl";
 in {
   flake-file.inputs.deploy-rs = {
@@ -42,34 +34,26 @@ in {
     in {
       hostname = addresses.${name} or name;
 
-      # Not :22. NetBird's agent redirects the mesh address's :22 to its own
-      # embedded SSH server, which authenticates through NetBird rather than by
-      # key — so a deploy to <host>.nb.lvdar.nl:22 is refused as
-      # "Permission denied (password)". core.ssh gives OpenSSH :2222 as well
-      # for exactly this, and using it everywhere keeps gaia (reached by its
-      # public name, where the redirect does not apply) on the same rule.
+      # Not :22 — NetBird redirects the mesh address's :22 to its own SSH
+      # server (key-less, "Permission denied (password)"). OpenSSH answers
+      # on :2222 (core.ssh); used for gaia too so one rule covers all hosts.
       sshOpts = ["-p" "2222"];
 
       profiles.system = {
         user = "root";
-        # Without this deploy-rs uses the *local* username, which only exists on
-        # voyager — every other host's primary user is `nixos`. core.ssh permits
-        # root login and gives root the same authorized keys, so connecting as
-        # root is both simplest and avoids needing sudo to activate.
+        # deploy-rs would use the local username, which only exists on
+        # voyager; core.ssh permits root with the same keys (root skips sudo).
         sshUser = "root";
         magicRollback = true;
-        # Everything is built here and the closure pushed. The aarch64 Pi is
-        # emulated via voyager's binfmt (boot.binfmt.emulatedSystems): slow, but
-        # the alternative — `remoteBuild` on a Pi 3 — means a 4x A53 with 1 GB of
-        # RAM compiling nixos-hardware's linux-rpi kernel, which is not in
-        # cache.nixos.org. That takes the better part of a day and tends to OOM.
+        # Build here and push the closure: remoteBuild on the Pi means a
+        # 4x A53 / 1 GB compiling the uncached rpi kernel — about a day, and
+        # it OOMs.
         remoteBuild = false;
         path = inputs.deploy-rs.lib.${system}.activate.nixos nixos;
       };
     })
     config.flake.nixosConfigurations;
 
-  # deploy-rs's own validity checks, folded into `nix flake check`.
   flake.checks =
     lib.mapAttrs
     (system: deployLib: deployLib.deployChecks config.flake.deploy)

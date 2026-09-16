@@ -1,16 +1,13 @@
 # services.eduvpn — the eduVPN linux client, plus the two pieces of system
-# configuration it needs to work here at all. Voyager-only: it is a client for
-# TU/e's campus VPN, and no server has any use for it.
+# configuration it needs to work here at all. Voyager-only: it is a client
+# for TU/e's campus VPN, and no server has any use for it.
 #
-# The GUI drives NetworkManager directly — it writes a `eduVPN` WireGuard
-# profile on every connect and deletes it on disconnect — so the user only
-# needs the networkmanager group, which the primary-user battery already
-# grants. Nothing here runs as a service. The persist dirs are `home.eduvpn`,
-# mirroring how `home.steam` pairs with roles.gaming.
+# The GUI drives NetworkManager directly and nothing runs as a service; the
+# persist dirs are `home.eduvpn`, mirroring `home.steam`/roles.gaming.
 {den, ...}: {
   den.aspects.services.eduvpn = {
-    # The mesh-priority rule below reads NetBird's client options, and there is
-    # no sense in the coexistence fix without the thing it coexists with.
+    # The mesh-priority rule below reads NetBird's client options — the
+    # coexistence fix is pointless without the thing it coexists with.
     includes = [den.aspects.services.netbird.client];
 
     nixos = {
@@ -21,44 +18,25 @@
     }: let
       netbird = config.services.netbird.clients.default;
 
-      # Both halves of the eduvpn/netbird problem are routing-rule priority, so
-      # they are worth stating together.
+      # eduvpn installs its rules at v4 priorities 2 and 3, NetBird at 105/110,
+      # so eduvpn always wins: its rule 3 (`not from 0.0.0.0/0 fwmark <wg mark>
+      # table <eduvpn table>`) sends every unmarked packet into eduvpn's table
+      # before NetBird's rules are consulted. Even the *split* profile swallows
+      # the mesh — TU/e claims 100.64.0.0/10, the whole CGNAT range the NetBird
+      # mesh is a /16 inside. Neither side misbehaves; both were handed the same
+      # address space, and eduvpn holds the lower priority.
       #
-      # eduvpn installs its rules at priorities 2 and 3 (v4), NetBird installs
-      # its at 105 and 110. eduvpn therefore always wins, and its rule 3 —
-      # `not from 0.0.0.0/0 fwmark <wg mark> table <eduvpn table>` — sends every
-      # unmarked packet into eduvpn's table before NetBird's rules are ever
-      # consulted.
+      # So carve the mesh back out at priority 1 (a v4 priority eduvpn does not
+      # use). Inert when eduvpn is down: mesh traffic goes to main, where it
+      # would have gone anyway. NetBird's own transport gets the same treatment
+      # — under the full tunnel it would nest inside the campus tunnel (works
+      # at 1392-vs-1280 MTU, but slower for nothing and dead if campus ever
+      # blocks UDP to the relays).
       #
-      # For the full-tunnel profile that table holds a default route, so it
-      # swallows the mesh outright. For the *split* profile it swallows it too,
-      # which is the surprising half: TU/e's split profile claims
-      # 100.64.0.0/10 — the whole CGNAT range — and the NetBird mesh is a /16
-      # inside it. Neither eduvpn nor NetBird is misbehaving; they were simply
-      # both handed the same address space by their operators, and eduvpn holds
-      # the lower priority.
-      #
-      # So carve the mesh back out ahead of eduvpn, at a priority eduvpn does
-      # not use for v4 (it starts at 2). The rule is inert when eduvpn is down:
-      # it sends mesh traffic to the main table, which is where it would have
-      # gone anyway.
-      #
-      # The mesh's *transport* needs the same treatment for a different
-      # reason. Under the full-tunnel profile eduvpn's table has a default
-      # route, so NetBird's own encrypted packets — which carry NetBird's
-      # fwmark, not eduvpn's — are diverted into it and the mesh runs nested
-      # inside the campus tunnel. That works, since eduvpn's 1392 MTU has room
-      # for NetBird's 1280 plus overhead, but it is slower for no benefit and
-      # it fails outright if campus ever blocks outbound UDP to the relays.
-      # Send anything already marked as NetBird transport straight to main.
-      #
-      # Nothing here is written down as a literal. NetBird's pool is allocated
-      # by the management server on gaia and its fwmark is the agent's own
-      # constant, so both are read back off the interface — a hardcode would be
-      # a value only this file believes, and would break the mesh silently
-      # rather than loudly if either ever changed.
-      # `netbird up`/`down` create and destroy this, which is the signal the
-      # unit below actually wants.
+      # No literals: NetBird's pool and fwmark are read back off the interface
+      # — a hardcode would be a value only this file believes and would break
+      # the mesh silently if either changed.
+      # `netbird up`/`down` create and destroy this — the signal the unit below wants.
       deviceUnit = "sys-subsystem-net-devices-${utils.escapeSystemdPath netbird.interface}.device";
 
       meshPriority = pkgs.writeShellApplication {
@@ -133,45 +111,27 @@
     in {
       environment.systemPackages = [pkgs.eduvpn-client];
 
-      # Strict reverse-path filtering breaks any full-tunnel VPN that routes via
-      # a policy rule, which here means eduvpn's non-split profile.
-      #
-      # The nixos rpfilter rule sits in mangle PREROUTING with `--validmark`, so
-      # it repeats the route lookup using the packet's fwmark. A reply arriving
-      # on the wireless interface has mark 0, and eduvpn's `not from 0.0.0.0/0
-      # fwmark <wg mark>` rule therefore sends that lookup into eduvpn's own
-      # table, whose default route points back down the tunnel. oif never
-      # matches the interface the packet came in on, so the packet is dropped —
-      # taking the WireGuard handshake response with it, and the proxyguard TCP
-      # fallback after it. Only the split profile survived, because its table
-      # holds prefixes rather than a default and the lookup falls through to
-      # main.
-      #
-      # Loose only asks that a route to the source exist at all, which is the
-      # right question on a machine with more than one routing table.
+      # Strict rp_filter breaks eduvpn's non-split profile: the nixos rpfilter
+      # rule re-does the route lookup with the packet's fwmark, a reply on the
+      # wireless interface has mark 0, eduvpn's rule sends that lookup into
+      # eduvpn's table whose default route points back down the tunnel, oif
+      # never matches the ingress interface, and the packet — WireGuard
+      # handshake response included — is dropped. Loose only asks that a route
+      # to the source exist, the right question with more than one routing table.
       networking.firewall.checkReversePath = "loose";
 
       systemd.services.eduvpn-mesh-priority = {
         description = "Keep the NetBird mesh reachable while eduvpn is connected";
         documentation = ["man:ip-rule(8)"];
 
-        # Tied to the *interface*, not to the agent's unit. `netbird up` and
-        # `netbird down` toggle the connection inside a daemon that keeps
-        # running either way, so hanging this off netbird.service means it
-        # never fires on the transitions that actually matter — and a `switch`
-        # installs the unit without anything ever starting it, which is exactly
-        # how this shipped dead the first time.
-        #
-        # wt0 appears and disappears with the connection, so binding to its
-        # device unit gets both edges for free: the rules go in when there is a
-        # mesh to protect and come out when there is not. multi-user.target is
-        # listed as well so that a `switch` while the mesh is already up starts
-        # it now rather than at the next toggle.
-        #
-        # BindsTo is a requirement, so `systemctl start` with the mesh down
-        # does not fail — it queues, and sits there until wt0 exists. That
-        # looks like a hang and is not one; there is simply nothing to do until
-        # there is an interface. Bring netbird up and the queued job runs.
+        # Tied to the *interface*, not the agent's unit: `netbird up`/`down`
+        # toggle the connection inside a daemon that keeps running either way,
+        # so netbird.service never fires on the transitions that matter — and a
+        # `switch` that installs the unit without starting it is exactly how
+        # this shipped dead the first time. Binding to wt0's device unit gets
+        # both edges for free; multi-user.target so a `switch` while the mesh
+        # is already up starts it now. BindsTo queues rather than fails when
+        # the mesh is down — not a hang; the queued job runs once wt0 exists.
         after = [deviceUnit "${netbird.suffixedName}.service"];
         bindsTo = [deviceUnit];
         wantedBy = [deviceUnit "multi-user.target"];
@@ -182,7 +142,7 @@
           ExecStart = "${meshPriority}/bin/eduvpn-mesh-priority start";
           ExecStop = "${meshPriority}/bin/eduvpn-mesh-priority stop";
           # Booting offline, or before the agent has an address, is the normal
-          # way to reach the timeout above. Retry rather than sit failed.
+          # way to reach the timeout; retry rather than sit failed.
           Restart = "on-failure";
           RestartSec = 30;
         };

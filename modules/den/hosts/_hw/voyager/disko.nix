@@ -1,7 +1,5 @@
-# Setup luks encryption with btrfs subvolumes for impermanence
-# Sources:
+# LUKS + btrfs subvolumes for impermanence. Sources:
 # - https://github.com/nix-community/disko/blob/master/example/luks-btrfs-subvolumes.nix
-# - https://github.com/vimjoyer/impermanent-setup
 # - https://haseebmajid.dev/posts/2024-07-30-how-i-setup-btrfs-and-luks-on-nixos-using-disko/
 {device ? throw "Set this to your disk device, e.g. /dev/sda", ...}: {
   disko.devices = {
@@ -29,9 +27,8 @@
               passwordFile = "/tmp/secret.key";
               settings = {
                 allowDiscards = true;
-                # 10s was too tight: the FIDO2 attempt would time out before the
-                # touch registered, silently falling back to the passphrase
-                # prompt — indistinguishable from the key just not working.
+                # 10s was too tight: the FIDO2 attempt timed out before the touch
+                # registered, silently falling back to the passphrase prompt.
                 crypttabExtraOpts = ["fido2-device=auto" "token-timeout=30"];
               };
               content = {

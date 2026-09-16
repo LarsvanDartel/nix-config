@@ -1,24 +1,10 @@
-# obs-move-transition, unbroken against OBS 32.2.
-#
-# OBS 32.2 marked obs_properties_add_button (and friends) OBS_DEPRECATED, and
-# obs-move-transition 3.2.1 compiles with -Werror=deprecated-declarations. The
-# result is a plugin that cannot be built against the OBS it is meant to load
-# into: five translation units fail with "all warnings being treated as errors"
-# and voyager's home-manager generation dies with them.
-#
-# This blocks more than OBS. flake-bump builds every host before it will push a
-# lock, so one uncompilable leaf on voyager holds the *whole fleet* at an old
-# nixpkgs — endeavour and gaia included. That is the gate working as designed,
-# which is exactly why the leaf has to be fixed rather than waited out.
-#
-# Demoting the error is the right scope. These are deprecations, not removals:
-# the functions still exist and still work in 32.2, upstream simply intends to
-# drop them later. Patching the call sites would mean carrying a fork of a
-# plugin whose author will do it properly on his own schedule.
-#
-# Delete this once nixpkgs ships a version that compiles clean. The build
-# failing with "unknown warning option" is not how that will announce itself —
-# it will just be dead weight, so check the plugin's version when touching it.
+# obs-move-transition, unbroken against OBS 32.2: OBS marked
+# obs_properties_add_button and friends deprecated and the plugin builds
+# with -Werror=deprecated-declarations. Demoting the error is the right
+# scope — the functions still work in 32.2, and patching call sites would
+# mean carrying a fork. Delete once nixpkgs ships a version that compiles
+# clean; that will not announce itself, so check the plugin's version when
+# touching this.
 {...}: {
   nixpkgs.overlays = [
     (_final: prev: {

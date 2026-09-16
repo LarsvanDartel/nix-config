@@ -1,10 +1,8 @@
-# core.nixpkgs aspect — overlays + allowUnfree for den-produced hosts (and their
-# home-manager, which shares the OS pkgs via useGlobalPkgs). den's default
-# instantiate (inputs.nixpkgs.lib.nixosSystem) builds each host's pkgs from this
-# nixpkgs config, exactly as the reference (sini) sets os.nixpkgs. Overlays come
+# core.nixpkgs — overlays + allowUnfree for den-produced hosts (and their
+# home-manager, which shares the OS pkgs via useGlobalPkgs). Overlays come
 # from inputs only — reading the flake-parts `config` here would create a
-# flake→host→flake recursion. Local packages (modules/pkgs/*) will be delivered
-# via self.overlays.default once a host needs them (voyager).
+# flake→host→flake recursion. Local packages (modules/pkgs/*) arrive via
+# self.overlays.default once a host needs them (voyager).
 {inputs, ...}: let
   stable = final: _prev: {
     stable = import inputs.nixpkgs-stable {

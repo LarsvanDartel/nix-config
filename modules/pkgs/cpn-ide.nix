@@ -1,22 +1,11 @@
 # cpn-ide — the Coloured Petri net editor and simulator used in 2AMI10.
-#
-# The course calls this Windows-only, and the download is indeed a Windows
-# installer, but what it carries is portable: a Spring Boot backend that does
-# all the work, an Angular frontend, and the Access/CPN engine -- which ships a
-# Linux build of the CPN Tools simulator right next to the Windows one. So
-# there is no Wine here. innoextract opens the installer, and the only
-# platform-specific work is that those Linux simulator binaries are 32-bit and
-# name /lib/ld-linux.so.2 as their loader, which does not exist on NixOS.
-#
-# Two pieces are replaced rather than reused:
-#
-#   * The frontend is served by the backend (spring.resources.static-locations)
-#     instead of loaded over file://, which keeps it on the same origin as the
-#     API and out of CORS entirely.
-#   * The installer's Electron shell is written against Electron 4 and drives
-#     its file dialogs through the `remote` module, removed from Electron
-#     years ago. _process-mining/cpn-ide-app is a small shell of our own; see
-#     its main.js for why it presents a plain Chrome user agent.
+# "Windows-only" in name only: the installer (opened with innoextract, no
+# Wine) carries a portable Spring Boot backend + Angular frontend + a Linux
+# build of the CPN Tools simulator — whose binaries are 32-bit and need the
+# pkgsi686 glibc loader patched in below. Two pieces are replaced: the
+# frontend is served by the backend (spring.resources.static-locations) to
+# stay same-origin and out of CORS, and the Electron-4 shell (file dialogs
+# via the long-removed `remote` module) by _process-mining/cpn-ide-app.
 {...}: {
   nixpkgs.overlays = [
     (final: _prev: {

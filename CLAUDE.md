@@ -161,4 +161,4 @@ URL, so a partial push can leave the two out of sync.
 ## Conventions
 
 - Commits: conventional-commit style, lowercase, imperative, explaining the *why* (`fix(netbird): move the OIDC callbacks off hash routes`).
-- Every file starts with a comment explaining its purpose; non-obvious decisions get a comment explaining the reasoning and the constraint that forced them. Match this — the existing comments are load-bearing documentation.
+- Every file starts with a one-line `# <name> — <what>` header. Beyond that, comments earn their place by preventing a future mistake: a trap, a security decision, a hand-synced cross-host value, a packaging pin, a "do not reintroduce" guard — in at most a few lines. No narrative essays, no tool tutorials, no restating what the code or upstream docs already say; the repo was deliberately de-essayed in this style, keep it that way.

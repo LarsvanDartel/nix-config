@@ -1,43 +1,19 @@
-# home.wallpapers — the background collection, linked into a directory the
-# wallpaper picker (noctalia's WallpaperSelector / control centre) browses.
-#
-# The images come from their own git repo on the knot (the `wallpapers` flake
-# input, declared below) rather than being fetched one file at a time. They are
-# binary, they change as a set, and the previous shape needed a URL and a hash
-# per image — adding one meant editing nix, and there was nowhere to put a
-# picture that was not also a nix expression.
-#
-# `ranking.txt` in that repo is the collection in preference order, best first,
-# and it is what this file is built around: it decides which files are
-# backgrounds at all, what order they appear in, which one is the default, and
-# which ones the rotation cycles through. Re-rank, push, bump the input, and all
-# four follow.
-#
-# `theme.enable` will run them through imagemagick's `-remap` against a swatch
-# strip built from the 16 base16 colours, with Floyd-Steinberg dithering, so a
-# background uses *only* theme colours. It is off: a sixteen-colour remap is a
-# heavy hand on a photograph, and the collection is photographs now rather than
-# the handful of flat illustrations it was built for.
-#
-# Images stay in the store and are symlinked into the picker directory, so they
-# cost nothing to "install". Drop your own files in alongside them — the picker
-# reads that writable directory, and activation only ever touches symlinks it
-# put there itself.
+# home.wallpapers — the background collection, symlinked into the directory
+# the picker (noctalia's WallpaperSelector / control centre) browses. Images
+# live in their own git repo (the `wallpapers` flake input below): binaries
+# that change as a set. ranking.txt there is the preference order and drives
+# everything — what counts as a background, picker order, the default, the
+# rotation; re-rank, push, bump the input. theme.enable (base16 remap via
+# imagemagick) is off: the collection is photographs now, and a sixteen-colour
+# remap is too heavy a hand. Store files are only symlinked; the picker
+# directory stays writable for your own images.
 {...}: {
-  # The collection itself, as a non-flake input so the revision is pinned in
-  # flake.lock with everything else (and picked up by flake-bump) rather than
-  # in a hash next to a `fetchgit` call.
-  #
-  # Fetched over the knot's *public HTTPS* rather than `git@knot.lvdar.nl:` on
-  # purpose: this is built on voyager and, through build-gate, on endeavour, and
-  # neither should need an SSH credential in order to produce a wallpaper. The
-  # `did:plc:` path is the repo's persistent name — it survives a rename, where
-  # `lvdar.nl/wallpapers` would not — and is the same shape comin uses to reach
-  # nix-config (see services/comin.nix).
-  #
-  # `shallow=1` because this is ~20 MB of pictures and no history is wanted.
-  #
-  # Remember `nix run .#write-flake` after touching this.
+  # Non-flake input so the revision pins in flake.lock (and flake-bump picks
+  # it up). Public HTTPS, not git@knot: built on voyager and endeavour via
+  # build-gate, neither of which should need an SSH credential for a
+  # wallpaper. `did:plc:` is the repo's persistent name (survives a rename;
+  # same shape comin uses, see services/comin.nix). shallow=1: ~20 MB of
+  # pictures, no history wanted. Remember `nix run .#write-flake` after this.
   flake-file.inputs.wallpapers = {
     url = "git+https://knot.lvdar.nl/did:plc:nmkqw2d6qov4smqqvovwmwof?shallow=1";
     flake = false;
@@ -58,12 +34,8 @@
 
     repo = inputs.wallpapers;
 
-    # `ranking.txt` is one filename per line and nothing else, which is the
-    # whole reason it is a bare list: this reads it without parsing anything.
-    #
-    # `inputs.wallpapers` is a fetched source path rather than a derivation
-    # output, so this is an ordinary file read during evaluation — not
-    # import-from-derivation, and not a reason to build anything.
+    # ranking.txt is one filename per line; the input is a fetched source
+    # path, so this is an ordinary eval-time file read, not IFD.
     ranking =
       lib.filter (l: l != "")
       (lib.splitString "\n" (builtins.readFile "${repo}/ranking.txt"));
@@ -82,12 +54,9 @@
         neither frieren/ nor defaults/ of the wallpapers input.
       ''; "${repo}/${dir}/${name}";
 
-    # Every background, in rank order, with its rank baked into the filename.
-    #
-    # The prefix is the point: the picker sorts by name and has no idea a
-    # ranking exists, so numbering the files is what makes it list them best
-    # first. It also gives the rotation below a trivial way to say "the top
-    # eight" — `sort | head -8`.
+    # Rank-prefixed filenames: the picker sorts by name and knows nothing of
+    # the ranking, so numbering is what lists them best first (and gives the
+    # rotation its "top eight" via `sort | head -8`).
     ordered =
       lib.imap1 (i: name: {
         inherit name;
@@ -130,12 +99,9 @@
       pkgs.writeText "wallpaper-pairs"
       (lib.concatMapStrings (w: "${w.src} ${w.file}\n") ordered);
 
-    # Dithering matters: a flat 16-colour remap posterises photographs into
-    # banded blobs, Floyd–Steinberg keeps the gradients readable.
-    #
-    # Run in parallel: this is ninety images and it reruns in full whenever the
-    # palette changes, which would make it comfortably the slowest step of a
-    # rebuild if done one at a time.
+    # Floyd–Steinberg: a flat 16-colour remap posterises photographs into
+    # banded blobs. Parallel because this is ninety images, rerun in full
+    # whenever the palette changes.
     themed =
       pkgs.runCommand "wallpapers-themed" {nativeBuildInputs = [pkgs.imagemagick];}
       ''
@@ -152,15 +118,10 @@
       xargs -a ${pairs} -L1 sh -c 'ln -s "$1" "$OUT/$2"' _
     '';
 
-    # Cycles the background through the top of the ranking.
-    #
-    # Not noctalia's own automation, which can only shuffle a whole directory
-    # and only runs under niri anyway. This drives whichever shell is actually
-    # up, so the Hyprland session gets the same behaviour.
-    #
-    # The index lives in XDG_RUNTIME_DIR, so a reboot starts again from the
-    # favourite rather than resuming mid-cycle — which is the nicer of the two
-    # behaviours, and means there is no state to persist.
+    # Cycles the top of the ranking — not noctalia's own automation (whole-
+    # directory shuffle, niri-only); this drives whichever shell is up. Index
+    # in XDG_RUNTIME_DIR: a reboot restarts from the favourite, so there is
+    # no state to persist.
     rotate = pkgs.writeShellScript "wallpaper-rotate" ''
       set -eu
       dir=${lib.escapeShellArg cfg.directory}
@@ -274,15 +235,11 @@
     config = {
       cosmos.system.impermanence.persist.directories = ["Pictures/wallpapers"];
 
-      # Symlink the collection into the (writable) picker directory.
-      #
-      # The pruning pass is not optional bookkeeping: filenames carry the rank,
-      # so they change whenever the ranking does, and an image dropped from the
-      # collection would otherwise stay in the picker forever. Testing for a
-      # *dangling* link is not enough either — the superseded store path is
-      # still there until it is garbage collected, so the stale link resolves
-      # perfectly well. Hence: remove any symlink pointing into the store that
-      # is not part of the current set, and never touch a real file.
+      # Pruning is not optional bookkeeping: rank-prefixed names change with
+      # the ranking, so a dropped image would linger in the picker forever.
+      # Dangling-link tests don't cut it — the superseded store path resolves
+      # fine until GC — so remove any store-pointing symlink not in the
+      # current set, and never touch a real file.
       home.activation.defaultWallpapers = lib.hm.dag.entryAfter ["writeBoundary"] ''
         run mkdir -p ${lib.escapeShellArg cfg.directory}
 
@@ -315,14 +272,11 @@
           Service = {
             Type = "oneshot";
             ExecStart = "${rotate}";
-            # The user manager's PATH is not the session's. coreutils for the
-            # script itself, /run/current-system/sw/bin for hyprctl, and the
-            # home-manager profile for noctalia-shell.
-            #
-            # `home.profileDirectory` rather than a literal: this profile is
-            # ~/.local/state/nix/profile, and the ~/.nix-profile this first
-            # guessed at does not exist, so nothing was ever found and the
-            # rotation silently did nothing.
+            # User-manager PATH is not the session's: coreutils for the
+            # script, /run/current-system/sw/bin for hyprctl, profile for
+            # noctalia-shell. `home.profileDirectory`, not a literal — this
+            # profile is ~/.local/state/nix/profile and ~/.nix-profile does
+            # not exist here, which once left the rotation silently dead.
             Environment = [
               "PATH=${lib.makeBinPath [pkgs.coreutils]}:/run/current-system/sw/bin:${config.home.profileDirectory}/bin"
             ];
@@ -335,10 +289,9 @@
             PartOf = ["graphical-session.target"];
           };
           Timer = {
-            # A minute after the session comes up, then every interval. Not
-            # `interval` for the first one too: that left a fresh session
-            # sitting on the same image for half an hour, which is
-            # indistinguishable from the rotation being broken.
+            # First tick a minute after the session, not `interval`: a fresh
+            # session otherwise sits on one image for half an hour, which
+            # looks exactly like a broken rotation.
             OnActiveSec = "1min";
             OnUnitActiveSec = cfg.rotate.interval;
           };

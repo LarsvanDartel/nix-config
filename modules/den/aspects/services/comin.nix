@@ -1,32 +1,19 @@
 # services.comin — GitOps deployment: hosts pull their own config.
 #
-# Replaces running deploy-rs by hand for the hosts that opt in. A host polls
-# the knot, and when main moves it builds and switches itself. The direction of
-# the arrow is the point: nothing needs credentials to reach the fleet, so
-# there is no key anywhere that grants root on four machines. That was the
-# objection to deploying from CI, and pulling does not have it — a compromised
-# spindle can at worst fail a build, not push a system.
+# Hosts poll the knot and switch themselves when the deploy branch moves:
+# pulling, not pushing, so no key anywhere grants root on the fleet and a
+# compromised spindle can at worst fail a build. Pulls from the knot over
+# public HTTPS (`info/refs` unauthenticated, verified), not the mesh, not
+# GitHub — the cost is that the knot becomes load-bearing: if it is down,
+# nothing deploys, which is the correct failure.
 #
-# It pulls from the knot over public HTTPS, not over the mesh and not from
-# GitHub. The knot serves `info/refs` unauthenticated (verified), so no
-# credential is involved at all, and the fleet stops depending on a remote it
-# does not own for its own deployments. The cost is that endeavour becomes
-# load-bearing for everyone's updates — if the knot is down nothing deploys,
-# which is the correct failure: nothing deploys, rather than something wrong
-# deploying.
+# No magic rollback, unlike deploy-rs — recovery is the bootloader menu.
+# The `testing` branch gets `nixos-rebuild test`: try something on a host
+# without making it the boot default.
 #
-# Two safety properties worth knowing before trusting it:
-#
-#   * comin builds and switches on the machine itself. There is no
-#     magic-rollback the way deploy-rs has one — a configuration that breaks
-#     networking breaks it, and the recovery is the bootloader menu.
-#   * pushing to the `testing` branch gets `nixos-rebuild test`: activated but
-#     not made the boot default. That is the way to try something on a host
-#     that is a nuisance to visit physically.
-#
-# Not enabled fleet-wide on purpose; see the comments on each host. In
-# particular pioneer would have to *build* on a Raspberry Pi 3, and voyager
-# would switch itself out from under whoever is typing on it.
+# Not enabled fleet-wide; see per-host comments. pioneer would have to
+# build on a Raspberry Pi 3; voyager would switch itself out from under
+# whoever is typing on it.
 {
   den,
   inputs,
@@ -144,29 +131,22 @@
           mode = "0400";
         };
 
-        # github.com's host key, pinned rather than accepted on first use.
-        # Taken from api.github.com/meta, which is where GitHub publishes it.
-        #
-        # StrictHostKeyChecking below is `yes`, not `accept-new`: with the key
-        # pinned here there is no first use left to accept, so anything that
-        # does not match this is a failure rather than a new entry written to
-        # a file nobody reads. That is the whole reason to pin it — a fetch
-        # that silently trusts whatever answers is not meaningfully
-        # authenticated.
+        # github.com's host key, pinned (from api.github.com/meta).
+        # StrictHostKeyChecking is `yes`, not `accept-new`: with the key pinned
+        # there is no first use left to accept — a mismatch is a failure, not a
+        # new entry written to a file nobody reads.
         programs.ssh.knownHosts."github.com" = {
           hostNames = ["github.com"];
           publicKey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl";
         };
 
-        # Scoped to this unit rather than dropped into /root/.ssh/config: the
-        # key exists for comin's flake fetches and nothing else on the host has
-        # any business using it.
+        # Scoped to this unit, not /root/.ssh/config — only comin's flake
+        # fetches have any business using this key.
         systemd.services.comin.environment.GIT_SSH_COMMAND = "ssh -i ${cfg.secretsKeyFile} -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes";
 
-        # gcroots is the part that matters: it pins the last generation comin
-        # built so a GC between build and switch cannot delete it out from
-        # under the deployer. store.json (deployment history) and the working
-        # clone are merely expensive to lose — without this, every boot on an
+        # gcroots matters: it pins the last generation comin built so a GC
+        # between build and switch cannot delete it. store.json and the clone
+        # are merely expensive to lose — unpersisted, every boot on an
         # impermanent host is a fresh clone of the whole repository.
         cosmos.system.impermanence.persist.directories = [
           {
@@ -184,22 +164,15 @@
             {
               name = "origin";
               url = cfg.repository;
-              # `deploy`, not `main` — this is the whole point of
-              # services/build-gate.nix. main is where work lands; deploy is
-              # where work that has built on all three hosts lands, advanced by
-              # the gate and by nothing else. comin has no magic rollback, so
-              # the difference is between a typo costing a git push and a typo
-              # costing two production hosts.
-              #
-              # comin calls this option `main` regardless of the branch's name:
-              # it means "the branch to switch to", as against `testing` below.
+              # `deploy`, not `main` — the whole point of services/build-gate.nix:
+              # deploy is advanced by the gate and by nothing else, and comin has
+              # no magic rollback. comin calls this option `main` regardless of
+              # the branch's name: it means "the branch to switch to".
               branches.main.name = cfg.deployBranch;
 
-              # comin's own default, named here because it is a feature worth
-              # remembering: this branch is `test`-activated, not switched, so
-              # it disappears on reboot. Deliberately left ungated — pushing to
-              # `testing` is how you try something *without* waiting for the
-              # gate, and it cannot outlive a reboot.
+              # comin's own default, named because it is worth remembering:
+              # `testing` is test-activated, disappears on reboot, deliberately
+              # ungated — the way to try something without waiting for the gate.
               branches.testing.name = "testing";
               poller.period = cfg.pollSeconds;
             }

@@ -1,10 +1,8 @@
 # services.tino — TINO (github:confirm/tino), a git+Typst-backed
 # collaborative document editor. See pkgs/tino.nix for why it is packaged
-# natively rather than run from upstream's Docker image.
-#
-# Integrated with kanidm the same way immich/grafana/opencloud are: a
-# confidential OAuth2 client provisioned in services/kanidm.nix, published
-# through gaia's netbird-proxy ungated because TINO does its own OIDC login.
+# natively. Integrated with kanidm like immich/grafana/opencloud: a
+# confidential OAuth2 client in services/kanidm.nix, published ungated
+# through gaia's netbird-proxy because TINO does its own OIDC login.
 {den, ...}: {
   den.aspects.services.tino = {
     includes = [den.aspects.services.netbird.client];
@@ -23,12 +21,10 @@
 
       pythonEnv = pkgs.python3.withPackages (ps: [ps.tino]);
 
-      # `git lfs install --system` (what upstream's Dockerfile does) writes
-      # the LFS filter into the system gitconfig, and `core.attributesFile`
-      # points it at the gitattributes shipped in the repo. There is nowhere
-      # writable to put a system gitconfig in the store, so this is handed to
-      # git directly via GIT_CONFIG_SYSTEM instead — git 2.32+ reads that
-      # env var in place of the compiled-in path.
+      # Upstream's Dockerfile does `git lfs install --system`; there is no
+      # writable system gitconfig in the store, so it is handed to git via
+      # GIT_CONFIG_SYSTEM (git 2.32+ reads that in place of the compiled-in
+      # path), with core.attributesFile pointing at the repo's gitattributes.
       gitConfig = pkgs.writeText "tino-gitconfig" ''
         [core]
             attributesFile = ${pkgs.python3Packages.tino}/share/tino/gitattributes
@@ -111,21 +107,14 @@
 
         systemd.tmpfiles.rules = [
           "d /var/lib/tino 0750 ${user} ${user} - -"
-          # TINO does not read TYPST_FONT_PATHS or any other ambient env
-          # var for fonts — it builds its own `typst --font-path` from
-          # TINO_FONT_DIR (config.py), which defaults to a real, writable
-          # subdirectory of TINO_DATA_DIR backing a FontService (presumably
-          # a per-instance font-upload feature in the UI). So the fix isn't
-          # an env var: it's seeding that directory. `C` copies once, if
-          # the destination doesn't already exist, rather than replacing it
-          # outright — an uploaded font placed here by the FontService
-          # later must survive every subsequent activation, not just be
-          # clobbered back to this package's contents.
-          #
-          # The gewis Typst package's letterhead sidebar sets its wordmark
-          # in Lato Black (GEWISLetter.cls loads `\usepackage[default]{lato}`,
-          # and it's an embedded font in the real corporate-identity PDFs) —
-          # not a system font typst would otherwise discover on its own.
+          # TINO reads no ambient font env var: it builds its own
+          # `typst --font-path` from TINO_FONT_DIR (config.py), a writable
+          # subdir of TINO_DATA_DIR backing a FontService (per-instance font
+          # upload in the UI). So the fix is seeding that directory with `C` —
+          # copy once if absent — so a font uploaded later is never clobbered
+          # by activation. Lato Black is the GEWIS letterhead wordmark,
+          # embedded in the corporate PDFs, not a system font typst would
+          # discover on its own.
           "C /var/lib/tino/fonts/lato - ${user} ${user} - ${pkgs.lato}/share/fonts"
         ];
         cosmos.system.impermanence.persist.directories = [
@@ -137,22 +126,18 @@
           }
         ];
 
-        # Owned by kanidm rather than tino: services/kanidm.nix's oauth2
-        # provisioning reads the same file as `basicSecretFile` so both sides
-        # of the client agree on the secret. tino's own service still reaches
-        # it via LoadCredential below, which systemd loads as root before the
-        # ownership check would apply.
+        # Owned by kanidm, not tino: services/kanidm.nix's provisioning reads
+        # the same file as `basicSecretFile` so both sides of the client agree
+        # on the secret. tino still reaches it via LoadCredential, which
+        # systemd loads as root before ownership would apply.
         sops.secrets."keys/tino/oidc-client-secret".owner = "kanidm";
 
         # Left unset, TINO generates a random session-signing key on every
-        # process start (its own config.py says so explicitly) — and gunicorn
-        # respawning the worker for any reason (a slow upstream OIDC call
-        # hitting the default worker timeout, a crash, a deploy) silently
-        # invalidates every existing session cookie mid-flight. That reads
-        # exactly like "log in successfully, land back on the login page":
-        # the callback sets a session against one secret, the next request
-        # hits a worker signed with a different one. A stable key removes the
-        # respawn as a variable entirely.
+        # process start, and a gunicorn respawning the worker (worker timeout
+        # on a slow OIDC call, a crash, a deploy) silently invalidates every
+        # session cookie mid-flight — "log in successfully, land back on the
+        # login page": the callback and the next request hit different
+        # secrets. A stable key removes the respawn as a variable.
         sops.secrets."keys/tino/session-secret-key".owner = user;
 
         systemd.services.tino = {
@@ -166,14 +151,12 @@
             TINO_BASE_URL = "https://${cfg.domain}";
             TINO_OIDC_DISCOVERY_URL = "https://auth.lvdar.nl/oauth2/openid/tino/.well-known/openid-configuration";
             TINO_OIDC_CLIENT_ID = "tino";
-            # kanidm's own "groups" claim (tied to granting the "groups"
-            # scope tino's own client hardcodes requesting) is the
-            # identity's entire raw kanidm group membership fleet-wide —
-            # see services/kanidm.nix. TINO stores the whole userinfo
-            # response in its session cookie, and that pushed Set-Cookie
-            # over the ~4KB browsers silently cap it at, so login always
-            # completed server-side and never actually stuck client-side.
-            # tino_groups is the small claim kanidm.nix maps instead.
+            # kanidm's raw "groups" claim is the identity's entire fleet-wide
+            # membership (see services/kanidm.nix); TINO stores the whole
+            # userinfo response in its session cookie, and the pushed
+            # Set-Cookie blew past the ~4KB cap browsers silently enforce —
+            # login completed server-side and never stuck client-side.
+            # tino_groups is the small mapped claim instead.
             TINO_OIDC_GROUPS_CLAIM = "tino_groups";
             TINO_ACCENT_COLOUR = cfg.accentColour;
             GIT_CONFIG_SYSTEM = toString gitConfig;
@@ -194,8 +177,8 @@
           };
         };
 
-        # netbird-proxy reaches it over the mesh like any other target, so the
-        # port opens on wt0 and nowhere else — endeavour is edgeTerminated.
+        # netbird-proxy dials over the mesh, so the port opens on wt0 only —
+        # endeavour is edgeTerminated.
         cosmos.services.netbird.client.exposedPorts = [cfg.port];
       };
     };

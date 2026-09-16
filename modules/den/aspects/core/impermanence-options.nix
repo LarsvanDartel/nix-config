@@ -1,7 +1,6 @@
-# core.impermanence-options — the persist option schema, declared on every host
-# so any aspect can contribute persist paths. The `impermanence` aspect reads
-# them and only activates where included. (Intra-host list-merge, not a
-# cross-entity quirk.) Also declares cosmos.user.name, read by ssh/sops.
+# core.impermanence-options — persist option schema, declared on every host so
+# any aspect can contribute persist paths; the `impermanence` aspect reads them
+# and only activates where included. Also declares cosmos.user.name (ssh/sops).
 {...}: {
   den.aspects.core.impermanence-options.nixos = {lib, ...}: let
     inherit (lib.types) listOf str coercedTo attrsOf bool;

@@ -1,42 +1,28 @@
 # services.build-gate — nothing reaches the fleet until it has been built.
 #
-# comin deploys `main` within five minutes of a push and has no magic rollback,
-# so for a while the only thing standing between a typo and two production
-# hosts was whether the author had run `nix build` first. That is not a gate,
-# it is a habit.
+# comin deploys within five minutes of a push and has no magic rollback; this
+# is the gate. On every push to main it builds all three x86_64 hosts at the
+# pushed revision and, only if all three are green, fast-forwards a `deploy`
+# branch. comin tracks `deploy`, never `main` — the fleet only ever sees
+# verified work.
 #
-# This is the gate. On every push to main it builds all three x86_64 hosts at
-# the pushed revision and, only if all three are green, fast-forwards a
-# `deploy` branch. comin tracks `deploy`, never `main` — so `main` is where
-# work lands and `deploy` is where verified work lands, and the fleet only ever
-# sees the second.
+# On the metal, not in the spindle's pipeline microVM, which is what it
+# replaces: the identical three-host build took 76 minutes there against 4m36s
+# native (emulated CPU against 72 threads, slirp networking, vsock-proxied
+# attic, cold store). Runs as this host's own systemd unit, next to the
+# flake-bump timer that already did exactly this.
 #
-# Why this rather than a workflow on the spindle, which is what it replaces:
-# the identical three-host build took **76 minutes inside a pipeline microVM
-# and 4m36s natively here**. The sandbox was fighting on four fronts at once —
-# emulated CPU against 72 real threads, slirp4netns userspace networking, attic
-# behind a vsock proxy, and a cold store every single run. The gate was never
-# too slow; the venue was wrong. So it runs on the metal, as the machine's own
-# systemd unit, next to the flake-bump timer that already did exactly this.
+#   * The trigger is a file: the knot keeps refs/heads/main as a plain file
+#     whose mtime moves on every push — a systemd.path fires within a second,
+#     no credential, no open port, no network. See `paths` below.
+#   * A red build is silent apart from ntfy: the push succeeds, `deploy`
+#     simply does not follow. Notification via the type-wide OnFailure
+#     drop-in in core/notify-failure.nix.
+#   * `main` and `deploy` can diverge, deliberately — `git log deploy..main`
+#     is "what has not passed yet".
 #
-# Three things worth knowing before relying on it:
-#
-#   * **The trigger is a file, not a poll and not a webhook.** endeavour is the
-#     knot host, and a knot keeps `refs/heads/main` as a plain file whose mtime
-#     moves on every push. A systemd.path watching it fires within a second,
-#     needs no credential, no open port and no network — see `paths` below.
-#   * **A red build is silent apart from ntfy.** The push succeeds, `main`
-#     moves, and `deploy` simply does not follow. Nothing is reverted and
-#     nothing is rejected; the fleet just stays where it was, which is the
-#     correct behaviour and also an easy one to miss. The notification comes
-#     from the type-wide OnFailure drop-in in core/notify-failure.nix.
-#   * **`main` and `deploy` can diverge, deliberately.** If they have, the
-#     fleet is running something older than HEAD on purpose. `git log
-#     deploy..main` is the question "what has not passed yet".
-#
-# It does *not* gate flake-bump: that timer already builds all three hosts
-# before it commits, so a lock bump is verified by construction and pushing it
-# to main would only make it wait to be verified twice.
+# Does *not* gate flake-bump: that timer already builds all three hosts
+# before it commits, so a lock bump is verified by construction.
 {
   den,
   inputs,
@@ -244,9 +230,8 @@
         systemd.paths.build-gate = {
           wantedBy = ["multi-user.target"];
           pathConfig = {
-            # PathChanged rather than PathModified: git writes the new ref to a
-            # lock file and renames it over the old one, so what is observed is
-            # a replacement, not a write.
+            # PathChanged, not PathModified: git writes the new ref to a lock
+            # file and renames it over the old one — a replacement, not a write.
             PathChanged = cfg.watchPath;
             # Catch a push that happened while this host was down. Without it
             # the gate silently skips whatever landed during a reboot.
@@ -255,10 +240,9 @@
           };
         };
 
-        # A push during a build would otherwise be lost: the path unit cannot
-        # queue, it can only note that the service is already running. Checking
-        # once more after every run closes that — the script exits immediately
-        # when deploy already matches main, so the common case costs a fetch.
+        # A push during a build would otherwise be lost — the path unit cannot
+        # queue, only note the service is running. The timer closes that; the
+        # script exits immediately when deploy already matches main.
         systemd.timers.build-gate = {
           wantedBy = ["timers.target"];
           timerConfig = {

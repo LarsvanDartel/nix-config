@@ -1,6 +1,5 @@
-# roles.default — the baseline every host gets (was the nixos `common`
-# aggregate, minus boot which is opt-in). Applied to every den host via
-# den.schema.host.includes (see defaults.nix).
+# roles.default — the baseline every host gets, applied via
+# den.schema.host.includes (see defaults.nix). boot is opt-in, not here.
 {den, ...}: {
   den.aspects.roles.default.includes = with den.aspects; [
     core.nix
@@ -12,17 +11,15 @@
     core.yubikey
     core.ssh
     core.sops
-    # Every host should be able to say which commit it is running, including
-    # pioneer — the one most likely to be quietly out of date.
+    # Every host should know which commit it is running — pioneer most of
+    # all, as the one most likely to be quietly out of date.
     core.revision
-    # A bounded journal is wanted on every host — a laptop has no more use for
-    # four gigabytes of it than a Pi does. Failure *notifications* are not here
-    # but in roles.server: see the note there.
+    # A bounded journal is wanted on every host. Failure *notifications* are
+    # in roles.server — see the note there.
     core.journald
-    # Pull side of the binary cache only. Reading from a cache is universally
-    # useful — voyager is the host that most wants it, since it builds
-    # pioneer's aarch64 closure under emulation. Serving one is not, so
-    # services.attic itself stays on endeavour.
+    # Pull side of the binary cache only: reading is universally useful
+    # (voyager most — it builds pioneer's aarch64 closure under emulation),
+    # serving is not, so services.attic stays on endeavour.
     services.attic.client
   ];
 }

@@ -1,37 +1,30 @@
 # services.microbin — pastebin and small-file drop, public to read and OIDC to
-# write.
 #
-# The shape: a paste exists to be handed to someone, so reads must work without
-# an account. Writes must not. MicroBin has no OIDC and no plugin surface, so
-# that split is made in front of it — oauth2-proxy against kanidm, with nginx
-# doing the routing. This is the fleet's first forward-auth: everything else
-# that speaks OIDC does it natively in-app.
+# Reads public, writes OIDC-gated: a paste exists to be handed to someone, so
+# reads must work without an account and writes must not. MicroBin has no
+# OIDC and no plugin surface, so the split is made in front of it —
+# oauth2-proxy against kanidm, nginx routing. The fleet's first forward-auth.
 #
-# Because there is now something in the request path that must not be skipped,
-# MicroBin binds loopback and nginx is the only thing that can reach it. The
-# mesh-facing port belongs to nginx (`proxyPort`), and that is what gaia's
-# netbird-proxy targets. Publishing MicroBin's own port would let any mesh peer
-# POST straight past the gate — which is the whole reason this file exists.
+# MicroBin binds loopback and nginx is the only thing that can reach it; the
+# mesh-facing port is nginx's `proxyPort`, which is what gaia's netbird-proxy
+# targets. Publishing MicroBin's own port would let any mesh peer POST
+# straight past the gate. Hence a deliberate exception to "an edge-terminated
+# host has nothing for a local vhost to do": here the vhost does
+# authorisation, not TLS.
 #
-# This is therefore a deliberate exception to the rule the other aspects state,
-# that an edge-terminated host has nothing for a local vhost to do. Here the
-# vhost is not doing TLS, it is doing authorisation.
+# The route split was derived by probing a running MicroBin, not reading its
+# source, because two things are not what they look like:
 #
-# The route split was derived by running MicroBin and probing it, not by
-# reading its source, because two things are not what they look like:
+#   * `POST /upload/` — trailing slash — creates a pasta just like `POST
+#     /upload`. Opening `/upload/` as a prefix so pasta *views* work would
+#     also open an unauthenticated write endpoint — hence `limit_except GET
+#     HEAD` on every public location.
+#   * MICROBIN_SHORT_PATH does not move generated links onto `/p/`: after
+#     creating a pasta MicroBin redirects to `/upload/{id}`, so `/upload/`
+#     must be readable or every link it hands out is dead.
 #
-#   * `POST /upload/` — with a trailing slash — creates a pasta just as
-#     `POST /upload` does. Opening `/upload/` as a prefix so that pasta *views*
-#     work would therefore also open an unauthenticated write endpoint. Hence
-#     `limit_except GET HEAD` on every public location: the prefix is open for
-#     reading and refuses everything else.
-#   * MICROBIN_SHORT_PATH does not move generated links onto `/p/`. After
-#     creating a pasta MicroBin redirects to `/upload/{id}` regardless, so
-#     `/upload/` has to be readable or every link it hands out is dead for the
-#     person it was handed to.
-#
-# The list below is an allow-list. Anything not named here is authenticated,
-# which is the direction that fails safely when MicroBin grows a route.
+# The list below is an allow-list: anything not named is authenticated,
+# which fails safely when MicroBin grows a route.
 {...}: {
   den.aspects.services.microbin.nixos = {
     config,
@@ -131,10 +124,9 @@
 
           MICROBIN_MAX_FILE_SIZE_UNENCRYPTED_MB = cfg.maxFileSizeMiB;
 
-          # /list and /pastalist still answer 200 with this off — they just
-          # render nothing. Verified rather than assumed, because a 200 reads
-          # like a leak. They are authenticated regardless: neither is on the
-          # allow-list.
+          # /list and /pastalist still answer 200 with this off, they just
+          # render nothing (verified — a 200 reads like a leak).
+          # Authenticated regardless: neither is on the allow-list.
           MICROBIN_LIST_SERVER = false;
 
           # Load-bearing for URL stability, not just aesthetics: IDs are
@@ -156,13 +148,11 @@
         };
       };
 
-      # A static user, not the module's DynamicUser.
-      #
-      # DynamicUser plus StateDirectory does not put state in /var/lib/microbin
-      # at all — systemd uses /var/lib/private/microbin and leaves a symlink.
-      # Persisting the visible path would then persist a symlink and lose every
-      # pasta on the next boot: silent total data loss on an impermanent host,
-      # not a permissions error. Same trap ollama.nix documents for its engine.
+      # A static user, not the module's DynamicUser. DynamicUser+
+      # StateDirectory puts state in /var/lib/private/microbin behind a
+      # symlink at the visible path — persisting the visible path would
+      # persist the symlink and lose every pasta on the next boot: silent
+      # total data loss, not a permissions error. Same trap as ollama.nix.
       users.users.microbin = {
         isSystemUser = true;
         group = "microbin";
@@ -223,16 +213,12 @@
         # for oauth2-proxy to filter on.
         email.domains = ["*"];
 
-        # PKCE is opt-in here and off by default, which kanidm — which enforces
-        # it — rejects at the authorise step:
-        #
-        #   No PKCE code challenge was provided with client in enforced PKCE
-        #   mode | o2rs.name: "microbin"
-        #
-        # surfacing to the browser as a bare invalid_request. The aspect
-        # deliberately does not set allowInsecureClientDisablePkce the way
-        # jellyfin and traccar each had to; this is the other way
-        # to satisfy that requirement, and the better one.
+        # PKCE is opt-in here and off by default, which kanidm — which
+        # enforces it — rejects at the authorise step ("No PKCE code
+        # challenge was provided with client in enforced PKCE mode"),
+        # surfacing to the browser as a bare invalid_request. Deliberately
+        # not allowInsecureClientDisablePkce as jellyfin and traccar each
+        # had to; this is the other, better way to satisfy the requirement.
         extraConfig.code-challenge-method = "S256";
 
         nginx = {
@@ -241,19 +227,15 @@
         };
       };
 
-      # oauth2-proxy performs OIDC discovery once, at startup, and exits if it
-      # fails. The issuer is the *public* name, so that request has to leave
-      # this host, cross the mesh, pass gaia's proxy and land back on kanidm —
-      # none of which is true in the first seconds of a boot. On 2026-08-30 it
-      # got nginx's 502, and because the module sets Restart=always while
-      # leaving RestartSec at its 100ms default, systemd spent NixOS's whole
-      # five-restart budget inside half a second and gave up for good. microbin
-      # then served 500s until someone restarted it by hand.
-      #
-      # So: retry slowly, and for long enough that the rest of the fleet can
-      # finish coming up. Ordering after kanidm removes the most common part of
-      # the race; the retry budget covers the rest, which is not local to this
-      # host and cannot be ordered against.
+      # oauth2-proxy performs OIDC discovery once, at startup, and exits if
+      # it fails. The issuer is the *public* name, so that request must leave
+      # this host, cross the mesh, pass gaia's proxy and land on kanidm —
+      # none of which is true in the first seconds of a boot. On 2026-08-30
+      # it got nginx's 502, and Restart=always with the 100ms default
+      # RestartSec spent NixOS's whole five-restart budget inside half a
+      # second and gave up for good; microbin served 500s until restarted by
+      # hand. Retry slowly and long enough for the fleet to finish coming up;
+      # ordering after kanidm removes the most common part of the race.
       systemd.services.oauth2-proxy = {
         after = ["kanidm.service"];
         serviceConfig.RestartSec = "10s";
@@ -292,24 +274,22 @@
           # matters here.
           "/upload/" = publicRead;
 
-          # The create POST, authenticated. This exact-match location is not
-          # redundant with `location /`: defining the `/upload/` prefix above
-          # makes nginx answer a request for bare `/upload` with its own 301
-          # to `/upload/`, and it does that *before* auth_request runs. The
-          # form posts to `/upload`, so without this every submission — signed
-          # in or not — is redirected, downgraded to GET by the browser's 301
-          # handling, and lands on a path that only permits reads. Safe, in
-          # that no unauthenticated write ever succeeded, but the paste button
-          # did not work either.
+          # The create POST, authenticated. Not redundant with
+          # `location /`: the `/upload/` prefix above makes nginx answer
+          # bare `/upload` with its own 301 to `/upload/`, and it does that
+          # *before* auth_request runs. The form posts to `/upload`, so
+          # without this every submission is redirected, downgraded to GET
+          # by the browser, and lands on a read-only path — safe, but the
+          # paste button did not work.
           "= /upload".proxyPass = backend;
 
           "/auth/" = publicForm;
           "/auth_raw/" = publicForm;
           "/auth_file/" = publicForm;
 
-          # Same correction as the X-Forwarded-Proto below, for the login
+          # Same correction as X-Forwarded-Proto below, for the login
           # redirect the oauth2-proxy nginx module generates: it interpolates
-          # $scheme, which is http on this side of the edge, and would send the
+          # $scheme, http on this side of the edge, and would send the
           # visitor to a URL gaia does not serve.
           "@redirectToAuth2ProxyLogin".return =
             mkForce "307 https://${cfg.domain}/oauth2/start?rd=https://$host$request_uri";
@@ -321,11 +301,10 @@
         extraConfig = ''
           proxy_set_header X-Forwarded-Proto https;
 
-          # nginx builds absolute redirects from its own listen address, which
-          # here is a mesh port behind the edge — so a redirect it generates
-          # names http://bin.lvdar.nl:8087/, which is both a dead link for the
-          # visitor and a needless disclosure of where this actually runs.
-          # Relative redirects resolve against the public URL instead.
+          # nginx builds absolute redirects from its own listen address — a
+          # mesh port behind the edge — naming http://bin.lvdar.nl:8087/: a
+          # dead link and a needless disclosure. Relative redirects resolve
+          # against the public URL.
           absolute_redirect off;
         '';
       };

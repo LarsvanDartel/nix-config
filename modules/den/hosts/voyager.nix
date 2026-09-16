@@ -1,9 +1,7 @@
-# voyager (x86_64 desktop/gaming laptop, ThinkPad P1 gen3 + nvidia). den-produced;
-# named `voyager` during the migration to avoid colliding with the old `voyager`.
+# voyager (x86_64 desktop/gaming laptop, ThinkPad P1 gen3 + nvidia). den-produced.
 #
 # Hardware from a nixos-facter report; filesystems from disko. Generate on voyager:
 #   sudo nix run nixpkgs#nixos-facter -- -o modules/den/hosts/_facter/voyager.facter.json
-#
 {
   den,
   inputs,
@@ -19,23 +17,21 @@
       roles.gaming
       desktop.hyprland
       desktop.greetd.tuigreet
-      # Base-level, not specialisation-level: the niri specialisation inherits
-      # the parent config, so the Mod-tap option has to be declared here for its
-      # binds to read it.
+      # Base-level, not specialisation-level: the niri specialisation
+      # inherits the parent config, so the Mod-tap option must be declared
+      # here for its binds to read.
       desktop.keyd
       services.containers
       services.netbird.client
       services.eduvpn
-      # Ships its journal to loki. Not node-exporter: a laptop that sleeps
-      # would sit permanently "target down". Logs have no such problem —
-      # they simply stop and resume.
+      # Ships its journal to loki. Not node-exporter: a sleeping laptop
+      # would sit permanently "target down"; logs just stop and resume.
       services.alloy
       hardware.fingerprint
       hardware.thinkpad
       hardware.v4l2loopback
     ];
 
-    # the primary user gets the desktop home + the voyager-specific apps.
     lvdar = {
       includes = with den.aspects; [
         roles.desktop-home
@@ -61,10 +57,8 @@
         home.eduvpn
       ];
 
-      # voyager-specific home settings.
       homeManager = {pkgs, ...}: {
         cosmos = {
-          # The file manager for inode/directory.
           cli.programs.yazi.defaultApplication = true;
 
           cli.programs.nvim = {
@@ -78,21 +72,18 @@
               mcrl2.enable = true;
             };
 
-            # Here and not in the nvim aspect: it needs endeavour's ollama on
-            # the mesh, so it is a property of this machine's reachability
-            # rather than of the editor. Manual trigger — see the option — so
-            # that being off the mesh costs a keypress rather than a stall on
-            # every pause.
+            # Here, not in the nvim aspect: it needs endeavour's ollama on
+            # the mesh — a property of this machine's reachability. Manual
+            # trigger (see the option) so being off the mesh costs a
+            # keypress, not a stall on every pause.
             minuet.enable = true;
           };
 
           desktops.hyprland.animations.enable = false;
 
-          # Rotate through the top 20 of the ranked collection rather than the
-          # default 8. This is the machine the collection was ranked on and the
-          # one it is looked at all day, so the cycle can afford to be longer
-          # before it starts repeating; 20 of 90 still leaves the ones that lost
-          # out of it, which was the point of ranking them.
+          # Top 20 of the ranked collection rather than the default 8: this
+          # is the machine it is looked at on all day, and 20 of 90 still
+          # leaves the losers out — which was the point of ranking them.
           desktops.wallpapers.rotate.count = 20;
 
           gaming.launchers.minecraft.mcsr.enable = true;
@@ -137,17 +128,14 @@
 
         programs.ssh.settings."es-pynq047.ics.ele.tue.nl".setEnv = "TERM=xterm-256color";
 
-        # The kanidm CLI, for managing accounts/groups without going through
-        # the web UI — see e.g. tino's kanidm.nix setup for what it gates.
-        # Pinned to _1_11 to match services/kanidm.nix's server package
-        # (kanidmWithSecretProvisioning_1_11) — the CLI and server speak a
-        # versioned protocol.
+        # The kanidm CLI for account/group admin without the web UI. Pinned
+        # to _1_11 to match services/kanidm.nix's server package — the CLI
+        # and server speak a versioned protocol.
         home.packages = [pkgs.mcrl2 pkgs.kanidm_1_11];
 
-        # Points the CLI at the public endpoint by default so `kanidm ...`
-        # works with no flags. Plain `verify_ca` (the default) is fine —
-        # auth.lvdar.nl is a normal ACME cert via gaia's netbird-proxy, not
-        # kanidm's own self-signed one.
+        # Public endpoint by default so `kanidm ...` needs no flags.
+        # verify_ca is fine — auth.lvdar.nl is a normal ACME cert via
+        # gaia's netbird-proxy, not kanidm's self-signed one.
         xdg.configFile."kanidm/config".text = ''
           uri = "https://auth.lvdar.nl"
         '';
@@ -176,21 +164,15 @@
 
         cli.programs.nh.flake-dir = "/home/lvdar/nix-config";
 
-        # Sync against endeavour's taskchampion-sync-server over the mesh,
-        # rather than through gaia at task.lvdar.nl the way the phone does.
-        # Same history either way — this path just declines to leave the mesh
-        # and come back in to reach a machine two rooms away. The id and the
-        # encryption secret come from sops; see the aspect.
+        # Sync direct over the mesh rather than out through gaia and back;
+        # same history either way. Credentials from sops — see the aspect.
         programs.taskwarrior.sync.serverUrl = "http://endeavour.nb.lvdar.nl:10222";
       };
 
-      # nixos-facter puts every detected GPU driver into the initrd. Here that
-      # means nvidia, which drags in 103 MB of GSP firmware plus a 12 MB
-      # nvidia.ko and takes the initrd to 138 MB — three of those fill the
-      # 511 MB ESP on their own, which is what made `nh os boot` run out of
-      # space. Nothing needs it that early: the boot console and the LUKS
-      # prompt are on the internal panel, which is Intel, and nvidia loads at
-      # stage 2 via boot.kernelModules (nvidia_uvm) as before.
+      # facter would put nvidia in the initrd — 103 MB of GSP firmware plus
+      # nvidia.ko; three of those fill the 511 MB ESP (what made `nh os boot`
+      # run out of space). Console and LUKS prompt are on the Intel panel;
+      # nvidia loads at stage 2 via boot.kernelModules as before.
       facter.detected.boot.graphics.kernelModules = ["i915"];
 
       # Hibernate
@@ -206,12 +188,9 @@
           options hid_apple fnmode=0
         '';
 
-        # Without this the LUKS FIDO2 "confirm presence on security token" cue
-        # is just one more plain-text line racing kernel/systemd boot spam on
-        # the console — easy to miss, with no visual sign of when to touch the
-        # key. Plymouth gives systemd-ask-password a real UI to route that
-        # prompt through instead. `quiet` above keeps kernel log lines from
-        # fighting the splash for the console.
+        # Plymouth gives the LUKS FIDO2 prompt a real UI instead of a
+        # plain-text line racing kernel boot spam; `quiet` keeps log lines
+        # off the splash.
         plymouth.enable = true;
       };
 
@@ -227,30 +206,19 @@
         };
       };
 
-      # DNS on a laptop that roams onto networks it does not control.
-      #
-      # The global default pins 9.9.9.9 as resolvconf's `static` entry, which
-      # makes it the *first* nameserver everywhere and, because
-      # `nameservers != []`, also flips NetworkManager to `dns = "none"` — so NM
-      # never installs the DNS the network itself handed out. On TU/e's
-      # tue-wpa2 that is fatal: Quad9's :53 does not answer from campus, and the
-      # resolvers that would (131.155.3.3/131.155.2.3) only reached resolv.conf
-      # at all because dhcpcd was *also* running on the wifi interface. Empty
-      # here means NM owns DNS and the local network's resolvers are used, which
-      # is the only thing that works on a network that filters egress :53.
+      # The global default pins 9.9.9.9 first in resolv.conf and flips NM
+      # to dns = none, so the network's own resolvers never arrive — fatal
+      # on TU/e's tue-wpa2, where Quad9's :53 is filtered. Empty means NM
+      # owns DNS and uses the local network's resolvers: the only thing that
+      # works where egress :53 is filtered.
       cosmos.networking.nameservers = [];
 
-      # ...and with NM owning DHCP, dhcpcd must not also be. dhcpcd was leasing
-      # wlp0s20f3 alongside NetworkManager's internal DHCP client — two clients
-      # leasing, writing resolv.conf and adding routes on one interface. It only
-      # ever looked harmless because dhcpcd happened to win the resolv.conf
-      # race, which is also the only reason DNS worked at all while
-      # `nameservers` above forced NM to `dns = "none"`.
-      #
-      # Disabled here rather than via `networking.useDHCP`: the facter module
-      # declares `networking.interfaces.wlp0s20f3.useDHCP = true` per-interface,
-      # and dhcpcd's own default is the *or* of the global flag and every
-      # interface's, so clearing the global one changes nothing.
+      # ...and with NM owning DHCP, dhcpcd must not also be leasing
+      # wlp0s20f3 — two clients on one interface, and DNS only ever worked
+      # because dhcpcd happened to win the resolv.conf race. Disabled here,
+      # not via networking.useDHCP: facter declares per-interface useDHCP
+      # and dhcpcd ORs the global flag with every interface's, so the global
+      # changes nothing.
       networking.dhcpcd.enable = false;
 
       networking.networkmanager.wifi.powersave = false;
@@ -265,52 +233,28 @@
         bgscan=""
       '';
 
-      # 25565 is a Minecraft server run here occasionally, for people on the
-      # same network.
-      #
-      # 5353 and 45114 are what home.catt needs, and are the reason `catt scan`
-      # found four devices with the firewall stopped and none with it running.
-      # Chromecast discovery is mDNS: the query goes to the multicast group and
-      # the replies come back unsolicited, so with nothing opened they are
-      # dropped and the scan reports an empty network rather than an error.
-      # 45114 is the little web server catt starts when casting a *local file* —
-      # the device is handed a URL pointing back here and fetches it itself, so
-      # without that port a scan succeeds, the cast is accepted, and the video
-      # never starts.
-      #
-      # Open on every interface rather than the wireless one alone, which reads
-      # careless and is close to it: this is a laptop, so the untrusted network
-      # is the same interface as the trusted one and scoping buys nothing
-      # against a café. What it would exclude is wt0, and the mesh already
-      # refuses this by policy — a non-fleet peer gets DNS and nothing else, and
-      # no fleet machine is looking for a Chromecast.
-      #
-      # The exposure is bounded by nothing listening most of the time: a port
-      # opened in the firewall with no process behind it refuses connections.
-      # It matters only while catt is running, and then it is one file, being
-      # served to a device on the same network, for as long as it plays.
+      # 25565: an occasional Minecraft server for people on the same
+      # network. 5353/45114: catt — mDNS replies come back unsolicited
+      # (dropped means `catt scan` reports an empty network, not an error),
+      # and 45114 is the server catt starts when casting a local file (the
+      # device fetches the URL itself; without it the cast is accepted and
+      # the video never starts). Open on every interface: on a laptop
+      # scoping buys nothing, and wt0 is already refused by mesh policy.
+      # Bounded by nothing listening most of the time.
       networking.firewall.allowedUDPPorts = [25565 5353];
       networking.firewall.allowedTCPPorts = [25565 45114];
 
       cosmos.system.impermanence.device = "/dev/mapper/crypted";
 
-      # Compositor choice is a BOOT-time switch: each specialisation is its own
-      # GRUB entry. The default entry stays Hyprland, so nothing changes unless
-      # a specialisation is picked.
-      #
-      # Specialisation bodies are plain NixOS modules and cannot `include` den
-      # aspects, so the niri/noctalia content is applied from the shared factory
-      # modules that the aspects also use.
-      # `nh os switch` reads /etc/specialisation to stay in the specialisation
-      # you booted (nh 4.4.1, SPEC_LOCATION); NixOS itself never writes that
-      # file, so each specialisation declares its own name here. The base config
-      # deliberately has no such file, so it resolves to the parent system.
-      # `configurationName` is what GRUB calls the entry. Without it
-      # install-grub.pl falls back to "(<name> - <date> - <version>)", where
-      # the date comes from lstat()ing a *store* symlink — so every
-      # specialisation is dated 1970-01-01 and the real label is buried in
-      # parentheses behind it. The result is unreadable at boot, which is the
-      # one moment it has to be readable.
+      # Compositor choice is a boot-time switch: each specialisation is its
+      # own GRUB entry; the default stays Hyprland. Specialisation bodies
+      # are plain NixOS modules and can't `include` den aspects, so the
+      # niri/noctalia content comes from the shared factory modules.
+      # `nh os switch` reads /etc/specialisation to stay in the booted one
+      # (nh 4.4.1) — NixOS never writes that file, so each specialisation
+      # declares its own name here. configurationName is what GRUB shows;
+      # without it every entry is dated 1970-01-01 (lstat of a store
+      # symlink) and unreadable at the one moment it must be readable.
       specialisation = {
         # Explicit, labelled entry, otherwise identical to the default.
         hyprland.configuration = {
@@ -323,8 +267,8 @@
 
           imports = [
             (import ../aspects/desktop/_niri/system.nix {inherit inputs;})
-            # Swap tuigreet for the noctalia greeter, so the login screen
-            # matches the shell this specialisation boots into.
+            # Swap tuigreet for the noctalia greeter, matching the shell
+            # booted.
             (import ../aspects/desktop/_greetd/noctalia.nix {})
           ];
 
@@ -357,11 +301,10 @@
       # as a remote builder.
       boot.binfmt.emulatedSystems = ["aarch64-linux"];
 
-      # Push what this machine builds to the cache, which is most of what the
-      # fleet builds: the desktop closure, everything from the overlays, and
-      # the emulated aarch64 toplevel above — the expensive one this exists
-      # for. Until now nothing anywhere pushed, so the cache was empty and CI
-      # rebuilt from source what this laptop had already emulated.
+      # Push what this machine builds — the desktop closure, the overlays,
+      # and the emulated aarch64 toplevel (the expensive one). Before this
+      # nothing pushed, so CI rebuilt from source what this laptop had
+      # already emulated.
       cosmos.services.attic.client.watchStore.enable = true;
 
       system.stateVersion = "24.11";

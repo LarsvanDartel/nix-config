@@ -1,7 +1,7 @@
-# home.wrapper-stylix — the stylix theming base for the wrapped-package catalog
-# (modules/meta/hm-wrappers.nix). Mirrors the desktop's Nord scheme + font stack
-# without the cosmos.desktops.* option layer (which doesn't exist in an isolated
-# wrap evaluation). autoEnable is off; each wrapped program enables its own target.
+# home.wrapper-stylix — stylix base for the wrapped-package catalog
+# (modules/meta/hm-wrappers.nix): mirrors the desktop's Nord scheme + fonts
+# without the cosmos.desktops.* options. autoEnable off — each wrapped program
+# enables its own target.
 {inputs, ...}: {
   den.aspects.home.wrapper-stylix.homeManager = {pkgs, ...}: {
     imports = [inputs.stylix.homeModules.stylix];

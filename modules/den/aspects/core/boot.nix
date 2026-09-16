@@ -1,6 +1,5 @@
-# core.boot aspect — grub bootloader + the cosmos.system.boot options (was
-# flake.modules.nixos.common in modules/nixos/system/boot.nix). Opt-in per host
-# (hosts without a bootloader, e.g. the Pi, don't include it), so it is NOT in
+# core.boot — grub bootloader + the cosmos.system.boot options. Opt-in per
+# host (hosts without a bootloader, e.g. the Pi, don't include it), so NOT in
 # roles.default.
 {...}: {
   den.aspects.core.boot.nixos = {

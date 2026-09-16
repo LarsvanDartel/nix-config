@@ -1,17 +1,9 @@
 # prom-lite — ProM Lite 1.4, the process mining framework used in 2AMI10.
-#
-# Upstream ships a jar bundle plus a launcher script, and separately a Windows
-# installer carrying its own JRE 8. That JRE is not incidental: ProM Lite 1.4
-# predates the removal of JAXB from the JDK, and importing an XES log reaches
-# javax.xml.bind.DatatypeConverter while parsing timestamps, which Java 11 no
-# longer has. So this runs on jdk8 rather than the newest JDK that "works".
-#
-# Two more things the upstream script does not handle here. ProM keeps its
-# downloaded package set, its workspace and its UI config next to ProM.ini and
-# resolves them relative to the working directory, so the launcher runs it out
-# of a writable state directory instead of the store. And Swing paints nothing
-# under a non-reparenting window manager unless AWT is told the window manager
-# is one, which on niri means a blank window without the env var below.
+# jdk8, not a newer JDK that merely "works": importing an XES log reaches
+# javax.xml.bind.DatatypeConverter, removed from the JDK after 8. The
+# launcher runs it out of a writable state directory (ProM resolves its
+# package set/workspace/config relative to the cwd), and exports
+# _JAVA_AWT_WM_NONREPARENTING — Swing paints nothing under niri without it.
 {...}: {
   nixpkgs.overlays = [
     (final: _prev: {

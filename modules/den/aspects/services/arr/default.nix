@@ -1,7 +1,6 @@
-# The *arr stack. This file holds only the base aspect: the `media` group and
-# the two directories everything else hangs off. Each service is its own file
-# beside this one and includes `services.arr` for them; `arr/vpn.nix` adds the
-# VPN-confinement namespace that the download clients run inside.
+# The *arr stack base aspect: the `media` group and the directories the rest
+# hang off. Per-service files beside this one include `services.arr`;
+# arr/vpn.nix adds the VPN-confinement namespace for the download clients.
 {...}: {
   den.aspects.services.arr.nixos = {
     config,

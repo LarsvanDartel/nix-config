@@ -1,18 +1,11 @@
 # services.loki — one place to grep four hosts' journals from.
 #
-# On endeavour with the rest of the stack, and unlike prometheus its data does
-# go on /tank: logs are the part that grows without a bound anyone chose, and
-# the 250 GB system SSD already carries every service's state. The path is
-# deliberately NOT added to cosmos.system.impermanence.persist — /tank is a ZFS
-# pool outside the persist layer, and an entry there would bind-mount /persist
-# over the top and put the logs back on the SSD. hosts/endeavour.nix documents
-# that trap twice.
-#
-# Shipped to by endeavour, gaia and voyager. Explicitly not pioneer: a shipper
-# keeps a position file and buffers, and hosts/pioneer.nix already raises the
-# watchdog to 60s because SD-card IO stalls the board hard enough to trip it.
-# Its journal is capped at 128 MB instead, which is the cheaper answer for a
-# host running thirteen services.
+# On endeavour; data on /tank because logs grow without bound and the 250 GB
+# system SSD already carries every service's state. Deliberately NOT in
+# cosmos.system.impermanence.persist: /tank is a ZFS pool outside the persist
+# layer, and an entry there bind-mounts /persist over it — putting the logs
+# back on the SSD (hosts/endeavour.nix documents this twice). Shipped to by
+# endeavour, gaia, voyager; not pioneer (SD-card watchdog, see alloy.nix).
 {den, ...}: {
   den.aspects.services.loki = {
     includes = [den.aspects.services.netbird.client];
@@ -70,8 +63,8 @@
             server = {
               http_listen_address = "0.0.0.0";
               http_listen_port = cfg.port;
-              # Quiet: loki logs every push at info, and this host ships its
-              # own journal to it — which would then log about logging.
+              # Quiet: loki logs every push at info, and this host ships its own
+              # journal to it — it would log about logging.
               log_level = "warn";
             };
 
@@ -100,9 +93,8 @@
 
             limits_config = {
               retention_period = cfg.retention;
-              # Journald timestamps can lag when a host has been offline and
-              # flushes on reconnect; rejecting those would silently lose
-              # exactly the logs from the outage being investigated.
+              # Journald timestamps lag after an offline host flushes on
+              # reconnect; rejecting them would drop exactly the outage logs.
               reject_old_samples = false;
             };
 

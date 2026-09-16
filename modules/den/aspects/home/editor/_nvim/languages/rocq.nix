@@ -22,16 +22,11 @@ in {
             pynvim
           ]))
       ];
-      # Plain, unpatched. There used to be an overrideAttrs here rewriting
-      # `expand('<sfile>:p:h:h')` in autoload/coqtail.vim so the plugin found
-      # its python/ directory through a symlink. It did nothing: the only such
-      # call lives in plugin/coqtail.vim, and nixpkgs said so on every build —
-      # "pattern ... doesn't match anything in file 'autoload/coqtail.vim'".
-      # The patched derivation was byte-identical to the unpatched one.
-      #
-      # If the symlink problem ever shows up for real, patch plugin/coqtail.vim
-      # and use --replace-fail, so the next upstream move breaks the build
-      # instead of quietly reverting the fix.
+      # No overrideAttrs: the old patch rewrote expand('<sfile>:p:h:h') in
+      # autoload/coqtail.vim, but that call only exists in plugin/coqtail.vim
+      # — it never matched and the derivation was unchanged. If the symlink
+      # issue is ever real, patch plugin/coqtail.vim with --replace-fail so
+      # an upstream move breaks the build instead of silently reverting.
       extraPlugins = [pkgs.vimPlugins.Coqtail];
     };
   };

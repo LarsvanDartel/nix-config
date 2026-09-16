@@ -62,15 +62,10 @@
                       "noatime"
                     ];
                   };
-                  # Swap has to be its own subvolume because / is wiped on
-                  # every boot by core/impermanence.nix — a swapfile under /
-                  # would be destroyed and recreated each time, which is both a
-                  # 32 GiB write per boot and useless, since it would not exist
-                  # during the early boot where it is most needed.
-                  #
-                  # No compress= here, deliberately: a btrfs swapfile must be
-                  # nodatacow and uncompressed. `btrfs filesystem mkswapfile`
-                  # sets that up, and disko does the same at install time.
+                  # Own subvolume: / is wiped each boot by core/impermanence.nix,
+                  # so a swapfile under / would be destroyed and recreated per boot.
+                  # No compress= here: btrfs swapfiles must be nodatacow and
+                  # uncompressed.
                   "/swap" = {
                     mountpoint = "/.swapvol";
                     swap.swapfile.size = "32G";
@@ -141,22 +136,12 @@
             };
           };
 
-          # The binary cache's chunk store, tuned for what it actually is.
-          #
-          # recordsize 1M matches the chunk sizes set in services/attic.nix; at
-          # the pool default of 128K every chunk was several records and so
-          # several IOs on a raidz1 stripe.
-          #
-          # sync=disabled is the significant one and is safe *here* specifically
-          # because every byte in this dataset is reproducible: it is a cache of
-          # build outputs that exist in the stores that pushed them. The pool
-          # has no SLOG, so honouring sync meant a ZIL round trip across
-          # spinning disks per chunk — measured at ~150 KB/s ingest against a
-          # 24 MB/s link. The exposure is that a power loss can lose the last
-          # few seconds of uploads, which costs a re-push and nothing else.
-          #
-          # Not snapshotted for the same reason: there is nothing here worth
-          # keeping a history of.
+          # Binary-cache chunk store. recordsize 1M matches attic's chunk size
+          # (services/attic.nix); at the 128K pool default each chunk spanned
+          # several raidz1 records. sync=disabled is safe because every byte is
+          # reproducible (re-push costs nothing) and the pool has no SLOG —
+          # honouring sync capped ingest at ~150 KB/s over the ZIL. No
+          # snapshots: nothing here worth a history.
           "atticd" = {
             type = "zfs_fs";
             options = {

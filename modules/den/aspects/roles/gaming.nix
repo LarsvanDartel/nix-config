@@ -1,5 +1,5 @@
-# roles.gaming — steam/gamemode/piper on top of the desktop (was the nixos
-# `gaming` aggregate). Gaming hosts include it.
+# roles.gaming — steam/gamemode/piper on top of the desktop. Gaming hosts
+# include it.
 {...}: {
   den.aspects.roles.gaming.nixos = {pkgs, ...}: {
     services.ratbagd.enable = true;

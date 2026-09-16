@@ -1,5 +1,4 @@
-# core.networking — base networking + the nameservers option (was
-# flake.modules.nixos.common in modules/nixos/networking/default.nix).
+# core.networking — base networking + the nameservers option.
 {...}: {
   den.aspects.core.networking.nixos = {
     config,

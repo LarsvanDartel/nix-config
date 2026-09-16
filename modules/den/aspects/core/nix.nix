@@ -1,24 +1,10 @@
-# core.nix aspect — nix daemon settings (was flake.modules.nixos.common in
-# modules/nixos/system/nix.nix). allowUnfree lives in core.nixpkgs.
+# core.nix — nix daemon settings. allowUnfree lives in core.nixpkgs.
 #
-# Nothing collected the store before this. Every host kept every system
-# generation it had ever built, forever, because `nix-collect-garbage` only
-# runs when someone types it and nobody was typing it:
-#
-#   endeavour  318 generations, 31k store paths, 86G of a 233G disk
-#   voyager    22 generations
-#   pioneer    11 generations, but 85% of a 15G SD card
-#
-# endeavour is the case this exists for. A generation is not just the closure
-# that changed — it is a GC root pinning every input of every rebuild since
-# June, which is why a host that deploys often accumulates faster than one that
-# does not.
-#
-# Both a timer and a pressure valve, because they answer different questions.
-# The timer bounds how far back the rollback list goes; min-free/max-free bounds
-# how close to full the disk gets, and fires during a build rather than after
-# it. A weekly timer alone still lets one large build fill the disk on a
-# Tuesday.
+# Nothing collected the store before this: generations are GC roots pinning
+# every input of every rebuild, and endeavour had 318 of them (86G of a 233G
+# disk). Both a timer and a pressure valve: the timer bounds the rollback
+# list, min-free/max-free fires mid-build — a weekly timer alone still lets
+# one large build fill the disk.
 {...}: {
   den.aspects.core.nix.nixos = {
     config,
@@ -95,28 +81,20 @@
         max-free = cfg.maxFree;
       };
 
-      # No `nix.optimise.automatic` here, deliberately. That timer exists for
-      # stores built without `auto-optimise-store`, which hard-links identical
-      # files as they are added — already on above. Running both means a weekly
-      # full-store scan that can only ever find what the write path already
-      # deduplicated, and on endeavour that is 31k paths of pointless IO.
+      # No `nix.optimise.automatic`, deliberately: auto-optimise-store already
+      # hard-links identical files on write; the timer would be a weekly
+      # full-store scan that can only re-find what the write path deduplicated.
       nix.gc = {
-        # Not on voyager. desktop/nh.nix sets `programs.nh.clean.enable` with
-        # `--keep-since 4d --keep 3`, and the nh module asserts
-        # `clean.enable -> !nix.gc.automatic` — two collectors on one store is
-        # a conflict it refuses to build rather than resolve. nh's cleaner is
-        # the better one on a laptop anyway: it understands home-manager
-        # profiles, which nix.gc does not. So this covers the three servers,
-        # which had nothing, and leaves the one host that was already handled
-        # alone.
+        # Not on voyager: desktop/nh.nix sets programs.nh.clean and the nh
+        # module asserts clean.enable -> !nix.gc.automatic — two collectors on
+        # one store is a build failure. nh's cleaner is also the better one
+        # there (it understands home-manager profiles); this covers the servers.
         automatic = !config.programs.nh.clean.enable;
         dates = cfg.gcDates;
         options = "--delete-older-than ${cfg.gcOlderThan}";
 
-        # Every host would otherwise collect at exactly midnight-plus-zero on
-        # the same weekday. voyager builds for pioneer under emulation and
-        # endeavour serves the cache, so overlapping collections are the one
-        # arrangement guaranteed to make a deploy slow.
+        # Spread collections: voyager cross-builds for pioneer and endeavour
+        # serves the cache; overlapping collections would slow every deploy.
         randomizedDelaySec = "45min";
       };
     };

@@ -1,8 +1,6 @@
-# home.firefox — kept, but included by no role: roles.desktop-home switched to
-# home.zen. Left in place so the browser is one line away rather than a revert,
-# and because it is still the reference for the policies and profile block that
-# zen.nix inherited. Defining an aspect costs nothing until something includes
-# it.
+# home.firefox — kept but included by no role: roles.desktop-home switched to
+# home.zen. Still the reference for the policies/profile block zen.nix
+# inherited; defining an aspect costs nothing until something includes it.
 {...}: {
   den.aspects.home.firefox.homeManager = {
     config,

@@ -1,5 +1,4 @@
-# core.sudo — sudo config + the lecture option (was flake.modules.nixos.common
-# in modules/nixos/security/sudo.nix).
+# core.sudo — sudo config + the lecture option.
 {...}: {
   den.aspects.core.sudo.nixos = {
     config,

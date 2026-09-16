@@ -1,5 +1,4 @@
-# core.ssh — openssh server + authorized keys for the primary user and root
-# (was flake.modules.nixos.common in modules/nixos/services/ssh/default.nix).
+# core.ssh — openssh server + authorized keys for the primary user and root.
 # Keys live in ./_ssh-keys (import-tree-ignored).
 {cosmosLib, ...}: let
   inherit (cosmosLib) get-files get-flake-path;
@@ -22,21 +21,12 @@ in {
     services.openssh = {
       enable = true;
 
-      # 2222 exists because NetBird's own SSH server takes 22 away on the mesh.
-      # Its agent redirects <netbird-ip>:22 to its embedded server on :22022
-      # (client/internal/engine_ssh.go), so once a peer has ssh_enabled every
-      # connection to <host>.nb.lvdar.nl:22 reaches that server instead of this
-      # one — a different host key, and no interest in the keys below, since it
-      # authenticates through NetBird. It presents as "Permission denied
-      # (password)" and, for anything that had connected before, a host key
-      # warning.
-      #
-      # That server is wanted (`netbird ssh <peer>` is the point of it), but it
-      # cannot be the only way in: deploy-rs reaches these hosts by their mesh
-      # name and authenticates as root with a key, and OpenSSH is what has to
-      # answer that. The redirect is specific to :22, so a second port is
-      # enough, and both servers coexist — netbird's on the mesh's :22, this
-      # one everywhere else and on :2222 throughout.
+      # 2222 exists because NetBird's SSH server claims the mesh's :22: the
+      # agent redirects <netbird-ip>:22 to its own embedded server (different
+      # host key, NetBird-only auth — presents as "Permission denied
+      # (password)"). deploy-rs connects as root by key via mesh names, so
+      # OpenSSH must answer elsewhere; the redirect is :22-specific, so both
+      # servers coexist.
       ports = [22 2222];
       hostKeys = [
         {

@@ -1,24 +1,17 @@
 # services.tile-traccar — feed Tile tracker locations into Traccar.
 #
-# Tile trackers have no GPS and no way to report anywhere but Tile's own
-# cloud: a tag is found by whichever phone running the Tile app walks past it,
-# and that phone uploads the fix. So this is a poller, not a receiver — it asks
-# Tile where each tag was last seen and forwards that to Traccar's OsmAnd
-# decoder, which is the one protocol that takes a plain HTTP request.
+# Tile trackers have no GPS: a tag is found by whichever phone running the
+# Tile app walks past it, so this is a poller, not a receiver — it asks Tile
+# where each tag was last seen and forwards that to Traccar's OsmAnd decoder,
+# the one protocol that takes a plain HTTP request.
 #
-# Grown from a throwaway script (~/dev/python/main.py) into something that
-# survives a reboot:
-#
-#   * one login for the life of the process rather than one per fetch. pytile
-#     re-inits the session itself when it expires, and the client UUID is kept
-#     on disk so Tile keeps seeing the same client instead of announcing a new
-#     device sign-in every restart.
-#   * a position is only forwarded when its timestamp moves. A tag reports
-#     when someone walks past it, which at a 20s poll means the same fix would
-#     otherwise be written to Traccar's history a few thousand times a day.
-#   * localhost, not the published edge. The script posted to a public name,
-#     which sent every fix out to gaia and back over WireGuard to reach a
-#     decoder listening on this very host.
+# Three decisions from the throwaway script this grew out of: one login for
+# the life of the process, with the client UUID kept on disk so Tile sees the
+# same client rather than a new device sign-in every restart; a position is
+# forwarded only when its timestamp moves, else the same fix lands in
+# Traccar's history a few thousand times a day; localhost, not the published
+# edge — the script used to post to the public name, sending every fix out
+# to gaia and back over WireGuard to a decoder on this very host.
 {den, ...}: {
   den.aspects.services.tile-traccar = {
     includes = [den.aspects.services.traccar];

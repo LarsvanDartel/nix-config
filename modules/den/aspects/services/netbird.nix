@@ -2,24 +2,21 @@
 #
 # Two aspects, mirroring the pangolin.nix layout they supersede:
 #
-#   services.netbird.client  the mesh client (every host). Also owns the
-#                            options shared with the server.
+#   services.netbird.client  mesh client (every host); owns the options
+#                            shared with the server.
 #   services.netbird         the control plane (gaia): management, signal,
 #                            dashboard and coturn from nixpkgs, plus the
-#                            reverse proxy and its service provisioning, which
-#                            nixpkgs has no module for. Includes the client, so
-#                            gaia is a peer like everything else.
+#                            reverse proxy and its service provisioning,
+#                            which nixpkgs has no module for. Includes the
+#                            client, so gaia is a peer like everything else.
 #
-# Why this replaced Pangolin: newt/pangolin only ever tunnelled *inbound*
-# traffic to gaia, so the hosts could not address each other and a roaming
-# voyager could reach nothing. A mesh solves that directly, and NetBird's
-# reverse proxy covers the ingress half Pangolin was also doing.
-#
-# Port 443 on gaia is shared by two things that both need to own a TLS
-# handshake: the control-plane vhost, and the reverse proxy (which runs its own
-# ACME). nginx `ssl_preread` splits them by SNI without decrypting either —
-# NetBird's docs mandate Traefik here, but this is precisely what ssl_preread
-# is for, and it keeps gaia on the nginx the dashboard already needs.
+# Why this replaced Pangolin: newt only ever tunnelled *inbound* traffic to
+# gaia, so hosts could not address each other and a roaming voyager reached
+# nothing. Port 443 on gaia is shared by the control-plane vhost and the
+# reverse proxy (which runs its own ACME); nginx `ssl_preread` splits them by
+# SNI without decrypting either — NetBird's docs mandate Traefik, but this is
+# what ssl_preread is for, and it keeps gaia on the nginx the dashboard
+# already needs.
 {den, ...}: {
   # Mesh client. Every host runs this; it is what makes them addressable by
   # name from anywhere, which is the whole point of the migration.
@@ -105,9 +102,8 @@
 
       publicPort = mkOption {
         type = port;
-        # Every host has to agree on this, and den gives an aspect no way to
-        # read another host's config, so it is a shared default rather than a
-        # per-host setting.
+        # Every host must agree on this, and den gives an aspect no way to
+        # read another host's config, so it is a shared default.
         default = 443;
         description = ''
           Public port the control plane answers on. Clients embed it in their
@@ -229,32 +225,21 @@
         allowedUDPPorts = cfg.client.exposedUdpPorts;
       };
 
-      # Which OAuth flow the daemon picks when it needs a user token — for
-      # `netbird ssh`, which asks the IdP who you are before it dials.
-      #
-      # NewOAuthFlow only tries PKCE when it believes a browser can be opened,
-      # and on Linux it decides that by reading DESKTOP_SESSION and
-      # XDG_CURRENT_DESKTOP out of *its own* environment (client/cmd/login.go,
-      # isUnixRunningDesktop). The daemon is a system service, so both are
-      # empty however graphical the machine is, and it goes straight to the
-      # device code flow instead — which management answers with NotFound,
-      # because DeviceAuthorizationFlow.Provider is "none" and kanidm does not
-      # advertise a device_authorization_endpoint to point it at anyway. The
-      # user sees "no SSO provider returned from management", naming the one
-      # flow that is configured and working.
-      #
-      # So tell it the truth about this host: on a machine with a display
-      # manager there is a browser to send the login to, and PKCE — which
-      # management fills from the discovery document at startup — is the flow
-      # that actually works.
-      # One block, because a dynamic attribute path cannot be split across
-      # several definitions the way a static one can.
+      # Which OAuth flow `netbird ssh` picks for its user token. NewOAuthFlow
+      # only tries PKCE when it believes a browser can be opened; on Linux it
+      # decides that from DESKTOP_SESSION/XDG_CURRENT_DESKTOP in *its own*
+      # environment (login.go, isUnixRunningDesktop), which are empty in a
+      # system daemon — so it falls to the device code flow, which management
+      # answers with NotFound (DeviceAuthorizationFlow.Provider is "none"),
+      # and the user sees "no SSO provider returned from management" while
+      # PKCE is the flow that actually works. One block: a dynamic attribute
+      # path cannot be split across several definitions.
       systemd.services.${config.services.netbird.clients.default.suffixedName} = {
-        # Move the agent when its resolver address changes. That address lives
-        # in config.json, written by a pre-start script, so the unit itself is
-        # identical either way and switch-to-configuration would leave the old
-        # process running — still holding :53, which is exactly the port
-        # unbound is about to want.
+        # Move the agent when its resolver address changes. That address
+        # lives in config.json, written by a pre-start script, so the unit is
+        # identical either way and switch-to-configuration would leave the
+        # old process running — still holding :53, the port unbound is about
+        # to want.
         restartTriggers = [cfg.client.dnsResolverAddress];
 
         environment =
@@ -262,33 +247,21 @@
           {XDG_CURRENT_DESKTOP = "netbird-has-a-browser";};
       };
 
-      # Watchdog for an agent bug that has now cost two outages, both on gaia,
-      # both at ~12 days of uptime.
-      #
-      # The agent programs its own nftables table (`ip netbird`), whose input
-      # path is a jump into netbird-acl-input-rules followed by a catch-all
-      # `iifname "wt0" drop`. A healthy ruleset starts with two entries that
-      # come from the management policy rather than from any published service:
-      #
+      # Watchdog for an agent bug that has cost two outages, both on gaia,
+      # both at ~12 days of uptime. The agent's nftables input chain
+      # (netbird-acl-input-rules) silently loses the two rules that come from
+      # the management policy rather than any published service —
       #   ct state established,related accept
-      #   ip saddr @nb0000001 accept          <- the "All -> All" Default policy
-      #
-      # Both silently disappear over time. What is left is only the per-service
-      # rules the reverse proxy generated, so the host keeps answering the two
-      # published ports and drops everything else — ICMP, SSH, Prometheus
-      # scrapes. It presents as "the host is up and serving the internet but is
-      # not on the mesh", and `netbird status` still cheerfully reports
-      # Connected/P2P because the WireGuard session really is fine.
-      #
-      # The management policy is not at fault: the API returns the Default
-      # policy enabled, bidirectional, all protocols, All -> All, throughout.
-      # Only the local translation of it rots, and restarting the agent
-      # reinstates it immediately. netbird 0.74.3, which is what nixpkgs has.
-      #
-      # So this restarts the agent when, and only when, the symptom is present.
-      # Deliberately not a periodic preemptive restart: that would hide how
-      # often this happens, and the journal line below is the only evidence
-      # anyone will ever have of the real frequency.
+      #   ip saddr @nb0000001 accept          <- the "All -> All" Default
+      # — leaving only the reverse proxy's per-service rules: the host keeps
+      # answering its two published ports and drops everything else (ICMP,
+      # SSH, scrapes), while `netbird status` still reports Connected/P2P
+      # because the WireGuard session is fine. The management policy is not
+      # at fault — the API returns it intact throughout; only the local
+      # translation rots, and restarting the agent reinstates it immediately.
+      # netbird 0.74.3. Deliberately not a periodic preemptive restart: the
+      # journal line below is the only evidence anyone will ever have of the
+      # real frequency.
       systemd.services.netbird-acl-watchdog = lib.mkIf cfg.client.aclWatchdog {
         description = "Restart the NetBird agent if its mesh ACLs have decayed";
         # No wantedBy: timer-driven only. A oneshot that fails during
@@ -304,15 +277,13 @@
         description = "Periodic NetBird mesh ACL check";
         wantedBy = ["timers.target"];
         timerConfig = {
-          # The interval is really a bound on how long the mesh stays down after
-          # a decay, so it is short — see aclWatchdogInterval for why 15m turned
-          # out to be far too generous. OnBootSec is smaller than it was for the
-          # same reason: a decay at boot is exactly the case nobody is watching.
+          # The interval is really a bound on how long the mesh stays down
+          # after a decay (see aclWatchdogInterval for why 15m was too
+          # generous); OnBootSec is small for the same reason. No
+          # RandomizedDelaySec: a single nft read on one host — jitter only
+          # widened the blackout it is supposed to bound.
           OnBootSec = "90s";
           OnUnitActiveSec = cfg.client.aclWatchdogInterval;
-          # No RandomizedDelaySec: there is nothing to spread here — a single
-          # nft read on one host — and the jitter only widened the blackout it
-          # is supposed to bound.
           Unit = "netbird-acl-watchdog.service";
         };
       };
@@ -335,37 +306,32 @@
         clients.default = {
           inherit (cfg.client) port;
 
-          # The peer's half of the SSH switch: it is willing to run NetBird's
-          # SSH server if management asks (cosmos.services.netbird.sshPeers on
-          # gaia). Current NetBird defaults this on, so this states what is
-          # already true rather than changing it — but the config file is
-          # rewritten by the agent, and nothing else here would keep it.
+          # The peer's half of the SSH switch: willing to run NetBird's SSH
+          # server if management asks (sshPeers on gaia). Current NetBird
+          # defaults this on; stated anyway because the agent rewrites
+          # config.json and nothing else here would keep it.
           config.ServerSSHAllowed = true;
 
-          # Enrolls unattended with a setup key. Deliberately not the
-          # interactive OIDC flow: that would need kanidm reachable *before*
-          # the host is on the mesh, and kanidm is published through it.
-          # No `systemdDependencies`, despite nixpkgs' own example proposing
-          # `sops-install-secrets.service`: that unit does not exist here.
-          # sops-nix installs the secrets from the activation script, which
-          # stage 2 runs before it execs systemd, so /run/secrets is already
-          # populated by the time any unit starts and there is nothing to wait
-          # for. Naming it anyway put a `Requires=` on a not-found unit, which
-          # made systemd refuse the start job at every boot — silently, since a
-          # unit that never starts logs nothing. That is why gaia sat at
-          # `NeedsLogin` with a healthy control plane in front of it.
+          # Unattended enrollment with a setup key: interactive OIDC would
+          # need kanidm reachable *before* the host is on the mesh, and
+          # kanidm is published through it. No `systemdDependencies`, despite
+          # nixpkgs' example proposing `sops-install-secrets.service`: that
+          # unit does not exist here — sops-nix installs from the activation
+          # script, which stage 2 runs before systemd, so /run/secrets is
+          # already populated. Naming it anyway put a `Requires=` on a
+          # not-found unit that silently never started, which is why gaia sat
+          # at NeedsLogin with a healthy control plane in front of it.
           login = {
             enable = true;
             setupKeyFile = config.sops.secrets."keys/netbird/setup-key".path;
           };
 
           # The login unit runs a bare `netbird up`, so the self-hosted
-          # management URL has to already be in config.json. That is what the
-          # module's `config` drop-in is for.
-          #
-          # Kept a literal attrset: nix merges `config.ServerSSHAllowed` above
-          # with this only while both are literals, and an `//` here turns it
-          # into an expression and collides.
+          # management URL must already be in config.json — that is what the
+          # module's `config` drop-in is for. Kept a literal attrset: nix
+          # merges ServerSSHAllowed above with this only while both are
+          # literals; an `//` here would turn it into an expression and
+          # collide.
           config = {
             ManagementURL = urlValue cfg.domain;
             AdminURL = urlValue cfg.domain;
@@ -1214,13 +1180,10 @@
         '';
       };
 
-      # Warn before the PAT lapses, rather than only once it has.
-      #
-      # The alerting fix in netbird-reconcile-services turns an expired token
-      # into a page within one tick, but by then publishing is already frozen.
-      # Management exposes everything needed to see it coming: /users marks the
-      # caller's own account with is_current, and /users/<id>/tokens carries
-      # expiration_date.
+      # Warn before the PAT lapses: the reconciler's alerting turns an
+      # expired token into a page within one tick, but by then publishing is
+      # already frozen. Management exposes /users (is_current) and
+      # /users/<id>/tokens (expiration_date).
       tokenExpiry = pkgs.writeShellApplication {
         name = "netbird-token-expiry";
         runtimeInputs = with pkgs; [curl jq coreutils];
@@ -1381,18 +1344,14 @@
             default = "netbird";
           };
 
-          # The IdP is the one thing that cannot be published through
-          # netbird-proxy. Management fetches the discovery document at startup
-          # and exits if it fails; the proxy cannot route anywhere until
-          # management is up. Serving the IdP from the proxy therefore closes a
-          # loop with no way in — which is exactly what retiring Pangolin did,
-          # since Pangolin's traefik had been the independent path all along:
-          # management crash-looped, the proxy answered 502 for every domain,
-          # and no amount of retrying could break the tie.
-          #
-          # So gaia's own nginx publishes it instead, terminating with the same
-          # wildcard certificate and forwarding straight over the mesh. Only the
-          # SNI split and the mesh have to work, and neither needs management.
+          # The IdP cannot be published through netbird-proxy: management
+          # fetches the discovery document at startup and exits if it fails,
+          # while the proxy cannot route anything until management is up — a
+          # loop with no way in, which is exactly what retiring Pangolin
+          # produced (management crash-looped, every domain answered 502). So
+          # gaia's own nginx publishes it instead, with the same wildcard
+          # certificate, forwarding straight over the mesh: only the SNI split
+          # and the mesh have to work, and neither needs management.
           idp = {
             domain = mkOption {
               type = nullOr str;
@@ -1588,14 +1547,12 @@
             mode = "0700";
           };
 
-        # netbird-mgmt fetches the OIDC discovery document at startup and exits
-        # if it cannot. kanidm is published through the very reverse proxy this
-        # host runs, so any blip there crash-loops management, systemd's default
-        # rate limiter parks it in `failed`, switch-to-configuration exits
-        # non-zero and deploy-rs rolls the whole deploy back — leaving the proxy
-        # still broken. Disabling the limiter keeps `Restart=always` retrying
-        # forever instead, so the host stays deployable and management recovers
-        # on its own once the IdP answers.
+        # netbird-mgmt fetches the OIDC discovery document at startup and
+        # exits if it cannot; kanidm is published through this host's own
+        # proxy, so a blip crash-loops management into systemd's rate limiter,
+        # and the activation failure makes deploy-rs roll back with the proxy
+        # still broken. No rate limit: Restart=always retries until the IdP
+        # answers again and the host stays deployable.
         systemd.services.netbird-management.unitConfig.StartLimitIntervalSec = 0;
         systemd.services.netbird-proxy.unitConfig.StartLimitIntervalSec = 0;
 
@@ -1639,18 +1596,15 @@
                 Audience = cfg.oidc.clientId;
                 ClientID = cfg.oidc.clientId;
 
-                # Loopback only. This flow belongs to the CLI, which completes
+                # Loopback only: this flow belongs to the CLI, which completes
                 # it on a listener it opens itself — the dashboard has its own
                 # OIDC config and never reads this. The dashboard's callback
-                # was listed here first, and NewPKCEAuthorizationFlow takes the
-                # first URL whose port it cannot already connect to: with no
-                # port to parse it dialled "netbird.lvdar.nl:", failed, called
-                # that free, and sent the browser to the dashboard carrying a
-                # code meant for the CLI. kanidm allowed the redirect and the
-                # dashboard then answered "there was an error logging you in".
-                #
-                # Two ports so a busy 53000 is not the end of it; both are in
-                # the client's originUrl in services/kanidm.nix.
+                # was listed here first; NewPKCEAuthorizationFlow takes the
+                # first URL whose port it cannot already connect to, and with
+                # no port to parse it dialled "netbird.lvdar.nl:", called that
+                # free, and sent the browser to the dashboard with a code
+                # meant for the CLI. Two ports so a busy 53000 is not the end
+                # of it; both are in the originUrl list in services/kanidm.nix.
                 RedirectURLs = [
                   "http://localhost:53000"
                   "http://localhost:54000"
@@ -1661,15 +1615,11 @@
               # actually listens on.
               Signal.URI = "${cfg.domain}:${toString cfg.publicPort}";
 
-              # Without these the dashboard authenticates but every API call is
-              # rejected, so it sits on a loading spinner forever.
-              #
-              # ApplyOIDCConfig fills AuthIssuer and AuthKeysLocation from the
-              # discovery document, but the audience cannot be derived and
-              # netbird only sets it on the EmbeddedIdP path, which is not in
-              # use here. Left empty, GetAuthAudiences returns [""], and
-              # jwt.WithAudience("") demands an `aud` containing the empty
-              # string — so validation can never succeed.
+              # Without these the dashboard authenticates but every API call
+              # is rejected — an eternal spinner. ApplyOIDCConfig fills issuer
+              # and keys from the discovery document, but the audience cannot
+              # be derived and netbird sets it only on the EmbeddedIdP path;
+              # left empty, jwt.WithAudience("") can never validate.
               HttpConfig = {
                 AuthAudience = cfg.oidc.clientId;
                 # Used for the reverse proxy's browser-auth flow.
@@ -1678,17 +1628,13 @@
                 # alongside its embedded IdP, so it too has to be explicit.
                 AuthUserIDClaim = "sub";
 
-                # Where the IdP sends the browser back after a bearer-auth
-                # login. Management serves this itself, on its own API and
-                # exempt from its own auth middleware, and the service the user
-                # was heading for rides along in the signed `state` — so it is
-                # one URL for every published domain, not one per domain.
-                #
-                # Left unset, the authorization request goes out with no
-                # `redirect_uri` at all and the IdP rejects it before the login
-                # form. netbird only fills this in alongside its embedded IdP,
-                # which is not in use here — the same gap as the two settings
-                # above. types.ProxyCallbackEndpointFull fixes the path.
+                # Where the IdP sends the browser after a bearer-auth login;
+                # management serves this itself, exempt from its own auth
+                # middleware, with the target service riding in the signed
+                # `state` — one URL for every published domain. Left unset the
+                # authorization request carries no redirect_uri and the IdP
+                # rejects it before the login form. Only filled alongside the
+                # embedded IdP — the same gap as the settings above.
                 AuthCallbackURL = "${authority}/api/reverse-proxy/callback";
               };
             };
@@ -1703,29 +1649,20 @@
               AUTH_CLIENT_ID = cfg.oidc.clientId;
               AUTH_AUDIENCE = cfg.oidc.clientId;
 
-              # Move the OIDC callbacks off hash routes. Left unset, the
-              # dashboard redirects to `/#callback` and `/#silent-callback`,
-              # which kanidm can never match: it strips the fragment from
-              # configured origins (RFC 6749 §3.1.2) while the incoming
-              # redirect_uri keeps it, so strict matching always fails — see
-              # kanidm#3217. NetBird's own setup.env.example exposes these two
-              # overrides for exactly this, and fixing it here rather than
-              # disabling kanidm's strict validation keeps the check on.
+              # Move the OIDC callbacks off hash routes: unset, the dashboard
+              # redirects to `/#callback`, which kanidm can never match — it
+              # strips fragments from configured origins (RFC 6749 §3.1.2,
+              # kanidm#3217) while the redirect_uri keeps one. NetBird exposes
+              # these two overrides for exactly this; fixing it here keeps
+              # kanidm's strict validation on.
               #
-              # These must be paths the dashboard has no page at. Its OIDC
-              # router matches on path alone — `eo(location.href) === eo(
-              # redirect_uri)` — with no test for a `code` parameter, so
-              # whatever path is named here stops being a page and becomes the
-              # callback handler forever. Pointing it at `/peers` (NetBird's
-              # own docs suggest that pair) therefore replaced the dashboard's
-              # landing page with a callback that had no code to redeem: login
-              # at kanidm succeeded, the real callback was consumed, and the
-              # app then navigated to a `/peers` that could only ever render
-              # the "authenticating" spinner.
-              #
-              # Nothing is exported at these two paths, so nginx serves the
-              # SPA shell for them below; the client-side router takes it from
-              # there.
+              # The paths must have no dashboard page: its OIDC router matches
+              # on path alone, with no test for a `code` parameter, so the
+              # named path becomes the callback handler forever. `/peers`
+              # (NetBird's own docs) replaced the landing page with a code-less
+              # callback — login succeeded, the app spun "authenticating"
+              # forever. Nothing is exported at these paths; nginx serves the
+              # SPA shell below.
               #
               # Must stay in step with the netbird originUrl list in
               # services/kanidm.nix.
@@ -1741,20 +1678,14 @@
         services.nginx.virtualHosts =
           {
             # Everything the splitter sends here shares one wildcard
-            # certificate, and that is all HTTP/2 connection coalescing needs: a
-            # browser holding a connection to netbird.lvdar.nl or auth.lvdar.nl
-            # will reuse it for *any* other *.lvdar.nl name rather than open a
-            # second one — same address, and the certificate already covers the
-            # name. Those requests arrive with a Host no server here matches,
-            # fall through to the default server, and every published domain
-            # quietly becomes whichever vhost sorted first. Which is how
-            # jellyfin.lvdar.nl and friends started answering with kanidm's
-            # login page, while curl — one connection per host, correct SNI
-            # every time — saw nothing wrong.
-            #
-            # 421 is the defined answer: the client drops the coalesced
-            # connection and retries on a new one, whose SNI routes it to
-            # netbird-proxy as intended. Saying it still requires a certificate.
+            # certificate, and that is all HTTP/2 connection coalescing needs:
+            # a browser holding a connection to one *.lvdar.nl name reuses it
+            # for any other, and those requests fall through to the default
+            # server — every published domain quietly became whichever vhost
+            # sorted first (jellyfin answering with kanidm's login page), while
+            # curl, one connection per host, saw nothing wrong. 421 is the
+            # defined answer: the client drops the coalesced connection and
+            # retries, and the new SNI routes to netbird-proxy. Needs a cert.
             "_" = {
               default = true;
               onlySSL = true;
@@ -1815,27 +1746,17 @@
               locations =
                 {"/".proxyPass = cfg.oidc.idp.upstream;}
                 // lib.optionalAttrs (oidcPath != null) {
-                  # Breaks a hard bootstrap deadlock that takes the whole ingress
-                  # down on every cold boot:
-                  #
-                  #   netbird-management exits unless it can fetch this document
-                  #     -> the document is served here, proxied to the IdP peer
-                  #       -> that peer is only reachable over the mesh
-                  #         -> the mesh is brought up by netbird-management
-                  #
-                  # Nothing in that loop retries its way out — management hard-
-                  # exits, and `StartLimitIntervalSec = 0` only means it retries
-                  # forever against a dependency that can never appear. On
-                  # 2026-08-12 recovering from it needed a reverse SSH tunnel and
-                  # a hand-written DNAT rule.
-                  #
-                  # `proxy_cache_use_stale` answers from the last successful
-                  # fetch while the peer is unreachable, which is exactly long
-                  # enough for management to start and bring the mesh up; the
-                  # entry then refreshes from the live document. A cached copy
-                  # rather than a checked-in one on purpose — a static file would
-                  # silently drift from whatever kanidm actually serves, and this
-                  # cannot, because it *is* what kanidm last served.
+                  # Breaks a bootstrap deadlock that takes the whole ingress
+                  # down on every cold boot: management exits unless it can
+                  # fetch this document -> the document is served here,
+                  # proxied to the IdP peer -> that peer is only reachable over
+                  # the mesh -> the mesh is brought up by management. Nothing
+                  # retries out of that loop (2026-08-12 needed a reverse SSH
+                  # tunnel and a hand-written DNAT rule). proxy_cache_use_stale
+                  # answers from the last successful fetch long enough for
+                  # management to start and raise the mesh. Cached, not
+                  # checked in: a static file would drift from what kanidm
+                  # serves; this *is* what kanidm last served.
                   "= ${oidcPath}" = {
                     proxyPass = "${cfg.oidc.idp.upstream}${oidcPath}";
                     extraConfig = ''
@@ -1900,11 +1821,10 @@
           })
           cfg.localVhosts;
 
-        # Backing store for the bootstrap cache above. inactive is a year
-        # because the entry has to still be there after an outage of arbitrary
-        # length — the one moment it is needed is a cold boot with the IdP
-        # unreachable, and an entry expired for inactivity would put the deadlock
-        # right back. It holds a single small JSON document.
+        # Backing store for the bootstrap cache above. inactive is a year so
+        # the entry survives an outage of arbitrary length — it is needed
+        # exactly at a cold boot with the IdP unreachable. One small JSON
+        # document.
         services.nginx.appendHttpConfig = lib.mkIf (cfg.oidc.idp.domain != null && oidcPath != null) ''
           proxy_cache_path /var/cache/nginx/oidc-bootstrap
             levels=1:2 keys_zone=oidc_bootstrap:1m max_size=1m
@@ -1946,11 +1866,10 @@
             (lib.filterAttrs (_: s: s.mode == "udp" && s.listenPort != null) cfg.services);
         };
 
-        # Mints the proxy's bouncer key on first start and registers it. Both
-        # halves are idempotent: the key is generated only when the file is
-        # missing, and a re-register of the same name is tolerated so a
-        # crowdsec database that has been wiped can be re-populated without
-        # invalidating the key the proxy already holds.
+        # Mints the proxy's bouncer key on first start and registers it, both
+        # halves idempotent: the key is generated only when missing, and a
+        # re-register of the same name is tolerated, so a wiped crowdsec
+        # database can be re-populated without invalidating the key.
         systemd.services.netbird-proxy-crowdsec = lib.mkIf config.services.crowdsec.enable {
           description = "Register netbird-proxy as a CrowdSec bouncer";
           after = ["crowdsec.service"];
@@ -2003,16 +1922,13 @@
               NB_PROXY_CERTIFICATE_DIRECTORY = "/var/lib/netbird-proxy/certs";
               NB_PROXY_GEO_DATA_DIR = "/var/lib/netbird-proxy/geolocation";
               # The embedded NetBird client writes its firewall and DNS state
-              # here. It defaults to /var/lib/netbird, which this service cannot
-              # write to — ProtectSystem=strict makes everything outside its own
-              # StateDirectory read-only — so it logged a failure every ten
-              # seconds (109k of them since 30 July) and re-derived that state on
-              # every restart instead of resuming it.
-              #
-              # Its own StateDirectory rather than granting write access to
-              # /var/lib/netbird: that one belongs to the netbird agent running
-              # alongside this, and pointing two daemons at one state.json would
-              # trade a loud failure for a quiet one.
+              # here. The default /var/lib/netbird is unwritable under
+              # ProtectSystem=strict (it logged a failure every ten seconds —
+              # 109k since 30 July — and re-derived its state on every
+              # restart). Its own StateDirectory rather than granting
+              # /var/lib/netbird: that belongs to the agent running alongside,
+              # and two daemons on one state.json would trade a loud failure
+              # for a quiet one.
               NB_STATE_DIR = "/var/lib/netbird-proxy";
               # Client IPs would otherwise all read as 127.0.0.1, which would make
               # any CIDR or country restriction meaningless.
@@ -2037,18 +1953,13 @@
             StateDirectory = "netbird-proxy";
             StateDirectoryMode = "0750";
             WorkingDirectory = "/var/lib/netbird-proxy";
-            # NET_ADMIN for the WireGuard tunnel it brings up; NET_BIND_SERVICE
-            # so an L4 service can publish a port below 1024.
-            #
-            # The second one is not hypothetical tidiness. Publishing the
-            # tangled knot's git-over-SSH on :22 failed with
-            #
-            #   router for TCP port 22: listen tcp :22: bind: permission denied
-            #
-            # and the proxy logs it, ignores that one mapping and carries on —
-            # so the service looks created, every other mapping keeps working,
-            # and the port is simply never bound. Nothing needed this before
-            # because the only other L4 publish is traccar-osmand on 5055.
+            # NET_ADMIN for the WireGuard tunnel; NET_BIND_SERVICE so an L4
+            # service can publish below 1024. The second is not hypothetical:
+            # the knot's git-over-SSH on :22 failed with "listen tcp :22:
+            # bind: permission denied", which the proxy logs, ignores and
+            # carries on — the service looks created, everything else works,
+            # and the port is never bound. Only other L4 publish so far:
+            # traccar-osmand on 5055.
             AmbientCapabilities = ["CAP_NET_ADMIN" "CAP_NET_BIND_SERVICE"];
             CapabilityBoundingSet = ["CAP_NET_ADMIN" "CAP_NET_BIND_SERVICE"];
 
@@ -2070,17 +1981,12 @@
           '';
         };
 
-        # Driven by the timer below, deliberately NOT by multi-user.target.
-        #
-        # This cannot succeed until peers have enrolled and a real API token
-        # exists, and both of those come *after* the control plane is first
-        # deployed. A unit that fails during activation makes
-        # switch-to-configuration exit non-zero, which deploy-rs reads as a
-        # failed deploy and auto-rolls-back — so wiring it into the boot
-        # target would make the control plane impossible to deploy at all.
-        #
-        # The timer retries until the world is ready; `systemctl start
-        # netbird-services` forces it once the credentials are in place.
+        # Driven by the timer below, NOT multi-user.target: this cannot
+        # succeed until peers have enrolled and a real API token exists, both
+        # of which come after the control plane is first deployed — and a unit
+        # failing during activation makes deploy-rs roll back, which would make
+        # the control plane impossible to deploy. The timer retries until the
+        # world is ready; `systemctl start netbird-services` forces it.
         systemd.services.netbird-services = {
           description = "Reconcile declared NetBird reverse-proxy services";
           after = ["netbird-management.service"];

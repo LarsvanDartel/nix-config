@@ -1,29 +1,20 @@
 # services.idrac — the BMC, reachable over the mesh.
 #
-# This exists because of a circular dependency that turned a 56-second watchdog
-# reset into a seven-hour outage on 2026-08-28. iDRAC is on the home LAN and
-# cannot join the mesh itself, so the only way to it was through a machine on
-# that LAN — and the only always-on machine there is endeavour, the host the
-# BMC exists to recover. Out-of-band management that runs through the in-band
-# host is not out-of-band.
+# Published from pioneer, on the same LAN as the BMC and sharing nothing else
+# with endeavour: iDRAC cannot join the mesh itself, and the only other
+# always-on machine on that LAN is endeavour — the host the BMC exists to
+# recover. That circular dependency turned a 56-second watchdog reset into a
+# seven-hour outage on 2026-08-28.
 #
-# So it is published from pioneer, which is on the same LAN and shares nothing
-# else with endeavour. Two deliberate choices:
-#
-#   * Mesh only. Nothing is added to netbird.services on gaia and nothing is
-#     reachable from the internet. A BMC grants power control, a console and a
-#     foothold inside the LAN; Dell's firmware is not something to leave facing
-#     the public, and it would have to be, because the usual NetBird identity
-#     gate authenticates against kanidm — which runs on endeavour and is down
-#     in the one scenario this is for. gaia.nix documents the same trap for
-#     gatus.
-#
-#   * TLS terminates here. The BMC's own certificate is self-signed with
-#     CN=idrac-<service-tag> and no subjectAltName at all, so it can never match
-#     the name it is reached by; a browser warning on every visit trains exactly
-#     the wrong reflex on the most sensitive endpoint in the house. nginx serves
-#     the real wildcard instead and talks to the BMC over its own TLS with
-#     verification off — that hop is a switch away on the LAN.
+#   * Mesh only; nothing on gaia's netbird.services. A BMC grants power
+#     control, a console and a foothold inside the LAN, and the usual
+#     NetBird identity gate authenticates against kanidm — on endeavour, down
+#     in exactly the scenario this is for (gaia.nix documents the same trap
+#     for gatus).
+#   * TLS terminates here. The BMC's self-signed cert has no subjectAltName
+#     and can never match the name it is reached by; nginx serves the real
+#     wildcard and talks to the BMC with verification off — one switch away
+#     on the LAN.
 {den, ...}: {
   den.aspects.services.idrac = {
     includes = with den.aspects.services; [nginx netbird.client];
@@ -92,11 +83,9 @@
         # this — a machine on the LAN can reach the BMC directly.
         cosmos.services.netbird.client.exposedPorts = [cfg.port];
 
-        # Every request was paying a fresh TLS handshake to the BMC —
-        # measured at 0.53-0.70s time-to-first-byte against 0.03s for the
-        # client's own TLS to this host. The UI pulls about eighty files, so
-        # that is most of a minute of pure handshaking. A keepalive pool makes
-        # it once.
+        # Every request paid a fresh TLS handshake to the BMC — 0.53-0.70s
+        # TTFB against 0.03s for the client's own TLS to this host, and the
+        # UI pulls about eighty files. A keepalive pool makes it once.
         services.nginx.upstreams.idrac = {
           servers."${cfg.address}:443" = {};
           extraConfig = ''
@@ -106,9 +95,9 @@
           '';
         };
 
-        # Keepalive needs `Connection:` empty, while a websocket needs it set to
-        # `upgrade`; nginx's stock $connection_upgrade map sends `close` for
-        # ordinary requests, which defeats the pool. This keeps both working.
+        # Keepalive needs `Connection:` empty, a websocket needs `upgrade`;
+        # the stock $connection_upgrade map sends `close` for ordinary
+        # requests and defeats the pool. This keeps both working.
         services.nginx.appendHttpConfig = ''
           map $http_upgrade $idrac_connection {
             default upgrade;
@@ -129,9 +118,9 @@
 
           locations."/" = {
             proxyPass = "https://idrac";
-            # Not proxyWebsockets: it pins Connection to a map that closes the
-            # upstream connection on every ordinary request. The equivalent
-            # headers are set below, against a map that does not.
+            # Not proxyWebsockets: it pins Connection to a map that closes
+            # the upstream connection on every ordinary request. The
+            # equivalent headers below use a map that does not.
             proxyWebsockets = false;
             extraConfig = ''
               # The BMC's certificate is self-signed and names a service tag,

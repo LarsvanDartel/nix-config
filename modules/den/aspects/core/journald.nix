@@ -1,21 +1,8 @@
-# core.journald — bound the journal.
-#
-# Nothing set `services.journald.*` before this, so every host ran on the
-# nixpkgs default of "10% of the filesystem, capped at 4G" and nothing else.
-# That is a sizing rule for a machine whose disk exists to hold logs, and it
-# went unnoticed because journald evicts silently rather than filling the disk:
-#
-#   gaia      3.7G of journal on a 38G disk
-#   pioneer   575M with 1.7G free on an 89%-full SD card
-#   endeavour 767M
-#
-# So the defaults were not merely generous, they were actively costing gaia a
-# tenth of its disk and pioneer a third of its remaining space.
-#
-# Bounded by *time* as well as size. Size alone answers "how much disk will
-# this cost" but not "how far back can I look", and the second question is the
-# one being asked when something broke last Tuesday. Whichever limit is hit
-# first wins.
+# core.journald — bound the journal. The nixpkgs default (10% of the
+# filesystem, capped 4G) evicts silently and was costing gaia a tenth of its
+# disk and pioneer a third of its remaining SD-card space. Bounded by *time*
+# as well as size: size answers "how much disk", time answers "how far back
+# can I look"; whichever limit is hit first wins.
 {...}: {
   den.aspects.core.journald.nixos = {
     config,
@@ -70,11 +57,8 @@
       MaxFileSec = cfg.maxFileSec;
     };
 
-    # Rate limiting is deliberately left at the default (10000 entries per 30s
-    # per service). The loudest thing in the fleet is ipmi-fancontrol, which
-    # logs a sensor line every 10s on endeavour — six a minute, four orders of
-    # magnitude under the limit. Nothing here is chatty enough to warrant it,
-    # and a rate limit that ever engages drops exactly the burst of lines a
-    # crash produces, which is the moment the log matters most.
+    # Rate limiting deliberately left at the default: nothing here is chatty
+    # enough (loudest is ipmi-fancontrol at 6 lines/min), and a limit that
+    # ever engages drops exactly the burst a crash produces.
   };
 }

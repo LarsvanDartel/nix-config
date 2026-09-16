@@ -1,20 +1,16 @@
 # services.paperless — document archive with OCR, behind kanidm.
 #
-# Chosen over Papra, which is packaged here too and is the nicer app to look
-# at, because OCR and the auto-tagging classifier are the reason to keep a
-# document archive at all. Without them everything is filed by hand forever,
-# which is the failure mode that gets these abandoned. Papra also has one
-# maintainer; paperless-ngx is the community fork that exists because the
-# original went unmaintained — the same story as Readarr, with the good ending.
+# Chosen over Papra (also packaged here) because OCR and the auto-tagging
+# classifier are the reason to keep a document archive at all — without them
+# everything is filed by hand forever, the failure mode that gets these
+# abandoned. Papra also has one maintainer; paperless-ngx is the community
+# continuation.
 #
-# Unlike microbin this needs no forward-auth: paperless speaks OIDC natively
-# through django-allauth, so it follows the pattern every other service here
-# uses and gaia publishes it directly.
-#
-# The upstream module brings its own postgres user and redis instance, so
-# nothing here touches immich's database beyond sharing the same postgresql
-# server — which is what `database.createLocally` does, via a socket and
-# ensureDBOwnership.
+# No forward-auth, unlike microbin: paperless speaks OIDC natively via
+# django-allauth, so gaia publishes it directly. The upstream module brings
+# its own postgres user and redis instance, so nothing here touches immich's
+# database beyond the shared postgresql server (what `database.createLocally`
+# does, via a socket).
 {den, ...}: {
   den.aspects.services.paperless = {
     # For the `media` group and mediaDir. The base arr aspect is only those two
@@ -32,12 +28,11 @@
       cfg = config.cosmos.services.paperless;
       arr = config.cosmos.services.arr;
 
-      # /accounts/ is where paperless mounts allauth (paperless/urls.py), oidc
-      # is allauth's OPENID_CONNECT_URL_PREFIX default, and the trailing
-      # segments come from the provider's own urlpatterns. Checked against the
-      # vendored allauth rather than assumed: a wrong redirect URI is rejected
-      # *after* a successful login, so it reads as a broken IdP rather than a
-      # wrong string.
+      # /accounts/ is where paperless mounts allauth (paperless/urls.py),
+      # `oidc` is allauth's OPENID_CONNECT_URL_PREFIX default, and the
+      # trailing segments come from the provider's urlpatterns. Checked
+      # against the vendored allauth: a wrong redirect URI is rejected *after*
+      # a successful login, so it reads as a broken IdP.
       providerId = "kanidm";
       callback = "https://${cfg.domain}/accounts/oidc/${providerId}/login/callback/";
     in {
@@ -113,22 +108,18 @@
       };
 
       config = {
-        # Note, if you reach for it: `paperless-manage` is broken as nixpkgs
-        # ships it here. The wrapper composes
-        #
-        #   sudo -u paperless -g paperless  -g redis-paperless -E
-        #
-        # and sudo accepts only one -g, so it exits with its own usage message
-        # before running anything. Working around it means invoking the command
-        # as the paperless user so the wrapper takes its `sudo=exec` branch.
+        # `paperless-manage` is broken as nixpkgs ships it here: the wrapper
+        # composes `sudo -u paperless -g paperless -g redis-paperless -E`, and
+        # sudo accepts only one -g, so it exits with a usage message before
+        # running anything. Work around it by invoking the command as the
+        # paperless user so the wrapper takes its `sudo=exec` branch.
         services.paperless = {
           enable = true;
           inherit (cfg) port domain;
 
           # Bound to the mesh, not loopback: endeavour is edge-terminated, so
-          # netbird-proxy dials this port over wt0 and a loopback socket would
-          # refuse it. Reach is governed by the firewall, which opens this on
-          # wt0 only.
+          # netbird-proxy dials this port over wt0 and a loopback socket
+          # would refuse it. Reach is firewall-governed (wt0 only).
           address = "0.0.0.0";
 
           database.createLocally = true;
@@ -154,53 +145,42 @@
               # every user exist twice.
               PAPERLESS_SOCIAL_AUTO_SIGNUP = true;
 
-              # ...and give it permissions, which auto-signup does not. Without
-              # this a new account is created with none at all and every request
-              # it makes is refused — including /api/ui_settings/, so the SPA
-              # fails to load and shows a bare 403 rather than anything about
-              # permissions. That is what the first OIDC login did on
-              # 2026-08-30.
-              #
-              # The SOCIAL_ one, not PAPERLESS_ACCOUNT_DEFAULT_GROUPS: that is
-              # the local-signup path, which is unused here. Comma-separated if
-              # more are ever wanted.
-              #
-              # "Users" is a Django group, so it lives in paperless's database
-              # rather than here — like the libraries in kavita and the
-              # superuser flag. It carries full rights over documents, notes,
-              # tags, correspondents, document types, storage paths, saved
-              # views, custom fields, share links, UI settings and one's own
-              # MFA, plus read-only visibility of the task queue. It withholds
-              # what administers the server rather than uses it: workflows,
-              # application configuration, the mail accounts (which hold
-              # credentials), and the guardian/session/socialaccount internals.
+              # ...and give it permissions, which auto-signup does not: a new
+              # account is created with none at all, every request it makes is
+              # refused — including /api/ui_settings/, so the SPA shows a bare
+              # 403 — which is what the first OIDC login did on 2026-08-30.
+              # The SOCIAL_ one, not PAPERLESS_ACCOUNT_DEFAULT_GROUPS (the
+              # local-signup path, unused here); comma-separated for more.
+              # "Users" is a Django group living in paperless's database, like
+              # kavita's libraries and the superuser flag: full rights over
+              # documents, notes, tags, correspondents, document types,
+              # storage paths, saved views, custom fields, share links, UI
+              # settings and one's own MFA, plus read-only task queue —
+              # withholds what administers rather than uses: workflows, app
+              # configuration, mail accounts (which hold credentials), and
+              # the guardian/session/socialaccount internals.
               PAPERLESS_SOCIAL_ACCOUNT_DEFAULT_GROUPS = "Users";
             }
             // lib.optionalAttrs cfg.ai.enable {
               # Suggestions only — a title, tags, correspondents, a document
-              # type, storage paths and up to three dates, which paperless then
-              # matches by name against objects that already exist. They are
-              # offered on the document view and cached, NOT applied during
-              # consumption, so a slow model costs a wait when opening a
-              # document rather than a stalled ingest queue.
-              #
-              # Distinct from the scikit-learn classifier, which is already on
-              # and needs nothing: that one learns from corrections and can only
-              # propose tags you already have. This one reads the document and
-              # can propose a title and a date, which the classifier cannot.
+              # type, storage paths and dates, matched by name against
+              # objects that already exist. Offered on the document view and
+              # cached, NOT applied during consumption, so a slow model costs
+              # a wait at open rather than a stalled ingest queue. Distinct
+              # from the scikit-learn classifier (already on; learns from
+              # corrections; proposes only existing tags): this reads the
+              # document and can propose a title and a date.
               PAPERLESS_AI_ENABLED = true;
               PAPERLESS_AI_LLM_BACKEND = "ollama";
               PAPERLESS_AI_LLM_ENDPOINT = cfg.ai.endpoint;
               PAPERLESS_AI_LLM_MODEL = cfg.ai.model;
 
-              # PAPERLESS_AI_LLM_OUTPUT_LANGUAGE is deliberately unset. It adds
-              # a second pass that translates the suggestions, and matching is
-              # by name — so forcing a language is a way to stop suggested tags
-              # from matching the tags that exist.
-              #
-              # Embeddings are likewise unset: they power the chat-over-
-              # documents feature, not these suggestions, and would mean pulling
-              # another model for something nobody has asked for yet.
+              # PAPERLESS_AI_LLM_OUTPUT_LANGUAGE deliberately unset: it adds a
+              # translating second pass, and matching is by name — forcing a
+              # language is a way to stop suggested tags from matching the
+              # tags that exist. Embeddings likewise unset: they power
+              # chat-over-documents, not these suggestions, and would mean
+              # pulling another model for nothing asked for.
 
               # PAPERLESS_SOCIALACCOUNT_PROVIDERS is deliberately NOT here: it
               # carries the client secret and settings goes to the store. It
@@ -210,32 +190,23 @@
           environmentFile = config.sops.templates."paperless.env".path;
         };
 
-        # Regular login stays enabled, unlike immich's passwordLogin.
-        #
-        # kanidm runs on this host. If it is down or misprovisioned, an
-        # OIDC-only paperless is unreachable at exactly the moment someone
-        # needs to look something up — and unlike jellyfin there is no second
-        # way in. The superuser above is the break-glass account.
+        # Regular login stays enabled, unlike immich's passwordLogin: kanidm
+        # runs on this host, and an OIDC-only paperless is unreachable at
+        # exactly the moment someone needs to look something up if kanidm is
+        # down. The superuser above is the break-glass account.
 
         sops.secrets = {
           "keys/paperless/admin-password".owner = "paperless";
           "keys/paperless/oauth-client-secret".owner = "kanidm";
         };
 
-        # json.loads'd straight out of the environment by paperless
+        # json.loads'd straight from the environment by paperless
         # (settings/__init__.py), so this is allauth's provider dict as-is.
-        #
-        # Single-quoted, which systemd strips when it reads an EnvironmentFile
-        # and which the shell needs. The service works either way — systemd
-        # takes the value literally — but `paperless-manage` *sources* this
-        # same file, and an unquoted JSON object comes apart in the shell:
-        #
-        #   json.decoder.JSONDecodeError: Expecting property name enclosed in
-        #   double quotes: line 1 column 2 (char 1)
-        #
-        # which makes every management command unusable while OIDC is
-        # configured. The JSON contains double quotes and no single ones, so
-        # wrapping it this way is safe.
+        # Single-quoted because `paperless-manage` *sources* this same file
+        # and an unquoted JSON object comes apart in the shell
+        # (JSONDecodeError), making every management command unusable while
+        # OIDC is configured; systemd reads the value either way. The JSON
+        # contains double quotes and no single ones, so this wrapping is safe.
         sops.templates."paperless.env" = {
           content = ''
             PAPERLESS_SOCIALACCOUNT_PROVIDERS='${builtins.toJSON {
@@ -263,14 +234,11 @@
         users.users.paperless.extraGroups = ["media"];
 
         # Override the module's own rules rather than shadowing them with a
-        # second set. Both create these paths, and systemd-tmpfiles takes the
-        # first file it reads and logs "Duplicate line ... ignoring" for the
-        # rest — which happened to resolve in our favour, but silently, and
-        # only because of how the two filenames sort.
-        #
+        # second set: both create these paths, and systemd-tmpfiles keeps the
+        # first file it reads, logging "Duplicate line ... ignoring" for the
+        # rest — which resolved in our favour only by filename sort order.
         # `media` and group-write so scans can be dropped into the inbox by
-        # something other than paperless itself; the module's default would
-        # make both directories paperless:paperless.
+        # something other than paperless itself.
         systemd.tmpfiles.settings."10-paperless" = let
           shared = lib.mkForce {
             user = "paperless";

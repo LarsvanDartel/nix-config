@@ -1,5 +1,4 @@
-# core.locale aspect — timezone, locale, console, keymap (was
-# flake.modules.nixos.common in modules/nixos/system/locale.nix).
+# core.locale — timezone, locale, console, keymap.
 {...}: {
   den.aspects.core.locale.nixos = {...}: {
     time.timeZone = "Europe/Amsterdam";

@@ -1,32 +1,16 @@
 # services.taskchampion — the sync server Taskwarrior 3 replicates against.
 #
-# Taskwarrior 3 dropped taskd entirely; the replacement is TaskChampion, and
-# this is its server half. It is not a task database. Every client holds a
-# complete replica and syncs an encrypted operation log through here, which has
-# two consequences worth knowing before trusting it with anything:
+# The server half of TaskChampion (Taskwarrior 3 dropped taskd). Not a task
+# database: every client holds a full replica and syncs an encrypted op log,
+# so the server cannot read tasks (the client-side `sync.encryption_secret`
+# is the real secret) and losing this directory loses nothing a surviving
+# replica holds — hence "convenience, not survival" in hosts/endeavour.nix.
 #
-#   * The server cannot read the tasks. The client encrypts with
-#     `sync.encryption_secret`, which never leaves the client — so that secret,
-#     not this host, is what stands between a copy of this directory and your
-#     task list. Lose it on every client and the history here is unreadable.
-#   * Losing this directory is not losing the tasks. Any surviving replica can
-#     re-initialise sync and repopulate it. That is why the backup entry in
-#     hosts/endeavour.nix calls it convenience rather than survival.
-#
-# **This is published to the internet**, so that a phone syncs without joining
-# the mesh. TaskChampion has no authentication beyond knowing a client id, and
-# nothing in front of it can add any — its clients are native apps that cannot
-# complete a browser login, so gaia publishes it ungated like ntfy.
-#
-# The client id is therefore the whole of the access control, which makes it a
-# credential in a way it would not be on a mesh-only port. Hence `clientIdFile`
-# rather than a list of strings: `--allow-client-id` is a command-line
-# argument, and a command line is world-readable in the store and in `ps`, so
-# the ids arrive as a systemd credential and the arguments are built at start.
-# The id is *not* what protects the contents — the encryption does that, and an
-# attacker holding the id still sees ciphertext. What it protects is integrity
-# and the disk: without the allow-list anyone could create replicas here, and
-# with a leaked id they could append junk to yours.
+# Published ungated, like ntfy: native clients cannot complete a browser
+# login. The client id is the only auth, and `--allow-client-id` is a
+# command-line argument (world-readable in the store and `ps`), so the ids
+# arrive as a systemd credential. The id protects integrity and the disk,
+# not the contents: a leaked id lets someone append junk, not read.
 {...}: {
   den.aspects.services.taskchampion.nixos = {
     config,
@@ -42,10 +26,9 @@
     cfg = config.cosmos.services.taskchampion;
     serverCfg = config.services.taskchampion-sync-server;
 
-    # Rebuilds the upstream module's ExecStart with the ids read at runtime.
-    # Everything before the ids is copied from it deliberately: taking the
-    # values from `serverCfg` rather than restating them means a change to
-    # port, data dir or snapshot policy reaches this too.
+    # Rebuilds upstream's ExecStart with the ids read at runtime. Everything
+    # before the ids is taken from `serverCfg` deliberately, so upstream
+    # changes to port, data dir or snapshot policy reach this too.
     start = pkgs.writeShellApplication {
       name = "taskchampion-sync-server-start";
       text = ''
@@ -108,19 +91,17 @@
         enable = true;
         inherit (cfg) port;
 
-        # Bound wide: replicas are other machines, reached either over the mesh
-        # or through gaia's proxy, and endeavour is edgeTerminated so the
-        # public path arrives from gaia over WireGuard. The firewall is what
-        # limits reach — 10222 is opened on the netbird interface alone.
+        # Bound wide: replicas arrive over the mesh or through gaia's proxy
+        # (endeavour is edgeTerminated). The firewall limits reach — 10222
+        # opens on the netbird interface alone.
         host = "0.0.0.0";
 
-        # Pinned, not defaulted. Upstream ties this to stateVersion — it turns
-        # itself on from 26.05 — and a DynamicUser with StateDirectory puts the
-        # data in /var/lib/private/… behind a symlink. The persist entry below
-        # would then bind-mount the symlink and every sync would start from
-        # nothing after a reboot. Same trap microbin.nix and ollama.nix each
-        # document; here it would arm itself on a stateVersion bump rather than
-        # on anything anybody wrote.
+        # Pinned, not defaulted. Upstream ties this to stateVersion (on from
+        # 26.05); DynamicUser + StateDirectory would put the data in
+        # /var/lib/private, and the persist entry below would bind-mount the
+        # symlink — every sync starting from nothing after a reboot. Same trap
+        # as microbin.nix and ollama.nix; here it would arm itself on a
+        # stateVersion bump.
         dynamicUser = false;
       };
 

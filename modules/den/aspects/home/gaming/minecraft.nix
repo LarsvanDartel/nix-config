@@ -29,12 +29,10 @@
               pkgs.libxt
               pkgs.libxinerama
             ];
-            # graalvm-21 is the speedrunning JDK and stays first — the MCSR
-            # toolchain below is built around it and 1.16.1 wants a Java of
-            # that era. jdk25 is here for the other direction: Minecraft 26.2
-            # is compiled for Java 25 (class file version 69), so a launcher
-            # that only offers 21 cannot start the current game at all. Prism
-            # picks per instance, so both being present is the whole fix.
+            # graalvm-21 stays first — the MCSR toolchain is built around it
+            # and 1.16.1 wants a Java of that era. jdk25 covers the other
+            # direction: Minecraft 26.2 needs class file version 69 (Java 25).
+            # Prism picks per instance, so both present is the whole fix.
             jdks = [
               pkgs.mcsr.graalvm-21
               pkgs.jdk25
