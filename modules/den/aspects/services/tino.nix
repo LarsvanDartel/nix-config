@@ -43,13 +43,6 @@
         name = "tino-server";
         runtimeInputs = [pythonEnv pkgs.gitMinimal pkgs.git-lfs pkgs.typst];
         text = ''
-          # The gewis Typst package's letterhead sidebar sets its wordmark
-          # in Lato Black (GEWISLetter.cls loads `\usepackage[default]{lato}`,
-          # and it's an embedded font in the real corporate-identity PDFs) —
-          # not a system font typst would otherwise discover on its own, and
-          # not something a per-bucket font upload can fix declaratively
-          # since every meeting bucket compiling the gewis package needs it.
-          export TYPST_FONT_PATHS="${pkgs.lato}/share/fonts"
           export TINO_OIDC_CLIENT_SECRET TINO_SECRET_KEY
           TINO_OIDC_CLIENT_SECRET="$(cat "$CREDENTIALS_DIRECTORY/oidc-client-secret")"
           TINO_SECRET_KEY="$(cat "$CREDENTIALS_DIRECTORY/session-secret-key")"
@@ -116,7 +109,25 @@
         };
         users.groups.${user} = {};
 
-        systemd.tmpfiles.rules = ["d /var/lib/tino 0750 ${user} ${user} - -"];
+        systemd.tmpfiles.rules = [
+          "d /var/lib/tino 0750 ${user} ${user} - -"
+          # TINO does not read TYPST_FONT_PATHS or any other ambient env
+          # var for fonts — it builds its own `typst --font-path` from
+          # TINO_FONT_DIR (config.py), which defaults to a real, writable
+          # subdirectory of TINO_DATA_DIR backing a FontService (presumably
+          # a per-instance font-upload feature in the UI). So the fix isn't
+          # an env var: it's seeding that directory. `C` copies once, if
+          # the destination doesn't already exist, rather than replacing it
+          # outright — an uploaded font placed here by the FontService
+          # later must survive every subsequent activation, not just be
+          # clobbered back to this package's contents.
+          #
+          # The gewis Typst package's letterhead sidebar sets its wordmark
+          # in Lato Black (GEWISLetter.cls loads `\usepackage[default]{lato}`,
+          # and it's an embedded font in the real corporate-identity PDFs) —
+          # not a system font typst would otherwise discover on its own.
+          "C /var/lib/tino/fonts/lato - ${user} ${user} - ${pkgs.lato}/share/fonts"
+        ];
         cosmos.system.impermanence.persist.directories = [
           {
             directory = "/var/lib/tino";
