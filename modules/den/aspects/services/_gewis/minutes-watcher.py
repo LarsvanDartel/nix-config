@@ -27,12 +27,22 @@ Design notes (see the nix-config service that runs this):
   minutes.typ's current content for the merge) go straight to the
   filesystem — this runs on the same host as TINO, so that's just a local
   read, no reason to round-trip through HTTP for it.
-- Writes go through TINO's own REST API (PUT .../files/{path} + POST
-  .../git/commit) with the file path relative to the *bucket*, not the
-  meeting directory (e.g. `2026/62/minutes.typ`), authenticated with a
-  TINO API key, so the change shows up as a proper authored commit in
-  TINO's own history rather than a filesystem edit TINO's app layer never
-  sees.
+- Writes go through TINO's own REST API (PUT .../files/{path}) with the
+  file path relative to the *bucket*, not the meeting directory (e.g.
+  `2026/62/minutes.typ`), authenticated with a TINO API key — the same
+  write path the editor's own save button uses, so TINO's app layer
+  (path validation, git-status view) sees the change exactly like a
+  human edit. Deliberately PUT-only, no POST /git/commit: the file
+  lands in the bucket's working tree as an unsaved modification and
+  *committing stays a human action in TINO's UI* — the watcher used to
+  commit as `apikey:...`, which put machine authorship in the
+  committee's document history; now it just prepares the change and
+  whoever reviews it presses commit. (Cost, accepted: the PUT route
+  doesn't broadcast the `files-changed` websocket event the commit
+  route does, so an open TINO tab refreshes its git-status badge only
+  on its next interaction — the editor buffer itself was never
+  force-reloaded by that event anyway, and a stale editor save would
+  clobber the regeneration with or without the commit.)
 - The merge is by heading *title*, not position: existing prose under a
   heading survives verbatim as long as that heading's title still exists
   somewhere in the agenda. A renamed point starts a fresh (empty) section
@@ -358,11 +368,12 @@ def api_request(method: str, path: str, body: dict | None = None) -> dict:
         return json.loads(resp.read() or b'{}')
 
 
-def write_files_via_api(
-        meeting: Meeting, files: dict[str, str], message: str) -> None:
+def write_files_via_api(meeting: Meeting, files: dict[str, str]) -> None:
     '''`files` maps filename (e.g. "minutes.typ") to new content — turned
     into bucket-relative paths here so every caller just thinks in terms
-    of the meeting's own two files.
+    of the meeting's own two files. PUT-only, no commit: see the module
+    docstring — the change lands as an unsaved working-tree
+    modification, committing stays a human action in TINO's UI.
     '''
     for filename, content in files.items():
         api_request('PUT',
@@ -370,10 +381,6 @@ def write_files_via_api(
                         meeting.bucket.name}/files/{
                         meeting.api_path(filename)}',
                     {'content': content})
-    api_request('POST', f'/api/buckets/{meeting.bucket.name}/git/commit', {
-        'files': [meeting.api_path(filename) for filename in files],
-        'message': message,
-    })
 
 
 def load_state() -> dict:
@@ -469,10 +476,7 @@ def carry_forward_action_items(
     if new_minutes is not None and new_minutes != minutes_text:
         changed['minutes.typ'] = new_minutes
     if changed:
-        write_files_via_api(
-            meeting, changed,
-            f'Carry forward {len(rows)} open action item(s) from {prev.key}',
-        )
+        write_files_via_api(meeting, changed)
     return 'done'
 
 
@@ -522,13 +526,11 @@ def poll_once(state: dict) -> None:
                 )
             elif new_text == minutes_text:
                 log.info(
-                    '%s: outline unchanged, nothing to commit',
+                    '%s: outline unchanged, nothing to write',
                     meeting.key)
             else:
                 write_files_via_api(
-                    meeting, {'minutes.typ': new_text},
-                    'Update minutes outline from agenda',
-                )
+                    meeting, {'minutes.typ': new_text})
                 log.info('%s: minutes.typ updated', meeting.key)
         except (
             subprocess.CalledProcessError,
