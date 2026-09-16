@@ -249,6 +249,14 @@
             OPENID_SCOPE = "openid profile email";
             OPENID_BUTTON_LABEL = "kanidm";
 
+            # No code-level default despite the .env.example showing one —
+            # openidStrategy.js does `DOMAIN_SERVER + OPENID_CALLBACK_URL`
+            # with no `||` fallback, so leaving this unset sends kanidm a
+            # redirect_uri of literally "https://chat.lvdar.nlundefined" and
+            # every login fails with invalid_origin. Must match the kanidm
+            # originUrl below exactly.
+            OPENID_CALLBACK_URL = "/oauth/openid/callback";
+
             # The reason no concession appears in the kanidm block below:
             # LibreChat's openid-client strategy sends the code challenge,
             # unlike the authlib clients (jellyfin, traccar, tino) that each
