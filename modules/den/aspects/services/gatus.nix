@@ -153,7 +153,7 @@
             # and turns an impermanence entry over the visible path into the
             # EBUSY that has already broken ntfy, crowdsec and tile-traccar on
             # this host. The answer is not to give up the history but to stop
-            # using DynamicUser, which is what open-webui and microbin already
+            # using DynamicUser, which is what microbin and ollama already
             # do for the same reason — see the static user below.
             storage = {
               type = "sqlite";

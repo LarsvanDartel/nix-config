@@ -305,8 +305,8 @@
             scopeMaps.paperless-users = ["openid" "profile" "email"];
 
             # allauth sends a code challenge (OAUTH_PKCE_ENABLED above), so
-            # kanidm's PKCE requirement is met without the concession jellyfin,
-            # traccar and open-webui each had to make.
+            # kanidm's PKCE requirement is met without the concession jellyfin
+            # and traccar each had to make.
             preferShortUsername = true;
           };
         };

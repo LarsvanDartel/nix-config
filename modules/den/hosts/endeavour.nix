@@ -82,7 +82,7 @@
       services.pds
       services.minecraft
       services.minecraft.control
-      services.ollama.webui
+      services.ollama.librechat
       services.taskchampion
     ];
 
@@ -445,10 +445,12 @@
         # DID, and no amount of the rest reconstructs it.
         "/persist/var/lib/pds"
         "/persist/var/lib/opencloud"
-        # Open WebUI: chats, accounts and knowledge bases. Small, and the only
-        # part of the LLM stack worth backing up — the models it talks to are a
-        # re-download and are deliberately excluded.
-        "/persist/var/lib/open-webui"
+        # LibreChat: conversations and accounts in MongoDB, uploads in its
+        # dataDir. Small, and the only part of the LLM stack worth backing
+        # up — the models it talks to are a re-download and are deliberately
+        # excluded.
+        "/persist/var/lib/librechat"
+        "/persist/var/db/mongodb"
         # typstnique's leaderboard. Tiny, and the only thing this host runs
         # which cannot be rebuilt from the flake — the scores are the one part
         # not derivable from source.
@@ -574,7 +576,7 @@
           3030 # typstnique  typstnique.lvdar.nl
           3031 # site        lvdar.nl + www.lvdar.nl
           3040 # tino        tino.lvdar.nl
-          8084 # open-webui  chat.lvdar.nl
+          8084 # librechat  chat.lvdar.nl
           8086 # mc control  minecraft.lvdar.nl
 
           # ollama's API, mesh-only and deliberately absent from gaia.nix —

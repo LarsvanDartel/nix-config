@@ -229,8 +229,8 @@
             originLanding = "https://${cfg.domain}";
             scopeMaps.kavita-users = ["openid" "profile" "email"];
 
-            # Deliberately NOT allowInsecureClientDisablePkce, unlike jellyfin,
-            # traccar and open-webui. Those needed the concession because their
+            # Deliberately NOT allowInsecureClientDisablePkce, unlike jellyfin
+            # and traccar. Those needed the concession because their
             # clients send no code challenge; ASP.NET Core's handler enables
             # PKCE by default on the authorization code flow, so kanidm's
             # requirement should be met as-is. If the token exchange fails with
