@@ -55,6 +55,7 @@
       services.opencloud
       services.typstnique
       services.tino
+      services.gewisMinutesWatcher
       services.site
       services.cdrom
       hardware.ipmi-fancontrol
