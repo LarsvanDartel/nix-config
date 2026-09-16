@@ -391,7 +391,7 @@
           default = 8086;
           description = ''
             The published port: nginx serves the page and proxies the API. Not
-            8080 (suwayomi) or 8084 (open-webui); gaia must forward this one.
+            8080 (suwayomi) or 8084 (librechat); gaia must forward this one.
           '';
         };
 

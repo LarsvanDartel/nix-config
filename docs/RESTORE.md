@@ -93,8 +93,8 @@ restic restore latest --target /mnt/restore
 ```
 
 Then place the rest: `/persist/var/lib/{kanidm,traccar,arr,grafana,pds,opencloud,
-open-webui,nixos,radicale,suwayomi-server}`, `/persist/home`,
-`/var/backup/postgresql`, and the `/tank/*` trees.
+librechat,nixos,radicale,suwayomi-server}`, `/persist/var/db/mongodb`,
+`/persist/home`, `/var/backup/postgresql`, and the `/tank/*` trees.
 
 - **`/persist/var/lib/nixos`** is the uid/gid map. Restore it *before* starting
   services, or restored files get owners that no longer match.

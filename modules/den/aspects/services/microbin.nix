@@ -162,7 +162,7 @@
       # at all — systemd uses /var/lib/private/microbin and leaves a symlink.
       # Persisting the visible path would then persist a symlink and lose every
       # pasta on the next boot: silent total data loss on an impermanent host,
-      # not a permissions error. Same trap ollama.nix documents for open-webui.
+      # not a permissions error. Same trap ollama.nix documents for its engine.
       users.users.microbin = {
         isSystemUser = true;
         group = "microbin";
@@ -231,7 +231,7 @@
         #
         # surfacing to the browser as a bare invalid_request. The aspect
         # deliberately does not set allowInsecureClientDisablePkce the way
-        # jellyfin, traccar and open-webui each had to; this is the other way
+        # jellyfin and traccar each had to; this is the other way
         # to satisfy that requirement, and the better one.
         extraConfig.code-challenge-method = "S256";
 

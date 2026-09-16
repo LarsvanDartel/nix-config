@@ -474,7 +474,7 @@
           targets = endeavour 3031;
         };
 
-        # Open WebUI. Ungated, and for the sharper of the two reasons already
+        # LibreChat. Ungated, and for the sharper of the two reasons already
         # on this page: it is an SPA whose chat responses stream over SSE, so a
         # lapsed gate session answers a long-lived streaming request with a 302
         # the frontend cannot follow. That is the traccar NetworkError again,

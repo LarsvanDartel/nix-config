@@ -76,13 +76,15 @@ Custom options live under the **`cosmos.*`** namespace (`cosmos.system.impermane
 | host | arch | role |
 |---|---|---|
 | `voyager` | x86_64 | ThinkPad P1 gen3 laptop, nvidia, Hyprland + Zen browser. Compositor choice is a **boot-time** switch: the base config and a labelled `hyprland` specialisation are identical, and a `niri`/noctalia specialisation is a separate GRUB entry |
-| `endeavour` | x86_64 | the workhorse. jellyfin, immich, kanidm, traccar, opencloud/collabora, suwayomi + flaresolverr, ollama + open-webui on a Tesla P100, tangled (knot + spindle), a PDS, minecraft, attic, `services.site` (lvdar.nl), the VPN-confined `*arr` stack, and the prometheus/grafana/loki/alloy monitoring. ZFS `tank` with sanoid/zed; restic offsite |
+| `endeavour` | x86_64 | the workhorse. jellyfin, immich, kanidm, traccar, opencloud/collabora, suwayomi + flaresolverr, ollama + librechat (chat.lvdar.nl, local models + OpenRouter) on a Tesla P100, tangled (knot + spindle), a PDS, minecraft, attic, `services.site` (lvdar.nl), the VPN-confined `*arr` stack, and the prometheus/grafana/loki/alloy monitoring. ZFS `tank` with sanoid/zed; restic offsite |
 | `gaia` | x86_64 | public VPS and the fleet's only ingress. Runs the self-hosted **NetBird control plane**, and `netbird-proxy` terminates TLS and forwards to endeavour over the mesh. Also crowdsec, ntfy, unbound, the gatus status page, and the handful of vhosts its own nginx serves directly (`localVhosts`). (Pangolin used to be the ingress and is **decommissioned** — do not reintroduce it) |
 | `pioneer` | aarch64 | Raspberry Pi 3; built locally under voyager's binfmt emulation, never on the Pi. Publishes endeavour's **iDRAC** (`services.idrac`) to the mesh — it shares nothing with endeavour but a switch, which is the whole point: out-of-band management proxied by the machine it exists to recover is not out-of-band |
 
 Hardware comes from committed **nixos-facter** reports (`hosts/_facter/<host>.facter.json`, regenerate with `sudo nixos-facter -o …` on the host) plus **disko** layouts in `hosts/_hw/<host>/`. Most hosts use impermanence; persisted paths are declared via `cosmos.system.impermanence.persist.directories`.
 
 Secrets are sops-nix, sourced from the private `nix-secrets` flake input over SSH — you cannot evaluate a host without access to that repo.
+
+**Adding a secret** (do this from the `~/nix-secrets` clone, which has the age key): `nix run nixpkgs#sops -- set hosts/<host>/secrets.yaml '["keys"]["<service>"]["<name>"]' '"value"'` — keys are kebab-case paths nested under `keys`, and each host's file is encrypted to that host's age key + the user key. There is no `delete` subcommand; removing one is `sops unset <file> '<path>'`. Then commit, push, and **update the pin** in nix-config (`nix flake lock --update-input nix-secrets`): hosts read secrets through the flake input, so an un-pushed or un-pinned change is invisible to every host. The aspect consuming the secret must declare it in `sops.secrets` — referencing an undeclared key is an eval error.
 
 **Restoring a host: [`docs/RESTORE.md`](docs/RESTORE.md).** Read the first section
 before you need it — the restic password and storage-box SSH key are themselves
