@@ -330,6 +330,16 @@
           };
         };
 
+        # The nixpkgs module orders librechat only after tmpfiles/mongodb,
+        # not the network — its OIDC discovery request at startup can race
+        # a not-yet-ready resolver and lose, silently disabling login until
+        # the next restart with no retry. Observed once, live, on this exact
+        # deploy.
+        systemd.services.librechat = {
+          after = ["network-online.target"];
+          wants = ["network-online.target"];
+        };
+
         # Every key `credentials` reads must be declared for sops-nix to
         # decrypt it. Root ownership is enough for all of them — only
         # LoadCredential, running as root, reads these files.
