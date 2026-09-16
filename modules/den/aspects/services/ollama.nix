@@ -288,13 +288,19 @@
               # The local engine via its OpenAI-compatible /v1. LibreChat
               # 0.8.0 has no `noApiKey`; ollama ignores the Authorization
               # header entirely, so a dummy satisfies the schema. `fetch`
-              # populates the picker from the engine's /models.
+              # populates the picker from the engine's /models — but an empty
+              # `default` still crashes the service at start (Zod: "Array
+              # must contain at least 1 element"), so it needs a real seed
+              # even though fetch immediately replaces it.
               {
                 name = "Ollama";
                 apiKey = "ollama";
                 baseURL = "http://127.0.0.1:${toString ollamaCfg.port}/v1";
                 models = {
-                  default = [];
+                  default =
+                    if ollamaCfg.models != []
+                    then ollamaCfg.models
+                    else ["llama3.2"];
                   fetch = true;
                 };
               }
@@ -303,7 +309,7 @@
                 apiKey = "\${OPENROUTER_KEY}";
                 baseURL = "https://openrouter.ai/api/v1";
                 models = {
-                  default = [];
+                  default = ["meta-llama/llama-3-70b-instruct"];
                   fetch = true;
                 };
               }
