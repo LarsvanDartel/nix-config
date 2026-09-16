@@ -33,16 +33,18 @@
     config = {
       # The token itself has to be minted once through TINO's own UI —
       # POST /api/keys requires an authenticated user session, and there is
-      # deliberately no admin bootstrap path around that. Mint it (or edit
-      # /var/lib/tino/api_keys.yml, which TINO re-reads on mtime change)
-      # with *committer* access per bucket, not editor: API keys resolve
-      # their role solely from their own per-bucket access map (bucket ACLs
-      # are ignored for them, auth.py resolve_role), and the watcher's
-      # writes end in POST /git/commit, which requires committer — an
-      # editor key fails every commit with 403 after already PUTting the
-      # regenerated file into the working tree. A new committee bucket
-      # needs the key's access map extended with it before the watcher can
-      # write there.
+      # deliberately no admin bootstrap path around that. *editor* access
+      # per bucket is all the watcher needs: its writes are PUTs to
+      # .../files/{path} (the editor's own save route, require_editor) and
+      # deliberately nothing more — no git/commit, the regenerated files
+      # land as unsaved working-tree modifications and committing stays a
+      # human action in TINO's UI. (It used to POST /git/commit too, which
+      # needed *committer* — API keys resolve their role solely from their
+      # per-bucket access map, auth.py resolve_role — and put
+      # `apikey:...` machine authorship into committee history.) Mint the
+      # key (or edit /var/lib/tino/api_keys.yml, which TINO re-reads on
+      # mtime change) as editor; a new committee bucket needs the key's
+      # access map extended with it before the watcher can write there.
       sops.secrets."keys/gewis-minutes-watcher/tino-api-key".owner = "tino";
 
       systemd.services.gewis-minutes-watcher = {
