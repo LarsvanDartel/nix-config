@@ -65,9 +65,15 @@
         # The two rules the management policy contributes. Per-service rules
         # always carry a dport, so testing for an accept *without* one is what
         # distinguishes "the Default policy is applied" from "only the reverse
-        # proxy's rules survived".
+        # proxy's rules survived". The set name is a management-side hash
+        # whose spelling varies by agent version — 0.77 emitted @nb<digits>,
+        # 0.78 emits @nb-<hex> — so the class matches both spellings. Pinning
+        # it to one was not cosmetic: under 0.78 the watchdog read a healthy
+        # ruleset as decayed and restarted the agent every 2 min, a rolling
+        # mesh blackout that intermittently broke the knot's :22 DNAT and
+        # with it build-gate's fetch (2026-09-15, netbird 0.78.1).
         if grep -q 'ct state established,related.*accept' <<<"$rules" \
-          && grep -qE 'ip saddr @nb[0-9]+ accept$' <<<"$rules"; then
+          && grep -qE 'ip saddr @nb[0-9a-f-]+ accept$' <<<"$rules"; then
           exit 0
         fi
 
