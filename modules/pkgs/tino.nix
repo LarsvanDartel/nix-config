@@ -128,6 +128,31 @@
                 # file is just the crest's <g>, not a symbol.
                 install -Dm444 ${./_tino/logo.svg} tino/static/img/logo.svg
 
+                # login.html/index.html both wrap that <use> in an <svg
+                # viewBox="0 0 407 200"> sized only by CSS height (.logo,
+                # .login-logo) — sized for upstream's own wide wordmark
+                # logo. GEWIS's crest is close to square (its own symbol
+                # viewBox is 580x580), so under the default
+                # preserveAspectRatio="xMidYMid meet" it was being scaled
+                # to fit the *height* of that wide box and centered with a
+                # lot of wasted width either side — visibly tiny at the
+                # CSS height it was actually given. Squaring off the
+                # wrapper viewBox to match removes the wasted space so the
+                # crest fills the full height/width CSS gives it.
+                substituteInPlace tino/static/index.html tino/static/login.html \
+                  --replace-fail 'viewBox="0 0 407 200"' 'viewBox="0 0 200 200"'
+
+                # .login-logo's 64px height was sized for upstream's own
+                # compact wordmark, which reads fine that small; GEWIS's
+                # crest carries a full ring of circular text around the
+                # emblem that needs real size to stay legible. The login
+                # card has the room — its mascot image sits at 250px next
+                # to it — so this only affects the one clearly-branded
+                # moment, not the toolbar's small icon-height logo (left
+                # at 22px; that's app chrome, not a place to grow into).
+                substituteInPlace tino/static/login.html \
+                  --replace-fail 'height: 64px;' 'height: 110px;'
+
                 # tino stores the whole raw OIDC id_token in its
                 # (client-side, single signed-cookie) session purely to pass
                 # as id_token_hint on RP-initiated logout — a UX nicety that

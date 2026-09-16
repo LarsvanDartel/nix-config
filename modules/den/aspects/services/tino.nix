@@ -43,6 +43,13 @@
         name = "tino-server";
         runtimeInputs = [pythonEnv pkgs.gitMinimal pkgs.git-lfs pkgs.typst];
         text = ''
+          # The gewis Typst package's letterhead sidebar sets its wordmark
+          # in Lato Black (GEWISLetter.cls loads `\usepackage[default]{lato}`,
+          # and it's an embedded font in the real corporate-identity PDFs) —
+          # not a system font typst would otherwise discover on its own, and
+          # not something a per-bucket font upload can fix declaratively
+          # since every meeting bucket compiling the gewis package needs it.
+          export TYPST_FONT_PATHS="${pkgs.lato}/share/fonts"
           export TINO_OIDC_CLIENT_SECRET TINO_SECRET_KEY
           TINO_OIDC_CLIENT_SECRET="$(cat "$CREDENTIALS_DIRECTORY/oidc-client-secret")"
           TINO_SECRET_KEY="$(cat "$CREDENTIALS_DIRECTORY/session-secret-key")"
