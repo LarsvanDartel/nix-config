@@ -1,16 +1,13 @@
-# update-blocklists — refresh the vendored oisd snapshots.
-#
-# The blocklists live in the repo rather than in flake.lock because oisd
-# regenerates them continuously and a pinned narHash goes stale within a day;
-# services/unbound.nix has the full reasoning. That makes updating them a
-# deliberate act, and this is the act:
+# update-blocklists — refresh the vendored oisd snapshots (vendored because
+# oisd regenerates them continuously; services/unbound.nix has the
+# reasoning):
 #
 #   nix run .#update-blocklists
 #   git diff --stat modules/den/aspects/services/_unbound   # sanity check
 #   git commit
 #
-# Deliberately does not commit anything. The point of vendoring is that a
-# change in what the fleet's resolver blocks is something a human looked at.
+# Commits nothing deliberately: a change to what the fleet's resolver blocks
+# needs a human looking at it.
 {...}: {
   nixpkgs.overlays = [
     (final: _prev: {

@@ -1,17 +1,10 @@
 # services.alloy — ship this host's journal to loki.
 #
-# Alloy rather than promtail, which is what this was written against first:
-# promtail reached end of life and has been removed from nixpkgs. Alloy is
-# grafana's own successor and speaks to loki natively.
-#
-# Opt-in per host rather than in roles.server, because pioneer must not have
-# it: a shipper keeps a position file and buffers to disk, and that host
-# already raises its watchdog to 60s because SD-card IO stalls the board hard
-# enough to trip it. Its journal is capped at 128 MB instead.
-#
-# Reads the journal rather than tailing files. /var/log is persisted on every
-# impermanent host here, so a restart resumes where it left off instead of
-# re-shipping or skipping.
+# Alloy, not promtail (EOL, gone from nixpkgs). Opt-in per host, not in
+# roles.server: pioneer must not run a shipper — SD-card IO already stalls
+# its watchdog; its journal is capped at 128 MB instead. Reads the journal,
+# and /var/log is persisted on impermanent hosts, so a restart resumes
+# rather than re-ships or skips.
 {den, ...}: {
   den.aspects.services.alloy = {
     includes = [den.aspects.services.netbird.client];
@@ -27,9 +20,8 @@
 
       cfg = config.cosmos.services.alloy;
 
-      # Alloy's own config language, not YAML. Components are wired by
-      # referencing each other's exports, so this reads bottom-up: journal ->
-      # relabel -> write.
+      # Alloy's own config language, not YAML — components wire via each
+      # other's exports, so read bottom-up.
       config-alloy = pkgs.writeTextDir "config.alloy" ''
         loki.write "default" {
           endpoint {
@@ -117,8 +109,8 @@
           configPath = config-alloy;
         };
 
-        # The journal is root-readable; alloy runs as its own user, and
-        # systemd-journal is the group that grants a reader access to it.
+        # The journal is root-readable; the systemd-journal group grants
+        # alloy's user read access to it.
         systemd.services.alloy.serviceConfig.SupplementaryGroups = ["systemd-journal"];
       };
     };

@@ -1,7 +1,5 @@
-# home.core — the home baseline plumbing that isn't a single program: the
-# cosmos.user/impermanence home option schema (bridged from den's home.username),
-# nix settings, home-manager.enable, and sops. Was spread across
-# modules/home/{user,system/nix,system/impermanence-options,security/sops}.nix.
+# home.core — the home baseline plumbing: cosmos.user/impermanence option
+# schema, nix settings, home-manager.enable, sops.
 {inputs, ...}: {
   den.aspects.home.core.homeManager = {
     config,
@@ -15,8 +13,8 @@
 
     options.cosmos = {
       user = {
-        # den's define-user battery sets home.username/homeDirectory; mirror them
-        # into cosmos.user for the home features that read it.
+        # den's define-user sets home.username/homeDirectory; mirror them for
+        # the home features that read cosmos.user.
         name = mkOption {
           type = nullOr str;
           default = config.home.username;

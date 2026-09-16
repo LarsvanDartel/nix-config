@@ -1,7 +1,6 @@
 # services.arr.bazarr — subtitles for whatever radarr and sonarr fetched.
-#
-# The unit is hand-rolled rather than nixpkgs': that module has no way to place
-# the config directory, and bazarr keeps its database there.
+# Hand-rolled unit: the nixpkgs module cannot place the config directory,
+# and bazarr keeps its database there.
 {den, ...}: let
   inherit (import ./_lib.nix) vpnVhost;
 in {

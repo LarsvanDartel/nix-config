@@ -1,5 +1,5 @@
 # roles.desktop-home — the desktop home environment for the primary user on
-# desktop hosts (was the homeManager `desktop` aggregate).
+# desktop hosts.
 {den, ...}: {
   den.aspects.roles.desktop-home = {
     includes = with den.aspects.home; [
@@ -7,20 +7,16 @@
       wallpapers
       hyprland
       foot
-      # `, <cmd>` plus nix-index's command-not-found suggestions. Here rather
-      # than in home-base because the prebuilt index is 101 MB and pioneer has
-      # no room for it — see the aspect.
+      # `, <cmd>` + command-not-found suggestions. Here, not home-base: the
+      # prebuilt index is 101 MB and pioneer has no room for it — see the aspect.
       comma
       zen
       mpv
       spotify
-      # Fetches `full.distro` from a version-pinned stable.dl2.discordapp.net
-      # URL that Discord deletes when it ships the next build, so a machine
-      # without that path already in its store cannot build this closure —
-      # voyager can only because it fetched it while the URL still worked. It
-      # was dropped for a while because CI in a clean guest went red on it;
-      # with that gate gone it is voyager's problem alone, and voyager has the
-      # path. Expect it to bite on a fresh install or after a store GC.
+      # Pinned to a stable.dl2.discordapp.net URL that Discord deletes when
+      # it ships the next build, so only a machine with that path already in
+      # its store can build this closure (voyager can; a fresh install or a
+      # store GC breaks it). voyager's problem alone since the CI gate went.
       discord
       signal
       kde-connect

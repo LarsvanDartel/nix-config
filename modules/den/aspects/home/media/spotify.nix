@@ -19,9 +19,8 @@
       name = "Spotify Player";
       terminal = true;
       type = "Application";
-      # Resolved through the icon theme (Nordzy ships spotify-client), so it
-      # stays consistent with the rest of the desktop rather than hardcoding a
-      # store path.
+      # Resolved via the icon theme (Nordzy ships spotify-client) to stay
+      # consistent with the desktop rather than hardcoding a store path.
       icon = "spotify-client";
       comment = "Terminal Spotify client";
       categories = ["AudioVideo" "Audio" "Music" "Player"];

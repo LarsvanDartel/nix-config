@@ -74,17 +74,12 @@
             port = cfg.vpnTestService.port;
             protocol = "tcp";
           };
-          # Every entry becomes a route inside the namespace, back out through
-          # the bridge. Anything not listed is answered via the namespace's
-          # default route — which is the tunnel — so the reply leaves through
-          # the VPN and is never seen again.
-          #
-          # That is what made sabnzbd and transmission unreachable from the
-          # mesh while working locally: their ports are DNAT'd into the
-          # namespace in prerouting, so a request from gaia arrived fine and
-          # the SYN/ACK went out of ProtonVPN. It presented as a plain timeout
-          # with the packet absent from both hosts' filter chains, because
-          # prerouting had already redirected it and the reply never came back.
+          # Each entry becomes a route back out through the bridge; anything
+          # else is answered via the namespace default route — the tunnel —
+          # so the reply leaves through the VPN and is never seen again. That
+          # made sabnzbd/transmission unreachable from the mesh while fine
+          # locally: DNAT'd requests arrived, SYN/ACKs went out ProtonVPN,
+          # presenting as a plain timeout.
           accessibleFrom =
             [
               "192.168.1.0/24"
@@ -99,18 +94,12 @@
 
         systemd.services.arr.postStart = cfg.postUp;
 
-        # VPN-Confinement pings the WireGuard endpoint before configuring the
-        # tunnel and gives up after five attempts, one second apart. That is
-        # not enough at boot: network-online.target is reached when dhcpcd has
-        # a lease, which is a while before the WAN actually carries traffic, so
-        # arr-up ran into a dead network, failed, and took sabnzbd and
-        # transmission — both BindsTo it — down with it until someone noticed.
-        #
-        # Type=oneshot forbids Restart=, so the unit cannot simply try again.
-        # Waiting for the same precondition it does, with a budget measured in
-        # minutes rather than seconds, means its own check then passes first
-        # try. Parsing the endpoint out of the config here rather than pinging
-        # something well-known keeps this honest: the thing waited for is
+        # VPN-Confinement pings the endpoint five times, 1s apart, before
+        # configuring the tunnel — not enough at boot: network-online.target
+        # (dhcpcd lease) precedes WAN traffic actually flowing, so arr-up
+        # failed and took sabnzbd/transmission (both BindsTo it) down with it.
+        # Type=oneshot forbids Restart=, so wait for the same endpoint instead,
+        # with a minutes-long budget, parsed from the config so the wait is
         # exactly the thing needed next.
         systemd.services.arr.serviceConfig.ExecStartPre = [
           (getExe (pkgs.writeShellApplication {

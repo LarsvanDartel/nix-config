@@ -1,5 +1,5 @@
-# roles.home-base — the home baseline every user gets (was the homeManager
-# `common` aggregate). Included by the user aspects (lvdar, nixos).
+# roles.home-base — the home baseline every user gets. Included by the user
+# aspects (lvdar, nixos).
 {den, ...}: {
   den.aspects.roles.home-base.includes =
     (with den.aspects.home; [

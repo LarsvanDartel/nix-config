@@ -1,42 +1,24 @@
-# The noctalia greeter, as a plain NixOS module *factory*.
-#
-# Imported by BOTH `den.aspects.desktop.greetd.noctalia` (see ../greetd.nix) and
-# voyager's `specialisation.niri` — specialisation bodies are ordinary NixOS
-# modules and cannot `include` a den aspect, so the shared content lives here.
-# Call it as `import ./_greetd/noctalia.nix {}`.
+# The noctalia greeter, as a plain NixOS module *factory*: imported by BOTH
+# `den.aspects.desktop.greetd.noctalia` (see ../greetd.nix) and voyager's
+# `specialisation.niri` (specialisation bodies cannot `include` a den aspect).
+# Call as `import ./_greetd/noctalia.nix {}`.
 #
 # noctalia-greeter is a standalone C++ Wayland client (not part of the shell)
-# that renders greetd's login prompt in noctalia's visual language. It runs
-# inside cage, started by the `noctalia-greeter-session` wrapper.
+# rendering greetd's prompt in noctalia's look, run inside cage via the
+# `noctalia-greeter-session` wrapper. Two things it hardcodes:
+#   * sessions come only from /usr/share/wayland-sessions (no XDG_DATA_DIRS) —
+#     a tmpfiles symlink points it at the same curated linkFarm tuigreet uses;
+#   * the session wrapper shells out to cage, wlr-randr and dbus-run-session
+#     by name, and greetd's unit has no PATH — so the package is re-wrapped.
 #
-# Two things it hardcodes, and how they are satisfied here:
-#
-#   * Sessions come from /usr/share/wayland-sessions and
-#     /usr/local/share/wayland-sessions only — no XDG_DATA_DIRS, no NixOS
-#     session dir. A tmpfiles symlink points the first at the same curated
-#     linkFarm tuigreet uses, so both greeters offer exactly the same entries.
-#   * `noctalia-greeter-session` shells out to cage, wlr-randr and
-#     dbus-run-session by name, and greetd's unit has no PATH to speak of, so
-#     the package is re-wrapped with them.
-#
-# Theming (palette, wallpaper, default session) goes through
-# `services.displayManager.noctalia-greeter.settings`, which the upstream
-# NixOS module force-symlinks into /var/lib/noctalia-greeter/greeter.toml on
-# every activation — the ONE file the greeter documents as "declarative;
-# Nix-safe; UI and Sync never write this". Do not be tempted back to writing
-# /var/lib/noctalia-greeter/appearance.json by hand: pre-1.3.0 that file was
-# read on every launch, but 1.3.0 added a separate, mutable
-# /var/lib/noctalia-greeter/sync.toml ("UI + Sync; not managed by Nix") and
-# only *migrates* legacy appearance.json into it once, the first time sync.toml
-# doesn't exist yet. After that one migration the greeter never looks at
-# appearance.json again — a `C+` tmpfiles rule can force-refresh it every
-# deploy and the greeter will keep rendering whatever palette/wallpaper got
-# baked into sync.toml on day one, silently, forever (this is exactly how the
-# background went black: the themed wallpaper is a content-addressed store
-# path that changes on every stylix/wallpaper rebuild, sync.toml pinned the
-# very first one, and that generation was eventually garbage-collected out
-# from under it). greeter.toml doesn't have this problem — it is re-read by
-# the greeter on every launch, not migrated-and-forgotten.
+# Theming goes through `settings`, which the upstream module force-symlinks
+# into /var/lib/noctalia-greeter/greeter.toml (re-read on every launch). Do NOT
+# be tempted back to writing appearance.json by hand: since 1.3.0 it is only
+# *migrated once* into the mutable sync.toml ("UI + Sync; not managed by Nix")
+# and never read again — a `C+` tmpfiles rule force-refreshing it every deploy
+# still leaves the greeter silently rendering whatever got baked into sync.toml
+# on day one (exactly how the background went black: sync.toml pinned the first
+# wallpaper store path, later garbage-collected).
 {}: {
   config,
   lib,
@@ -93,10 +75,9 @@ in {
 
     wallpaper = mkOption {
       type = nullOr path;
-      # The primary user's themed stylix background. Read from home-manager
-      # because only the home side sets `stylix.image`; it is a store path, so
-      # the unprivileged greeter account can read it — a file under ~/Pictures
-      # could not.
+      # The primary user's stylix image: only the home side sets it, and it is
+      # a store path the unprivileged greeter account can read (~/Pictures
+      # could not be).
       default = config.home-manager.users.${config.cosmos.user.name}.stylix.image or null;
       defaultText = "the primary user's stylix.image";
       description = "Background shown behind the login prompt.";
@@ -109,26 +90,15 @@ in {
       command = "${greeter}/bin/noctalia-greeter-session";
     };
 
-    # Keyboard and cursor, through nixpkgs' own module rather than by hand.
-    #
-    # These are the two things the greeter will NOT pick up from anywhere else.
-    # An earlier attempt set XKB_DEFAULT_* and XCURSOR_* on the greetd unit and
-    # was silently inert: `strings` on noctalia-greeter 1.2.1 finds neither
-    # variable anywhere in the binary. It reads its own greeter.toml and
-    # nothing else.
-    #
-    # That matters most for the layout. This machine is Programmer Dvorak and
-    # the greeter defaulted to us qwerty, so a correctly typed password came
-    # back rejected — indistinguishable from a wrong password unless you
-    # already suspect the layout.
-    #
-    # `settings` is written to greeter.toml as a *store symlink* (tmpfiles
-    # `L+`), which is why this is worth using over hand-writing the file: no
-    # copy to go stale, and no repeat of the `C` vs `C+` trap below.
-    #
-    # `package` is the wrapped build, not pkgs.noctalia-greeter: 1.2.1's
-    # session script still calls dbus-run-session and cage by name, and the
-    # upstream module does not wrap them.
+    # Keyboard and cursor, through nixpkgs' own module. An earlier attempt set
+    # XKB_DEFAULT_*/XCURSOR_* on the greetd unit and was silently inert —
+    # neither string is anywhere in the 1.2.1 binary; it reads only its own
+    # greeter.toml. That matters most for layout: this machine is Programmer
+    # Dvorak, and a greeter defaulting to qwerty rejects a correctly typed
+    # password as though it were wrong. `settings` is symlinked to greeter.toml
+    # as a store path (tmpfiles `L+`) — nothing to go stale, and no `C` vs
+    # `C+` trap. `package` is the wrapped build: the upstream module does not
+    # wrap cage/dbus-run-session.
     services.displayManager.noctalia-greeter = {
       enable = true;
       package = greeter;
@@ -150,14 +120,12 @@ in {
 
         # Without this the greeter refuses to start the PAM conversation on an
         # empty password field, so pam_u2f's touch prompt (auth sufficient,
-        # first in the stack — see core.yubikey) never even fires: you have to
-        # type something and hit enter before FIDO gets a chance to run.
+        # first in the stack — see core.yubikey) never fires.
         auth.allow_empty_password = true;
 
-        # noctalia's own colour roles, mapped off the base16 scheme stylix is
-        # themed with. The key names are the greeter's (snake_case), not the
-        # shell's. `scheme = "Synced"` is what makes the greeter render this
-        # table instead of a built-in preset.
+        # The greeter's own (snake_case) colour roles off the base16 scheme;
+        # `scheme = "Synced"` is what makes it render this table instead of a
+        # built-in preset.
         appearance = {
           scheme = "Synced";
           theme_mode = "dark";

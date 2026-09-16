@@ -10,14 +10,13 @@
 # own OIDC against kanidm, and the other two are machine-to-machine legs that
 # cannot answer an interactive login.
 #
-# This replaces an earlier attempt where OpenCloud worked but editing did not.
-# Two things had to be true for that, and neither was: the collaboration service
-# needs AF_NETLINK to pass its own startup probe, and the Content-Security-Policy
-# must not name `form-action` at all. Both are below, with the evidence.
-#
-# The reference for the policy is OpenCloud's own csp.yaml from opencloud-compose;
-# it is worth diffing against on upgrade rather than reasoning from first
-# principles, which is how the form-action mistake got made in the first place.
+# This replaces an earlier attempt where OpenCloud worked but editing did
+# not. Two things had to be true and neither was: the collaboration service
+# needs AF_NETLINK to pass its own startup probe, and the CSP must not name
+# `form-action` at all. Both are below, with the evidence. The reference for
+# the policy is OpenCloud's own csp.yaml from opencloud-compose — worth
+# diffing against on upgrade; reasoning from first principles is how the
+# form-action mistake got made.
 {...}: {
   den.aspects.services.opencloud.nixos = {
     config,
@@ -244,28 +243,25 @@
             #
             # Radicale is reached through OpenCloud's proxy and nowhere else,
             # which is what makes single sign-on work: the proxy authenticates
-            # the request and names the user in X-Remote-User, and Radicale is
-            # configured to believe it. That belief is unconditional, which is
-            # why Radicale binds loopback and stays out of exposedPorts —
-            # anything able to reach it directly could claim to be anyone.
+            # and names the user in X-Remote-User, and Radicale believes it
+            # unconditionally — hence loopback-only and absent from
+            # exposedPorts: anything reaching it directly could claim to be
+            # anyone.
             additional_policies = lib.mkIf cfg.radicale.enable [
               {
-                # "default", not "radicale": these are appended to the policy
-                # the selector actually chooses, and it only ever chooses that
-                # one. A policy under any other name is well-formed, loads
-                # without complaint, and is never consulted — which looks
-                # exactly like the routes being ignored.
+                # "default", not "radicale": appended policies are added to
+                # the one the selector actually chooses, and it only ever
+                # chooses that one. Any other name loads fine and is never
+                # consulted — looks exactly like the routes being ignored.
                 name = "default";
                 routes = let
-                  # `prefix` is where Radicale is mounted as far as the outside
-                  # world is concerned. It has to be told, because it builds
-                  # redirects and hrefs from it and otherwise assumes it is at
-                  # the root — and the web UI decides whether a calendar exists
-                  # at all by asking `.well-known/caldav` and checking that the
-                  # URL it ends up at contains `/caldav`. Radicale answers that
-                  # with a 301 to `base_prefix + "/"`, so without the header the
-                  # redirect points at `/`, the check fails, and OpenCloud says
-                  # the calendar is not configured on this system.
+                  # Radicale must be told the prefix: it builds redirects and
+                  # hrefs from it and otherwise assumes the root. The web UI
+                  # decides a calendar exists at all by asking
+                  # .well-known/caldav and checking the URL it lands on
+                  # contains /caldav; Radicale answers with a 301 to
+                  # base_prefix + "/", so without the header the check fails
+                  # and OpenCloud says the calendar is not configured.
                   route = prefix: endpoint: {
                     inherit endpoint;
                     backend = "http://127.0.0.1:${toString cfg.radicale.port}";
@@ -333,14 +329,13 @@
             # module chunks the web UI loads in a worker.
             worker-src = ["'self'" "blob:"];
 
-            # NO form-action. It is a navigation directive, so unlike the fetch
-            # directives above it does *not* inherit from default-src — leaving
-            # it out means unrestricted, which is what OpenCloud's reference
-            # policy does and what WOPI needs: an editing session starts by
-            # POSTing a form at Collabora, access token in the body, and naming
+            # NO form-action. It is a navigation directive, so unlike the
+            # fetch directives above it does *not* inherit from default-src —
+            # leaving it out means unrestricted, which is what OpenCloud's
+            # reference policy does and what WOPI needs: an editing session
+            # POSTs a form at Collabora, access token in the body, and naming
             # only 'self' here blocked that POST and left the editor a black
-            # rectangle. Listing the Collabora domain would fix this one case
-            # and break the next form target that gets added.
+            # rectangle.
             object-src = ["'self'" "blob:"];
             script-src = ["'self'" "'unsafe-inline'" "https://auth.lvdar.nl/"];
             style-src = ["'self'" "'unsafe-inline'"];
@@ -370,18 +365,15 @@
               insecure = false;
               licensecheckenable = false;
 
-              # Proof keys are Collabora signing its WOPI requests so the host
-              # can tell them from a forgery. Collabora 25.04 has no switch for
-              # them and keeps the key at /etc/coolwsd/proof_key, which does not
-              # exist when the config comes from the store — the previous
-              # attempt worked around that by generating one into the package at
-              # build time, which put a private key in the world-readable store
-              # and still left the two ends disagreeing. Editing failed there.
-              #
-              # Verification off instead. What it protects against is something
-              # impersonating Collabora to the WOPI host, and both ends of this
-              # hop are services on one machine talking over the mesh, behind an
-              # edge that already authenticates.
+              # Proof keys let the host tell Collabora's WOPI requests from a
+              # forgery. Collabora 25.04 has no switch for them and keeps the
+              # key at /etc/coolwsd/proof_key, which does not exist when the
+              # config comes from the store; the previous attempt generated
+              # one into the package at build time — a private key in the
+              # world-readable store, and the two ends still disagreed.
+              # Verification off instead: both ends of this hop are services
+              # on one machine talking over the mesh, behind an edge that
+              # already authenticates.
               proofkeys.disable = true;
             };
             wopi.wopisrc = "https://${wopiDomain}";
@@ -389,22 +381,17 @@
         };
       };
 
-      # The collaboration service will not start without netlink. Its startup
-      # health check is a "web reachability" probe, and Go's route lookup opens
-      # an AF_NETLINK socket to enumerate interfaces; nixpkgs' sandbox allows
-      # only AF_UNIX, AF_INET and AF_INET6, so the call fails with "netlinkrib:
-      # address family not supported by protocol". The check then never passes,
-      # the service never registers, and every attempt to open a document ends
-      # at `GetAppProviderClient: eu.opencloud.api.collaboration: service not
-      # found` — which the browser renders as "Error contacting the requested
-      # application" over a black screen.
-      #
-      # This, not proof keys, is why editing never worked.
-      # Same reboot, same cause as services/ddns.nix: opencloud is only ordered
-      # After=network.target, so at boot its `collaboration` service cannot
-      # resolve docs.lvdar.nl, the `search` subservice trips the supervisor's
-      # five-failure threshold, and the whole unit exits 1. Restart=always puts
-      # it back within a second — but not before it has fired an alert.
+      # The collaboration service will not start without netlink: its startup
+      # probe is a "web reachability" check, and Go's route lookup opens an
+      # AF_NETLINK socket; nixpkgs' sandbox allows only AF_UNIX, AF_INET and
+      # AF_INET6, so the call fails, the check never passes, the service never
+      # registers, and every document open ends at "service not found" over a
+      # black screen. This, not proof keys, is why editing never worked.
+      # Same boot-race cause as services/ddns.nix: opencloud is only ordered
+      # After=network.target, so at boot `collaboration` cannot resolve
+      # docs.lvdar.nl, the `search` subservice trips the supervisor's
+      # five-failure threshold and the unit exits 1 — Restart=always puts it
+      # back within a second, but not before an alert fires.
       systemd.services.opencloud = {
         wants = ["network-online.target"];
         after = ["network-online.target" "nss-lookup.target"];
@@ -417,25 +404,22 @@
         "AF_NETLINK"
       ];
 
-      # OpenCloud's own provisioning writes that file into /etc/opencloud, and
-      # here it cannot: the path is an impermanence bind mount, and the unit
-      # doing the writing runs under ProtectSystem=strict, so it races the mount
-      # and lands on a read-only /etc — `opencloud init` fails with EROFS and
-      # the server then refuses to start over a missing jwt_secret.
-      #
-      # Generate it on the persistent side instead, before anything mounts it.
-      # The module's own init unit still runs and still checks for the file; by
-      # then it exists and is non-empty, so it does nothing. Seeding rather than
-      # declaring keeps every one of those secrets out of the store.
+      # OpenCloud's own provisioning writes that file into /etc/opencloud,
+      # which here is an impermanence bind mount; the writing unit runs under
+      # ProtectSystem=strict, races the mount and lands on a read-only /etc —
+      # `opencloud init` fails with EROFS and the server then refuses to start
+      # over a missing jwt_secret. Generate it on the persistent side instead,
+      # before anything mounts it; the module's own init unit still runs,
+      # finds the file non-empty and does nothing. Seeding keeps all of those
+      # secrets out of the store.
       systemd.services.opencloud-seed-config = {
         description = "Seed OpenCloud's machine config on the persistent volume";
         wantedBy = ["multi-user.target"];
-        # After the bind mount, not before it: that mount belongs to
+        # After the bind mount, not before: that mount belongs to
         # local-fs.target, so ordering ahead of it puts this unit before
-        # sysinit.target while still depending on it, and systemd breaks the
-        # cycle by dropping the job. Writing through the mount is fine — it
-        # lands on /persist, and this unit carries none of the sandboxing that
-        # made OpenCloud's own attempt fail.
+        # sysinit.target while still depending on it — systemd breaks the
+        # cycle by dropping the job. Writing through the mount is fine: it
+        # lands on /persist, and this unit carries no sandboxing.
         after = ["persist-persist-etc-opencloud-opencloud.yaml.service"];
         before = [
           "opencloud-init-config.service"
@@ -507,14 +491,12 @@
             # directory tree of .ics and .vcf files, per user.
             filesystem_folder = "/var/lib/radicale/collections";
 
-            # What a new user is given. Radicale creates a principal on first
+            # What a new user is given: Radicale creates a principal on first
             # login and nothing inside it, so without this a client connects,
-            # authenticates, finds no collections and reports that there are no
-            # calendars at this address — which is true, and reads like a
-            # configuration error.
-            #
-            # Created once, with the principal. Adding an entry here does not
-            # reach users who have already logged in.
+            # finds no collections and reports no calendars at this address —
+            # true, and reads like a configuration error. Created once, with
+            # the principal; adding an entry here does not reach users who
+            # have already logged in.
             predefined_collections = builtins.toJSON {
               def-calendar = {
                 "D:displayname" = "Personal Calendar";

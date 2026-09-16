@@ -1,7 +1,6 @@
-# nixpkgs instance + the `nixpkgs.overlays` aggregation option. The pkgs set is
-# built once per system here (from base overlays + whatever features contribute
-# to `nixpkgs.overlays`) and shared to hosts via withSystem (configurations.nix).
-# Local packages self-register into `nixpkgs.overlays` from modules/pkgs/*.nix.
+# nixpkgs instance + the `nixpkgs.overlays` aggregation option. The pkgs set
+# is built once per system here and shared to hosts via withSystem
+# (configurations.nix); local packages self-register from modules/pkgs/*.nix.
 {
   inputs,
   lib,

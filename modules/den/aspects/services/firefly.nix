@@ -1,36 +1,26 @@
-# services.firefly — Firefly III personal finance manager, plus its Enable
-# Banking-backed data importer for automated bank sync (Rabobank included:
-# Enable Banking covers 2500+ European PSD2 banks).
+# services.firefly — Firefly III personal finance manager, plus its
+# Enable Banking-backed data importer for automated bank sync.
 #
-# Enable Banking, not GoCardless Bank Account Data (née Nordigen): GoCardless
-# closed that free tier to new signups in July 2025. Enable Banking's free
-# path is narrower — "restricted mode", which only ever syncs accounts you
-# have pre-authorised by hand in its own portal, no business contract or
-# eIDAS certificate needed — but that is exactly this deployment's shape: one
-# person, their own accounts.
+# Enable Banking, not GoCardless (free tier closed to new signups July
+# 2025): its free "restricted mode" only syncs accounts pre-authorised by
+# hand in its own portal — exactly this deployment's shape, one person's own
+# accounts.
 #
-# Firefly has no native OIDC, unlike paperless/immich, so it authenticates
-# through kanidm the way MicroBin's write path does: oauth2-proxy in front,
-# nginx doing auth_request, and Firefly trusting the result via its
-# remote_user_guard rather than its own local login form. Published through
-# gaia *ungated* as a result — like immich/opencloud in the `shared` category
-# there — rather than also behind a NetBird identity check: kanidm SSO is
-# already a full login, and stacking NetBird's check in front of it would
-# mean authenticating twice for the same identity, exactly the friction
-# gaia.nix's own comment calls out for immich and opencloud.
+# Firefly has no native OIDC, so it authenticates like MicroBin's write
+# path: oauth2-proxy in front, nginx auth_request, Firefly trusting the
+# result via remote_user_guard. Published through gaia *ungated* — kanidm
+# SSO is already a full login, and stacking NetBird's check in front would
+# mean authenticating twice for the same identity (see gaia.nix on
+# immich/opencloud).
 #
-# The data importer is mesh-only and not in gaia.nix at all: it's opened by
-# hand, occasionally, to run an import — not a standing service worth a
-# second oauth2-proxy instance (oauth2-proxy is one systemd service per host;
-# a second gated vhost would need its own kanidm client *and* its own proxy
-# process). It does need real TLS despite that, unlike a plain mesh-direct
-# tool: Enable Banking's authorisation flow redirects the browser back to a
-# callback URL registered in its portal ahead of time, and that redirect (via
-# the bank's own site) is not guaranteed to tolerate a plain-HTTP target the
-# way a same-mesh client hitting the app directly would be. So this is served
-# under the real *.lvdar.nl wildcard at a name that resolves only inside the
-# mesh — same shape as idrac.lvdar.nl on pioneer.nix, and for the same reason:
-# a real cert needs a real name, and this one is not meant to be public.
+# The data importer is mesh-only and not in gaia.nix at all: opened by hand,
+# occasionally — not worth a second oauth2-proxy instance (one systemd
+# service per host; a second gated vhost needs its own kanidm client *and*
+# proxy process). It still needs real TLS: Enable Banking's authorisation
+# flow redirects the browser to a callback URL registered in its portal
+# ahead of time, and that redirect is not guaranteed to tolerate plain HTTP.
+# So: real wildcard cert, at a name that resolves only inside the mesh —
+# same shape as idrac.lvdar.nl on pioneer.nix.
 {den, ...}: {
   den.aspects.services.firefly = {
     includes = with den.aspects.services; [nginx netbird.client];
@@ -49,10 +39,9 @@
       notify = config.cosmos.system.notifyFailure;
 
       # Where a saved import configuration (config.json, downloaded from the
-      # importer's own web UI after a manual run) has to be placed by hand for
-      # the auto-import timer below to find it — there's no API to generate
-      # one, since it's meant to capture choices ("import everything since
-      # 2019", "connection reused across runs") only a human makes once.
+      # importer's web UI after a manual run) is placed by hand for the
+      # auto-import timer below to find — no API to generate one; it captures
+      # choices only a human makes once.
       importDir = "${importerCfg.dataDir}/import";
 
       autoImport = pkgs.writeShellApplication {
@@ -91,11 +80,10 @@
       };
 
       # The saved config.json carries an enable_banking_sessions id — the
-      # same "session" the browser flow authorised — so the real consent
-      # expiry (Enable Banking's GET /sessions/{id}, access.valid_until) can
-      # be checked directly rather than guessed from ASPSP ceilings. Verified
-      # live once by hand: Rabobank's actual grant for this connection is 90
-      # days from authorisation, not the 180-day maximum the bank allows.
+      # same session the browser flow authorised — so the real consent expiry
+      # (GET /sessions/{id}, access.valid_until) can be checked directly
+      # rather than guessed from ASPSP ceilings. Verified live once: this
+      # Rabobank grant is 90 days, not the 180-day maximum the bank allows.
       checkConsent = pkgs.writeShellApplication {
         name = "firefly-consent-check";
         runtimeInputs = with pkgs; [curl jq openssl coreutils];
@@ -157,11 +145,10 @@
         socket,
         extraConfig ? "",
         # $request_filename is right for the "~ \.php$" location (it always
-        # matches the literal /index.php that tryFiles rewrote to), but wrong
-        # for a prefix location like /api/ that never goes through tryFiles —
-        # there $request_filename would resolve to <root>/api/v1/whatever, a
-        # file that doesn't exist. Those pass the real front controller path
-        # explicitly instead.
+        # matches the literal /index.php tryFiles rewrote to), but wrong for
+        # a prefix location like /api/ that never goes through tryFiles —
+        # there it resolves to a nonexistent <root>/api/v1/whatever, so those
+        # pass the real front controller path explicitly instead.
         scriptFilename ? "$request_filename",
       }: {
         extraConfig = ''
@@ -203,11 +190,9 @@
 
         importerPort = mkOption {
           type = port;
-          # Not 8096: that's jellyfin's own port (jellyfin.nix), and having
-          # two different services try to bind it broke both — nginx won the
-          # bind for this vhost's SSL socket, and jellyfin's own listener (or
-          # the routing that reaches it) came apart as a result. Found only
-          # because jellyfin itself started 400ing.
+          # Not 8096: jellyfin's own port (jellyfin.nix) — two services
+          # trying to bind it broke both; found only because jellyfin itself
+          # started 400ing.
           default = 8098;
           description = ''
             Mesh-facing port for the data importer's own nginx vhost. Not
@@ -243,18 +228,15 @@
             DB_DATABASE = "firefly-iii";
             DB_USERNAME = "firefly-iii";
 
-            # gaia terminates TLS and forwards plain HTTP to this vhost (see
-            # the X-Forwarded-Proto override below), so without this Laravel
-            # doesn't trust that header and generates http:// links for
-            # everything — including, concretely, the setup wizard's own
-            # form action, which then fails to load entirely since nothing
-            # here answers on port 80.
+            # gaia terminates TLS and forwards plain HTTP, so without this
+            # Laravel doesn't trust X-Forwarded-Proto and generates http://
+            # links for everything — including the setup wizard's own form
+            # action, which then fails to load entirely.
             TRUSTED_PROXIES = "**";
 
-            # oauth2-proxy's X-Auth-Request-User/-Email land in these two
-            # PHP $_SERVER keys via the fastcgi_params below — plain names,
-            # not HTTP_-prefixed, matching Apache's mod_auth convention that
-            # remote_user_guard itself follows.
+            # oauth2-proxy's X-Auth-Request-User/-Email land in these $_SERVER
+            # keys via the fastcgi_params below — plain names, matching
+            # Apache's mod_auth convention that remote_user_guard follows.
             AUTHENTICATION_GUARD = "remote_user_guard";
             AUTHENTICATION_GUARD_HEADER = "REMOTE_USER";
             AUTHENTICATION_GUARD_EMAIL = "REMOTE_USER_EMAIL";
@@ -282,9 +264,9 @@
             FIREFLY_III_ACCESS_TOKEN_FILE = config.sops.secrets."keys/firefly/importer-access-token".path;
 
             # From a free Enable Banking account (enablebanking.com) in
-            # "restricted mode" — a manual, human signup that can't be
+            # "restricted mode" — a manual human signup that can't be
             # provisioned from here. The app's callback URL, registered in
-            # Enable Banking's own portal, has to be set to
+            # Enable Banking's portal, must be
             # https://${cfg.importerDomain}/eb-callback.
             ENABLE_BANKING_APP_ID_FILE = config.sops.secrets."keys/firefly/enable-banking-app-id".path;
             ENABLE_BANKING_PRIVATE_KEY_FILE = config.sops.secrets."keys/firefly/enable-banking-private-key".path;
@@ -356,15 +338,13 @@
           };
         };
 
-        # Both phpfpm sockets are 0660, group-owned by their own service
-        # user — upstream's module only widens that to the "nginx" group
-        # when enableNginx is on, which it isn't here (the custom vhosts
-        # above need the auth_request gate the module's own vhost has
-        # nowhere to hang). Without this, nginx gets a bare "13: Permission
-        # denied" connecting to the socket — on firefly-iii specifically,
-        # only once an actual authenticated request reaches the php
-        # location, since auth_request intercepts every anonymous one first
-        # and never gets there.
+        # Both phpfpm sockets are 0660, group-owned by their own service user
+        # — upstream only widens that to the "nginx" group when enableNginx
+        # is on, which it isn't here (custom vhosts for the auth_request
+        # gate). Without this nginx gets a bare "13: Permission denied" on
+        # the socket — on firefly-iii specifically, only once an
+        # authenticated request reaches the php location, since auth_request
+        # intercepts every anonymous one first.
         users.users.nginx.extraGroups = ["firefly-iii" "firefly-iii-data-importer"];
 
         # Peer auth over the unix socket, same as paperless/immich's own
@@ -395,30 +375,22 @@
           "keys/firefly/enable-banking-private-key".owner = "firefly-iii-data-importer";
         };
 
-        # A second, hand-rolled oauth2-proxy instance rather than
-        # services.oauth2-proxy: that option is a singleton, and
-        # microbin.nix already configures it (its own clientID, issuer,
-        # redirect URL) for MicroBin's write-path gate. Two callers setting
-        # different values on the same option conflict outright, so this one
-        # runs as its own systemd unit on a private port instead, with the
-        # nginx wiring oauth2-proxy-nginx.nix would otherwise generate
-        # written out by hand below.
+        # A second, hand-rolled oauth2-proxy rather than services.oauth2-proxy:
+        # that option is a singleton and microbin.nix already configures it —
+        # two callers setting different values conflict outright. This one
+        # runs as its own systemd unit on a private port, with the nginx
+        # wiring oauth2-proxy-nginx.nix would generate written by hand below.
         #
-        # LoadCredential rather than the module's usual pattern of running
-        # as a user with direct read access: it lets the client-secret file
-        # stay owned by kanidm (which also reads it, for
-        # kanidm.provision.systems.oauth2.firefly.basicSecretFile — see
-        # microbin.nix's identical secret) without this service needing to
-        # share that group. systemd (root) reads the credential file itself
-        # and hands the content to the service privately, regardless of the
-        # original file's owner.
+        # LoadCredential rather than running as a user with direct read
+        # access: the client-secret file stays owned by kanidm (which also
+        # reads it, for basicSecretFile — microbin.nix's identical pattern)
+        # without this service sharing that group; systemd (root) reads it
+        # and hands the content over privately.
         #
         # --whitelist-domain is required, not decorative: --reverse-proxy
-        # validates every redirect target it's asked to honour (including
-        # the X-Auth-Request-Redirect header the /oauth2/ location below
-        # sets) against this list, and an unset list means an empty one —
-        # rejecting every redirect with "domain / port not in whitelist"
-        # rather than the permissive default the flag's absence might imply.
+        # validates every redirect target it is asked to honour against this
+        # list, and an unset list is an empty one — rejecting every redirect
+        # with "domain / port not in whitelist".
         systemd.services.oauth2-proxy-firefly = {
           description = "oauth2-proxy for Firefly III";
           after = ["network.target" "kanidm.service"];
@@ -470,8 +442,7 @@
 
           # Server-level rather than only on "/": applies to the PHP location
           # below too, which Laravel's tryFiles rewrite is what actually
-          # serves every request from (this vhost has no bare-file route
-          # that isn't index.php).
+          # serves every request from.
           extraConfig = ''
             auth_request /oauth2/auth;
             error_page 401 = @redirectToAuth2ProxyLogin;
@@ -499,16 +470,13 @@
             };
 
             # Firefly's REST API authenticates its own callers with a Bearer
-            # token (OAuth personal access token or client) and was never
-            # meant to sit behind a browser SSO gate — the data importer's
-            # server-to-server calls have no session cookie to present, and
-            # got the same 307-to-login redirect a browser would, which is a
-            # login page rather than the JSON /api/v1/about was expecting.
-            # This can't just be "/" with auth_request off: tryFiles rewrites
-            # every request to /index.php internally, which then re-enters
-            # the same "~ \.php$" location regardless of the original path,
-            # so the exemption has to live on a location that calls fastcgi
-            # directly rather than falling through to that shared one.
+            # token and was never meant to sit behind a browser SSO gate —
+            # the importer's server-to-server calls have no session cookie
+            # and got the 307-to-login redirect, a login page where JSON was
+            # expected. Not just "/" with auth_request off: tryFiles rewrites
+            # every request to /index.php internally, which re-enters the
+            # same "~ \.php$" location, so the exemption has to live on a
+            # location that calls fastcgi directly.
             "/api/" = phpLocation {
               socket = config.services.phpfpm.pools.firefly-iii.socket;
               scriptFilename = "$document_root/index.php";
@@ -530,11 +498,10 @@
 
             "/oauth2/" = {
               # No trailing slash on the proxy_pass target: with one, nginx
-              # replaces the matched "/oauth2/" prefix with it, so a request
-              # for /oauth2/start reaches oauth2-proxy as bare /start —
-              # observed directly as "Rejecting invalid redirect /start...".
-              # Without the trailing slash the full URI, prefix included,
-              # passes through unchanged.
+              # replaces the matched "/oauth2/" prefix with it, so
+              # /oauth2/start reaches oauth2-proxy as bare /start ("Rejecting
+              # invalid redirect /start..."). Without it the full URI passes
+              # through unchanged.
               proxyPass = "http://127.0.0.1:4181";
               extraConfig = ''
                 auth_request off;

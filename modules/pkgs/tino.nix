@@ -1,36 +1,16 @@
-# pkgs.python3Packages.tino — the `tino` Python package (github:confirm/tino),
-# registered into python3Packages rather than built as a standalone
-# application: it has no console-script entry point of its own — upstream
-# runs it *as* a gunicorn worker target, "tino:create_app()" — so
-# services/tino.nix composes the actual run environment with
-# `python3.withPackages`.
+# tino — the `tino` Python package (github:confirm/tino), registered into
+# python3Packages rather than built standalone: no console-script entry
+# point (upstream runs it as a gunicorn worker, "tino:create_app()");
+# services/tino.nix composes the run env with python3.withPackages. Upstream
+# supports only Docker; native packaging is deliberate — this fleet runs no
+# containers.
 #
-# Upstream ships and supports only a Docker image, and calls a non-Docker
-# install "not recommended and unsupported". That warning is about a manual
-# Ubuntu-style install (chasing Python 3.14, the Typst CLI, and git-lfs by
-# hand), not about anything Nix-specific: every runtime dependency already
-# has a proper nixpkgs derivation, including the two Rust-backed ones
-# (pycrdt, pycrdt-websocket), and nixpkgs' own `typst` package happens to
-# already be pinned to exactly the 0.15.1 upstream's Dockerfile bundles. So
-# packaging it natively costs nothing that "unsupported" actually protects
-# against, and keeps it in the same shape as every other service here rather
-# than being this fleet's first Docker container.
-#
-# Two assets upstream's own `make build` vendors in are NOT part of the git
-# source and therefore not covered by a plain `buildPythonPackage` over it:
-#
-#   - tino/static/css/vendor/colours.css, curled from a corporate design URL
-#     at build time (`make vendor-css`). Every `--cd-*` and `--accent-*` CSS
-#     custom property the whole UI is styled with — including the login
-#     button — comes from this file. Without it those variables are simply
-#     undefined, which is exactly "the login button is invisible": white
-#     text on an unset (transparent) background.
-#   - tino/static/js/vendor/codemirror.js, an esbuild bundle of the editor's
-#     CodeMirror dependencies (`make vendor-js` / `npm run build`).
-#
-# Both are fetched/built here and spliced into the source tree before the
-# Python package is built, so `tool.setuptools.package-data`'s existing
-# `static/**/*` glob picks them up like any other static file.
+# Two assets upstream's `make build` vendors are NOT in the git source, so a
+# plain buildPythonPackage misses them: colours.css (every --cd-*/--accent-*
+# CSS custom property the UI styles with — without it the login button is
+# white on an unset background, i.e. invisible) and codemirror.js (an
+# esbuild bundle). Both are fetched/built here and spliced in pre-build so
+# package-data's static/**/* glob picks them up.
 {...}: {
   nixpkgs.overlays = [
     (final: prev: let
@@ -49,22 +29,18 @@
         hash = "sha256-QIMWQAGqD1V15fCZ8vUjGL6QE+BiHrFVdkbRnejvQE4=";
       };
 
-      # package-lock.json is gitignored upstream (never committed), so
-      # `fetchNpmDeps` has nothing to lock against in `src` itself. Generated
-      # once against this tag's package.json (`npm install
-      # --package-lock-only`) and carried here rather than regenerated on
-      # every eval — bump it by hand alongside `version`.
+      # package-lock.json is gitignored upstream, so fetchNpmDeps has
+      # nothing to lock against in src; generated once per tag and carried
+      # here — bump it by hand alongside `version`.
       srcWithNpmLock = final.runCommand "tino-src-with-npm-lock" {} ''
         cp -r ${src} $out
         chmod -R u+w $out
         install -Dm444 ${./_tino/package-lock.json} $out/package-lock.json
       '';
 
-      # esbuild's npm package normally downloads a prebuilt binary for its
-      # own platform in a postinstall script, which has no network access
-      # under the Nix sandbox. ESBUILD_BINARY_PATH is esbuild's own escape
-      # hatch for exactly this: point it at nixpkgs' own (Go-built) esbuild
-      # instead, and skip npm's install scripts entirely.
+      # esbuild's npm postinstall downloads a prebuilt binary — no network
+      # in the sandbox. ESBUILD_BINARY_PATH + --ignore-scripts point it at
+      # nixpkgs' esbuild instead.
       codemirrorBundle = final.buildNpmPackage {
         pname = "tino-codemirror-bundle";
         inherit version;
@@ -91,11 +67,8 @@
 
               build-system = with pyFinal; [setuptools setuptools-scm wheel];
 
-              # Upstream pins every dependency with `==`; nixpkgs carries
-              # newer, compatible releases of all of them, and matching the
-              # pin exactly would mean tracking tino's lockstep on every
-              # nixpkgs bump for no correctness reason FastAPI/uvicorn/
-              # gunicorn don't already give across minor versions.
+              # Upstream pins every dependency with `==`; relaxed rather
+              # than tracking tino's lockstep on every nixpkgs bump.
               pythonRelaxDeps = true;
 
               dependencies = with pyFinal; [
@@ -173,11 +146,9 @@
                     "    if False:  # id_token intentionally never kept in the session"
               '';
 
-              # gitattributes ships at the repo root (routes bucket git repos
-              # through git-lfs — see services/tino.nix), not inside the
-              # `tino` package dir, so `tool.setuptools.package-data` never
-              # installs it. Carried out as a share/ file instead of
-              # duplicating its content in the NixOS module.
+              # gitattributes sits at the repo root (git-lfs routing —
+              # services/tino.nix), so package-data never installs it;
+              # carried as a share/ file instead.
               postInstall = ''
                 install -Dm444 tino/gitattributes $out/share/tino/gitattributes
               '';

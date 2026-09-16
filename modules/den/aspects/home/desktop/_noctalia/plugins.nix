@@ -1,22 +1,14 @@
 # Declarative noctalia plugins.
 #
-# Upstream's model is imperative: the shell git-clones a plugin into
-# ~/.config/noctalia/plugins/<id> and records `enabled` in plugins.json. Two
-# things stop us replacing that with a plain store symlink:
-#
-#   * a plugin's own settings live at <pluginDir>/settings.json, written by the
-#     shell at runtime — a read-only store path makes saving fail silently;
-#   * plugins.json also holds plugins you install by hand, which nix must not
-#     clobber.
-#
-# So the plugin trees are *copied* out of pinned sources on activation (any
-# existing settings.json preserved) and plugins.json is merged with jq rather
-# than overwritten. Nix owns which plugins exist and that they are on; the shell
-# keeps owning their settings and anything installed through the UI.
-#
-# Bar placement is a separate matter: `bar.widgets` lives in the store-owned
-# settings.json, so a plugin's bar widget must be declared in ./home.nix as
-# `plugin:<id>` — it cannot be dragged in from the settings panel.
+# Upstream's model is imperative (git-clone into ~/.config/noctalia/plugins,
+# `enabled` recorded in plugins.json). A plain store symlink cannot replace it:
+#   * a plugin's own settings.json at <pluginDir>/ is written by the shell at
+#     runtime — a read-only store path makes saving fail silently;
+#   * plugins.json also holds hand-installed plugins, which nix must not clobber.
+# So plugin trees are *copied* out of pinned sources on activation (existing
+# settings.json preserved) and plugins.json is merged with jq, not overwritten.
+# Bar placement still lives in ./home.nix (`plugin:<id>` in bar.widgets):
+# store-owned, so not changeable from the settings panel.
 {}: {
   config,
   lib,
@@ -127,11 +119,9 @@ in {
       netbird =
         official "netbird"
         // {
-          # The widget puts the full NetBird address on the bar by default,
-          # which is fifteen characters next to a right side that already
-          # carries four permanently-shown readings — enough to push the bar
-          # past its width. Off, both text fields are hidden and it draws as
-          # the icon alone, the same as every other status widget up there.
+          # The full NetBird address on the bar is too wide next to the four
+          # permanent readings on that side; icon only, like the other status
+          # widgets.
           settings.showIpAddress = false;
         };
       ssh-sessions = official "ssh-sessions";
@@ -158,19 +148,17 @@ in {
   };
 
   config = {
-    # The kde-connect plugin is a bar widget over the same D-Bus daemon, so
-    # kdeconnect-indicator would only put a duplicate icon in the tray. mkForce
-    # because home.kde-connect enables it outright — and it should stay enabled
-    # there, since the Hyprland side has no such plugin and the tray icon is its
-    # only way in.
+    # The kde-connect plugin is a bar widget over the same D-Bus daemon, so the
+    # indicator would only duplicate it in the tray. mkForce because
+    # home.kde-connect enables it outright — and it must stay enabled there:
+    # the Hyprland side has no such plugin and the tray icon is its only way in.
     services.kdeconnect.indicator = lib.mkForce false;
 
-    # …but the indicator's menu was also the only route to the KDE Connect GUI,
-    # because home.kde-connect replaces the packaged launcher entry with a
-    # hidden, `Exec=`-less stub. With no indicator here, that leaves no way to
-    # reach per-device plugin configuration at all, so restore a working entry.
-    # The plugin's own panel covers pairing and the common actions; this is for
-    # everything past that.
+    # …but the indicator's menu was the only route to the KDE Connect GUI:
+    # home.kde-connect replaces the packaged launcher entry with a hidden,
+    # `Exec=`-less stub. Restore a working entry — the plugin's own panel covers
+    # pairing and the common actions; this is for per-device configuration
+    # past that.
     xdg.desktopEntries."org.kde.kdeconnect.app" = {
       exec = lib.mkForce "kdeconnect-app";
       icon = lib.mkForce "kdeconnect";

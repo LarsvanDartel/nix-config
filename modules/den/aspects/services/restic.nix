@@ -1,58 +1,30 @@
 # services.restic — the offsite copy, on a Hetzner Storage Box named stardust.
 #
-# Everything else in this repo protects against a component failing. This is
-# the only thing that protects against the machine being gone: raidz1 survives
-# a disk, sanoid survives a bad delete, and neither survives a fire, a theft,
-# or a `zpool destroy`. Before this existed there was no second copy of
-# anything, anywhere.
+# The offsite copy — the only thing here that protects against the machine
+# being gone: raidz1 survives a disk, sanoid a bad delete, neither a fire or
+# a `zpool destroy`.
 #
-# What is here and what is deliberately not:
+# In: the immich photo originals (40 GB, the only irreplaceable bytes), the
+# postgres dump behind them, kanidm (identity root), traccar's history, the
+# arr configs, grafana, opencloud, home. Out: the 673 GB re-acquirable media
+# library, regenerable immich thumbs/encoded-video, jellyfin metadata, loki
+# and prometheus. That split is what makes this affordable: ~42 GB, not 715.
 #
-#   in   the immich photo originals (40 GB, the only irreplaceable bytes on
-#        the host), the postgres dump behind them, kanidm (5 MB, and the
-#        identity root for every OIDC login in the fleet), traccar's location
-#        history, the arr configs, grafana, opencloud, and home.
-#   out  /tank/media/library/{movies,shows} — 673 GB the arr stack can
-#        re-acquire; jellyfin's 16 GB of regenerable metadata and transcode
-#        cache; loki and prometheus, which are observability about the past
-#        rather than state; and every *thumbs* or *encoded-video* directory,
-#        which immich rebuilds from the originals.
+# Included by endeavour and gaia both; the defaults below describe endeavour,
+# and gaia overrides repository, paths, exclude and quiesceServices in
+# gaia.nix.
 #
-# That split is the whole reason this is affordable: ~42 GB on a 1 TB box
-# instead of 715 GB.
-#
-# This aspect is included by endeavour and gaia both. The option defaults below
-# describe **endeavour**, because it holds essentially every irreplaceable byte
-# in the fleet and the reasoning above only makes sense next to its values;
-# gaia overrides repository, paths, exclude and quiesceServices in gaia.nix,
-# where the ~146 MB it actually needs is enumerated with its own reasoning.
-#
-# Named for the NASA sample-return craft — it flew through comet Wild 2's coma,
-# caught the grains in aerogel and dropped the capsule in Utah in 2006, which
-# is a backup described as a spacecraft. Genesis had the same job two years
-# earlier, its chute never opened, and it hit the desert at 300 km/h; that one
-# is not a name you give a backup.
-#
-# Two things about the Storage Box that cost an evening to learn, recorded so
-# they do not cost another one:
-#
-#   * SSH keys must be registered through Hetzner's own interface. Writing
-#     ~/.ssh/authorized_keys over SFTP persists the file and changes nothing —
-#     the file is a rendering of Hetzner's key store, not the thing consulted
-#     at login. ssh-copy-id appears to succeed and does not work.
-#   * port 22 accepts keys in RFC4716 form only, port 23 in OpenSSH form only.
-#     This generation of box has 23 closed, which also rules out the
-#     `command="rclone serve restic --append-only"` trick that would otherwise
-#     give real ransomware protection. Worth revisiting if Hetzner ever opens
-#     23 here.
+# Hetzner Storage Box traps: SSH keys must be registered through Hetzner's
+# own interface — writing authorized_keys over SFTP persists the file and
+# changes nothing. Port 22 takes RFC4716 keys only; port 23 (OpenSSH form,
+# which a `rclone serve restic --append-only` guard would need) is closed on
+# this generation — worth revisiting if Hetzner opens it.
 {...}: {
   den.aspects.services.restic = {
-    # Deliberately no `includes = [services.prometheus]`, though the ResticStale
-    # alert lives there. endeavour includes prometheus in its own right, and
-    # pulling it in from here would land the whole metrics stack on gaia — a
-    # 3.7 GiB VPS that services/prometheus.nix explicitly rules out as a host.
-    # The alert has no instance filter, so it covers whichever hosts export the
-    # timer; the dependency runs alert → backup, not backup → alert.
+    # No `includes = [services.prometheus]` though the ResticStale alert lives
+    # there: pulling it in would land the whole metrics stack on gaia, which
+    # services/prometheus.nix rules out as a host. The dependency runs alert
+    # → backup, not backup → alert.
     nixos = {
       config,
       lib,
@@ -102,19 +74,18 @@
             # immich regenerates both from the originals in upload/.
             "/tank/media/library/images/thumbs"
             "/tank/media/library/images/encoded-video"
-            # immich's own periodic DB dumps. The pg_dumpall above is the copy
-            # that gets restored; keeping both doubles the churn for nothing.
+            # immich's own periodic dumps; the pg_dumpall above is the copy
+            # that gets restored.
             "/tank/media/library/images/backups"
             # The arrs write these continuously and nobody has ever restored
-            # one. They are also the largest churning files in /var/lib/arr,
-            # so excluding them is most of what keeps the nightly delta small.
+            # one; also the largest churn in /var/lib/arr.
             "**/logs.db*"
             "**/*.log"
             "**/Backups/**"
-            # suwayomi keeps 1.4 GB beside its 3.5 MB database, none of it
-            # worth a nightly copy: bin/ is the KCEF Chromium download (1.1 GB,
-            # and kcefEnabled is false anyway), cache/ is fetched page images,
-            # and webUI/ and extensions/ are re-downloaded on demand.
+            # 1.4 GB beside a 3.5 MB database, none worth a nightly copy:
+            # bin/ is the KCEF Chromium download (kcefEnabled is false
+            # anyway), cache/ is page images, webUI/ and extensions/
+            # re-download on demand.
             "/persist/var/lib/suwayomi-server/.local/share/Tachidesk/bin"
             "/persist/var/lib/suwayomi-server/.local/share/Tachidesk/cache"
             "/persist/var/lib/suwayomi-server/.local/share/Tachidesk/webUI"
@@ -211,18 +182,15 @@
           "keys/stardust/ssh-key" = {};
         };
 
-        # Hetzner shares one RSA host key across storage boxes, and it is the
-        # only algorithm this one offers. Pinned rather than left to
-        # StrictHostKeyChecking=accept-new: an unattended job that trusts
-        # whatever answers on first contact has no authentication of the
-        # server at all, which for a backup target means happily encrypting
-        # your only offsite copy to somebody else's disk.
+        # Hetzner shares one RSA host key across boxes and offers no other
+        # algorithm. Pinned, not accept-new: an unattended job that trusts
+        # whatever answers on first contact would encrypt the only offsite
+        # copy to somebody else's disk.
         programs.ssh.knownHosts."u649268.your-storagebox.de".publicKey = "ssh-rsa AAAAB3NzaC1yc2EAAAABIwAAAQEA5EB5p/5Hp3hGW1oHok+PIOH9Pbn7cnUiGmUEBrCVjnAw+HrKyN8bYVV0dIGllswYXwkG/+bgiBlE6IVIBAq+JwVWu1Sss3KarHY3OvFJUXZoZyRRg/Gc/+LRCE7lyKpwWQ70dbelGRyyJFH36eNv6ySXoUYtGkwlU5IVaHPApOxe4LHPZa/qhSRbPo2hwoh0orCtgejRebNtW5nlx00DNFgsvn8Svz2cIYLxsPVzKgUxs8Zxsxgn+Q/UvR7uq4AbAhyBMLxv7DjJ1pc7PJocuTno2Rw9uMZi1gkjbnmiOh6TTXIEWbnroyIhwc8555uto9melEUmWNQ+C+PwAK+MPw==";
 
-        # A consistent dump, not a copy of a running data directory. immich is
-        # the only real user of this postgres, and its database is the index
-        # for the 40 GB of photos backed up alongside it — restoring the blobs
-        # without it gives you files nothing can find.
+        # A consistent dump, not a copy of a running data dir: immich's
+        # database is the index for the 40 GB of photos backed up alongside
+        # it — blobs without it are files nothing can find.
         services.postgresqlBackup = lib.mkIf cfg.postgresDump {
           enable = true;
           backupAll = true;
@@ -241,9 +209,8 @@
           }
           ++ [
             {
-              # restic's cache. Not strictly required — it rebuilds — but
-              # rebuilding it means re-reading index files from the far end, and
-              # on a nightly job that is a slow first run every single night.
+              # restic's cache — rebuilds, but rebuilding re-reads index
+              # files from the far end: a slow first run every single night.
               directory = "/var/cache/restic-backups-stardust";
               user = "root";
               group = "root";
@@ -253,44 +220,38 @@
 
         services.restic.backups.stardust = {
           inherit (cfg) repository exclude;
-          # The dump directory is appended rather than asked of the host: this
-          # module is what creates it, so a host listing it would be repeating
-          # a detail it does not own.
+          # The dump directory is appended here, not asked of the host: this
+          # module is what creates it.
           paths = cfg.paths ++ lib.optional cfg.postgresDump pgBackupDir;
 
           passwordFile = config.sops.secrets."keys/stardust/password".path;
           initialize = true;
 
-          # restic shells out to ssh for the sftp backend, so this is where the
-          # key and the port live. -s sftp rather than a shell: the box runs
-          # mod_sftp and has no shell to give.
+          # restic shells out to ssh for the sftp backend, so the key and
+          # port live here. -s sftp: the box runs mod_sftp, no shell to give.
           extraOptions = [
             "sftp.command='${lib.getExe pkgs.openssh} -p 22 -i ${sshKey} -o BatchMode=yes u649268@u649268.your-storagebox.de -s sftp'"
           ];
 
           timerConfig = {
             OnCalendar = cfg.schedule;
-            # Unlike the transcode timer, this one is Persistent. A missed
-            # transcode should be skipped; a missed backup should be caught up
-            # at the next opportunity, because the gap it leaves is permanent.
+            # Persistent, unlike the transcode timer: a missed backup leaves
+            # a permanent gap; a missed transcode should be skipped.
             Persistent = true;
             RandomizedDelaySec = "20m";
           };
 
           pruneOpts = cfg.retention;
 
-          # Reads structure, not just checksums, on 5% of the data per run.
-          # A backup that has never been verified is a belief; this is the
-          # cheapest way to keep it a fact between full restore tests.
+          # Reads structure, not just checksums, on 5% of the data per run —
+          # an unverified backup is a belief, not a fact.
           checkOpts = ["--read-data-subset=5%"];
           runCheck = true;
 
           # See quiesceServices. Cleanup runs whether the backup succeeded or
-          # not, which is the whole reason the stop lives here rather than in a
-          # wrapper — a failed run must not leave the unit down until morning.
-          # null rather than "" when the list is empty: the option is nullOr str
-          # and an empty string still counts as "set", which would have the
-          # module write out a no-op script and wire an ExecStopPost for it.
+          # not, so a failed run cannot leave units down until morning. null,
+          # not "", when the list is empty: an empty string still counts as
+          # "set" and would wire a no-op script plus an ExecStopPost.
           backupPrepareCommand = lib.mkIf (cfg.quiesceServices != []) ''
             ${pkgs.systemd}/bin/systemctl stop ${lib.escapeShellArgs cfg.quiesceServices}
           '';

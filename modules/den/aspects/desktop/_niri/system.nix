@@ -12,33 +12,29 @@
 }: let
   colors = config.lib.stylix.colors.withHashtag;
 
-  # Resolved from PATH at runtime so the compositor is not coupled to the
+  # Resolved from PATH at runtime, so the compositor is not coupled to the
   # user-scoped noctalia package (see home.noctalia).
   noctalia = target: action: "noctalia-shell ipc call ${target} ${action}";
 
   # No foot server runs under niri, so use the standalone binary.
   terminal = "foot";
 
-  # What a *tap* of the Mod key produces, courtesy of keyd's overload (see
+  # What a *tap* of the Mod key produces via keyd's overload (see
   # desktop/keyd.nix). Holding Mod is unaffected, so this is free to bind.
   modTap = config.cosmos.desktops.input.modTap.keysym;
 
-  # A bind that still fires while the screen is locked. `allow-when-locked` is a
-  # KDL *property* of the bind node, so it goes in `props`, with the action as
-  # the node's content.
+  # A bind that still fires while the screen is locked. `allow-when-locked` is
+  # a KDL *property* of the bind node, so it goes in `props`.
   locked = action: _: {
     props.allow-when-locked = true;
     content = action;
   };
 
-  # Workspace keys, matching the Hyprland config's `code:10`..`code:18`.
-  #
-  # niri binds by XKB *key name* and has no keycode escape hatch, so we cannot
-  # say "physical key 1" directly. Under Programmer Dvorak (us/dvp) the number
-  # row's digits are both shifted AND reordered (Shift gives 7 5 3 1 9 0 2 4 6),
-  # so `Mod+1` would land on the physical 5 key. Binding the row's *unshifted*
-  # keysyms instead hits exactly the physical keys Hyprland's keycodes did.
-  #
+  # Workspace keys, matching Hyprland's `code:10`..`code:18`. niri binds by XKB
+  # *key name* with no keycode escape hatch, and under us/dvp the digit row is
+  # both shifted and reordered (Shift gives 7 5 3 1 9 0 2 4 6), so `Mod+1`
+  # would land on the physical 5 key. Binding the row's unshifted keysyms hits
+  # exactly the physical keys Hyprland's keycodes did:
   #   physical:  1  2  3  4  5  6  7  8  9
   #   us(dvp):   &  [  {  }  (  =  *  )  +
   workspaceKeys = [
@@ -98,19 +94,11 @@
           accel-profile = "flat";
           accel-speed = 0.0;
         };
-        # Deliberately absent: focus-follows-mouse.
-        #
-        # It was on here to mirror the Hyprland input block, which still sets
-        # `follow_mouse = 2`. The two are not the same thing. Hyprland's 2
-        # detaches pointer focus from keyboard focus — the cursor crossing a
-        # window does not steal typing — whereas niri's node is the plain
-        # thing: cross a window and it takes focus, keyboard included. Mirroring
-        # the number rather than the behaviour is what made niri feel like it
-        # was switching windows on its own.
-        #
-        # niri has no equivalent of Hyprland's detached mode, so the honest
-        # mirror of `follow_mouse = 2` is to leave this off and let clicks move
-        # focus.
+        # Deliberately absent: focus-follows-mouse. Hyprland's `follow_mouse =
+        # 2` detaches pointer focus from keyboard focus; niri's node is the
+        # plain thing (cross a window and it takes keyboard focus too), and niri
+        # has no detached mode — so the honest mirror of `follow_mouse = 2` is
+        # leaving this off and letting clicks move focus.
       };
 
       layout = {
@@ -145,15 +133,15 @@
               y = 4;
             };
           };
-          # Tinted with the scheme's darkest background rather than pure black,
-          # so it reads as depth in the palette instead of a grey smudge.
+          # Tinted with the scheme's base00 rather than pure black, so it reads
+          # as depth in the palette.
           color = "${colors.base00}a0";
         };
       };
 
-      # Nine permanent workspaces, like Hyprland's. niri's workspaces are
-      # normally dynamic (created/destroyed on demand); *named* ones always
-      # exist even when empty, so declaring "1".."9" keeps all nine live.
+      # Nine permanent workspaces, like Hyprland's: *named* niri workspaces
+      # always exist even when empty; unnamed ones are created/destroyed on
+      # demand.
       workspaces = lib.listToAttrs (
         map (i: {
           name = toString i;
@@ -161,16 +149,12 @@
         }) (lib.range 1 9)
       );
 
-      # Global blur tuning. Blur itself needs no switch here: niri honours any
-      # surface that asks for it over `ext-background-effect` — which is how
-      # noctalia's bar, panels and launcher get theirs — and the window rule
-      # below turns it on for foot, which cannot ask.
-      #
-      # `passes` and `noise` are matched to the Hyprland session's
-      # `decoration.blur` so the two sessions look like the same desktop.
-      # `offset` and `saturation` are left at niri's defaults: Hyprland's
-      # `size` and `vibrancy` are not the same quantities, so copying the
-      # numbers across would be false precision rather than parity.
+      # Global blur tuning. Blur needs no switch here: niri honours surfaces
+      # that ask via `ext-background-effect` (how noctalia's bar, panels and
+      # launcher get theirs), and the window rule below turns it on for foot,
+      # which cannot ask. `passes`/`noise` match the Hyprland session's
+      # decoration.blur; `offset`/`saturation` stay at niri's defaults —
+      # Hyprland's size/vibrancy are different quantities, not parity.
       blur = {
         passes = 4;
         noise = 0.01;
@@ -182,7 +166,7 @@
 
       environment.NIXOS_OZONE_WL = "1";
 
-      # Ported from the Hyprland binds (_hyprland/binds.nix): same keys, same
+      # Ported from the Hyprland binds (_hyprland/binds.nix): same keys and
       # modifiers, niri's equivalent actions.
       binds =
         {
@@ -193,23 +177,17 @@
           # (Hyprland's Mod+D toggle_swallow has no niri equivalent.)
 
           # Three different things in niri, where Hyprland had one. Mod+F keeps
-          # Hyprland's meaning; the other two take the keys niri itself uses.
-          #
-          #   Mod+F        fullscreen — covers the screen, bar and gaps gone
-          #   Mod+M        maximize the WINDOW to the edges of the working
-          #                area: the bar stays, struts/gaps/borders do not,
-          #                and the window is *told* it is maximized so it
-          #                squares its own corners like it would anywhere else
-          #   Mod+Shift+M  maximize the COLUMN — full width, gaps and borders
-          #                kept, and it can still hold several windows
+          # Hyprland's meaning (covers the screen, bar and gaps gone); Mod+M
+          # maximizes the WINDOW to the working area (bar stays, and the window
+          # is *told* it is maximized so it squares its corners); Mod+Shift+M
+          # maximizes the COLUMN (full width, gaps kept, can hold several
+          # windows).
           "Mod+F".fullscreen-window = _: {};
           "Mod+M".maximize-window-to-edges = _: {};
           "Mod+Shift+M".maximize-column = _: {};
 
-          # Tells a window it is fullscreen without making it fullscreen. A
-          # browser drops its chrome for a slide deck while staying a normal
-          # resizable window, so a screencast can frame it next to the notes
-          # instead of surrendering the whole monitor to it.
+          # Tells a window it is fullscreen without making it so: a screencast
+          # can frame a browser slide deck next to the notes.
           "Mod+Ctrl+F".toggle-windowed-fullscreen = _: {};
 
           # Move focus
@@ -230,42 +208,26 @@
           "Mod+Ctrl+K".set-window-height = "-10%";
           "Mod+Ctrl+J".set-window-height = "+10%";
 
-          # Put more than one window in a column — niri's answer to both
-          # "split vertically" and "stack", which are the same thing here:
-          # a column holding several windows, drawn either shared or tabbed.
-          # Nothing above can create that state, so without these the
-          # focus-window-up/down and move-window-up/down binds are
-          # unreachable in practice.
-          #
-          # Not Mod+BracketLeft/Right as upstream niri binds them. On
-          # Programmer Dvorak the brackets sit on the number row — [ at the
-          # physical 2 key, ] at the physical 0 — where the workspace binds
-          # below already live, so those would collide.
-          #
-          # Comma and Period are adjacent on dvp's top letter row (";,.pyf"),
-          # left hand, and free. They are also what the niri docs use for this
-          # action, so what is written there matches what is bound here.
+          # Creates the multi-window column niri uses for both "split" and
+          # "stack" — nothing above can create that state, so without these the
+          # focus/move window-up/down binds are unreachable. Not upstream's
+          # Mod+BracketLeft/Right: on dvp the brackets sit on the number row
+          # where the workspace binds live. Comma/Period are adjacent and free
+          # on dvp's top letter row, and are what the niri docs use.
           "Mod+Comma".consume-or-expel-window-left = _: {};
           "Mod+Period".consume-or-expel-window-right = _: {};
 
-          # Flip that column between tabbed and shared. `default-column-display`
-          # above is "tabbed", so a new column stacks; this is how to get an
-          # actual vertical split for the one column that wants it.
+          # Flip a column between tabbed and shared: `default-column-display`
+          # above is "tabbed", so this is how one column gets an actual split.
           "Mod+W".toggle-column-tabbed-display = _: {};
 
           # Power menu / lock
           "Mod+Escape".spawn-sh = noctalia "sessionMenu" "toggle";
           "Mod+Shift+Escape".spawn-sh = noctalia "lockScreen" "lock";
 
-          # Tapping Mod on its own opens the control centre. `keyd monitor`
-          # shows the tap arriving with no modifier held —
-          #
-          #   leftmeta down, leftcontrol down,     <- keyd's modifier guard
-          #   leftmeta up,   leftcontrol up,
-          #   f19 down,      f19 up
-          #
-          # so the unmodified form is the only one that can ever match; a
-          # `Mod+` variant was dead weight.
+          # Tapping Mod on its own opens the control centre. keyd delivers the
+          # tap unmodified (it arrives as f19 with no modifier held), so the
+          # unmodified form is the only one that can ever match.
           ${modTap}.spawn-sh = noctalia "controlCenter" "toggle";
 
           # Utilities
@@ -276,14 +238,10 @@
           "Mod+S".screenshot = _: {};
           "Mod+Shift+S".screenshot-window = _: {};
 
-          # Screencasting. The plumbing already works — programs.niri ships the
-          # gnome portal and desktop.audio the pipewire stack — so what is
-          # bound here is niri's own casting feature: a stream that appears in
-          # the portal picker as "niri Dynamic Cast Target". Share it once,
-          # then re-aim it from the keyboard without going back through the
-          # sharing dialog. Each new cast starts out empty regardless of where
-          # this last pointed, so selecting it can never reveal something by
-          # accident.
+          # niri's dynamic cast: a stream that appears in the portal picker as
+          # "niri Dynamic Cast Target" — share it once, then re-aim from the
+          # keyboard. Each new cast starts out empty regardless of where the
+          # last pointed, so selecting it can never reveal something by accident.
           "Mod+C".set-dynamic-cast-window = _: {};
           "Mod+Ctrl+C".set-dynamic-cast-monitor = _: {};
           "Mod+Ctrl+Shift+C".clear-dynamic-cast-target = _: {};
@@ -334,23 +292,15 @@
           matches = [{is-floating = true;}];
           geometry-corner-radius = 6.0;
           clip-to-geometry = true;
-          # Depth, where the rest of the layout is flat. A floating window sits
-          # *on top of* the tiled columns with nothing else to separate the
-          # two, and the shadow is what says which is which. Tiled windows are
-          # left flat on purpose — they tile, so they need no separating.
+          # Depth, where the rest of the layout is flat: the shadow is what
+          # separates a floating window from the tiled columns beneath it.
           shadow.on = _: {};
         }
-        # foot is translucent (stylix.opacity.terminal), and without this it
-        # would be translucent onto whatever happens to be behind it. A
-        # terminal cannot request blur for itself the way noctalia can — there
-        # is no `ext-background-effect` support in foot — so niri is told to
-        # blur it from this side.
-        #
-        # `xray` is left at its default, meaning on: the blur is computed once
-        # against the wallpaper and reused, rather than recomputed every time
-        # anything underneath moves. `xray false` would blur the actual windows
-        # below, but upstream still marks that experimental — it drops out
-        # during open/close animations and while dragging a tiled window.
+        # foot is translucent (stylix.opacity.terminal) but cannot request blur
+        # itself (no ext-background-effect support in foot), so niri blurs it
+        # from this side. `xray` stays at its default (on): the blur is computed
+        # once against the wallpaper. `xray false` is still experimental
+        # upstream — it drops during open/close animations and while dragging.
         {
           matches = [{app-id = "^foot$";}];
           background-effect.blur = true;
@@ -361,14 +311,10 @@
           open-floating = true;
         }
         # Drawn as a solid black rectangle in screencasts. Deliberately
-        # "screencast" and not "screen-capture": the latter would also blank
-        # these in screenshots, and a screenshot is something you took on
-        # purpose.
-        #
-        # The app-ids are each package's StartupWMClass, read off the desktop
-        # file rather than guessed — a wrong id here fails *silently* and the
-        # window is shared anyway, which is the one failure mode this rule
-        # exists to prevent.
+        # "screencast", not "screen-capture" — the latter would also blank these
+        # in screenshots, which you took on purpose. The app-ids are each
+        # package's StartupWMClass; a wrong id fails *silently* and the window
+        # is shared anyway.
         {
           matches = [
             {app-id = "^signal$";}
@@ -377,10 +323,9 @@
           block-out-from = "screencast";
         }
         # Whatever is actually being cast turns red, so there is never a
-        # question about which window the far end can see. Matches only the
-        # target of a *window* cast (the dynamic target above included); a
-        # whole-monitor cast has no window to mark and cannot be indicated
-        # this way.
+        # question about which window the far end can see. Matches only window
+        # casts (the dynamic target included); a monitor cast has no window to
+        # mark.
         {
           matches = [{is-window-cast-target = true;}];
           focus-ring = {
@@ -397,13 +342,10 @@
       # Layer-shell surfaces — noctalia's bar, panels and notifications — are
       # not windows, so no window rule above ever sees them.
       layer-rules = [
-        # Notification and toast popups carry message previews, and blocking
-        # them out covers the case the window rule above cannot: the
-        # notification for a Signal message is drawn by noctalia, not by
-        # Signal, so blocking Signal's window does nothing for it.
-        #
-        # noctalia namespaces its surfaces `noctalia-<kind>-<output>`, hence
-        # matching the prefix including the trailing dash.
+        # Notification and toast popups carry message previews, and they are
+        # drawn by noctalia, not the app — blocking Signal's window does nothing
+        # for its notification preview. Surfaces are namespaced
+        # `noctalia-<kind>-<output>`, hence the trailing dash in the match.
         {
           matches = [
             {namespace = "^noctalia-notifications-";}
@@ -411,31 +353,18 @@
           ];
           block-out-from = "screencast";
         }
-        # There is deliberately NO `background-effect { blur }` rule here, and
-        # it is not an omission — it was tried and reverted.
-        #
-        # noctalia blurs its bar, panels and launcher itself, through
-        # `ext-background-effect` (`general.enableBlurBehind`). Those surfaces
-        # hand the compositor an explicit blur *region*, so the blur lands on
-        # the card and nothing else. Its notifications, toasts, OSDs and popup
-        # menus do not: each is a `color: "transparent"` PanelWindow that
-        # declares no region, and notifications and toasts are additionally
-        # padded by `shadowPadding` on every edge, so the layer surface is
-        # strictly larger than the card drawn inside it.
-        #
-        # A layer-rule can only say "blur this surface", meaning the whole
-        # rectangle. Since xray is on by default, that rectangle fills with
-        # blurred *wallpaper* — which showed up as a large blue box around
-        # every notification, the wallpaper being a photo of sky.
-        #
-        # The Hyprland session gets away with the equivalent rule
-        # (_hyprland/rules.nix) because mako's layer surface *is* the
-        # notification, with no transparent padding around it.
-        #
-        # So these stay translucent (stylix.opacity.popups) and unblurred.
-        # Fixing it properly is noctalia's side of the fence: those windows
-        # would have to attach a BackgroundEffect with a blurRegion the way
-        # MainScreen, Dock and LauncherOverlayWindow already do.
+        # There is deliberately NO `background-effect { blur }` rule here — it
+        # was tried and reverted. noctalia blurs its bar, panels and launcher
+        # itself via `ext-background-effect` with an explicit blur region; its
+        # notifications, toasts, OSDs and popup menus declare no region and are
+        # padded by shadowPadding, so the layer surface is strictly larger than
+        # the card. A layer-rule can only blur the whole rectangle, which with
+        # xray on fills with blurred wallpaper — a large blue box around every
+        # notification (the wallpaper is a photo of sky). The Hyprland session's
+        # equivalent (_hyprland/rules.nix) works because mako's layer surface IS
+        # the notification. Fixing it is noctalia's side: those windows would
+        # need a blurRegion the way MainScreen, Dock and LauncherOverlayWindow
+        # already do.
       ];
     };
   };
@@ -467,13 +396,10 @@ in {
   ];
 
   # programs.niri turns polkit on but ships no authentication agent. That job is
-  # now noctalia's `polkit-agent` plugin (see _noctalia/plugins.nix) — only one
+  # noctalia's `polkit-agent` plugin (see _noctalia/plugins.nix) — only one
   # process can hold the polkit agent registration, so a standalone
-  # hyprpolkitagent unit here would race it and one of the two would lose.
-  #
-  # The trade-off: no agent runs before noctalia is up. In this specialisation
-  # noctalia is the session shell, so that window is the same one in which
-  # nothing could prompt anyway.
+  # hyprpolkitagent unit here would race it. Cost: no agent runs before
+  # noctalia is up, but in this specialisation nothing could prompt then anyway.
 
   # One entry in the greeter (see desktop/greetd.nix for why it is curated).
   cosmos.profiles.desktop.addons.greetd.sessions = [

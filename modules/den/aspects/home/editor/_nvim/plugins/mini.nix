@@ -22,7 +22,6 @@
         basics = {};
         clue = {
           triggers = [
-            # Leader triggers
             {
               mode = "n";
               keys = "<Leader>";
@@ -32,13 +31,11 @@
               keys = "<Leader>";
             }
 
-            # Built-in completion
             {
               mode = "i";
               keys = "<C-x>";
             }
 
-            # `g` key
             {
               mode = "n";
               keys = "g";
@@ -48,7 +45,6 @@
               keys = "g";
             }
 
-            # Marks
             {
               mode = "n";
               keys = "\"";
@@ -66,7 +62,6 @@
               keys = "`";
             }
 
-            # Registers
             {
               mode = "n";
               keys = "\"";
@@ -84,13 +79,11 @@
               keys = "<C-r>";
             }
 
-            # Window commands
             {
               mode = "n";
               keys = "<C-w>";
             }
 
-            # `z` key
             {
               mode = "n";
               keys = "z";
@@ -102,7 +95,6 @@
           ];
 
           clues = [
-            # Enhance this by adding descriptions for <Leader> mapping groups
             "miniclue.gen_clues.builtin_completion()"
             "miniclue.gen_clues.g()"
             "miniclue.gen_clues.marks()"
@@ -121,7 +113,6 @@
         cursorword = {};
         hipatterns = {
           highlighters = {
-            # Highlight standalone 'FIXME', 'HACK', 'TODO', 'NOTE'
             fixme = {
               pattern = "%f[%w]()FIXME()%f[%W]";
               group = "MiniHipatternsFixme";
@@ -139,7 +130,6 @@
               group = "MiniHipatternsNote";
             };
 
-            # Highlight hex color strings (`#rrggbb`) using that color
             hex_color = "hipatterns.gen_highlighter.hex_color()";
           };
         };
@@ -189,11 +179,6 @@
     };
 
     keymaps = [
-      # {
-      #   mode = "n";
-      #   key = "<leader>a";
-      #   action.__raw = "function() require'harpoon':list():add() end";
-      # }
     ];
   };
 }

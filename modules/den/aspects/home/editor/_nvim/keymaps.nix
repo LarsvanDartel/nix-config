@@ -17,13 +17,10 @@
           inherit action key;
         })
         {
-          # Esc to clear search results
           "<esc>" = ":noh<CR>";
 
-          # fix Y behaviour
           Y = "y$";
 
-          # resize with arrows
           "<C-Up>" = ":resize -2<CR>";
           "<C-Down>" = ":resize +2<CR>";
           "<C-Left>" = ":vertical resize +2<CR>";
@@ -36,7 +33,6 @@
           inherit action key;
         })
         {
-          # better indenting
           ">" = ">gv";
           "<" = "<gv";
           "<TAB>" = ">gv";

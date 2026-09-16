@@ -1,4 +1,4 @@
-# home.ssh (was the ssh contribution to homeManager.common).
+# home.ssh
 {cosmosLib, ...}: let
   inherit (cosmosLib) get-file-names get-flake-path get-file-name-without-extension;
 
@@ -37,21 +37,15 @@ in {
         enable = true;
         enableDefaultConfig = false;
 
-        # The servers' primary account is `nixos`, not `lvdar` — only voyager
-        # names its user after its owner. ssh defaults to the *local* username,
-        # so `ssh endeavour.nb.lvdar.nl` from voyager asks for an account that
-        # does not exist there and is refused with a bare "Permission denied
-        # (publickey)", which reads like a key problem rather than a name one.
-        #
-        # A literal, because den cannot read another host's `cosmos.user.name`
-        # any more than it can read its ports.
-        #
-        # `settings` is a DAG, and ssh takes the first value it is given for a
-        # keyword, so these have to be ordered ahead of the catch-all below.
-        # Port 2222 for the same reason: NetBird's agent redirects the mesh
-        # address's :22 to its own SSH server, which does not want these keys.
-        # `netbird ssh <peer>` is how to reach that one deliberately; plain ssh
-        # should keep meaning OpenSSH. See core/ssh.nix.
+        # The servers' primary account is `nixos`, not the local username:
+        # without this, ssh from voyager asks for an account that doesn't
+        # exist there and is refused with a bare "Permission denied
+        # (publickey)", which reads like a key problem. A literal because den
+        # can't read another host's cosmos.user.name. `settings` is a DAG and
+        # ssh keeps the first value per keyword, so these must precede the
+        # catch-all below. Port 2222 likewise: NetBird redirects the mesh
+        # address's :22 to its own SSH server, which doesn't want these keys
+        # — reach that one with `netbird ssh <peer>`. See core/ssh.nix.
         settings."*.nb.lvdar.nl" = entryBefore ["*"] {
           User = "nixos";
           Port = 2222;

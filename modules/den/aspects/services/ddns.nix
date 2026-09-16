@@ -1,26 +1,15 @@
 # services.ddns — publish this host's public address as a name.
 #
-# Exists for one reason: gaia's crowdsec whitelist needs to know the home
-# connection, and a checked-in literal cannot. hosts/gaia.nix carried
-# `whitelistIps = ["86.86.217.11"]` with a comment admitting it is "dynamic, so
-# it will drift" — and when it does it stops protecting this household and
-# starts protecting whoever the ISP hands the address to next. The comment
-# claimed the `lvdar.nl` entry in whitelistFqdns was "the durable half", but
-# lvdar.nl resolves to gaia, not to home, so nothing covered this.
+# Exists for gaia's crowdsec whitelist: the home address is dynamic, and a
+# checked-in literal drifts into whitelisting whoever the ISP hands the
+# address to next. crowdsec resolves names for exactly this (s01-whitelist
+# postoverflow, services/crowdsec.nix); this module keeps the name true.
+# Runs on endeavour, the host actually behind the home connection — gaia
+# only sees that address as a source IP.
 #
-# crowdsec already resolves names for exactly this purpose
-# (services/crowdsec.nix, the s01-whitelist postoverflow, one lookup per alert
-# rather than per event). Giving it a name that tracks the address is the whole
-# fix; this is the half that keeps the name true.
-#
-# Runs on endeavour rather than gaia because endeavour is the host that is
-# actually behind the home connection. gaia sees that address only as a source
-# IP on inbound connections, which is not something it can publish.
-#
-# The whitelist matters because crowdsec's bouncer drops in nftables, not in
-# nginx: a ban on the home address does not merely return 403, it black-holes
-# the WireGuard handshake too. Losing the mesh from home is the one failure
-# where the fix and the path to the fix disappear together.
+# A crowdsec ban is not a 403: the bouncer drops in nftables, so it
+# black-holes the WireGuard handshake too — losing the mesh from home loses
+# the path to the fix.
 {...}: {
   den.aspects.services.ddns.nixos = {
     config,
@@ -73,12 +62,9 @@
     config = mkIf cfg.enable {
       sops.secrets.${cfg.secret} = {};
 
-      # Upstream orders this After=network.target, which only means the network
-      # stack has been configured — not that a route exists or that DNS answers.
-      # On the reboot of 2026-08-24 it ran anyway, failed to reach the ipify API,
-      # and the failure notification then failed too because ntfy.lvdar.nl did
-      # not resolve yet. It is a Restart=no oneshot, so nothing retried it until
-      # the timer came round fifteen minutes later.
+      # Upstream orders this After=network.target only. On the 2026-08-24
+      # reboot it ran before DNS answered, failed, and (Restart=no oneshot)
+      # was not retried until the timer.
       systemd.services.cloudflare-dyndns = {
         wants = ["network-online.target"];
         after = ["network-online.target" "nss-lookup.target"];
@@ -89,10 +75,8 @@
         apiTokenFile = config.sops.secrets.${cfg.secret}.path;
         inherit (cfg) domains;
         ipv4 = true;
-        # The home connection's v6 prefix is delegated and rotates independently
-        # of the v4 address; publishing a stale AAAA would send traffic nowhere.
-        # crowdsec matches on the source address of the connection, which for
-        # this purpose is v4.
+        # The v6 prefix rotates independently of the v4 address — a stale AAAA
+        # would send traffic nowhere; crowdsec matches the v4 source address.
         ipv6 = false;
         proxied = false;
         # Often enough to matter after a re-address, rarely enough to stay well

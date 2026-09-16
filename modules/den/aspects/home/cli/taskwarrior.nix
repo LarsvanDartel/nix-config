@@ -1,11 +1,9 @@
 # home.taskwarrior (+ taskwarrior-tui, and the sync block for services.taskchampion)
 #
-# Split across nixos and homeManager because the sync configuration is a
-# secret: taskwarrior wants `sync.encryption_secret` as a literal in taskrc,
-# and the only literal worth writing there is one that came out of sops. So the
-# nixos half renders the whole sync stanza into a sops template owned by the
-# user, and the homeManager half does nothing but `include` it — taskrc has no
-# way to read a value from a file, but it can include one.
+# Split across nixos and homeManager because taskrc wants
+# sync.encryption_secret as a literal: the nixos half renders the whole sync
+# stanza into a user-owned sops template, and the homeManager half just
+# `include`s it — taskrc cannot read a value from a file, only include one.
 {
   den,
   inputs,
@@ -41,16 +39,11 @@
       };
 
       config = mkIf (cfg.serverUrl != null) {
-        # The id is not a per-device identifier: the TaskChampion protocol
-        # "uses the term client to refer generically to all replicas
-        # replicating a single task history", so every device on this list —
-        # voyager and the phone — presents the same UUID. A different one is a
-        # different, empty list, not a second seat at the same one.
-        #
-        # It is a credential rather than a name because the server is
-        # published (services/taskchampion.nix), which is why it comes from
-        # sops instead of being written here. hosts/common: endeavour needs the
-        # same value for its allow-list.
+        # Every replica presents the same UUID: TaskChampion's "client" means
+        # all replicas of one task history, so a different id is a different,
+        # empty task list, not a second seat at the same one. A credential
+        # (the server is published — services/taskchampion.nix), hence sops;
+        # hosts/common holds the same value for endeavour's allow-list.
         sops.secrets = {
           "keys/taskwarrior/client-id" = {
             sopsFile = "${builtins.toString inputs.nix-secrets}/hosts/common/secrets.yaml";
@@ -59,9 +52,8 @@
           "keys/taskwarrior/encryption-secret".owner = userName;
         };
 
-        # The whole sync stanza, not just the secrets: taskrc's `include` takes
-        # a file, so keeping the url here too means one file to include and one
-        # place where the sync configuration lives.
+        # The whole stanza, not just the secrets: taskrc's include takes a
+        # file, so the url lives here too — one include, one place for sync.
         sops.templates."taskwarrior-sync.conf" = {
           content = ''
             sync.server.url=${cfg.serverUrl}
@@ -92,17 +84,11 @@
         enable = true;
         package = pkgs.taskwarrior3;
 
-        # The default theme's color.overdue (fg only) and color.scheduled
-        # (bg only) are individually sane, but rule.color.merge=1 combines
-        # colors from *every* matching rule rather than just the
-        # highest-precedence one — so an overdue+scheduled task gets
-        # color.overdue's red foreground stapled onto color.scheduled's dark
-        # navy background, and comes out unreadable. Turning merge off makes
-        # the highest-precedence rule win outright.
-        #
-        # Last line of taskrc, and taskwarrior lets a later definition win — so
-        # anything set by hand with `task config` earlier in the file is
-        # overridden by what sops rendered, rather than silently shadowing it.
+        # rule.color.merge (default on) combines colors from every matching
+        # rule, so an overdue+scheduled task gets overdue's red fg on
+        # scheduled's dark navy bg — unreadable; off makes the
+        # highest-precedence rule win outright. Last line of taskrc: later
+        # definitions win, so this overrides anything set via `task config`.
         extraConfig =
           ''
             rule.color.merge=0

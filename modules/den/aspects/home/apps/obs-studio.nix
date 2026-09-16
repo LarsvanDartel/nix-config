@@ -12,9 +12,8 @@
 
     cfg = config.cosmos.programs.obs-studio;
 
-    # A sink that goes nowhere, whose monitor is therefore a recording of
-    # whatever was played into it. Created by a client rather than declared in
-    # pipewire.conf.d on purpose — see the unit below.
+    # A sink that goes nowhere, so its monitor is a recording of whatever was
+    # played into it. Created by a client on purpose — see the unit below.
     createSink = pkgs.writeShellScript "obs-virtual-audio" ''
       exec ${pkgs.pipewire}/bin/pw-cli -m create-node adapter '{
         factory.name = support.null-audio-sink
@@ -70,34 +69,25 @@
       };
       cosmos.system.impermanence.persist.directories = [".config/obs-studio"];
 
-      # Deliberately a client of pipewire rather than a `context.modules` entry
-      # in pipewire.conf.d, which is how these are usually written.
+      # A pipewire client, not a pipewire.conf.d context.modules entry: an
+      # earlier attempt (libpipewire-module-loopback, media.class
+      # Audio/Source/Virtual) segfaulted pipewire 1.6.8 ("can't add port:
+      # -28") and took the daemon down in a restart loop — no sound at all.
+      # As a separate process the worst case is no virtual device.
       #
-      # Loaded into the daemon, anything that goes wrong here goes wrong to all
-      # audio: an earlier attempt at this used libpipewire-module-loopback with
-      # a `media.class = Audio/Source/Virtual` playback node, which on pipewire
-      # 1.6.8 fails to create its ports ("can't add port: -28") and then
-      # segfaults cleaning them up. Because the module lived in the daemon, the
-      # daemon died with it, in a restart loop, and the machine came up with no
-      # sound at all. As a separate process the worst case is no virtual
-      # device.
+      # Hence a sink monitor rather than a virtual source: Audio/Source/Virtual
+      # is the class that crashes, and monitors are listed everywhere
+      # microphones are.
       #
-      # It is also why the microphone is this sink's monitor rather than a
-      # virtual source of its own: Audio/Source/Virtual is the class that would
-      # be listed directly as a microphone, and it is the class that crashes.
-      # A monitor is listed by everything that offers monitors — which, having
-      # checked, includes what this is for.
-      #
-      # Two OBS-side settings finish the job and neither can be set from here:
-      # its config is persisted rather than generated, and OBS rewrites it. In
-      # Settings → Audio → Advanced set Monitoring Device to this sink, then
-      # per source, Advanced Audio Properties → Audio Monitoring → "Monitor and
-      # Output".
+      # Two OBS-side settings finish this and can't be set from here (its
+      # config is persisted and OBS rewrites it): Settings → Audio → Advanced
+      # → Monitoring Device = this sink, and per source, Advanced Audio
+      # Properties → Audio Monitoring → "Monitor and Output".
       systemd.user.services.obs-virtual-audio = mkIf cfg.virtualAudio.enable {
         Unit = {
           Description = "Virtual audio sink to accompany OBS's virtual camera";
-          # The node lives as long as this client, and there is nothing to own
-          # it before pipewire exists or after it goes away.
+          # The node lives only as long as this client; nothing owns it
+          # outside pipewire's lifetime.
           After = ["pipewire.service"];
           BindsTo = ["pipewire.service"];
         };
@@ -106,8 +96,7 @@
           Restart = "on-failure";
           RestartSec = 2;
         };
-        # Started by pipewire rather than at login, so it follows a restart of
-        # the daemon instead of being left behind by one.
+        # Wanted by pipewire, not at login, so it follows daemon restarts.
         Install.WantedBy = ["pipewire.service"];
       };
     };

@@ -1,31 +1,21 @@
 # services.transcode — periodically re-encode library video to AV1 on the GPU.
 #
-# The array is small for what it holds (2x raidz1 of 3x558G, shared with
-# opencloud and the download scratch dirs), so the point of this is reclaimed
-# space, not uniformity. It replaces each file with an AV1 copy of itself and
-# keeps everything else about it — same path, same name, same audio, same
-# subtitles.
+# The point is reclaimed space, not uniformity: each file is replaced with an
+# AV1 copy of itself — same path, name, audio, subtitles. Three properties
+# make an unattended, destructive job like this tolerable: every output is
+# probed before it is allowed to replace anything (a lost stream or a short
+# output is discarded, never swapped in); a file that does not actually
+# shrink by `minSaving` is put back and marked so it is not tried again
+# (which is what makes it safe to point at HEVC); and the work is bounded —
+# `maxPerRun` files a night, `parallel` at a time, stopping early if the
+# pool is filling, counting encodes in flight (each holds a second copy of
+# its source).
 #
-# Three properties make an unattended, destructive job like this tolerable:
-#
-#   * it never trusts the encoder. Every output is probed before it is allowed
-#     to replace anything, and an output that lost a stream or came out short
-#     is discarded rather than swapped in.
-#   * it never churns for nothing. A file that does not actually shrink by
-#     `minSaving` is put back and marked so it is not tried again. That is what
-#     makes it safe to point at HEVC, which often has nothing left to give.
-#   * it does bounded work. `maxPerRun` files a night, at most `parallel` at
-#     a time, and it stops early if the pool is filling up — counting the
-#     encodes already in flight, each of which is holding a second copy of
-#     its source.
-#
-# The encoder is the Arc A310's, via jellyfin-ffmpeg — deliberately, and not
-# nixpkgs' ffmpeg. intel-media-driver 26.1.6 exports __vaDriverInit_1_24, which
-# needs libva >= 2.24; nixpkgs' ffmpeg links libva 2.22.0 and cannot load the
-# driver at all ("has no function __vaDriverInit_1_0"). jellyfin-ffmpeg carries
-# libva 2.24.0 of its own, which is why jellyfin can drive this GPU while
-# nothing else on the host could. Nothing about the system's graphics stack
-# needs changing; the package choice is the whole fix.
+# The encoder is the Arc A310's, via jellyfin-ffmpeg — deliberately, not
+# nixpkgs' ffmpeg: intel-media-driver 26.1.6 exports __vaDriverInit_1_24 and
+# needs libva >= 2.24, while nixpkgs' ffmpeg links libva 2.22.0 and cannot
+# load the driver at all. jellyfin-ffmpeg carries libva 2.24.0 of its own;
+# the package choice is the whole fix, nothing else on the host changes.
 {den, ...}: {
   den.aspects.services.transcode = {
     includes = with den.aspects.services; [
@@ -340,11 +330,10 @@
           };
         };
 
-        # Nightly rather than the interval style used by the only other timer
-        # in this repo (netbird-services): this competes with playback for the
-        # same GPU, so it wants a quiet window rather than a fixed cadence.
-        # Not Persistent — a missed night should be skipped, not turned into a
-        # burst of encodes at the next boot.
+        # Nightly rather than interval-style: this competes with playback for
+        # the same GPU, so it wants a quiet window, not a fixed cadence. Not
+        # Persistent — a missed night is skipped, not turned into a burst of
+        # encodes at the next boot.
         systemd.timers.transcode = {
           description = "Nightly library re-encode";
           wantedBy = ["timers.target"];

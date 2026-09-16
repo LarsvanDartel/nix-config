@@ -1,14 +1,7 @@
-# minuet — LLM completion against the fleet's own ollama, not a cloud service.
-#
-# Off by default and opt-in per host, because it is the one plugin here that
-# does not work standalone: it needs services.ollama reachable on the mesh,
-# which is endeavour and nowhere else. Enabling it on a machine that cannot
-# reach that host gives an editor whose completions silently time out.
-#
-# Deliberately fill-in-middle rather than chat. qwen2.5-coder's template
-# handles a `suffix`, so the model is told what comes *after* the cursor as
-# well as before — which is what makes a completion fit the surrounding code
-# instead of merely continuing the line.
+# minuet — LLM completion against the fleet's own ollama (endeavour only).
+# Opt-in per host: needs services.ollama on the mesh; elsewhere completions
+# silently time out. fill-in-middle, not chat — only /v1/completions takes a
+# suffix (text after the cursor), which is what makes suggestions fit.
 {
   lib,
   config,
@@ -77,14 +70,11 @@ in {
       settings = {
         provider = "openai_fim_compatible";
 
-        # One suggestion. More means more tokens generated per request for a
-        # menu that is mostly ignored, and this card charges for every one.
+        # One suggestion — more is wasted tokens on this shared GPU.
         n_completions = 1;
 
-        # Lines of surrounding buffer sent as context. Modest deliberately:
-        # prompt processing is this GPU's weakest axis — no tensor cores — so
-        # context is the thing that decides whether a completion arrives in
-        # time, more than the model's own speed.
+        # Modest on purpose: prompt processing (no tensor cores) is this
+        # GPU's bottleneck, so context size decides latency more than model speed.
         context_window = 512;
 
         provider_options.openai_fim_compatible = {
@@ -92,15 +82,13 @@ in {
           end_point = cfg.endpoint;
           inherit (cfg) model;
 
-          # minuet reads the *name of an environment variable* here, not a key.
-          # ollama needs no credential, but the field is mandatory, so it is
-          # pointed at a variable that is always set and never used. TERM is
-          # the conventional choice for exactly this in minuet's own docs.
+          # minuet reads an env-var *name* here; ollama needs no key, so
+          # point it at a variable that is always set and never used (TERM,
+          # the conventional filler per minuet's docs).
           api_key = "TERM";
 
           optional = {
-            # A completion, not an essay. Anything longer stops being
-            # something you can read and accept at a glance.
+            # Short enough to read and accept at a glance.
             max_tokens = 128;
             top_p = 0.9;
           };
@@ -120,8 +108,8 @@ in {
       };
     };
 
-    # Ask for a completion where the cursor is. Bound even when autoTrigger is
-    # on, because the useful case is asking again after editing the line.
+    # Manual ask-at-cursor; still bound with autoTrigger on for re-asking
+    # after editing the line.
     programs.nixvim.keymaps = [
       {
         mode = "i";

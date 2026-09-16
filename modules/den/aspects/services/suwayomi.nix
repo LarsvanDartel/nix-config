@@ -25,12 +25,11 @@
     options.cosmos.services.suwayomi = {
       ip = mkOption {
         type = str;
-        # Loopback is right only while a local nginx vhost fronts this. Under
-        # edge termination netbird-proxy dials `peer:8080` straight over the
-        # mesh, and a loopback-bound socket refuses that connection — the app
-        # has to answer on the netbird interface itself. Reach is still
-        # governed by the firewall, which opens this port on wt0 only (see
-        # cosmos.services.netbird.client.exposedPorts on endeavour).
+        # Loopback only while a local nginx vhost fronts this. Under edge
+        # termination netbird-proxy dials `peer:8080` straight over the mesh
+        # and a loopback bind refuses it. Reach is still firewall-governed:
+        # the port opens on wt0 only (netbird.client.exposedPorts on
+        # endeavour).
         default =
           if config.cosmos.networking.edgeTerminated
           then "0.0.0.0"
@@ -55,20 +54,16 @@
       };
       extensionStores = mkOption {
         type = listOf str;
-        # index.pb, not the index.min.json this used to point at. keiyoushi
-        # moved to Mihon's Extension Store and left the old URL serving a
-        # two-entry stub that reads "Outdated App" / "Update to Mihon 0.20.1+" —
-        # so the page looked broken while the server was faithfully rendering
-        # everything it had been given. Needs suwayomi-server >= 2.3.2223 for
-        # extension API v1.6, which is why modules/pkgs/suwayomi-server.nix
-        # pins ahead of nixpkgs.
+        # index.pb, not the old index.min.json: keiyoushi moved to Mihon's
+        # store and left the old URL serving a two-entry "Outdated App" stub
+        # — the page looked broken while the server rendered what it was
+        # given. Needs suwayomi-server >= 2.3.2223 (extension API v1.6),
+        # hence the pin ahead of nixpkgs in modules/pkgs/suwayomi-server.nix.
         #
-        # Named for the *server.conf* key, which 2.3 renamed from
-        # extensionRepos to extensionStores. That rename is not cosmetic: the
-        # nixpkgs module still writes the old key, 2.3's migration of it yields
-        # an empty list rather than an error, and the extension page then looks
-        # exactly as broken as it did before the upgrade. Hence the explicit
-        # settings.server.extensionStores below rather than the module option.
+        # Named for the server.conf key 2.3 renamed from extensionRepos —
+        # which the nixpkgs module still writes; 2.3 migrates that to an empty
+        # list rather than erroring, so the page looks exactly as broken.
+        # Hence the explicit settings.server.extensionStores below.
         default = ["https://raw.githubusercontent.com/keiyoushi/extensions/repo/index.pb"];
       };
       expose = mkOption {
@@ -162,22 +157,13 @@
         optional (cfg.homeLink != null)
         "L+ ${cfg.homeLink} - - - - ${cfg.downloadsDir}";
 
-      # Comick's image CDN answers a burst of page requests with HTTP 429, and
-      # not on a rate you can pace around — a plain sequential fetch with a
-      # second between pages still trips it intermittently. The reader survives
-      # that because a failed page gets a retry button; the downloader gives up
-      # after three tries and parks the chapter as ERROR.
-      #
-      # startDownloader does not revive those: an entry already at tries=3 is
-      # skipped and the queue goes straight back to STOPPED. Re-enqueueing it
-      # where it sits is worse than useless — it increments the try count
-      # instead of clearing it and zeroes the progress. Only a dequeue resets
-      # the counter, so this sweeps ERROR entries out and puts them back.
-      #
-      # It converges because the pages already fetched stay in the on-disk
-      # cache: measured over one sweep, two chapters went 22% -> 61% and
-      # 10% -> 84%, and both finished on the next. So each pass resumes rather
-      # than restarting, and a chapter completes after a few sweeps.
+      # Comick's CDN answers page bursts with HTTP 429 regardless of pacing;
+      # the downloader gives up after three tries and parks the chapter as
+      # ERROR. startDownloader does not revive those — it skips entries at
+      # tries=3, and re-enqueueing in place increments the count and zeroes
+      # progress. Only a dequeue resets the counter, so this sweeps ERROR
+      # entries out and puts them back. It converges because fetched pages
+      # stay in the on-disk cache: each sweep resumes rather than restarts.
       systemd.services.suwayomi-download-retry = mkIf cfg.downloadRetry.enable {
         description = "Re-queue suwayomi chapter downloads that failed on HTTP 429";
         after = ["suwayomi-server.service"];
@@ -256,22 +242,19 @@
         settings.server = {
           inherit (cfg) ip port;
 
-          # The 2.3 key. Written directly because the nixpkgs module's
-          # extensionRepos option targets the 2.1 name, which 2.3 silently
-          # discards. The basicAuth* keys below are left on the module options
-          # on purpose — 2.3 does migrate those to authMode/authUsername, and
-          # the module turns basicAuthPasswordFile into an envsubst placeholder
-          # so the secret never enters the store. Hand-writing them would lose
-          # that.
+          # The 2.3 key, written directly: the module's extensionRepos option
+          # targets the 2.1 name, which 2.3 silently discards. The basicAuth*
+          # keys below stay on the module options on purpose — 2.3 migrates
+          # those, and the module envsubsts basicAuthPasswordFile so the
+          # secret never enters the store.
           extensionStores = cfg.extensionStores;
 
-          # Follows webview.enable, which until now it did not. That option only
-          # swapped the *package* for the FHS-wrapped one; whether the server
-          # tries to start CEF at all is this runtime setting, and it defaults
-          # to true. So with the webview off, suwayomi still initialised CEF on
-          # every start — outside the FHS env, where it cannot resolve glib —
-          # logged an UnsatisfiedLinkError, and re-downloaded 519 MB of Chromium
-          # into the state directory to do it. Harmless but entirely wasted.
+          # Follows webview.enable, which until now it did not: that option
+          # only swapped the *package*; whether CEF starts at all is this
+          # runtime setting, which defaults to true. With the webview off the
+          # server still initialised CEF outside the FHS env —
+          # UnsatisfiedLinkError plus a 519 MB Chromium re-download into the
+          # state directory, every start.
           kcefEnabled = cfg.webview.enable;
 
           # Cloudflare. mkIf rather than an explicit false, so a host that sets

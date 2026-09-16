@@ -1,5 +1,4 @@
-# core.yubikey — pcscd/udev + u2f PAM (was flake.modules.nixos.common in
-# modules/nixos/security/yubikey.nix).
+# core.yubikey — pcscd/udev + u2f PAM.
 {...}: {
   den.aspects.core.yubikey.nixos = {
     config,
@@ -7,16 +6,12 @@
     pkgs,
     ...
   }: let
-    # `runuser -l` resets the environment, and a udev worker has none of
+    # `runuser -l` resets the environment and a udev worker has none of
     # XDG_RUNTIME_DIR / WAYLAND_DISPLAY / DBUS_SESSION_BUS_ADDRESS to begin
-    # with — noctalia's IPC needs all three (verified: it crashed on an
-    # unset runtime dir, then failed to find "any running instance" once the
-    # runtime dir alone was supplied). Lifted from whichever of the user's own
-    # processes actually has a Wayland display open, rather than hardcoding a
-    # compositor binary name, so this works under either specialisation. A
-    # script file also sidesteps nested-quoting hazards in the udev RUN+=
-    # line, which a `-c "…"` string embedding another command runs straight
-    # into.
+    # with — noctalia's IPC needs all three. Lift them from one of the user's
+    # own processes that has a Wayland display open (no hardcoded compositor,
+    # works under either specialisation); a script file also avoids nested
+    # quoting in the udev RUN+= line.
     lockScript = pkgs.writeShellScript "yubikey-lock" ''
       user=${config.cosmos.user.name}
       uid=$(${pkgs.coreutils}/bin/id -u "$user")
@@ -62,13 +57,9 @@
         udev.packages = with pkgs; [yubikey-personalization];
         dbus.packages = [pkgs.gcr_4];
 
-        # lock session on yubikey removal.
-        #
-        # `loginctl lock-sessions` only emits logind's Session.Lock() signal —
-        # it does nothing unless something is listening for it, and neither
-        # hyprlock nor noctalia hook that signal; both only lock in response to
-        # being run directly (see cosmos.profiles.desktop.lockCommand above and
-        # lockScript above), so that's what has to run here instead.
+        # `loginctl lock-sessions` only emits logind's Session.Lock() signal,
+        # which nothing here listens for — hyprlock and noctalia only lock
+        # when run directly (lockCommand/lockScript above), so that's this.
         udev.extraRules = lib.mkIf (config.cosmos.profiles.desktop.lockCommand != "") ''
           ACTION=="remove",\
            ENV{ID_BUS}=="usb",\
@@ -86,12 +77,9 @@
         sudo.u2fAuth = true;
       };
 
-      # A pam_u2f mapping is a key handle + public key, not a credential — the
-      # private key never leaves the YubiKey, so this is safe to commit in the
-      # open rather than through sops. Regenerate with:
+      # A pam_u2f mapping is a key handle + public key, not a credential —
+      # safe to commit in the open. Regenerate per key (one line each) with:
       #   nix-shell -p pam_u2f --run pamu2fcfg
-      # (touch the key when it prompts) and paste the resulting line(s) here,
-      # one per line for multiple keys registered to the same user.
       security.pam.u2f.settings = {
         authfile = "/etc/u2f_mappings";
         cue = true;

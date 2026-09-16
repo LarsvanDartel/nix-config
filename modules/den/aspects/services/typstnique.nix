@@ -10,12 +10,9 @@
     services.typstnique = {
       enable = true;
       port = 3030;
-      # Bound to the mesh rather than loopback: this runs on endeavour, which
-      # is edgeTerminated, so the connection arrives from gaia's netbird-proxy
-      # over WireGuard and a loopback bind would refuse it.
-      #
-      # The firewall is what limits reach: 3030 is opened on the netbird
-      # interface alone (netbird.client.exposedPorts in hosts/endeavour.nix).
+      # 0.0.0.0, not loopback: endeavour is edgeTerminated, connections arrive
+      # from gaia's netbird-proxy over WireGuard. The firewall limits reach
+      # (netbird.client.exposedPorts in hosts/endeavour.nix).
       address = "0.0.0.0";
     };
   };

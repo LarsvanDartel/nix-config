@@ -1,18 +1,14 @@
 # services.grafana — dashboards over the prometheus on this host.
 #
-# Published at grafana.lvdar.nl with the NetBird identity gate deliberately
-# OFF, and its own kanidm OIDC client instead. This is the opencloud pattern,
-# not the arr one, and the reason is a bug this repo has already been bitten
-# by: the gate answers a lapsed session with a 302 to the IdP, and Grafana is
-# an SPA that talks to its own API over XHR. It cannot follow that redirect and
-# dies with a bare NetworkError — exactly what took traccar down until it was
-# ungated (see the comment on `traccar` in hosts/gaia.nix). Its own OIDC also
-# avoids logging in twice, and carries a role through rather than just a
-# yes/no.
+# Published with the NetBird identity gate deliberately OFF and its own
+# kanidm OIDC client — the opencloud pattern, not the arr one. The gate
+# answers a lapsed session with a 302 to the IdP; Grafana is an SPA whose
+# XHR cannot follow it and dies with a bare NetworkError — what took traccar
+# down until it was ungated (hosts/gaia.nix). Its own OIDC also avoids a
+# second login and carries a role, not just yes/no.
 #
-# The local admin login is left enabled on purpose. If kanidm is down — and
-# kanidm runs on this host, behind the same edge — an OIDC-only Grafana is a
-# dashboard you cannot open at precisely the moment you want to look at it.
+# Local admin login kept: kanidm runs on this host behind the same edge, so
+# OIDC-only would lock the dashboard exactly when you want to look at it.
 {den, ...}: {
   den.aspects.services.grafana = {
     includes = with den.aspects.services; [netbird.client prometheus loki];
@@ -30,11 +26,9 @@
       prom = config.cosmos.services.prometheus;
       loki = config.cosmos.services.loki;
 
-      # Hand-written rather than imported from grafana.com: a dashboard pulled
-      # by id is a JSON blob nobody in this repo can review, pinned to nothing,
-      # and it breaks silently when the metric names it assumes change. This is
-      # small enough to read, and covers what the alert rules alert on — so
-      # when a notification arrives there is a graph for it.
+      # Hand-written, not imported from grafana.com: an id-pulled dashboard
+      # is an unreviewable JSON blob pinned to nothing, breaking silently
+      # when metric names change. Covers what the alert rules alert on.
       fleetJson = pkgs.writeText "fleet.json" (builtins.toJSON {
         title = "Fleet";
         uid = "fleet";
@@ -148,16 +142,13 @@
           # this, and no longer ships a default. Losing it means those secrets
           # cannot be decrypted, so it is generated once and kept, not derived.
           "keys/grafana/secret-key".owner = "grafana";
-          # Grafana ships admin/admin, and this instance is published — so the
-          # break-glass local login below was a login anyone on the internet
-          # had, verified working before this existed.
-          #
-          # Caveat worth knowing: grafana only reads this when it *creates* the
-          # admin account. Setting it on an instance that already started once
-          # changes nothing, silently — the fix then is to remove
-          # /var/lib/grafana/data/grafana.db (provisioned datasources and
-          # dashboards come back from nix) or run
-          # `grafana cli admin reset-admin-password`.
+          # Grafana ships admin/admin, and this instance is published — the
+          # break-glass local login was a login anyone on the internet had
+          # until this existed. Caveat: grafana only reads this when it
+          # *creates* the admin account; setting it later changes nothing,
+          # silently — remove /var/lib/grafana/data/grafana.db (provisioned
+          # content comes back from nix) or `grafana cli admin
+          # reset-admin-password`.
           "keys/grafana/admin-password".owner = "grafana";
         };
 
@@ -180,10 +171,10 @@
               http_addr = "0.0.0.0";
               http_port = cfg.port;
               inherit (cfg) domain;
-              # Absolute, and https: grafana builds its OIDC redirect_uri from
-              # this. Get it wrong and kanidm rejects the callback under strict
-              # redirect matching, which is the same class of failure the
-              # netbird dashboard hit.
+              # Absolute and https: grafana builds its OIDC redirect_uri
+              # from this — wrong and kanidm rejects the callback under
+              # strict redirect matching (same failure the netbird dashboard
+              # hit).
               root_url = "https://${cfg.domain}";
             };
 
@@ -208,18 +199,16 @@
               allow_sign_up = true;
               login_attribute_path = "preferred_username";
 
-              # kanidm emits grafana_role from its claim map; anyone who gets
-              # this far without one is a Viewer. Admin is not the default on
-              # purpose — the OIDC group is what grants it, so revoking in
-              # kanidm actually revokes.
+              # kanidm emits grafana_role from its claim map; no role means
+              # Viewer. Admin is not the default — the OIDC group grants it,
+              # so revoking in kanidm actually revokes.
               role_attribute_path = "contains(grafana_role[*], 'Admin') && 'Admin' || 'Viewer'";
             };
 
-            # Kept, deliberately — see the header. kanidm lives on this host
-            # and behind the same edge, so OIDC-only would make a Grafana
-            # outage and a kanidm outage the same event. Only defensible
-            # because the admin password above is a real one; with the shipped
-            # default this was an open door on a published service.
+            # Kept deliberately (see header): OIDC-only would make a Grafana
+            # outage and a kanidm outage the same event. Defensible only
+            # because the admin password above is a real one — with the
+            # shipped default this was an open door.
             auth.disable_login_form = false;
           };
 

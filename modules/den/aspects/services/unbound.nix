@@ -1,27 +1,10 @@
 # services.unbound — recursive DNS + oisd blocklist.
 #
-# The blocklists are **vendored** in ./_unbound rather than fetched as flake
-# inputs, and that is a correctness fix, not tidying.
-#
-# They used to be `flake = false` inputs pointing at https://big.oisd.nl/unbound
-# and its nsfw sibling. oisd regenerates those files continuously — the header
-# of each snapshot carries a `# Version: YYYYMMDDHHMM` line — so the narHash in
-# flake.lock describes a file that no longer exists at that URL within a day or
-# so. Every machine here kept working anyway, because the fetched copy was
-# already in its store and eval cache. The first environment with a genuinely
-# cold store was CI, and it failed immediately:
-#
-#   error: mismatch in field 'narHash' of input
-#          {"type":"file","url":"https://big.oisd.nl/unbound"}
-#
-# which means the same failure was waiting for any fresh machine, or for any
-# rebuild after a garbage collection deep enough to drop those paths. A DNS
-# blocklist is not something to discover you cannot rebuild during a recovery.
-#
-# The cost is 12 MB + 22 MB of sorted domains in git, ~4.8 MB compressed, and
-# an explicit act to update — `nix run .#update-blocklists`. That is the right
-# trade for the fleet's resolver: updates become a reviewable commit instead of
-# a silent change in what the network can reach.
+# The blocklists are vendored in ./_unbound deliberately. As `flake = false`
+# file inputs they broke: oisd regenerates the files continuously, so the
+# locked narHash stops matching within a day and any cold store (CI, a fresh
+# machine, a deep GC) fails eval. Vendoring makes updates a reviewable
+# commit: `nix run .#update-blocklists`.
 {...}: {
   den.aspects.services.unbound.nixos = {
     config,
@@ -85,9 +68,9 @@
       };
 
       # Lifted out of hosts/endeavour.nix so a second resolver can carry the
-      # same list. A backup that answers but stops blocking ads is a confusing
-      # failure mode — the whole point of a fallback is that you cannot tell
-      # which one served you.
+      # same list. A backup that answers but stops blocking is a confusing
+      # failure: the point of a fallback is that you cannot tell which one
+      # served you.
       oisd = {
         enable = mkEnableOption "the oisd blocklist";
         nsfw = mkOption {
@@ -161,11 +144,10 @@
           toString (pkgs.writeText "unbound-blocklist" merged)
       );
 
-      # Ordering only, not a dependency: on a host where the agent had taken
-      # :53 as the system resolver, it has to be moved aside before unbound can
-      # bind. Without this the deploy fails with "address already in use" and
-      # rolls back, which is unrecoverable without a manual restart — the new
-      # config that moves the agent is the very thing being rolled back.
+      # Ordering only, not a dependency: where the agent had taken :53 as the
+      # system resolver it must move aside before unbound can bind, else the
+      # deploy fails "address already in use" and rolls back — unrecoverable,
+      # because the config that moves the agent is what gets rolled back.
       systemd.services.unbound.after =
         optional cfg.mesh.enable
         "${config.services.netbird.clients.default.suffixedName}.service";
@@ -209,30 +191,28 @@
           }
           (mkIf (cfg.localRecords != {}) {
             server = {
-              # `static` per name rather than `transparent`: transparent falls
-              # through to the public answer when the local one does not match,
-              # and the public answer here is the wildcard pointing at the edge
-              # — the wrong address, returned confidently, which is the failure
-              # the mesh forward-zone below is already commented about.
+              # `static` per name, not `transparent`: transparent falls
+              # through to the public answer, which here is the wildcard
+              # pointing at the edge — the wrong address, returned
+              # confidently. Same failure the mesh forward-zone below is
+              # commented about.
               local-zone = mapAttrsToList (name: _: ''"${name}." static'') cfg.localRecords;
               local-data = mapAttrsToList (name: addr: ''"${name}. IN A ${addr}"'') cfg.localRecords;
             };
           })
           (mkIf cfg.mesh.enable {
-            # The mesh domain is not in public DNS and is not DNSSEC-signed,
-            # while its parent lvdar.nl is. Without domain-insecure the
-            # validator rejects every forwarded answer as bogus and the whole
-            # zone SERVFAILs — which looks exactly like the resolver being
-            # down.
+            # The mesh domain is not in public DNS and not DNSSEC-signed
+            # while its parent lvdar.nl is: without domain-insecure the
+            # validator rejects every forwarded answer as bogus and the zone
+            # SERVFAILs, which looks exactly like the resolver being down.
             server = {
               domain-insecure = netbird.dnsDomain;
 
-              # Unbound refuses to send queries to loopback by default
-              # (do-not-query-localhost defaults to yes), so the forward-zone
-              # below is silently skipped and the whole mesh zone SERVFAILs
-              # while the target answers perfectly when queried by hand. The
-              # protection is against resolving via a local recursor by
-              # accident; here loopback is exactly where the answer lives.
+              # Unbound refuses loopback targets by default
+              # (do-not-query-localhost), so the forward-zone below would be
+              # silently skipped and the mesh zone SERVFAILs while the target
+              # answers fine by hand. The default guards against accidental
+              # local recursors; here loopback is where the answer lives.
               do-not-query-localhost = "no";
             };
 
@@ -240,10 +220,9 @@
               {
                 name = "${netbird.dnsDomain}.";
                 forward-addr = cfg.mesh.resolver;
-                # No fallback to the public resolvers. They would answer with
-                # the wildcard A record for lvdar.nl, which is the edge's
-                # public address — the wrong answer, returned confidently,
-                # which is worse than no answer.
+                # No fallback to public resolvers: they would answer the
+                # lvdar.nl wildcard (the edge's public address) — the wrong
+                # answer, returned confidently, worse than none.
                 forward-first = "no";
               }
             ];
@@ -256,11 +235,10 @@
         ];
       };
 
-      # Scoped when firewallInterfaces says so, global otherwise. Global is the
-      # old behaviour and remains the default deliberately: this resolver serves
-      # the mesh AND, on endeavour, the home LAN, and a wrong list here takes
-      # name resolution down for everything that depends on it — including
-      # comin, which then cannot fetch the fix.
+      # Global unless scoped, deliberately: this resolver serves the mesh and,
+      # on endeavour, the home LAN, and a wrong interface list takes name
+      # resolution down for everything depending on it — including comin,
+      # which then cannot fetch the fix.
       networking.firewall = mkMerge [
         (mkIf (cfg.firewallInterfaces == null) {
           allowedUDPPorts = [cfg.port];

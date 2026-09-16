@@ -1,17 +1,8 @@
 # thunderbird-addons — extensions and themes from addons.thunderbird.net,
-# repackaged for home-manager's programs.thunderbird.profiles.<p>.extensions.
-#
-# That option expects each package to drop its xpi under
-# share/mozilla/extensions/{ec8030f7-c20a-464f-9b0e-13a3a9e97384}/<addon-id>.xpi
-# — the same layout modules/pkgs/web-bluetooth-firefox.nix uses for a Zen
-# extension. Unlike Zen's add-ons, none of these are on NUR's
-# rycee.firefox-addons: that overlay only tracks addons.mozilla.org, and
-# Thunderbird's add-ons live on a separate site with its own catalog.
-#
-# Each is otherwise an unmodified download fetched by the exact attachment
-# URL (not a "latest" alias, which is a moving target) so the hash stays
-# meaningful. All but paperless-ngx-uploader come signed from ATN as-is;
-# that one is pinned to a GitHub release instead — see its own comment.
+# repackaged for programs.thunderbird.profiles.<p>.extensions: each drops its
+# xpi under share/mozilla/extensions/{ec8030f7-…}/<addon-id>.xpi, the same
+# layout web-bluetooth-firefox.nix uses. None are on rycee.firefox-addons
+# (AMO-only catalog). Pinned to exact attachment URLs, never "latest".
 {...}: {
   nixpkgs.overlays = [
     (final: _prev: let
@@ -38,18 +29,13 @@
         };
     in {
       thunderbird-addons = {
-        # Uploads the open message's PDF attachments to a paperless-ngx
-        # instance from a context menu — the on-demand alternative to giving
-        # paperless-ngx its own IMAP account against Proton Bridge.
-        #
-        # From GitHub, not ATN: ATN's listing is stuck on 0.9.1, whose
-        # options.js awaits browser.permissions.contains() before calling
-        # permissions.request() — the await loses the click's transient user
-        # activation, so request() throws and the settings form can never
-        # actually save a URL. Fixed upstream in 1.1.0 (also fixes
-        # permissions.request() rejecting a match pattern that includes a
-        # port, which a self-hosted paperless URL usually does), but ATN
-        # review hasn't caught up. Unsigned as a result — see
+        # Uploads a message's PDF attachments to paperless-ngx from a
+        # context menu — the alternative to giving paperless its own IMAP
+        # account. From GitHub, not ATN: ATN is stuck on 0.9.1, whose
+        # options.js loses the click's user activation awaiting
+        # permissions.contains() before permissions.request(), so the
+        # settings form can never save; 1.1.0 also fixes match patterns
+        # containing a port. Unsigned as a result — see
         # xpinstall.signatures.required in thunderbird.nix.
         paperless-ngx-uploader = mkThunderbirdXpi {
           pname = "thunderbird-paperless-ngx-uploader";

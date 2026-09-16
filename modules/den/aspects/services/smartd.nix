@@ -1,32 +1,10 @@
 # services.smartd — tell me which disk is dying before it dies.
 #
-# endeavour has nine disks and no SMART monitoring of any kind: `smartctl` was
-# not even installed. Eight of them are second-hand SAS spinners in two raidz1
-# vdevs, which means the pool survives losing one disk *per vdev* and no more.
-# Without this, the way you learn a disk is failing is that it fails — and if
-# the second one in the same vdev is also old and also unmonitored, the way you
-# learn about that is losing the pool.
-#
-# There is a hot spare (wwn-0x5000cca02f3cabb0) sitting AVAIL. ZFS will pull it
-# in automatically on a fault, which is exactly the event that is currently
-# invisible: the pool would silently drop from "redundant with a spare" to
-# "redundant" and nothing would say so.
-#
-# Not in roles.server, and not on the other two hosts, because SMART is a
-# property of real disks:
-#
-#   gaia     one QEMU virtual disk. smartctl reports the hypervisor's fiction.
-#   pioneer  an SD card on the mmc bus, which has no SMART interface at all —
-#            eMMC health lives in ext_csd, not here.
-#
-# A monitor that reports nothing useful on two of three hosts does not belong
-# in the role; it belongs on the host with the disks. Same reasoning that keeps
-# core.notify-failure out of roles.default.
-#
-# Notifications go to ntfy through the mail hook rather than a mail stack.
-# smartd's only notification mechanism is "run a program with the message on
-# stdin", which is what a mailer is; pointing that at curl is using the hook
-# as designed, not subverting it.
+# SMART monitoring for endeavour's nine disks (two raidz1 vdevs, hot spare
+# wwn-0x5000cca02f3cabb0 pulled in by ZFS on fault). Host-local, not in
+# roles.server: gaia's disk is virtual and pioneer's is an SD card — no SMART
+# on either. Notifications go to ntfy via smartd's run-a-program mail hook
+# rather than a mail stack.
 {inputs, ...}: {
   den.aspects.services.smartd.nixos = {
     config,
@@ -118,25 +96,20 @@
     };
 
     config = {
-      # Also declared by core.notify-failure, which this host has via
-      # roles.server. Identical definitions merge; repeating it means this
-      # aspect is not silently broken if it is ever used somewhere that has no
-      # failure notifier.
+      # Also declared by core.notify-failure (identical definitions merge);
+      # repeating it keeps this aspect working on a host without a notifier.
       sops.secrets."keys/ntfy/password".sopsFile =
         builtins.toString inputs.nix-secrets + "/hosts/common/secrets.yaml";
 
-      # The nixpkgs module runs the daemon from the store and stops there, so
-      # `smartctl` is not on PATH. That is precisely backwards: the moment this
-      # aspect earns its keep is when a push notification arrives and you want
-      # to look at the disk yourself, and the tool for that would not exist.
+      # The module runs the daemon from the store and omits `smartctl` from
+      # PATH — the tool you want the moment an alert arrives.
       environment.systemPackages = [pkgs.smartmontools];
 
       services.smartd = {
         enable = true;
 
-        # Explicit list only. DEVICESCAN would also pick up the BD-RE drive and
-        # any USB stick that happens to be plugged in at boot, and each of those
-        # is a source of alerts about nothing.
+        # Explicit list only: DEVICESCAN would also pick up the BD-RE drive
+        # and any USB stick plugged in at boot — alerts about nothing.
         autodetect = false;
 
         devices =
@@ -146,8 +119,8 @@
           })
           cfg.devices;
 
-        # The mail path is the hook; the mailer is curl. sender/recipient are
-        # required by the module and land in headers this script discards.
+        # The mailer is curl; sender/recipient are required by the module and
+        # discarded by the script.
         notifications.mail = {
           enable = true;
           sender = "smartd@${config.networking.hostName}";

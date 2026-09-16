@@ -1,22 +1,11 @@
 # services.pds — a self-hosted ATProto Personal Data Server.
 #
-# The point of this is ownership of an identity rather than of a service. A PDS
-# holds the repository of signed records behind an ATProto account: posts,
-# follows, and — once services/tangled.nix is running — the issues and pull
-# requests that Tangled stores as records rather than rows. Running it here
-# means the account is addressed by a domain that is already ours instead of by
-# a username on somebody's server.
+# Single-user by design: the handle sits under lvdar.nl, covered by the
+# existing wildcard in services/acme.nix. Hosting others' handles would need
+# *.pds.lvdar.nl (wildcards match a single label) — a deliberate non-goal.
 #
-# Single-user by design. The handle sits directly under lvdar.nl, which the
-# existing *.lvdar.nl wildcard in services/acme.nix already covers, so this
-# needs no certificate work at all. Hosting handles for other people would mean
-# a second-level wildcard (*.pds.lvdar.nl) — wildcards match a single label, so
-# *.lvdar.nl does not cover it — and that is a deliberate non-goal here.
-#
-# Ungated at the edge, like immich and traccar and for the same reason: ATProto
-# clients speak XRPC over HTTP and authenticate with their own tokens. A NetBird
-# identity check in front answers a lapsed session with a 302 to kanidm, which
-# no app can follow — it surfaces as a bare network error.
+# Ungated at the edge like immich and traccar: ATProto clients authenticate
+# with their own tokens and cannot follow a NetBird 302 to kanidm.
 {den, ...}: {
   den.aspects.services.pds = {
     includes = [den.aspects.services.netbird.client];
@@ -56,11 +45,9 @@
       };
 
       config = {
-        # PDS_JWT_SECRET, PDS_ADMIN_PASSWORD and the PLC rotation key. The
-        # rotation key is the one that cannot be regenerated: it is what proves
-        # control of the DID, so losing it means losing the identity even with
-        # every byte of data intact. It belongs in a password manager as well as
-        # here, exactly like the restic repository password.
+        # PDS_JWT_SECRET, PDS_ADMIN_PASSWORD, PLC rotation key. The rotation
+        # key proves control of the DID and cannot be regenerated — losing it
+        # loses the identity; it belongs in a password manager too.
         sops.secrets."keys/pds/env" = {};
 
         services.bluesky-pds = {
@@ -76,10 +63,9 @@
           pdsadmin.enable = true;
         };
 
-        # Static `pds` user with a plain StateDirectory, so this is the ordinary
-        # persist shape rather than the /var/lib/private EBUSY case that ntfy
-        # hit. On the SSD rather than /tank: it is small, and it is the one
-        # thing here whose latency a phone notices.
+        # Static `pds` user with a plain StateDirectory — the ordinary persist
+        # shape, not the /var/lib/private EBUSY case ntfy hit. On the SSD, not
+        # /tank: the one thing here whose latency a phone notices.
         cosmos.system.impermanence.persist.directories = [
           {
             directory = "/var/lib/pds";

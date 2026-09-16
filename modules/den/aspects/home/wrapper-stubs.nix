@@ -1,8 +1,7 @@
-# home.wrapper-stubs — declares the cross-cutting cosmos.* options that some home
-# aspects write to (zsh init/aliases, impermanence persist) so they can be
-# evaluated in ISOLATION for the wrapped-package catalog (where the aspects that
-# normally declare those options aren't present). Values set here go nowhere —
-# this is only about making the option exist. Added to hmWrappers.baseModules.
+# home.wrapper-stubs — cosmos.* option stubs (zsh init/aliases, impermanence
+# persist) so aspects evaluate in isolation in the wrapped-package catalog,
+# where the real declarers are absent. Values set here go nowhere.
+# Added to hmWrappers.baseModules.
 {...}: {
   den.aspects.home.wrapper-stubs.homeManager = {lib, ...}: let
     inherit (lib.options) mkOption;

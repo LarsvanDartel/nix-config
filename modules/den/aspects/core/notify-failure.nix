@@ -1,22 +1,12 @@
 # core.notify-failure — push a notification when any systemd service fails.
+# Works on every host including pioneer, which cannot carry a metrics agent.
 #
-# The fleet runs ~96 services and nothing watched any of them: a unit that died
-# at 3am stayed dead until somebody happened to look. This is the cheapest
-# thing that changes that, and it works on every host including pioneer, which
-# cannot carry a metrics agent.
-#
-# Wired to *every* service at once through systemd's type-wide drop-in
-# directory. A drop-in in `/etc/systemd/system/service.d/` applies to all units
-# whose name ends in `.service` — so one file covers everything that exists now
-# and everything added later, with no per-unit boilerplate and nothing to keep
-# in sync. The alternative, mapping over `config.systemd.services` to set
-# `onFailure` on each, reads the option it is defining and infinitely recurses.
-#
-# The notifier must not notify about itself. Drop-ins are applied unit file
-# first, then `<type>.d`, then `<unit>.d` — so the type-wide OnFailure would be
-# re-added on top of anything the unit file said, and only a *unit-specific*
-# drop-in can clear it. Without that, a notifier that fails (no network, ntfy
-# down — precisely when things are broken) retriggers itself forever.
+# One type-wide drop-in (/etc/systemd/system/service.d/) covers every
+# .service unit, present and future — mapping over config.systemd.services
+# instead reads the option it is defining and recurses infinitely. The
+# notifier itself needs a *unit-specific* drop-in to clear OnFailure (drop-ins
+# apply unit file first, then <type>.d, then <unit>.d — only the last can
+# reset it), else a failed notifier retriggers itself forever.
 {inputs, ...}: {
   den.aspects.core.notify-failure.nixos = {
     config,
@@ -133,9 +123,8 @@
     };
 
     config = mkIf cfg.enable {
-      # From the common file: every host publishes as the same user, so this is
-      # one secret encrypted to all four host keys rather than four copies to
-      # keep in step.
+      # Every host publishes as the same user: one secret encrypted to all
+      # four host keys rather than four copies to keep in step.
       sops.secrets."keys/ntfy/password".sopsFile =
         builtins.toString inputs.nix-secrets + "/hosts/common/secrets.yaml";
 
@@ -147,12 +136,9 @@
           ExecStart = "${lib.getExe notify} %i";
           LoadCredential = "ntfy-password:${config.sops.secrets."keys/ntfy/password".path}";
 
-          # systemd disables the start timeout entirely for Type=oneshot, so
-          # this is a bound where there was none: without it a notifier wedged
-          # on a half-open socket waits forever, holding a job slot, and the
-          # unit shows as still "activating" long after the alert is moot.
-          # Sized to fit what the script can legitimately take — the settle
-          # wait plus the retry budget — with headroom.
+          # A bound where Type=oneshot has none: without it a notifier wedged
+          # on a half-open socket waits forever, holding a job slot. Sized to
+          # the settle wait plus retry budget, with headroom.
           TimeoutStartSec = "10min";
 
           # It reaches the internet and reads one credential; nothing else.
@@ -179,11 +165,9 @@
         };
       };
 
-      # Delivered as a systemd package rather than through environment.etc:
-      # /etc/systemd/system is a symlink to a store-built units directory, so
-      # nothing can be written inside it directly. generateUnits lndirs any
-      # directory found under a package's lib/systemd/system, which is exactly
-      # what a `.d` drop-in directory is.
+      # Delivered as a systemd package, not environment.etc: /etc/systemd/system
+      # is a symlink to a store-built units directory, and generateUnits lndirs
+      # any lib/systemd/system dir in a package — which is what a `.d` dir is.
       systemd.packages = [
         (pkgs.runCommand "notify-failure-dropins" {} ''
           d=$out/lib/systemd/system

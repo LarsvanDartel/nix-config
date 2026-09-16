@@ -1,23 +1,17 @@
 # services.crowdsec — behavioural detection and IP reputation for the edge.
 #
-# Restored from the Pangolin era, where it read traefik's logs and banned
-# through a traefik bouncer. Both of those are gone, so the shape changed:
+# Detection reads nginx's access log (control plane, IdP) and the journal
+# (sshd, kernel). netbird-proxy's access logs go to management over gRPC,
+# never to disk, so the published services rely on reputation, not
+# behaviour. Remediation is two bouncers: the firewall bouncer drops bans in
+# nftables before TLS — the half that sheds crawler load — and netbird-proxy
+# queries the same LAPI per request, so a blocked visitor gets an answer,
+# not a timeout, and decisions apply even to traffic the firewall lets
+# through.
 #
-#   detection    nginx's access log (the control plane and the IdP) and the
-#                journal (sshd, kernel). netbird-proxy's own access logs are
-#                shipped to management over gRPC rather than written to disk,
-#                so there is nothing local to parse for the published services
-#                — their protection comes from reputation, not behaviour.
-#   remediation  two bouncers. The firewall bouncer drops banned addresses in
-#                nftables, before TLS, which is what actually sheds crawler
-#                load; netbird-proxy queries the same LAPI per request, so a
-#                blocked visitor gets an answer rather than a timeout, and
-#                decisions apply even to traffic the firewall lets through.
-#
-# Most of the value here is the community blocklist rather than anything
-# detected locally: the traffic in question is opportunistic scanning from
-# addresses already burned elsewhere. Enrolling in the console (capi) is what
-# turns that on, so the enroll key is not optional garnish.
+# Most of the value is the community blocklist, not local detection: the
+# traffic is opportunistic scanning from addresses burned elsewhere. The
+# capi enroll key is what turns that on; it is not optional garnish.
 {...}: {
   den.aspects.services.crowdsec.nixos = {
     config,
@@ -33,9 +27,8 @@
 
     writeYamlFile = (pkgs.formats.yaml {}).generate;
 
-    # The same file the crowdsec module generates for its own `-c` flag.
-    # Identical inputs, so identical store path — this is a second reference to
-    # one file, not a second copy of it.
+    # The same file the module generates for its own `-c` flag — identical
+    # inputs, so identical store path: a second reference, not a second copy.
     configFile = writeYamlFile "crowdsec.yaml" config.services.crowdsec.settings.general;
 
     etcDefaults = {
@@ -60,9 +53,9 @@
         default = [
           "127.0.0.1/32"
           "::1/128"
-          # The mesh. Every peer reaches the edge through it, and the reverse
-          # proxy's own embedded client is a peer too — banning one would take
-          # out the thing doing the banning.
+          # The mesh: every peer reaches the edge through it, and the reverse
+          # proxy's own embedded client is a peer — banning one takes out the
+          # thing doing the banning.
           "100.64.0.0/10"
           "192.168.0.0/16"
           "10.0.0.0/8"
@@ -112,9 +105,9 @@
         hub.collections = [
           "crowdsecurity/linux"
           "crowdsecurity/sshd"
-          # Brings in base-http-scenarios and http-cve: path traversal, the
-          # usual scanner probes, and the CVE payloads that follow them. This
-          # is the collection that reads what nginx writes.
+          # Brings in base-http-scenarios and http-cve: scanner probes, path
+          # traversal, CVE payloads. The collection that reads what nginx
+          # writes.
           "crowdsecurity/nginx"
         ];
 
@@ -173,11 +166,10 @@
           };
         };
 
-        # Under the state directory, not /etc/crowdsec. These are written at
-        # runtime and have to survive a reboot — losing them re-registers the
-        # machine as a fresh console instance — but /etc/crowdsec is an
-        # nix-generated symlink tree, and bind-mounting a persistent directory
-        # over it hides config.yaml, at which point cscli cannot start at all.
+        # Under the state directory, not /etc/crowdsec: written at runtime and
+        # must survive a reboot (losing them re-registers as a fresh console
+        # instance), while /etc/crowdsec is an nix-generated symlink tree a
+        # bind-mount would hide config.yaml under.
         settings.capi.credentialsFile = "/var/lib/crowdsec/online_api_credentials.yaml";
         settings.lapi.credentialsFile = "/var/lib/crowdsec/local_api_credentials.yaml";
         settings.console = {
@@ -238,14 +230,13 @@
       };
 
       # Drops decisions into nftables, so a banned address never completes a
-      # TLS handshake. This is the half that sheds load rather than merely
-      # answering politely.
+      # TLS handshake — the half that sheds load, not just answers politely.
       services.crowdsec-firewall-bouncer.enable = true;
 
-      # nixpkgs enrols only when the token file is ABSENT — the condition is
-      # inverted, so with a real token nothing is ever sent. Until that is
-      # fixed upstream, do it here; `console enroll` is idempotent, and
-      # failure must not keep the engine down, hence the `|| true`.
+      # nixpkgs enrols only when the token file is ABSENT — inverted, so with
+      # a real token nothing is ever sent. Do it here until fixed upstream;
+      # `console enroll` is idempotent, and failure must not keep the engine
+      # down, hence the `|| true`.
       systemd.services.crowdsec.serviceConfig.ExecStartPre = let
         cscli = getExe' config.services.crowdsec.package "cscli";
         inherit (config.services.crowdsec.settings.console) tokenFile;
@@ -259,29 +250,26 @@
         ''))
       ];
 
-      # nixpkgs gives the registration service `DynamicUser` and a
-      # `StateDirectory` that includes crowdsec's own. systemd then insists on
-      # relocating /var/lib/crowdsec under /var/lib/private, which cannot work
-      # when impermanence has already bind-mounted it — the migration fails with
-      # EBUSY, the unit never runs, no API key is ever written, and the bouncer
-      # dies at LoadCredential with a file-not-found. It runs as the crowdsec
-      # user regardless, so turning the dynamic allocation off costs nothing.
+      # nixpkgs gives the registration service DynamicUser and a
+      # StateDirectory that includes crowdsec's own: systemd insists on
+      # relocating /var/lib/crowdsec under /var/lib/private, which cannot
+      # work once impermanence has bind-mounted it — EBUSY, the unit never
+      # runs, no API key is written, and the bouncer dies at LoadCredential.
+      # It runs as the crowdsec user regardless, so static allocation costs
+      # nothing.
       systemd.services.crowdsec-firewall-bouncer-register.serviceConfig.DynamicUser =
         lib.mkForce false;
 
-      # Upstream's registration script hard-exits with "Bouncer registered but
-      # API key is not present" whenever crowdsec's database still lists the
-      # bouncer while the key file it refers to has gone. Those two live in
-      # different places — the database under /var/lib/crowdsec/state, the key
-      # under /var/lib/crowdsec-firewall-bouncer-register — so anything that
-      # loses one but not the other wedges the unit permanently, and there is no
-      # branch in the script that recovers.
-      #
-      # Which is exactly what the first working impermanence rollback did on
-      # gaia (2026-08-12): the database survived on /persist, the key did not,
-      # and the firewall bouncer stayed down through every subsequent restart.
-      # Dropping the stale registration lets the script take its "not
-      # registered" branch and mint a fresh key.
+      # Upstream's registration script hard-exits with "Bouncer registered
+      # but API key is not present" when the database still lists the bouncer
+      # while the key file has gone — they live in different places (database
+      # under /var/lib/crowdsec/state, key under
+      # /var/lib/crowdsec-firewall-bouncer-register), so losing one but not
+      # the other wedges the unit; no branch in the script recovers. Exactly
+      # what the first impermanence rollback did on gaia (2026-08-12):
+      # database survived on /persist, key did not, bouncer down through
+      # every restart. Dropping the stale registration lets it mint a fresh
+      # key.
       systemd.services.crowdsec-firewall-bouncer-register.serviceConfig.ExecStartPre = [
         "-${pkgs.writeShellScript "crowdsec-drop-stale-bouncer" ''
           key=/var/lib/crowdsec-firewall-bouncer-register/api-key.cred
@@ -295,86 +283,49 @@
         ''}"
       ];
 
-      # nixpkgs gives the bouncer `Requires=` on that registration service but
-      # no `After=`, which is no ordering at all — systemd starts both at once.
-      # On the very first boot the bouncer therefore reaches LoadCredential
-      # before the API key exists and dies at step CREDENTIALS with a bare
-      # "No such file or directory". It works ever after, because by then the
-      # key is on disk, which is what makes this such a confusing first deploy.
+      # nixpkgs gives the bouncer Requires= on the registration service but
+      # no After= — no ordering at all. On the very first boot the bouncer
+      # reaches LoadCredential before the API key exists and dies at step
+      # CREDENTIALS; it works ever after, which is what makes the first
+      # deploy so confusing.
       systemd.services.crowdsec-firewall-bouncer.after = [
         "crowdsec-firewall-bouncer-register.service"
       ];
 
       # nixpkgs ends the hub-update timer with
-      # `ExecStartPost=systemctl reload crowdsec.service`, but runs the unit as
-      # an unprivileged `DynamicUser`. Reloading a system unit is a privileged
-      # operation, so polkit refuses it:
+      # `ExecStartPost=systemctl reload crowdsec.service` run under an
+      # unprivileged DynamicUser — polkit refuses it and the unit goes red on
+      # every tick: whole host degraded, OnFailure ntfy, a standing false
+      # alarm. A polkit rule is not the fix — security.polkit.enable is false
+      # on these headless hosts, so extraConfig renders into a configuration
+      # nothing reads (/etc/polkit-1/rules.d does not exist; verified on the
+      # host). Enabling polkitd on a public VPS to authorise one reload is
+      # not worth the attack surface.
       #
-      #   systemctl[…]: Failed to reload crowdsec.service: Access denied
-      #
-      # The update itself succeeds — `cscli hub update` exits 0 and the new
-      # index is on disk — so this is purely the notification step failing, and
-      # the damage is that the unit goes red on every tick. That drags the whole
-      # host to `degraded` and fires the OnFailure ntfy route, which is exactly
-      # the kind of standing false alarm that teaches you to ignore the channel.
-      #
-      # The obvious fix is a polkit rule granting that one verb on that one
-      # unit, and it does not work here: `security.polkit.enable` is false on
-      # these headless hosts, so `extraConfig` renders into a configuration
-      # nothing reads — /etc/polkit-1/rules.d does not even exist. It fails
-      # exactly as silently as it sounds, so this was verified on the host
-      # rather than by reading the option.
-      #
-      # Enabling polkitd on a public VPS to authorise one reload is a daemon
-      # and an attack surface for very little. Instead, drop the privileged
-      # call from the unprivileged unit and let systemd do the escalation it
-      # already knows how to do: `OnSuccess=` fires a root-owned oneshot when
-      # the update exits cleanly. The reload still happens, only when the
-      # update actually succeeded, and no permission is granted to crowdsec.
-      # And with the permission problem out of the way the unit failed again,
-      # on the step underneath it:
-      #
-      #   Job type reload is not applicable for unit crowdsec.service.
-      #
-      # nixpkgs never gives crowdsec.service an `ExecReload`, so upstream's
-      # `systemctl reload` could not have worked even as root — the permission
-      # denial was hiding a second, independent bug. Upstream crowdsec's own
-      # unit file reloads on SIGHUP, which the engine handles by re-reading its
-      # configuration and the hub index, so that is what this restores.
-      #
-      # SIGHUP rather than a restart deliberately: this is the edge's LAPI, and
-      # the firewall bouncer queries it per decision. A restart would drop those
-      # queries for as long as it takes to come back, to refresh an index.
+      # Instead, OnSuccess= below fires a root-owned oneshot when the update
+      # exits cleanly. Underneath the permission denial sat a second bug:
+      # nixpkgs never gives crowdsec.service an ExecReload, so the reload
+      # could not have worked even as root. Upstream's own unit reloads on
+      # SIGHUP, which the engine handles by re-reading config and the hub
+      # index — so that is what this restores. SIGHUP, not a restart: the
+      # firewall bouncer queries this LAPI per decision, and a restart would
+      # drop those queries just to refresh an index.
       systemd.services.crowdsec.serviceConfig.ExecReload = "${getExe' pkgs.coreutils "kill"} -HUP $MAINPID";
 
-      # nixpkgs' `crowdsec-setup` ExecStartPre runs `cscli hub update`, which
-      # needs to reach cdn-hub.crowdsec.net, and the unit is `Restart=no`. A
-      # single failed lookup there therefore leaves crowdsec down permanently —
-      # and because netbird-proxy asks the LAPI about every request and fails
-      # *closed* when it cannot, "crowdsec did not start" means every published
-      # service answers 403. The whole edge, not just the protected part.
+      # crowdsec-setup's ExecStartPre runs `cscli hub update`, which needs
+      # cdn-hub.crowdsec.net, and the unit is Restart=no — one failed lookup
+      # leaves crowdsec down permanently, and netbird-proxy fails *closed* on
+      # a dead LAPI, so every published service answers 403. Not hypothetical:
+      # on 2026-08-29 a comin switch restarted crowdsec and unbound together,
+      # ExecStartPre lost the DNS race by six seconds, crowdsec stayed
+      # failed, and jellyfin, immich, grafana, the status page and the knot
+      # served 403 for six hours — comin fetches through the same edge, so
+      # the fleet could not deploy its way out.
       #
-      # That is not hypothetical. On 2026-08-29 a comin switch restarted both
-      # crowdsec and unbound; crowdsec's ExecStartPre ran at 04:37:01 and lost
-      # the race by six seconds:
-      #
-      #   04:37:02 crowdsec-setup: lookup cdn-hub.crowdsec.net: no such host
-      #   04:37:08 unbound: active
-      #
-      # crowdsec stayed failed, and jellyfin, immich, grafana, the status page
-      # and the knot all served 403 for the next six hours. comin could not pull
-      # either — it fetches through that same edge — so the fleet could not
-      # deploy its way out.
-      #
-      # Two independent guards, because either one alone still leaves a way in:
-      #
-      #   after/wants nss-lookup.target  don't start before name resolution
-      #                                  exists. unbound sits Before= it, so
-      #                                  this is the ordering that was missing.
-      #   Restart = on-failure           and if the update fails anyway — the
-      #                                  CDN is down, the network flaps — retry
-      #                                  at RestartSec (60s) instead of leaving
-      #                                  the ingress dark until someone notices.
+      # Two independent guards, because either alone leaves a way in:
+      # after/wants nss-lookup.target (unbound sits Before= it — the ordering
+      # that was missing), and Restart=on-failure so a failed update retries
+      # at RestartSec instead of leaving the ingress dark.
       systemd.services.crowdsec = {
         after = ["nss-lookup.target"];
         wants = ["nss-lookup.target"];

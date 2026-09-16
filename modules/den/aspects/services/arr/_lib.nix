@@ -1,13 +1,10 @@
-# Shared by the *arr aspects, which each live in their own file. Underscored,
-# so import-tree leaves it alone and it stays a plain expression to `import`
-# rather than a flake-parts module.
+# Shared by the *arr aspects. Underscored so the import-tree leaves it alone:
+# a plain expression to `import`, not a flake-parts module.
 rec {
-  # nginx vhost fronting a service inside the VPN namespace.
-  #
-  # A confined service binds the namespace side of the bridge (192.168.15.1),
-  # which nothing outside the namespace can route to. This listens on the same
-  # port in the root namespace and proxies across, so the port means the same
-  # thing whether or not a service happens to be confined.
+  # nginx vhost for a service inside the VPN namespace. A confined service
+  # binds the namespace side of the bridge (192.168.15.1), unroutable from
+  # outside; this proxies the same port in the root namespace so the port
+  # means the same thing whether or not the service is confined.
   vpnVhost = port: {
     "127.0.0.1:${toString port}" = {
       listen = [
@@ -24,14 +21,11 @@ rec {
     };
   };
 
-  # radarr, sonarr and lidarr are the same service three times over: the same
-  # nixpkgs module shape, the same options, differing only in name, port and
-  # which library directory they own. Written out per file they were 70
-  # identical lines apiece, where the only thing worth reading is the three
-  # values below — so each file supplies those and this supplies the rest.
-  #
-  # Anything that grows its own shape (prowlarr's ExecStart override, bazarr's
-  # hand-rolled unit) is written out longhand in its own file instead.
+  # radarr/sonarr/lidarr are the same service three times over (same nixpkgs
+  # module shape; only name, port and library dir differ) — each file supplies
+  # those three values, this supplies the rest. Anything with its own shape
+  # (prowlarr's ExecStart override, bazarr's hand-rolled unit) is longhand in
+  # its own file.
   mkSimpleArr = {
     name,
     defaultPort,

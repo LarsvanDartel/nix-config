@@ -6,7 +6,6 @@
   config = {
     programs.nixvim = {
       plugins = {
-        # Lazy loading
         lz-n.enable = true;
 
         gitsigns = {
