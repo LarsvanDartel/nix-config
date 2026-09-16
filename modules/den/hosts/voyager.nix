@@ -42,6 +42,7 @@
         home.steam
         home.minecraft
         home.claude
+        home.oh-my-pi
         home.taskwarrior
         home.catt
         home.zathura
