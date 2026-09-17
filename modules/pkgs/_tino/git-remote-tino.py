@@ -57,8 +57,11 @@ Authentication and endpoints:
   .git/config, so prefer the file). The key needs *committer* on the
   bucket to push (editor for read), exactly like TINO's own UI roles.
 - Base URL, in order: the URL's host (tino:// form), `TINO_URL` env,
-  default https://tino.lvdar.nl — the public netbird-proxy name, which
-  is the entire point: no NetBird needed on this machine.
+  `git config tino.url` (per-repo or `--global`; git layers those for
+  free — `git config tino.url https://tino.example.org` once per repo
+  or machine beats exporting an env var every shell), default
+  https://tino.lvdar.nl — the public netbird-proxy name, which is the
+  entire point: no NetBird needed on this machine.
 
 Run by git as: git-remote-tino <remote> <url>. GIT_DIR is set and the
 cwd is the repository, so push can shell out to git for diff-tree /
@@ -91,8 +94,8 @@ class Tino:
     '''The REST half of the bridge: one bucket on one TINO server.'''
 
     def __init__(self) -> None:
-        base, key, slug = self._parse_url()
-        self.base = base.rstrip('/')
+        url_base, key, slug = self._parse_url()
+        self.base = (url_base or self._configured_base()).rstrip('/')
         self.slug = slug
         self.key = key or self._key_from_env_or_file()
         if not self.key:
@@ -101,12 +104,13 @@ class Tino:
                 '~/.config/tino/api-key, or use tino://<key>@host/<bucket>')
 
     @staticmethod
-    def _parse_url() -> tuple[str, str | None, str]:
+    def _parse_url() -> tuple[str | None, str | None, str]:
         # git invokes us as `git-remote-tino <remote> <url>`; the url is
         # `tino::<bucket>` (transport::address form) or
         # `tino://[key@]host/<bucket>`. With no second argument git
         # looked us up via remote.<name>.vcs and the remote's own url
-        # is the address.
+        # is the address. Only the `tino://` form carries an explicit
+        # base — everything else defers to _configured_base().
         url = sys.argv[2] if len(sys.argv) > 2 else sys.argv[1]
         if url.startswith('tino://'):
             rest = url[len('tino://'):]
@@ -114,13 +118,29 @@ class Tino:
             if '@' in rest:
                 key, rest = rest.split('@', 1)
             host, _, path = rest.partition('/')
-            base = f'https://{host}'
-            return base, key, path.strip('/')
+            return f'https://{host}', key, path.strip('/')
         if url.startswith('tino::'):
-            address = url[len('tino::'):]
-            return os.environ.get('TINO_URL', DEFAULT_BASE), None, address
-        # remote.<name>.vcs path: no URL to parse — fall back to env.
-        return os.environ.get('TINO_URL', DEFAULT_BASE), None, url
+            return None, None, url[len('tino::'):]
+        return None, None, url
+
+    @staticmethod
+    def _configured_base() -> str:
+        '''`TINO_URL` env, then `git config tino.url` (git itself layers
+        repo-local over --global, so this one lookup already respects
+        both), then the public default. A bare git-config lookup with no
+        repository in scope just fails closed to the default — this
+        runs from the repo being cloned/fetched/pushed, so there always
+        is one.
+        '''
+        env = os.environ.get('TINO_URL')
+        if env:
+            return env
+        proc = subprocess.run(
+            ['git', 'config', '--get', 'tino.url'],
+            capture_output=True, text=True, check=False)
+        if proc.returncode == 0 and proc.stdout.strip():
+            return proc.stdout.strip()
+        return DEFAULT_BASE
 
     @staticmethod
     def _key_from_env_or_file() -> str | None:
