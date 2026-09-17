@@ -5,17 +5,26 @@
 # helper's own header comment is the full usage and design doc; the
 # short form is `git clone tino::<bucket>`.
 #
-# ~/.config/tino/api-key holds the personal TINO API key and is
-# persisted: it is a plain file rather than a sops secret because it is
-# a per-user credential minted and rotated on TINO's side
-# (/var/lib/tino/api_keys.yml on endeavour) — no host should be able to
-# read it, only the user who pushed it there. voyager's impermanence
-# wipes unpersisted ~/.config on every boot, which is exactly why the
-# directory is listed here rather than left to chance.
+# keys/tino/api-key (nix-secrets: users/common/secrets.yaml) is the
+# personal TINO API key, deployed the same way home.ssh deploys private
+# keys: sops-nix decrypts it fresh on every activation straight to
+# ~/.config/tino/api-key, so unlike a manually-dropped file it survives
+# voyager's impermanence wipe without needing its own persist entry —
+# activation *is* what repopulates it. Minted/rotated on TINO's side
+# (/var/lib/tino/api_keys.yml on endeavour); committer access per
+# bucket is granted there, not here — see the helper's own header for
+# why editor is not enough.
 {...}: {
-  den.aspects.home.tino.homeManager = {pkgs, ...}: {
+  den.aspects.home.tino.homeManager = {
+    config,
+    pkgs,
+    ...
+  }: {
     home.packages = [pkgs.git-remote-tino];
 
-    cosmos.system.impermanence.persist.directories = [".config/tino"];
+    sops.secrets."keys/tino/api-key" = {
+      sopsFile = "${config.cosmos.security.sops.sopsFolder}/common/secrets.yaml";
+      path = "${config.home.homeDirectory}/.config/tino/api-key";
+    };
   };
 }
