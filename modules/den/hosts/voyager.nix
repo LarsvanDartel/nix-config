@@ -37,6 +37,9 @@
         roles.desktop-home
         home.steam
         home.minecraft
+        home.tino
+        home.kanidm
+        home.mcrl2
         home.claude
         home.oh-my-pi
         home.taskwarrior
@@ -127,18 +130,6 @@
         };
 
         programs.ssh.settings."es-pynq047.ics.ele.tue.nl".setEnv = "TERM=xterm-256color";
-
-        # The kanidm CLI for account/group admin without the web UI. Pinned
-        # to _1_11 to match services/kanidm.nix's server package — the CLI
-        # and server speak a versioned protocol.
-        home.packages = [pkgs.mcrl2 pkgs.kanidm_1_11];
-
-        # Public endpoint by default so `kanidm ...` needs no flags.
-        # verify_ca is fine — auth.lvdar.nl is a normal ACME cert via
-        # gaia's netbird-proxy, not kanidm's self-signed one.
-        xdg.configFile."kanidm/config".text = ''
-          uri = "https://auth.lvdar.nl"
-        '';
       };
     };
 
