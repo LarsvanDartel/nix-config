@@ -144,6 +144,28 @@
                   --replace-fail \
                     "    if token.get('id_token'):" \
                     "    if False:  # id_token intentionally never kept in the session"
+
+                # Upstream's text-extension allowlist (everything else
+                # falls through to the `* filter=lfs` catch-all below it)
+                # has no Nix entries. GEWIS buckets increasingly carry a
+                # personal-convenience flake.nix/flake.lock alongside
+                # documents (e.g. abc-meetings' typst devShell) — without
+                # this, git's LFS-aware diff machinery perpetually shows
+                # them "modified" in TINO's UI, comparing the real
+                # working-tree file against what git-lfs-clean *would*
+                # produce if staged. Cosmetic (commits land real content
+                # either way, verified by inspecting the actual git
+                # objects: `repo.index.add()` never goes through the
+                # clean filter, only `git diff`'s display does), but
+                # confusing enough to fix at the source once rather than
+                # per-bucket — a bucket-local .gitattributes override
+                # would also work but TINO's own file listing hides
+                # dotfiles, so git-remote-tino clones would never
+                # materialize it.
+                cat >> tino/gitattributes <<'EOF'
+                *.nix text !filter !diff !merge text
+                *.lock text !filter !diff !merge text
+                EOF
               '';
 
               # gitattributes sits at the repo root (git-lfs routing —
