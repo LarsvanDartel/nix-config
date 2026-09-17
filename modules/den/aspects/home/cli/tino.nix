@@ -22,6 +22,15 @@
   }: {
     home.packages = [pkgs.git-remote-tino];
 
+    # The helper's own default (tino.lvdar.nl, baked in as a last-resort
+    # fallback) is duplicated logic — this is the actual source of
+    # truth: `git config --get tino.url` is the helper's second-highest
+    # precedence layer (below only an explicit tino://host/bucket URL),
+    # so declaring it here means changing the fleet's public TINO
+    # hostname is a one-line nix-config edit, not a per-machine `git
+    # config` command someone has to remember to run.
+    programs.git.settings.tino.url = "https://tino.lvdar.nl";
+
     sops.secrets."keys/tino/api-key" = {
       sopsFile = "${config.cosmos.security.sops.sopsFolder}/common/secrets.yaml";
       path = "${config.home.homeDirectory}/.config/tino/api-key";
