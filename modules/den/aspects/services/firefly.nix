@@ -46,7 +46,7 @@
 
       autoImport = pkgs.writeShellApplication {
         name = "firefly-auto-import";
-        runtimeInputs = [pkgs.coreutils];
+        runtimeInputs = [pkgs.coreutils pkgs.gnugrep];
         text = ''
           config="${importDir}/config.json"
           if [ ! -f "$config" ]; then
@@ -75,7 +75,37 @@
           FIREFLY_III_ACCESS_TOKEN="$(< "$CREDENTIALS_DIRECTORY/access-token")"
           set +a
 
-          exec ${importerCfg.package}/artisan importer:import "$config"
+          # config.json uses a sliding 30-day "range" window (not Firefly's
+          # date-of-last-known-transaction "partial" mode), so every run
+          # re-fetches transactions the previous run(s) already imported.
+          # firefly-iii-data-importer logs each of those as an "error" entry
+          # (app/Console/Commands/Import.php: any non-empty errors[] forces
+          # exit code GENERAL_ERROR) even though `ignore_duplicate_transactions`
+          # already told it to skip re-adding them — duplicate detection
+          # working as intended still reads as a hard failure to systemd. Seen
+          # daily since the config was created on 2026-09-05, paging over
+          # ntfy every night for zero actual problem. Only escalate when some
+          # of the reported errors are *not* duplicate skips.
+          set +e
+          output="$(${importerCfg.package}/artisan importer:import "$config" 2>&1)"
+          status=$?
+          set -e
+          printf '%s\n' "$output"
+
+          total_errors="$(printf '%s\n' "$output" | grep -oE 'Array contains [0-9]+ error\(s\)' | grep -oE '[0-9]+' || true)"
+          # "Duplicate of transaction #" also shows up 2-3x per duplicate in
+          # the submission-attempt DEBUG/ERROR lines above — only the final
+          # "Import index N: ..." report line is one-per-array-entry, so
+          # that's what has to line up with the declared error count.
+          dup_errors="$(printf '%s\n' "$output" | grep -cE '^Import index [0-9]+: .*Duplicate of transaction #' || true)"
+          total_errors="''${total_errors:-0}"
+          dup_errors="''${dup_errors:-0}"
+
+          if [ "$status" -ne 0 ] && [ "$total_errors" -gt 0 ] && [ "$total_errors" -eq "$dup_errors" ]; then
+            echo "firefly-auto-import: $total_errors error(s) reported, all already-imported duplicates — not a real failure."
+            exit 0
+          fi
+          exit "$status"
         '';
       };
 
