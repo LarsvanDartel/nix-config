@@ -51,7 +51,7 @@
         home.process-mining
         home.obs-studio
         home.which-key
-        home.freecad
+        # home.freecad
         home.orca-slicer
         home.simplelogin
         home.proton.mail-bridge

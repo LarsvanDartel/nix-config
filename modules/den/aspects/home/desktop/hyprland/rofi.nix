@@ -11,6 +11,12 @@
   in {
     cosmos.system.impermanence.persist.directories = [rofi-dir];
 
+    # Own theme/font below (mkForce'd already), same reasoning as
+    # hyprlock/mako/waybar: stylix's rofi target would otherwise fight it,
+    # and it sets `programs.rofi.font` through the same deprecated top-level
+    # option this file already moved off of.
+    stylix.targets.rofi.enable = false;
+
     home.packages = with pkgs; [
       jq
       rofi-systemd
@@ -19,15 +25,12 @@
 
     programs.rofi = {
       enable = true;
-      terminal = "${config.cosmos.cli.terminals.default}";
-      cycle = true;
       plugins = with pkgs; [
         rofi-emoji
         rofi-calc
         rofi-power-menu
         rofi-systemd
       ];
-      location = "center";
       theme = mkForce (
         with config.lib.stylix.colors.withHashtag;
           builtins.toFile "theme.rasi" ''
@@ -50,7 +53,14 @@
             ${builtins.readFile ./rofi-theme.rasi}
           ''
       );
-      extraConfig = {
+      # terminal/cycle/location/extraConfig collapsed into `settings` —
+      # home-manager 2026-09-18 renamed those top-level options, and
+      # abort-on-warn turns the deprecation warning into a hard eval
+      # failure.
+      settings = {
+        terminal = "${config.cosmos.cli.terminals.default}";
+        cycle = true;
+        location = 0; # center, per home-manager's former locationsMap
         cache-dir = "~/${rofi-dir}";
         show-icons = true;
         sort = true;
