@@ -197,6 +197,19 @@
         };
       };
 
+      # Disk swap was sitting at 15.8/16G under normal desktop load (default
+      # swappiness=60, no zram) — thrashing to the 990 Pro well before RAM was
+      # actually exhausted. zram-generator's default priority (5) beats the
+      # disko swapfile's (-2), so the kernel drains this RAM-backed, zstd
+      # -compressed tier first and only spills to disk once ~7.5G (50% of
+      # 15G RAM) of compressed pages is full. Raising swappiness makes the
+      # kernel reach for that now-cheap tier instead of reclaiming page
+      # cache; it does *not* touch the disk swapfile, which stays the
+      # hibernation target (boot.resumeDevice/resume_offset above) and is
+      # never written to directly by zram.
+      zramSwap.enable = true;
+      boot.kernel.sysctl."vm.swappiness" = 100;
+
       # The global default pins 9.9.9.9 first in resolv.conf and flips NM
       # to dns = none, so the network's own resolvers never arrive — fatal
       # on TU/e's tue-wpa2, where Quad9's :53 is filtered. Empty means NM
