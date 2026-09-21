@@ -62,6 +62,16 @@
           address = "larsvandartel@proton.me";
           userName = "larsvandartel@proton.me";
           realName = "Lars van Dartel";
+          # Custom-domain address on the same Proton account — Bridge
+          # accepts any address the account is allowed to send as, so no
+          # separate SMTP/IMAP config; signature inherits from the
+          # proton account above.
+          aliases = [
+            {
+              address = "lars@lvdar.nl";
+              realName = "Lars van Dartel";
+            }
+          ];
           # Via Proton Bridge (home.proton.mail-bridge): loopback
           # IMAP/SMTP with STARTTLS.
           imap = {
