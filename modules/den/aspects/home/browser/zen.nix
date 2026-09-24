@@ -93,6 +93,12 @@
         DisplayMenuBar = "never";
         DNSOverHTTPS.Enabled = false;
         DontCheckDefaultBrowser = true;
+        # Any policies.json (this whole block) switches on Firefox's
+        # Enterprise Policy Engine, which defaults the Web Serial API to
+        # blocked from 151 on — same gate esptool-web-installer-style sites
+        # (ESP Web Tools, crosspoint) need to flash over /dev/ttyACM*. 3 =
+        # allow, 2 = block; there's no "ask" value.
+        DefaultSerialGuardSetting = 3;
         PasswordManagerEnabled = false;
         TranslateEnabled = true;
         UseSystemPrintDialog = true;

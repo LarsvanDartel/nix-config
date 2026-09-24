@@ -10,6 +10,7 @@
       fontconfig
       nh
       power
+      serial
       styling
     ];
 
