@@ -25,14 +25,40 @@
   den.aspects.services.jellyfin.nixos = {
     config,
     lib,
+    pkgs,
     ...
   }: let
     inherit (lib.options) mkOption;
     inherit (lib.lists) optional;
     inherit (lib.types) bool path port;
-    inherit (lib.modules) mkIf;
+    inherit (lib.modules) mkIf mkForce;
 
     cfg = config.cosmos.services.jellyfin;
+
+    # jellarr's client only ever sends the legacy X-Emby-Token header, but
+    # our Jellyfin has EnableLegacyAuthorization=false (upstream's current
+    # default), so that header is never even read and every request
+    # 401s. jellarr's own HTTP wrapper doesn't treat that as an error
+    # (openapi-fetch never populates `error` for a body-less 401), so it
+    # silently feeds `undefined` in as the "current" server state — which
+    # is what actually throws ("Cannot set properties of undefined
+    # (setting '$root')") once the encoding-diff step tries to compute a
+    # patch against it. Confirmed live against endeavour's Jellyfin:
+    # sending both headers, i.e. adding the modern `Authorization`
+    # header Jellyfin reads unconditionally, fixes auth and jellarr
+    # applies cleanly. Patch the one line in the built bundle rather than
+    # fork the module; drop once jellarr grows a non-legacy client.
+    jellarrPkg = pkgs.callPackage "${inputs.jellarr}/nix/package.nix" {};
+    jellarrPatched = jellarrPkg.overrideAttrs (old: {
+      postInstall =
+        (old.postInstall or "")
+        + ''
+          substituteInPlace $out/share/bundle.cjs --replace-fail \
+            "headers.set(\"X-Emby-Token\", apiKey);" \
+            "headers.set(\"X-Emby-Token\", apiKey);
+                headers.set(\"Authorization\", 'MediaBrowser Client=\"jellarr\", Device=\"cli\", DeviceId=\"jellarr\", Version=\"0.1.0\", Token=\"' + apiKey + '\"');"
+        '';
+    });
   in {
     imports = [inputs.jellarr.nixosModules.default];
 
@@ -203,6 +229,11 @@
           };
         };
       };
+
+      # jellarr's own build always resolves the systemd unit's ExecStart
+      # to `pkgs.callPackage ../package.nix {}` internally (no package
+      # option to override); mkForce it to the auth-patched build above.
+      systemd.services.jellarr.serviceConfig.ExecStart = mkForce (lib.getExe jellarrPatched);
 
       # Dropped when the edge terminates TLS: netbird-proxy forwards straight to
       # cfg.port over the mesh, so there is nothing for a local vhost to do.
