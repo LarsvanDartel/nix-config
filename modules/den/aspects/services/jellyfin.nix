@@ -2,6 +2,26 @@
 {inputs, ...}: {
   flake-file.inputs.jellarr.url = "github:venkyr77/jellarr";
 
+  # jellarr pins pnpmDeps.hash against pnpm 11.15.0 (its own locked
+  # nixpkgs); our shared pkgs is newer and ships pnpm 12.x, whose store
+  # format changes the fixed-output hash for the same pnpm-lock.yaml,
+  # breaking every nixpkgs bump. Patch the one stale hash instead of
+  # forking the whole nixosModule; drop once upstream regenerates it
+  # against a current nixpkgs.
+  nixpkgs.overlays = [
+    (final: prev: {
+      fetchPnpmDeps = args:
+        prev.fetchPnpmDeps (
+          if
+            args.pname or null
+            == "jellarr"
+            && args.hash == "sha256-jo1BjRAjjfNKF0xb5cLCuELSveHeJ98iLPhMDKP1QbI="
+          then args // {hash = "sha256-qNVnhHjTFPhJxJ8oZPBSfJs2OjNSlbmS31okZuSGWMU=";}
+          else args
+        );
+    })
+  ];
+
   den.aspects.services.jellyfin.nixos = {
     config,
     lib,
