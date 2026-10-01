@@ -77,6 +77,19 @@
       # Pass, browser passwords, ssh-agent) looks wiped, even though the
       # persisted keyring file on disk is untouched.
       security.pam.services.login.enableGnomeKeyring = true;
+
+      # `services.gnome.gnome-keyring` (not home.keyring's user-level service)
+      # is what puts `gcr`'s SystemPrompter/PrivatePrompter D-Bus services on
+      # `services.dbus.packages` — without it gnome-keyring-daemon's own
+      # unlock/change-password dialogs fail with "couldn't initialize prompt:
+      # ... not activatable" and silently never unlock, so seahorse can't even
+      # be used to blank the login keyring's passphrase.
+      services.gnome.gnome-keyring.enable = true;
+      # `services.gnome.gcr-ssh-agent.enable` defaults to the option above and
+      # collides with core.ssh's `programs.ssh.startAgent` (only one SSH agent
+      # may be installed) — we want gnome-keyring purely for its Secret
+      # Service + prompter, not its ssh-agent replacement.
+      services.gnome.gcr-ssh-agent.enable = false;
     };
   };
 
