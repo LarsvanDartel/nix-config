@@ -379,11 +379,6 @@ in {
     useNautilus = false;
   };
 
-  # programs.niri turns gnome-keyring on by default, whose ssh-agent component
-  # collides with core.ssh's `programs.ssh.startAgent`. We already run
-  # gnome-keyring as a user service where it is wanted (home.keyring).
-  services.gnome.gnome-keyring.enable = lib.mkForce false;
-
   environment.systemPackages = with pkgs; [
     # niri autostarts xwayland-satellite from $PATH (on by default since 25.05),
     # but the module does not install it.
