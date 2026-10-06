@@ -8,7 +8,7 @@
   }: let
     inherit (lib.options) mkOption;
     inherit (lib.types) bool;
-    inherit (lib.modules) mkIf;
+    inherit (lib.modules) mkIf mkForce;
 
     cfg = config.cosmos.services.kanidm;
     # The gated services published by netbird-proxy (netbird.services in
@@ -102,6 +102,23 @@
               if config.cosmos.networking.edgeTerminated
               then ["100.64.0.0/10"]
               else ["127.0.0.1"];
+
+            # Upstream defaults this to a *derivation* (entryManagementDir,
+            # an empty linkFarm — we never set entryManagement.migrations)
+            # rather than a path string. kanidm.nix's filterConfig
+            # (filterAttrsRecursive stripping nulls) walks into any attrset
+            # nested under server.settings, and derivations built via
+            # mkDerivation carry a `.stdenv` attribute — so it recurses
+            # straight into stdenv's own deprecated isDarwin/is32bit/…
+            # compat shims and forces every lib.warn in them.
+            # abort-on-warn turns that into a hard eval failure (broke
+            # flake-bump against nixpkgs rev 494ce7f, 2026-10-06). mkForce
+            # the same path as a plain string — what the TOML generator
+            # would coerce it to anyway — to keep the recursive filter off
+            # derivation internals. Revisit (track
+            # server.entryManagement.migrations here too) if that option is
+            # ever used.
+            migration_path = mkForce (toString (pkgs.linkFarm "kanidm-entry-management" []));
           };
         };
 
