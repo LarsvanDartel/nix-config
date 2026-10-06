@@ -116,6 +116,7 @@
             ublock-origin
             proton-pass
             zotero-connector
+            privacy-pass
           ])
           ++ [
             # Page half of Web Bluetooth, paired with the native host above.
