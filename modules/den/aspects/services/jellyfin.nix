@@ -3,11 +3,18 @@
   flake-file.inputs.jellarr.url = "github:venkyr77/jellarr";
 
   # jellarr pins pnpmDeps.hash against pnpm 11.15.0 (its own locked
-  # nixpkgs); our shared pkgs is newer and ships pnpm 12.x, whose store
-  # format changes the fixed-output hash for the same pnpm-lock.yaml,
-  # breaking every nixpkgs bump. Patch the one stale hash instead of
-  # forking the whole nixosModule; drop once upstream regenerates it
-  # against a current nixpkgs.
+  # nixpkgs); our shared pkgs is newer, and pnpm's store-fetch format
+  # changes the fixed-output hash for the same pnpm-lock.yaml across pnpm
+  # major/minor bumps alike — this has now broken twice on unrelated
+  # nixpkgs bumps (pnpm 11→12.3.4 on 2026-09-26, then 12.3.4→12.9.0 on
+  # 2026-10-06, the latter surfacing as the jellarr build succeeding at
+  # the pnpmDeps fetch but failing offline-install with
+  # ERR_PNPM_NO_OFFLINE_TARBALL — the fetched store's format didn't match
+  # what the newer pnpm binary expected). Patch the one stale hash instead
+  # of forking the whole nixosModule; drop once upstream regenerates it
+  # against a current nixpkgs. Regenerate via: set the replacement hash to
+  # "", build `services.jellyfin`'s jellarr derivation, and copy the
+  # "got:" hash from the mismatch error.
   nixpkgs.overlays = [
     (final: prev: {
       fetchPnpmDeps = args:
@@ -16,7 +23,7 @@
             args.pname or null
             == "jellarr"
             && args.hash == "sha256-jo1BjRAjjfNKF0xb5cLCuELSveHeJ98iLPhMDKP1QbI="
-          then args // {hash = "sha256-qNVnhHjTFPhJxJ8oZPBSfJs2OjNSlbmS31okZuSGWMU=";}
+          then args // {hash = "sha256-7VXyltKa602y4vdmLYyLHFYbcwc8DKQ/dMzEKOYPHT0=";}
           else args
         );
     })
