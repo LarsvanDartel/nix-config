@@ -504,6 +504,7 @@
         sonarr.targets = endeavour 8989;
         lidarr.targets = endeavour 8686;
         bazarr.targets = endeavour 6767;
+        lingarr.targets = endeavour 9876;
       };
 
       system.stateVersion = "24.11";

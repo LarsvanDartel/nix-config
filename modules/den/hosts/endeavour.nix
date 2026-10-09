@@ -67,6 +67,7 @@
       services.arr.sonarr
       services.arr.lidarr
       services.arr.bazarr
+      services.arr.lingarr
       services.arr.jellyseerr
       services.transcode
       services.prometheus
@@ -568,6 +569,7 @@
           8989 # sonarr      sonarr.lvdar.nl
           8686 # lidarr      lidarr.lvdar.nl
           6767 # bazarr      bazarr.lvdar.nl
+          9876 # lingarr     lingarr.lvdar.nl
 
           # OpenCloud and the two legs Collabora needs.
           9200 # opencloud   cloud.lvdar.nl
