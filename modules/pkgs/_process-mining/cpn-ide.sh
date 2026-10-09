@@ -11,8 +11,6 @@ tmp="$data/tmp"
 simulator="$tmp/accesscpn/simulator"
 mkdir -p "$data"
 
-# The window is the session, and it outlives the shell that started it, so by
-# default detach and log to a file. --foreground keeps it attached.
 if [ "${1:-}" = "--foreground" ]; then
   shift
 else
@@ -29,8 +27,7 @@ for binary in "$share"/simulator/*; do
   [ -e "$target" ] || install -m 755 "$binary" "$target"
 done
 
-# The frontend defaults to talking to port 8080; if you move it, set the server
-# address in the IDE's settings to match.
+# If you move the port, set the server address in the IDE's settings to match.
 port="${CPN_IDE_PORT:-8080}"
 url="http://localhost:$port/"
 

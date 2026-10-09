@@ -1,19 +1,10 @@
 # services.comin — GitOps deployment: hosts pull their own config.
 #
-# Hosts poll the knot and switch themselves when the deploy branch moves:
-# pulling, not pushing, so no key anywhere grants root on the fleet and a
-# compromised spindle can at worst fail a build. Pulls from the knot over
-# public HTTPS (`info/refs` unauthenticated, verified), not the mesh, not
-# GitHub — the cost is that the knot becomes load-bearing: if it is down,
-# nothing deploys, which is the correct failure.
-#
-# No magic rollback, unlike deploy-rs — recovery is the bootloader menu.
-# The `testing` branch gets `nixos-rebuild test`: try something on a host
-# without making it the boot default.
-#
-# Not enabled fleet-wide; see per-host comments. pioneer would have to
-# build on a Raspberry Pi 3; voyager would switch itself out from under
-# whoever is typing on it.
+# Pulling, not pushing: no key grants root on the fleet. Pulls the knot over
+# public HTTPS, so if the knot is down nothing deploys (the correct failure).
+# No magic rollback — recovery is the bootloader menu.
+# Not fleet-wide: pioneer would build on a Pi 3; voyager would switch itself
+# out from under whoever is typing on it.
 {
   den,
   inputs,
@@ -131,23 +122,16 @@
           mode = "0400";
         };
 
-        # github.com's host key, pinned (from api.github.com/meta).
-        # StrictHostKeyChecking is `yes`, not `accept-new`: with the key pinned
-        # there is no first use left to accept — a mismatch is a failure, not a
-        # new entry written to a file nobody reads.
+        # Pinned from api.github.com/meta; hence StrictHostKeyChecking=yes.
         programs.ssh.knownHosts."github.com" = {
           hostNames = ["github.com"];
           publicKey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl";
         };
 
-        # Scoped to this unit, not /root/.ssh/config — only comin's flake
-        # fetches have any business using this key.
+        # Scoped to this unit: only comin's flake fetches may use this key.
         systemd.services.comin.environment.GIT_SSH_COMMAND = "ssh -i ${cfg.secretsKeyFile} -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes";
 
-        # gcroots matters: it pins the last generation comin built so a GC
-        # between build and switch cannot delete it. store.json and the clone
-        # are merely expensive to lose — unpersisted, every boot on an
-        # impermanent host is a fresh clone of the whole repository.
+        # gcroots pins the last built generation against GC before switch.
         cosmos.system.impermanence.persist.directories = [
           {
             directory = "/var/lib/comin";
@@ -164,15 +148,10 @@
             {
               name = "origin";
               url = cfg.repository;
-              # `deploy`, not `main` — the whole point of services/build-gate.nix:
-              # deploy is advanced by the gate and by nothing else, and comin has
-              # no magic rollback. comin calls this option `main` regardless of
-              # the branch's name: it means "the branch to switch to".
+              # comin calls this `main` regardless: "the branch to switch to".
               branches.main.name = cfg.deployBranch;
 
-              # comin's own default, named because it is worth remembering:
-              # `testing` is test-activated, disappears on reboot, deliberately
-              # ungated — the way to try something without waiting for the gate.
+              # Test-activated and deliberately ungated.
               branches.testing.name = "testing";
               poller.period = cfg.pollSeconds;
             }
@@ -180,8 +159,6 @@
 
           exporter = {
             port = cfg.exporterPort;
-            # Reachable over the mesh only, via the netbird rule below —
-            # never by opening it on every interface.
             openFirewall = false;
           };
         };

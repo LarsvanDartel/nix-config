@@ -1,13 +1,6 @@
-# update-blocklists — refresh the vendored oisd snapshots (vendored because
-# oisd regenerates them continuously; services/unbound.nix has the
-# reasoning):
-#
-#   nix run .#update-blocklists
-#   git diff --stat modules/den/aspects/services/_unbound   # sanity check
-#   git commit
-#
-# Commits nothing deliberately: a change to what the fleet's resolver blocks
-# needs a human looking at it.
+# update-blocklists — refresh the vendored oisd snapshots
+# (`nix run .#update-blocklists`). Commits nothing deliberately: a change to
+# what the fleet's resolver blocks needs human review.
 {...}: {
   nixpkgs.overlays = [
     (final: _prev: {

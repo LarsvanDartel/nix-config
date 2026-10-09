@@ -1,35 +1,19 @@
 # services.attic — a binary cache the whole fleet pulls from.
 #
-# Exists because four hosts build independently and pioneer (aarch64,
-# assembled on voyager under binfmt — a Pi 3 with 866 MiB cannot build its
-# own closure) re-emulated whatever cache.nixos.org lacks, from scratch,
-# every time. On endeavour (array + uptime), mesh-only: a Nix client cannot
-# complete the browser OIDC redirect gaia's gate answers with, so publishing
-# it would mean bearerAuth off with attic's own tokens as the only lock.
+# Mesh-only: Nix clients cannot complete gaia's browser OIDC redirect.
 #
-# Two nixpkgs-module traps:
-#
-#   * `services.atticd` sets DynamicUser+StateDirectory — the /var/lib/private
-#     EBUSY case that broke ntfy and gatus, worse here because a dynamic UID
-#     also changes ownership of persistent data across boots. Forced off in
-#     favour of a static user, the shape services/prometheus.nix uses.
-#   * Cache contents go on /tank and are deliberately NOT in
-#     cosmos.system.impermanence.persist — /tank is a ZFS pool outside the
-#     persist layer, and an entry there bind-mounts /persist over it and puts
-#     a growing cache on the 250 GB system SSD. The sqlite index is the
-#     opposite case and does get a persist entry.
+#   * `services.atticd`'s DynamicUser+StateDirectory hits the /var/lib/private
+#     EBUSY trap (as ntfy/gatus did); forced to a static user.
+#   * Cache contents on /tank are deliberately NOT in impermanence.persist —
+#     an entry would bind-mount /persist over it onto the system SSD. The
+#     sqlite index does get a persist entry.
 {
   den,
   inputs,
   ...
 }: {
-  # The pull side, in roles.default so every host benefits — endeavour costs
-  # nothing there since it is the server.
-  #
-  # Inert until `publicKey` is set — a sequencing fact, not an oversight:
-  # attic mints the cache's signing keypair when the cache is *created*, at
-  # runtime. Deploy the server, run `atticd-atticadm`, paste the public key
-  # into the option default below, deploy the clients.
+  # Inert until `publicKey` is set: the keypair is minted at runtime when the
+  # cache is created (`atticd-atticadm`), then pasted into the default below.
   den.aspects.services.attic.client = {
     includes = [den.aspects.core.sops];
 
@@ -44,9 +28,7 @@
 
       cfg = config.cosmos.services.attic.client;
 
-      # attic's CLI has no --config; it reads $XDG_CONFIG_HOME/attic/config.toml
-      # and nothing else — hence the runtime directory with a symlink into the
-      # rendered secret.
+      # attic's CLI has no --config; it only reads $XDG_CONFIG_HOME/attic/config.toml.
       configHome = "/run/attic-client";
     in {
       options.cosmos.services.attic.client = {
@@ -124,22 +106,13 @@
       config = lib.mkMerge [
         (lib.mkIf (cfg.publicKey != null) {
           nix.settings = {
-            # Merged with cache.nixos.org, not displacing it — precedence is
-            # the `priority` each cache advertises in nix-cache-info, set on
-            # the server: `attic cache configure lvdar --priority 39`.
-            #
-            # 39 against upstream's 40, so this cache is tried first wherever
-            # it has the path and 404s fall through. It was 41 (upstream
-            # first) until a CI run showed why that is wrong on the mesh:
-            # attic is a LAN hop, cache.nixos.org an internet one. The cost
-            # is voyager off-home asking an unreachable cache first, bounded
-            # by connect-timeout and fallback below.
+            # Precedence comes from the server-side cache priority
+            # (`attic cache configure lvdar --priority 39`, below upstream's
+            # 40): attic is a LAN hop, cache.nixos.org an internet one.
             substituters = [cfg.endpoint];
             trusted-public-keys = [cfg.publicKey];
 
-            # The cache is mesh-only and voyager is regularly somewhere it
-            # cannot be reached — fail over to building or cache.nixos.org
-            # quickly instead of hanging on a dead route.
+            # Mesh-only cache; voyager is often off-mesh.
             connect-timeout = 5;
             fallback = true;
           };
@@ -152,9 +125,7 @@
               mode = "0400";
             };
 
-            # A whole config file rather than a bare secret, because the CLI has
-            # no flag for either the endpoint or the token — it reads both from
-            # config.toml and nothing else.
+            # The CLI reads endpoint and token only from config.toml.
             templates."attic-client.toml".content = ''
               default-server = "${cfg.cacheName}"
 
@@ -164,10 +135,7 @@
             '';
           };
 
-          # So `attic push` is there for what watch-store cannot cover —
-          # seeding above all: it only uploads paths that appear after it
-          # starts. Not hypothetical: it is how the Discord blob whose
-          # upstream URL has since 404'd got in.
+          # For seeding: watch-store only uploads paths that appear after it starts.
           environment.systemPackages = [pkgs.attic-client];
 
           systemd.tmpfiles.rules = [
@@ -187,13 +155,10 @@
             serviceConfig = {
               ExecStart = "${lib.getExe pkgs.attic-client} watch-store ${cfg.cacheName}";
 
-              # The cache is mesh-only and voyager is often off it, so this
-              # unit failing is normal. Restart forever and quietly; keep it
-              # off the type-wide OnFailure ntfy route (core/notify-failure.nix).
+              # Failing off-mesh is normal; keep it off the OnFailure ntfy route.
               Restart = "always";
               RestartSec = 30;
 
-              # Uploading is not what this host is for.
               Nice = 15;
               IOSchedulingClass = "idle";
             };
@@ -267,11 +232,7 @@
       };
 
       config = {
-        # Per-host, so no explicit sopsFile: core/sops.nix points
-        # defaultSopsFile at hosts/<hostname>/secrets.yaml. A template rather
-        # than a bare secret because atticd wants an EnvironmentFile (same
-        # shape as gatus.nix); systemd opens it as root before dropping
-        # privileges, so no owner is needed.
+        # EnvironmentFile is opened by systemd as root, so no owner needed.
         sops = {
           secrets."keys/attic/token-secret" = {};
           templates."attic.env".content = ''
@@ -308,14 +269,10 @@
           environmentFile = config.sops.templates."attic.env".path;
 
           settings = {
-            # Bound to every interface and firewalled to the mesh, the shape
-            # kanidm and the arrs use here. NetBird assigns this host's mesh
-            # address at enrollment, so it is not knowable at eval time.
+            # Mesh address is assigned at enrollment, unknown at eval time.
             listen = "[::]:${toString cfg.port}";
 
-            # Attic builds client-facing URLs from this, so it must be the
-            # name clients actually resolve — the mesh name, not localhost
-            # (resolvable here via services/unbound.nix).
+            # Client-facing URLs are built from this; must be the mesh name.
             api-endpoint = "http://${config.networking.hostName}.${dnsDomain}:${toString cfg.port}/";
 
             database.url = "sqlite:///var/lib/atticd/server.db?mode=rwc";
@@ -325,21 +282,11 @@
               path = cfg.dataDir;
             };
 
-            # Content-defined chunking is what makes this worth running over
-            # a plain `nix copy` target: closures that differ by one
-            # derivation share the chunks of everything else. The sizes are
-            # 16x upstream's, and that is a storage decision, not a dedup one:
-            # every chunk costs a database transaction and a synchronous
-            # write, and /tank is two raidz1 vdevs of spinning disks with no
-            # SLOG, sustaining only a few per second. Measured before
-            # changing anything: ~150 KB/s ingest on a 24 MB/s link, 2.3
-            # chunks/second, 31 chunks per store path — a 2 GB CUDA closure
-            # took four hours and starved watch-store into 30-second pool
-            # timeouts. nar-size-threshold is the bigger lever: at 32 MiB the
-            # overwhelming majority of paths are stored whole and skip the
-            # machinery. Only new uploads are affected. The dedup lost is
-            # small — the wins come from whole closures reused across hosts,
-            # not sub-megabyte overlap inside a NAR.
+            # Sizes are 16x upstream's: every chunk costs a DB transaction and
+            # a sync write, and /tank (raidz1 HDDs, no SLOG) managed ~2.3
+            # chunks/s — a 2 GB closure took four hours. Most paths now skip
+            # chunking via nar-size-threshold; cross-host closure reuse is
+            # where the dedup wins are anyway.
             chunking = {
               nar-size-threshold = 33554432; # 32 MiB
               min-size = 262144; # 256 KiB
@@ -356,25 +303,17 @@
           };
         };
 
-        # The header explains why. Nested inside serviceConfig on purpose:
-        # den unwraps priority wrappers to classify aspect content, and a
-        # mkForce at the top level recurses infinitely alongside facter (see
-        # hosts/pioneer.nix).
+        # Nested inside serviceConfig on purpose: a top-level mkForce recurses
+        # infinitely in den alongside facter (see hosts/pioneer.nix).
         systemd.services.atticd.serviceConfig = {
           DynamicUser = lib.mkForce false;
 
-          # PrivateUsers maps the service into its own user namespace, which is
-          # harmless with a dynamic UID but hides the static one from the files
-          # it owns on /tank.
+          # PrivateUsers hides the static UID from the files it owns on /tank.
           PrivateUsers = lib.mkForce false;
 
-          # Refuse to start rather than fill the system SSD — same guard and
-          # reasoning as services/minecraft.nix. dataDir is its own dataset
-          # (hosts/_hw/endeavour/disko.nix) whose recordsize and sync settings
-          # are half of why uploads are not glacial; missing or unmounted, the
-          # path still *exists* on the pool root, so atticd would start
-          # happily, write chunks with the wrong properties, and be slow again
-          # for reasons nobody would think to look for.
+          # dataDir must be its own dataset (hosts/_hw/endeavour/disko.nix);
+          # unmounted, atticd would silently write to the pool root with the
+          # wrong recordsize/sync settings.
           ExecStartPre = [
             (lib.getExe (pkgs.writeShellApplication {
               name = "atticd-datadir-guard";

@@ -1,9 +1,7 @@
 # home.calculator — qalculate, the engine rofi-calc is built on.
 #
-# noctalia's `noctalia-calculator` plugin was rejected: plain arithmetic over
-# bundled AdvancedMath.js — no unit, currency or number-base conversion.
-# libqalculate has all of those. Exposed as the `qalc` CLI (aliased `=`) and
-# a floating terminal window for compositor keybinds.
+# noctalia's `noctalia-calculator` plugin was rejected: no unit, currency or
+# number-base conversion.
 {...}: {
   den.aspects.home.calculator.homeManager = {
     config,
@@ -20,7 +18,6 @@
       pkgs.writeShellScriptBin "qalc"
       ''exec ${lib.getExe' pkgs.libqalculate "qalc"} -set "autocalc 1" "$@"'';
 
-    # `app-id` is what the compositor window rules match on to float it.
     launcher =
       pkgs.writeShellScriptBin "calculator"
       ''exec ${terminal} --app-id=calculator -- ${lib.getExe qalc} "$@"'';

@@ -19,18 +19,9 @@
         sslCiphers = "AES256+EECDH:AES256+EDH:!aNULL";
       };
 
-      # Build-time `nginx -t` on the real config. `validateConfigFile` does not
-      # do this: it runs gixy, a security linter with its own parser, which
-      # accepted an invalid map variable name that then killed nginx's own
-      # pre-start parse and every vhost on the host.
-      #
-      # Sandbox details, all load-bearing: exit status is worthless (pid/log
-      # writes fail after the parse, as nixbld), so "syntax is ok" in the
-      # output is the signal. Interpolating the config derivation — not
-      # copying by path — brings its mime/fastcgi/proxy includes into the
-      # sandbox. It comes from environment.etc because upstream `configFile`
-      # is a let binding with no option. In system.checks so it gates the
-      # build without shipping anything to the host.
+      # Build-time `nginx -t` on the real config. `validateConfigFile` only runs
+      # gixy, which once accepted an invalid map variable that killed every vhost.
+      # nginx's exit status is useless in the sandbox; grep for "syntax is ok".
       system.checks = [
         (pkgs.runCommand "nginx-config-${config.networking.hostName}" {
             nativeBuildInputs = [config.services.nginx.package pkgs.openssl];

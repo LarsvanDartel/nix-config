@@ -62,7 +62,7 @@ There are no tests beyond `nix flake check`; correctness is eval + build.
 
 ## Code Conventions & Common Patterns
 
-- **Every file opens with a `# <name> — <what it is>` purpose comment**; non-obvious decisions get a comment explaining the *why* and the constraint that forced it. The existing comments are load-bearing documentation — match this.
+- **Every file opens with a `# <name> — <what it is>` purpose comment**. Beyond that, comment only what the code cannot say: non-obvious constraints, upstream workarounds, traps that broke something, hand-synced cross-host literals. No comments for simple or self-evident cases (enabling a service, opening a port, persisting a state dir, setting a user/group).
 - **Feature-local inputs**: declare `flake-file.inputs.<name>.url` in the module that uses it, then `nix run .#write-flake`. Never edit `flake.nix` (generated; `check-flake-file` enforces sync).
 - **Aspect shapes** (simple → full → composite):
   ```nix

@@ -24,29 +24,19 @@ in {
     ];
 
   options.cosmos.desktops.common.styling = {
-    # Internal: on when the styling feature is imported (parts self-gate on it).
     enable = mkEnableOption "styling configuration" // {default = true;};
   };
 
   config = mkIf cfg.enable {
-    # stylix drives the cursor via home.pointerCursor; opt in explicitly to
-    # silence the deprecation (required once abort-on-warn is on).
+    # Required under abort-on-warn: silences stylix's cursor deprecation.
     home.pointerCursor.enable = lib.mkDefault true;
 
     stylix = {
       enable = true;
       autoEnable = true;
-      # One source of truth for how see-through the desktop is; both shells
-      # read these rather than carrying their own numbers. stylix reaches
-      # foot/alacritty from `terminal`, and off that same value flips btop's and
-      # helix's `transparent` flags — load-bearing: a TUI painting its own
-      # opaque background punches a solid rectangle through the translucent
-      # terminal. The niri shell's surfaces are wired by hand in
-      # _noctalia/home.nix: stylix's noctalia-shell target is gated on
-      # `options.programs ? noctalia-shell` and ours is a wrapped package, so
-      # the target is inert. `applications` is deliberately 1.0 — a translucent
-      # PDF is harder to read, and translucent browser chrome around opaque
-      # content just looks broken.
+      # Load-bearing: `terminal` also flips btop's/helix's `transparent`, or a
+      # TUI paints an opaque rectangle through the terminal. noctalia reads these
+      # by hand (_noctalia/home.nix). `applications` stays 1.0 deliberately.
       opacity = {
         terminal = 0.8;
         desktop = 0.8;

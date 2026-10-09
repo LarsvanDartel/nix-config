@@ -1,11 +1,7 @@
 # services.zed — make the ZFS event daemon actually say something.
 #
-# Upstream zfs-zed.service ran silently: ZED_EMAIL_ADDR unset makes
-# zed-functions.sh return early from every notification path. Three alarm
-# layers by design: prometheus watches pool state (already degraded), zed
-# fires on the events that precede it (checksum errors, scrub repairs, spare
-# pull-in), smartd is the disk's own opinion. Routed to ntfy via ZED_EMAIL_PROG
-# — `services.zfs.zed.enableMail` is OFF on purpose: it asserts a setuid
+# Upstream zfs-zed is silent without ZED_EMAIL_ADDR. Routed to ntfy via
+# ZED_EMAIL_PROG; `services.zfs.zed.enableMail` stays OFF: it asserts a setuid
 # sendmail wrapper exists, the thing being avoided.
 {inputs, ...}: {
   den.aspects.services.zed.nixos = {
@@ -75,8 +71,7 @@
         # "restore from restic" rather than "replace a disk".
         ZED_NOTIFY_DATA = true;
 
-        # Auto-pull the hot spare on fault: a spare that needs a human to
-        # notice and act is an empty bay.
+        # Auto-pull the hot spare on fault.
         ZED_SPARE_ON_CHECKSUM_ERRORS = 10;
         ZED_SPARE_ON_IO_ERRORS = 1;
 

@@ -1,10 +1,7 @@
 # services.alloy — ship this host's journal to loki.
 #
-# Alloy, not promtail (EOL, gone from nixpkgs). Opt-in per host, not in
-# roles.server: pioneer must not run a shipper — SD-card IO already stalls
-# its watchdog; its journal is capped at 128 MB instead. Reads the journal,
-# and /var/log is persisted on impermanent hosts, so a restart resumes
-# rather than re-ships or skips.
+# Opt-in per host, not in roles.server: pioneer must not run a shipper — SD-card
+# IO already stalls its watchdog.
 {den, ...}: {
   den.aspects.services.alloy = {
     includes = [den.aspects.services.netbird.client];
@@ -20,8 +17,6 @@
 
       cfg = config.cosmos.services.alloy;
 
-      # Alloy's own config language, not YAML — components wire via each
-      # other's exports, so read bottom-up.
       config-alloy = pkgs.writeTextDir "config.alloy" ''
         loki.write "default" {
           endpoint {
@@ -109,8 +104,6 @@
           configPath = config-alloy;
         };
 
-        # The journal is root-readable; the systemd-journal group grants
-        # alloy's user read access to it.
         systemd.services.alloy.serviceConfig.SupplementaryGroups = ["systemd-journal"];
       };
     };

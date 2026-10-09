@@ -1,14 +1,11 @@
 # roles.server — headless baseline. Included by server hosts.
 {den, ...}: {
-  # Server-only, deliberately not in roles.default: nobody sits at a server,
-  # while a laptop's failures are mostly yours and suspend/resume churn
-  # would make the notifications noise.
+  # Server-only: on laptops suspend/resume churn makes failure notifications
+  # noise.
   den.aspects.roles.server.includes = [
     den.aspects.core.notify-failure
-    # Says so when a deploy has staged a new kernel that is not running yet.
     # Notifies rather than reboots — see the aspect for why.
     den.aspects.core.reboot-required
-    # Host metrics on every server, scraped from endeavour over the mesh.
     den.aspects.services.node-exporter
   ];
 

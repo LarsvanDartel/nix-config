@@ -1,4 +1,4 @@
-# services.suwayomi — manga server (was flake.modules.nixos.suwayomi).
+# services.suwayomi — manga server.
 {...}: {
   den.aspects.services.suwayomi.nixos = {
     config,
@@ -25,11 +25,8 @@
     options.cosmos.services.suwayomi = {
       ip = mkOption {
         type = str;
-        # Loopback only while a local nginx vhost fronts this. Under edge
-        # termination netbird-proxy dials `peer:8080` straight over the mesh
-        # and a loopback bind refuses it. Reach is still firewall-governed:
-        # the port opens on wt0 only (netbird.client.exposedPorts on
-        # endeavour).
+        # Under edge termination netbird-proxy dials over the mesh, which a
+        # loopback bind refuses.
         default =
           if config.cosmos.networking.edgeTerminated
           then "0.0.0.0"
@@ -54,16 +51,9 @@
       };
       extensionStores = mkOption {
         type = listOf str;
-        # index.pb, not the old index.min.json: keiyoushi moved to Mihon's
-        # store and left the old URL serving a two-entry "Outdated App" stub
-        # — the page looked broken while the server rendered what it was
-        # given. Needs suwayomi-server >= 2.3.2223 (extension API v1.6),
-        # hence the pin ahead of nixpkgs in modules/pkgs/suwayomi-server.nix.
-        #
-        # Named for the server.conf key 2.3 renamed from extensionRepos —
-        # which the nixpkgs module still writes; 2.3 migrates that to an empty
-        # list rather than erroring, so the page looks exactly as broken.
-        # Hence the explicit settings.server.extensionStores below.
+        # index.pb, not index.min.json: the old URL serves an "Outdated App"
+        # stub. Needs suwayomi-server >= 2.3.2223, hence the pin in
+        # modules/pkgs/suwayomi-server.nix.
         default = ["https://raw.githubusercontent.com/keiyoushi/extensions/repo/index.pb"];
       };
       expose = mkOption {
@@ -157,13 +147,9 @@
         optional (cfg.homeLink != null)
         "L+ ${cfg.homeLink} - - - - ${cfg.downloadsDir}";
 
-      # Comick's CDN answers page bursts with HTTP 429 regardless of pacing;
-      # the downloader gives up after three tries and parks the chapter as
-      # ERROR. startDownloader does not revive those — it skips entries at
-      # tries=3, and re-enqueueing in place increments the count and zeroes
-      # progress. Only a dequeue resets the counter, so this sweeps ERROR
-      # entries out and puts them back. It converges because fetched pages
-      # stay in the on-disk cache: each sweep resumes rather than restarts.
+      # Comick's CDN 429s page bursts and the downloader parks chapters as
+      # ERROR after three tries; only a dequeue resets the counter, so this
+      # sweeps ERROR entries out and re-enqueues them.
       systemd.services.suwayomi-download-retry = mkIf cfg.downloadRetry.enable {
         description = "Re-queue suwayomi chapter downloads that failed on HTTP 429";
         after = ["suwayomi-server.service"];
@@ -242,23 +228,15 @@
         settings.server = {
           inherit (cfg) ip port;
 
-          # The 2.3 key, written directly: the module's extensionRepos option
-          # targets the 2.1 name, which 2.3 silently discards. The basicAuth*
-          # keys below stay on the module options on purpose — 2.3 migrates
-          # those, and the module envsubsts basicAuthPasswordFile so the
-          # secret never enters the store.
+          # Written directly: the module's extensionRepos targets the 2.1 key,
+          # which 2.3 silently discards.
           extensionStores = cfg.extensionStores;
 
-          # Follows webview.enable, which until now it did not: that option
-          # only swapped the *package*; whether CEF starts at all is this
-          # runtime setting, which defaults to true. With the webview off the
-          # server still initialised CEF outside the FHS env —
-          # UnsatisfiedLinkError plus a 519 MB Chromium re-download into the
-          # state directory, every start.
+          # Defaults to true; with the webview off CEF would still start outside
+          # the FHS env and re-download 519 MB of Chromium every start.
           kcefEnabled = cfg.webview.enable;
 
-          # Cloudflare. mkIf rather than an explicit false, so a host that sets
-          # no URL leaves suwayomi's own default alone.
+          # mkIf, not false, so a host without a URL keeps suwayomi's default.
           flareSolverrEnabled = mkIf (cfg.flareSolverrUrl != null) true;
           flareSolverrUrl = mkIf (cfg.flareSolverrUrl != null) cfg.flareSolverrUrl;
           downloadAsCbz = true;
@@ -271,7 +249,6 @@
         };
       };
 
-      # Dropped when the edge terminates TLS.
       services.nginx.virtualHosts = mkIf (cfg.expose && !config.cosmos.networking.edgeTerminated) {
         "suwayomi.lvdar.nl" = {
           forceSSL = true;

@@ -1,14 +1,6 @@
-# Declarative noctalia plugins.
-#
-# Upstream's model is imperative (git-clone into ~/.config/noctalia/plugins,
-# `enabled` recorded in plugins.json). A plain store symlink cannot replace it:
-#   * a plugin's own settings.json at <pluginDir>/ is written by the shell at
-#     runtime — a read-only store path makes saving fail silently;
-#   * plugins.json also holds hand-installed plugins, which nix must not clobber.
-# So plugin trees are *copied* out of pinned sources on activation (existing
-# settings.json preserved) and plugins.json is merged with jq, not overwritten.
-# Bar placement still lives in ./home.nix (`plugin:<id>` in bar.widgets):
-# store-owned, so not changeable from the settings panel.
+# Declarative noctalia plugins. Copied (not symlinked) on activation: plugins
+# write their own settings.json at runtime, and plugins.json is jq-merged so
+# hand-installed plugins aren't clobbered.
 {}: {
   config,
   lib,
@@ -22,8 +14,7 @@
 
   mainSourceUrl = "https://github.com/noctalia-dev/noctalia-plugins";
 
-  # The official monorepo. Pinned: plugins are QML loaded straight into the
-  # shell, so "whatever main happens to be today" is not a thing to auto-track.
+  # Pinned: plugins are QML loaded straight into the shell.
   monorepo = pkgs.fetchFromGitHub {
     owner = "noctalia-dev";
     repo = "noctalia-plugins";
@@ -92,19 +83,14 @@ in {
     description = "Plugins installed into ~/.config/noctalia/plugins and enabled.";
     default = {
       # -- ThinkPad / power ---------------------------------------------------
-      # Charge start/stop thresholds. Needs the udev rule + battery_ctl group
-      # from hardware.thinkpad, or the sysfs write is denied.
+      # Needs the udev rule + battery_ctl group from hardware.thinkpad.
       battery-threshold = official "battery-threshold";
-      # Fan profiles and temperatures. Needs thinkpad_acpi fan_control=1 and a
-      # writable /proc/acpi/ibm/fan — also hardware.thinkpad.
+      # Needs thinkpad_acpi fan_control=1 (hardware.thinkpad).
       thinkpad-fan = official "thinkpad-fan";
-      # Power draw, time remaining, battery health. Reads UPower (desktop.power).
       battery-monitor-plus = official "battery-monitor-plus";
 
       # -- niri ---------------------------------------------------------------
-      # Under Hyprland this asks the compositor (`hyprctl binds -j`); under niri
-      # it parses ~/.config/niri/config.kdl as a file, which the wrapped config
-      # would otherwise never create — see _niri/home.nix.
+      # Under niri this parses ~/.config/niri/config.kdl — see _niri/home.nix.
       keybind-cheatsheet = official "keybind-cheatsheet";
       display-settings = official "display-settings";
       niri-workspaces = official "niri-workspaces";
@@ -112,21 +98,14 @@ in {
 
       # -- integrations -------------------------------------------------------
       protonvpn = official "protonvpn";
-      # Mesh status, peer list and up/down. Shells out to the `netbird` CLI,
-      # which services.netbird already puts on PATH, and reads the daemon over
-      # its socket — which the client module leaves readable unprivileged, so
-      # the widget works without a polkit prompt.
       netbird =
         official "netbird"
         // {
-          # The full NetBird address on the bar is too wide next to the four
-          # permanent readings on that side; icon only, like the other status
-          # widgets.
+          # Too wide on the bar next to the other readings.
           settings.showIpAddress = false;
         };
       ssh-sessions = official "ssh-sessions";
       model-usage = official "model-usage";
-      # Not in the monorepo — its own repo, so its own pin.
       kde-connect = {
         src = pkgs.fetchFromGitHub {
           owner = "WerWolv";
@@ -139,8 +118,8 @@ in {
 
       # -- shell --------------------------------------------------------------
       plugin-manager = official "plugin-manager";
-      # Replaces the standalone hyprpolkitagent unit (see _niri/system.nix):
-      # only one process may own the polkit agent registration.
+      # Replaces hyprpolkitagent (see _niri/system.nix): only one polkit agent
+      # may register.
       polkit-agent = official "polkit-agent";
       privacy-indicator = official "privacy-indicator";
       screen-toolkit = official "screen-toolkit";
@@ -148,17 +127,11 @@ in {
   };
 
   config = {
-    # The kde-connect plugin is a bar widget over the same D-Bus daemon, so the
-    # indicator would only duplicate it in the tray. mkForce because
-    # home.kde-connect enables it outright — and it must stay enabled there:
-    # the Hyprland side has no such plugin and the tray icon is its only way in.
+    # Duplicates the kde-connect bar widget. mkForce: home.kde-connect must keep
+    # it enabled for Hyprland, where the tray icon is the only way in.
     services.kdeconnect.indicator = lib.mkForce false;
 
-    # …but the indicator's menu was the only route to the KDE Connect GUI:
-    # home.kde-connect replaces the packaged launcher entry with a hidden,
-    # `Exec=`-less stub. Restore a working entry — the plugin's own panel covers
-    # pairing and the common actions; this is for per-device configuration
-    # past that.
+    # home.kde-connect hides the launcher entry; restore it for per-device config.
     xdg.desktopEntries."org.kde.kdeconnect.app" = {
       exec = lib.mkForce "kdeconnect-app";
       icon = lib.mkForce "kdeconnect";
@@ -166,8 +139,7 @@ in {
       settings.NoDisplay = lib.mkForce "false";
     };
 
-    # Runtime dependencies the plugins shell out to. niri and hyprctl come from
-    # the compositor's own session PATH.
+    # niri and hyprctl come from the compositor's session PATH.
     home.packages = with pkgs; [
       jq
       wlr-randr # display-settings

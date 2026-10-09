@@ -1,34 +1,24 @@
-# Portable, stylix-themed wrapped packages via sini/hm-wrapper-modules: each
-# program's real home-manager module, composed with the wrapper-stylix base,
-# bwrapped into a standalone derivation exposed as `packages.<system>.<name>`.
-# Augmenting catalog — the normal home-manager install stays the daily driver.
-#
-# Drives the library directly instead of the upstream flake module: autoWrap
-# would not work here anyway — module-classes.nix wraps every flake.modules.*
-# entry in an attrs, defeating the arg-sniffing isWrappable. See the comment
-# on hmEval for the parts.nix side of that decision.
+# Portable, stylix-themed wrapped packages via sini/hm-wrapper-modules,
+# exposed as `packages.<system>.<name>`; the home-manager install stays the
+# daily driver. Drives the library directly: upstream's autoWrap can't work
+# here (module-classes.nix wraps every flake.modules.* entry in an attrs,
+# defeating isWrappable).
 {
   inputs,
   den,
   lib,
   ...
 }: let
-  # Bridge to den: each wrapped program's home module is the den aspect's
-  # homeManager class content (den.aspects.home.<n>.homeManager).
   hm = builtins.mapAttrs (_: a: a.homeManager) den.aspects.home;
 
-  # The full nix-wrapper-modules API plus this flake's HM adapter, the same
-  # value its flakeModules.default is built from.
   wlib = inputs.hm-wrapper-modules.lib;
 
-  # Theming + cross-cutting option stubs applied to every wrapped program.
   baseModules = [hm.wrapper-stylix hm.wrapper-stubs];
 
   stateVersion = "26.11";
 
-  # Tier 1 programs wrapped as portable, stylix-themed packages.
-  # NOTE: foot is intentionally omitted — its home aspect reads the desktop
-  # styling font options, which don't exist in an isolated wrap eval.
+  # foot is intentionally omitted — its home aspect reads desktop font
+  # options that don't exist in an isolated wrap eval.
   wrapNames = [
     "bat"
     "mpv"
@@ -42,7 +32,6 @@
     "zoxide"
     "yazi"
     "oh-my-posh"
-    # already standalone named modules
     "htop"
     "fzf"
     "zathura"
@@ -51,9 +40,8 @@
     "ranger"
   ];
 
-  # program -> stylix target name. wrapper-stylix has autoEnable off; only
-  # the relevant target is enabled per program, keeping desktop theming
-  # (GTK/KDE/blender/…) out of the closure. No entry = no stylix target.
+  # wrapper-stylix has autoEnable off; enabling only the program's own target
+  # keeps desktop theming (GTK/KDE/…) out of the closure.
   themedTargets = {
     bat = "bat";
     btop = "btop";
@@ -72,15 +60,9 @@
       ++ lib.optional (themedTargets ? ${n}) {stylix.targets.${themedTargets.${n}}.enable = true;};
   };
 
-  # The upstream flake module's job, done here instead. parts.nix calls
-  # wrapHomeModule with the default extractPackages = true, routing
-  # home.packages into the deprecated `extraPackages` — a warning, fatal
-  # under abort-on-warn, for every program whose HM module puts anything in
-  # home.packages (which `programs.<x>.enable` generally does). It is removed
-  # outright on 2026-08-31, and parts.nix exposes no way to reach the flag
-  # (upstream is dormant), so we call the same public wrapHomeModule
-  # ourselves with extraction off, feeding home.packages into `runtimePkgs`,
-  # the successor option, by hand.
+  # Called directly with extractPackages = false: parts.nix's default routes
+  # home.packages into the deprecated `extraPackages` (fatal under
+  # abort-on-warn, removed 2026-08-31) with no way to override it.
   hmEval = pkgs: homeModules:
     (inputs.home-manager.lib.homeManagerConfiguration {
       inherit pkgs;
@@ -110,17 +92,13 @@
       bwrapConfig.binds.ro = wlib.mkBinds base.passthru.hmAdapter;
       env.XDG_CONFIG_HOME = lib.mkIf config.bwrapConfig.enable (lib.mkForce null);
 
-      # Re-evaluated instead of read from passthru: nix-wrapper-modules'
-      # attrsRecursive (lazyAttrsOf, documented "less lazy") forces
-      # optionalValue for every key it descends, and walking a whole
-      # home-manager config that way reaches the removed
-      # home.sessionVariableSetter, which throws on read. Costs an extra HM
-      # eval per program — the reason hmEval exists.
+      # Re-evaluated, not read from passthru: attrsRecursive forces every key
+      # and reaches the removed home.sessionVariableSetter, which throws.
       runtimePkgs = (hmEval pkgs program.homeModules).home.packages;
     });
 in {
-  # (flake-file can't URL-pin a transitive input, so nix-wrapper-modules stays a
-  # top-level input that hm-wrapper-modules follows.)
+  # flake-file can't URL-pin a transitive input, so nix-wrapper-modules stays
+  # top-level for hm-wrapper-modules to follow.
   flake-file.inputs = {
     hm-wrapper-modules = {
       url = "github:sini/hm-wrapper-modules";
@@ -136,9 +114,8 @@ in {
     };
   };
 
-  # NOTE: git is omitted too — den's home.git bakes in ssh commit signing that
-  # reads cosmos.user.home (host-specific), which isn't portable/present in an
-  # isolated wrap. The deployed git (on every host) is unaffected.
+  # git is omitted too — den's home.git signing reads the host-specific
+  # cosmos.user.home, absent in an isolated wrap.
   perSystem = {pkgs, ...}: {
     packages = lib.mapAttrs (mkPackage pkgs) (lib.genAttrs wrapNames mkProgram);
   };

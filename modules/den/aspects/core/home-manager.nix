@@ -1,6 +1,4 @@
-# core.home-manager — HM NixOS-module config. den auto-imports the HM module
-# for users with the homeManager class; this sets shared options.
-# useGlobalPkgs=true so home shares the OS pkgs (overlays via core.nixpkgs).
+# core.home-manager — shared home-manager NixOS-module config.
 {inputs, ...}: {
   den.aspects.core.home-manager.nixos = {...}: {
     home-manager = {

@@ -1,49 +1,17 @@
 # services.flake-bump — the scheduled half of "keep the lock fresh".
 #
-# tangled has exactly three trigger kinds — push, pull_request, manual — so
-# "periodically" cannot be a workflow at all; this timer is the whole of it.
+# Daily: update every input, build the three x86_64 hosts, push the lock to
+# main only if all are green (comin then deploys). tangled has no scheduled
+# trigger, so this timer is the only way; run on demand with
+# `systemctl start flake-bump` rather than reintroducing a workflow copy.
 #
-# There was briefly a manual `.tangled/workflows/flake-update.yml` beside it,
-# meant as "the same work you can fire by hand from the appview". It was never
-# once triggered, and keeping a second copy of the three build commands only
-# bought a way for the two to disagree — which they already had: it updated
-# nix-secrets where this excludes it, and it dropped the --no-write-lock-file
-# and --no-link this uses. Removed. To get the same answer on demand, run this
-# unit: `systemctl start flake-bump`.
-#
-# That does commit and push when green, where the workflow deliberately did
-# not. The distinction is thinner than it looks — nothing is committed unless
-# all three hosts build, and when they do the commit is what you wanted. If a
-# true dry run is ever needed, it belongs here as a flag, not as a second file.
-#
-# What it does, once a day: update every flake input, build the three x86_64
-# hosts, and push the new lock to main only if all three are green. comin then
-# picks it up within five minutes and the fleet moves itself. If anything is
-# red the lock is reverted and the unit exits non-zero, which reaches ntfy
-# through the type-wide OnFailure drop-in in core/notify-failure.nix — no
-# separate notifier, and a failure that cannot be missed.
-#
-# Three things about this that are load-bearing:
-#
-#   * **nix-secrets is excluded from the update.** Everything else here is
-#     public; that one is a private git+ssh input and this host has no key for
-#     it. Builds use the same empty stub CI uses, which is sound for the same
-#     reason — sops-nix runs with validateSopsFiles = false, so nothing reads
-#     it. See .tangled/nix-secrets-stub/flake.nix.
-#   * **Only flake.lock is committed.** Never a tree the timer has otherwise
-#     touched. If the working copy is dirty for any reason the run aborts.
-#   * **It pushes over SSH to the knot, not into the bare repo on disk.**
-#     endeavour *is* the knot host, so writing to /tank/git directly would be
-#     tempting and wrong: the knot emits sh.tangled.git.refUpdate from its own
-#     receive path rather than from a git hook (hooks/post-receive.d is empty),
-#     so a filesystem push would move the ref while leaving CI untriggered and
-#     the appview showing nothing.
-#
-# The consequence worth stating plainly: an upstream change can now reach two
-# production hosts unattended, and comin has no magic rollback. The gate is
-# that all three hosts must build first — which, with abort-on-warn, is a
-# stronger gate than it sounds, since a deprecation warning anywhere is a
-# failure. It is not a guarantee that the result behaves.
+#   * nix-secrets is excluded: private git+ssh input with no key here; builds
+#     use .tangled/nix-secrets-stub (sound because validateSopsFiles = false).
+#   * Push over SSH to the knot, never into /tank/git directly: the knot emits
+#     refUpdate from its receive path, not a hook, so a filesystem push would
+#     leave CI untriggered.
+#   * Upstream changes reach production unattended; the gate is only that all
+#     three hosts build (with abort-on-warn).
 {
   den,
   inputs,
@@ -268,8 +236,7 @@
           serviceConfig = {
             Type = "oneshot";
             ExecStart = lib.getExe script;
-            # Builds three NixOS closures; the array and the Minecraft servers
-            # matter more than this finishing quickly.
+            # Yield to the array and Minecraft servers.
             Nice = 10;
             IOSchedulingClass = "idle";
           };

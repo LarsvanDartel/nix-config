@@ -1,28 +1,10 @@
 # services.build-gate — nothing reaches the fleet until it has been built.
 #
-# comin deploys within five minutes of a push and has no magic rollback; this
-# is the gate. On every push to main it builds all three x86_64 hosts at the
-# pushed revision and, only if all three are green, fast-forwards a `deploy`
-# branch. comin tracks `deploy`, never `main` — the fleet only ever sees
-# verified work.
-#
-# On the metal, not in the spindle's pipeline microVM, which is what it
-# replaces: the identical three-host build took 76 minutes there against 4m36s
-# native (emulated CPU against 72 threads, slirp networking, vsock-proxied
-# attic, cold store). Runs as this host's own systemd unit, next to the
-# flake-bump timer that already did exactly this.
-#
-#   * The trigger is a file: the knot keeps refs/heads/main as a plain file
-#     whose mtime moves on every push — a systemd.path fires within a second,
-#     no credential, no open port, no network. See `paths` below.
-#   * A red build is silent apart from ntfy: the push succeeds, `deploy`
-#     simply does not follow. Notification via the type-wide OnFailure
-#     drop-in in core/notify-failure.nix.
-#   * `main` and `deploy` can diverge, deliberately — `git log deploy..main`
-#     is "what has not passed yet".
-#
-# Does *not* gate flake-bump: that timer already builds all three hosts
-# before it commits, so a lock bump is verified by construction.
+# comin has no magic rollback, so comin tracks `deploy`, never `main`: on
+# every push to main this builds all x86_64 hosts and fast-forwards `deploy`
+# only if all are green. `git log deploy..main` is "what has not passed yet".
+# On the metal, not the spindle microVM (76 min there vs 4m36s native).
+# Does not gate flake-bump, which already builds all hosts before committing.
 {
   den,
   inputs,
@@ -220,8 +202,7 @@
           serviceConfig = {
             Type = "oneshot";
             ExecStart = lib.getExe script;
-            # Same courtesy as flake-bump: three closures matter less than the
-            # Minecraft servers and the array.
+            # Three closures matter less than the Minecraft servers and the array.
             Nice = 10;
             IOSchedulingClass = "idle";
           };

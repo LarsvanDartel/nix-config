@@ -1,12 +1,6 @@
-# desktop.greetd (+ tuigreet). greetd is the login manager; tuigreet draws the
-# session picker.
-#
-# Sessions are CURATED: each compositor aspect contributes exactly one entry via
-# `cosmos.profiles.desktop.addons.greetd.sessions`, and tuigreet is pointed at a
-# linkFarm of just those. Pointing it at the system-wide wayland-sessions dir
-# instead lists Hyprland twice, because `programs.hyprland.withUWSM` installs
-# BOTH `hyprland.desktop` ("Hyprland") and `hyprland-uwsm.desktop`
-# ("Hyprland (uwsm-managed)") — that was the duplicate-sessions bug.
+# desktop.greetd (+ tuigreet). Sessions are CURATED: each compositor aspect
+# contributes one entry and the greeter gets a linkFarm of just those — the
+# system-wide wayland-sessions dir lists Hyprland twice under withUWSM.
 {den, ...}: {
   den.aspects.desktop.greetd.nixos = {
     config,
@@ -58,9 +52,8 @@
     };
 
     config = {
-      # Only `default_session` — that is the greeter. `initial_session` is
-      # greetd's *autologin* slot; pointing it at the same value registered
-      # the greeter twice.
+      # Not `initial_session`: that is greetd's autologin slot; setting it to
+      # the same value registered the greeter twice.
       services.greetd = {
         enable = true;
         settings.default_session = {
@@ -68,35 +61,21 @@
         };
       };
 
-      # greetd's PAM service bypasses the generic-rules machinery
-      # (useDefaultRules = false; substacks /etc/pam.d/login for auth/password,
-      # includes it for session), so enableGnomeKeyring on
-      # `security.pam.services.greetd` itself is a no-op — pam_gnome_keyring has
-      # to go on `login`, the stack that actually runs. Without it the login
-      # gnome-keyring starts locked every boot and every secret in it (Proton
-      # Pass, browser passwords, ssh-agent) looks wiped, even though the
-      # persisted keyring file on disk is untouched.
+      # greetd's PAM stack substacks `login`, so enableGnomeKeyring on
+      # `greetd` itself is a no-op; without this the keyring starts locked
+      # every boot and all secrets look wiped.
       security.pam.services.login.enableGnomeKeyring = true;
 
-      # `services.gnome.gnome-keyring` (not home.keyring's user-level service)
-      # is what puts `gcr`'s SystemPrompter/PrivatePrompter D-Bus services on
-      # `services.dbus.packages` — without it gnome-keyring-daemon's own
-      # unlock/change-password dialogs fail with "couldn't initialize prompt:
-      # ... not activatable" and silently never unlock, so seahorse can't even
-      # be used to blank the login keyring's passphrase.
+      # System-level gnome-keyring is what registers gcr's prompter D-Bus
+      # services; without it keyring unlock dialogs silently never appear.
       services.gnome.gnome-keyring.enable = true;
-      # `services.gnome.gcr-ssh-agent.enable` defaults to the option above and
-      # collides with core.ssh's `programs.ssh.startAgent` (only one SSH agent
-      # may be installed) — we want gnome-keyring purely for its Secret
-      # Service + prompter, not its ssh-agent replacement.
+      # Defaults on with gnome-keyring and collides with core.ssh's
+      # `programs.ssh.startAgent` (only one SSH agent may be installed).
       services.gnome.gcr-ssh-agent.enable = false;
     };
   };
 
-  # The graphical alternative to tuigreet — same curated session list, noctalia's
-  # look. The body lives in ./_greetd/noctalia.nix so voyager's
-  # `specialisation.niri` can apply it too (specialisation bodies are plain
-  # modules and cannot `include` a den aspect).
+  # Body in ./_greetd/noctalia.nix, shared with voyager's specialisation.
   den.aspects.desktop.greetd.noctalia = {
     includes = [den.aspects.desktop.greetd];
     nixos = import ./_greetd/noctalia.nix {};
@@ -121,7 +100,6 @@
 
       tuigreet = "${pkgs.tuigreet}/bin/tuigreet";
 
-      # Exactly the entries the compositor aspects asked for — nothing else.
       sessionDir = pkgs.linkFarm "greetd-wayland-sessions" greetd.sessions;
     in {
       options.cosmos.profiles.desktop.addons.greetd.tuigreet = {
@@ -143,8 +121,6 @@
       config = {
         cosmos.system.impermanence.persist.directories = ["/var/cache/tuigreet"];
 
-        # `--remember-user-session` persists the picked session per user, so the
-        # choice sticks across logins (state lives in /var/cache/tuigreet).
         cosmos.profiles.desktop.addons.greetd.command = mkDefault (
           concatStringsSep " " (
             [

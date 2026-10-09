@@ -1,6 +1,5 @@
-# desktop.styling — system stylix. base16Scheme set directly to Nord (the old
-# config read it from the home user's stylix; setting it directly avoids a
-# home→nixos cross-eval and matches the scheme home uses).
+# desktop.styling — system stylix. base16Scheme set directly (not read from the
+# home user's stylix) to avoid a home→nixos cross-eval; must match home's.
 {inputs, ...}: {
   flake-file.inputs.stylix = {
     url = "github:nix-community/stylix";

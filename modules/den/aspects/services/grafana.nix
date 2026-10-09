@@ -1,14 +1,9 @@
 # services.grafana — dashboards over the prometheus on this host.
 #
-# Published with the NetBird identity gate deliberately OFF and its own
-# kanidm OIDC client — the opencloud pattern, not the arr one. The gate
-# answers a lapsed session with a 302 to the IdP; Grafana is an SPA whose
-# XHR cannot follow it and dies with a bare NetworkError — what took traccar
-# down until it was ungated (hosts/gaia.nix). Its own OIDC also avoids a
-# second login and carries a role, not just yes/no.
-#
-# Local admin login kept: kanidm runs on this host behind the same edge, so
-# OIDC-only would lock the dashboard exactly when you want to look at it.
+# NetBird identity gate deliberately OFF, own kanidm OIDC client instead:
+# the gate's 302 on a lapsed session kills SPA XHR with a bare NetworkError
+# (what took traccar down). Local admin login kept: kanidm sits behind the
+# same edge, so OIDC-only would lock you out exactly when you need to look.
 {den, ...}: {
   den.aspects.services.grafana = {
     includes = with den.aspects.services; [netbird.client prometheus loki];
@@ -26,9 +21,8 @@
       prom = config.cosmos.services.prometheus;
       loki = config.cosmos.services.loki;
 
-      # Hand-written, not imported from grafana.com: an id-pulled dashboard
-      # is an unreviewable JSON blob pinned to nothing, breaking silently
-      # when metric names change. Covers what the alert rules alert on.
+      # Hand-written, not imported from grafana.com: id-pulled dashboards are
+      # unreviewable blobs that break silently when metric names change.
       fleetJson = pkgs.writeText "fleet.json" (builtins.toJSON {
         title = "Fleet";
         uid = "fleet";
@@ -131,24 +125,18 @@
         sops.secrets = {
           # Read by kanidm to provision the client...
           "keys/grafana/oauth-client-secret".owner = "kanidm";
-          # ...and by grafana to authenticate as it. Two entries over one key
-          # rather than a shared group, so neither service can read the
-          # other's secrets by being in it.
+          # ...and by grafana. Two entries over one key rather than a shared
+          # group, so neither service can read the other's secrets.
           "grafana/oauth-client-secret" = {
             key = "keys/grafana/oauth-client-secret";
             owner = "grafana";
           };
-          # Grafana encrypts datasource credentials in its own database with
-          # this, and no longer ships a default. Losing it means those secrets
-          # cannot be decrypted, so it is generated once and kept, not derived.
+          # Encrypts datasource credentials in grafana's DB; losing it loses
+          # them, so it is generated once and kept, not derived.
           "keys/grafana/secret-key".owner = "grafana";
-          # Grafana ships admin/admin, and this instance is published — the
-          # break-glass local login was a login anyone on the internet had
-          # until this existed. Caveat: grafana only reads this when it
-          # *creates* the admin account; setting it later changes nothing,
-          # silently — remove /var/lib/grafana/data/grafana.db (provisioned
-          # content comes back from nix) or `grafana cli admin
-          # reset-admin-password`.
+          # Grafana ships admin/admin and this is published. Only read when the
+          # admin account is *created*; to change later, remove
+          # /var/lib/grafana/data/grafana.db or `grafana cli admin reset-admin-password`.
           "keys/grafana/admin-password".owner = "grafana";
         };
 
@@ -171,10 +159,8 @@
               http_addr = "0.0.0.0";
               http_port = cfg.port;
               inherit (cfg) domain;
-              # Absolute and https: grafana builds its OIDC redirect_uri
-              # from this — wrong and kanidm rejects the callback under
-              # strict redirect matching (same failure the netbird dashboard
-              # hit).
+              # Absolute and https: kanidm's strict redirect matching rejects
+              # the callback otherwise.
               root_url = "https://${cfg.domain}";
             };
 
@@ -205,10 +191,7 @@
               role_attribute_path = "contains(grafana_role[*], 'Admin') && 'Admin' || 'Viewer'";
             };
 
-            # Kept deliberately (see header): OIDC-only would make a Grafana
-            # outage and a kanidm outage the same event. Defensible only
-            # because the admin password above is a real one — with the
-            # shipped default this was an open door.
+            # See header. Defensible only because the admin password is real.
             auth.disable_login_form = false;
           };
 
@@ -224,8 +207,6 @@
                 url = "http://127.0.0.1:${toString prom.port}";
                 isDefault = true;
               }
-              # Without this the logs are collected and stored and simply
-              # cannot be read: Explore has nothing to query them with.
               {
                 name = "Loki";
                 uid = "loki";
@@ -238,13 +219,10 @@
             dashboards.settings.providers = [
               {
                 name = "fleet";
-                # A directory, not the .json itself. Grafana's file provider
-                # watches a folder; handed a file it logs "error watching
+                # A directory: handed a file, grafana logs "error watching
                 # folder" and the dashboard silently never appears.
                 options.path = dashboardDir;
-                # Provisioned dashboards are read-only in the UI, which is the
-                # point: an edit made in the browser would be silently reverted
-                # on the next deploy, so better it cannot be made.
+                # Read-only in the UI, since browser edits would be reverted on deploy.
                 allowUiUpdates = false;
               }
             ];

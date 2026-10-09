@@ -24,8 +24,6 @@
     };
 
     config = {
-      # Every service in the family runs as its own user in this group, which
-      # is what lets them hand files to one another under mediaDir.
       users.groups.media = {};
       cosmos.user.extraGroups = ["media"];
       systemd.tmpfiles.rules = ["d '${cfg.mediaDir}'  0775 root media - -"];

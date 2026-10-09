@@ -1,7 +1,5 @@
-# home.wrapper-stubs — cosmos.* option stubs (zsh init/aliases, impermanence
-# persist) so aspects evaluate in isolation in the wrapped-package catalog,
-# where the real declarers are absent. Values set here go nowhere.
-# Added to hmWrappers.baseModules.
+# home.wrapper-stubs — cosmos.* option stubs so aspects evaluate in isolation in
+# the wrapped-package catalog. Values set here go nowhere.
 {...}: {
   den.aspects.home.wrapper-stubs.homeManager = {lib, ...}: let
     inherit (lib.options) mkOption;

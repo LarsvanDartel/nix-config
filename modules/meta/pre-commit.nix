@@ -9,10 +9,8 @@
   imports = [inputs.pre-commit-hooks.flakeModule];
 
   perSystem = {config, ...}: let
-    # The vendored oisd blocklists — byte-for-byte what oisd serves (the point
-    # of the snapshot; services/unbound.nix has the reasoning). Excluded from
-    # every hook that would rewrite them: end-of-file-fixer failed on them
-    # outright, and any "fix" would break the upstream match.
+    # Vendored oisd blocklists must stay byte-for-byte upstream; keep every
+    # rewriting hook off them.
     vendored = ["\\.unbound$"];
   in {
     pre-commit.settings.hooks = {

@@ -1,16 +1,9 @@
 # services.taskchampion — the sync server Taskwarrior 3 replicates against.
 #
-# The server half of TaskChampion (Taskwarrior 3 dropped taskd). Not a task
-# database: every client holds a full replica and syncs an encrypted op log,
-# so the server cannot read tasks (the client-side `sync.encryption_secret`
-# is the real secret) and losing this directory loses nothing a surviving
-# replica holds — hence "convenience, not survival" in hosts/endeavour.nix.
-#
-# Published ungated, like ntfy: native clients cannot complete a browser
-# login. The client id is the only auth, and `--allow-client-id` is a
-# command-line argument (world-readable in the store and `ps`), so the ids
-# arrive as a systemd credential. The id protects integrity and the disk,
-# not the contents: a leaked id lets someone append junk, not read.
+# Every client holds a full encrypted replica, so losing this directory loses
+# nothing. Published ungated: native clients cannot do a browser login. The
+# client ids are the only auth and arrive as a systemd credential, since
+# `--allow-client-id` on the command line is world-readable.
 {...}: {
   den.aspects.services.taskchampion.nixos = {
     config,
@@ -26,9 +19,8 @@
     cfg = config.cosmos.services.taskchampion;
     serverCfg = config.services.taskchampion-sync-server;
 
-    # Rebuilds upstream's ExecStart with the ids read at runtime. Everything
-    # before the ids is taken from `serverCfg` deliberately, so upstream
-    # changes to port, data dir or snapshot policy reach this too.
+    # Rebuilds upstream's ExecStart from `serverCfg` so upstream changes still
+    # apply.
     start = pkgs.writeShellApplication {
       name = "taskchampion-sync-server-start";
       text = ''
@@ -91,17 +83,12 @@
         enable = true;
         inherit (cfg) port;
 
-        # Bound wide: replicas arrive over the mesh or through gaia's proxy
-        # (endeavour is edgeTerminated). The firewall limits reach — 10222
-        # opens on the netbird interface alone.
+        # Bound wide: endeavour is edgeTerminated; the firewall limits reach.
         host = "0.0.0.0";
 
-        # Pinned, not defaulted. Upstream ties this to stateVersion (on from
-        # 26.05); DynamicUser + StateDirectory would put the data in
-        # /var/lib/private, and the persist entry below would bind-mount the
-        # symlink — every sync starting from nothing after a reboot. Same trap
-        # as microbin.nix and ollama.nix; here it would arm itself on a
-        # stateVersion bump.
+        # Pinned: upstream ties this to stateVersion (on from 26.05), and
+        # DynamicUser would put data in /var/lib/private, where the persist
+        # entry bind-mounts the symlink — every sync restarting from nothing.
         dynamicUser = false;
       };
 

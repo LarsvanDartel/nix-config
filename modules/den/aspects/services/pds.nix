@@ -1,11 +1,7 @@
 # services.pds — a self-hosted ATProto Personal Data Server.
 #
-# Single-user by design: the handle sits under lvdar.nl, covered by the
-# existing wildcard in services/acme.nix. Hosting others' handles would need
-# *.pds.lvdar.nl (wildcards match a single label) — a deliberate non-goal.
-#
-# Ungated at the edge like immich and traccar: ATProto clients authenticate
-# with their own tokens and cannot follow a NetBird 302 to kanidm.
+# Single-user: hosting others' handles needs *.pds.lvdar.nl — a non-goal.
+# Ungated at the edge: ATProto clients cannot follow a NetBird 302 to kanidm.
 {den, ...}: {
   den.aspects.services.pds = {
     includes = [den.aspects.services.netbird.client];
@@ -58,14 +54,10 @@
           };
           environmentFiles = [config.sops.secrets."keys/pds/env".path];
 
-          # Account creation, invites and the eventual `goat` migration all
-          # happen from the shell on this host.
           pdsadmin.enable = true;
         };
 
-        # Static `pds` user with a plain StateDirectory — the ordinary persist
-        # shape, not the /var/lib/private EBUSY case ntfy hit. On the SSD, not
-        # /tank: the one thing here whose latency a phone notices.
+        # On the SSD, not /tank: the one thing here whose latency a phone notices.
         cosmos.system.impermanence.persist.directories = [
           {
             directory = "/var/lib/pds";

@@ -8,8 +8,7 @@
   inherit (lib.attrsets) filterAttrs;
   inherit (lib.strings) hasSuffix;
 
-  # Sibling non-default .nix files (import-tree ignores this whole _impl dir, so
-  # they are pulled in explicitly here rather than globally).
+  # import-tree ignores this _impl dir.
   nonDefault = dir:
     map (n: dir + "/${n}")
     (builtins.attrNames (filterAttrs (n: t: t == "regular" && n != "default.nix" && hasSuffix ".nix" n) (builtins.readDir dir)));

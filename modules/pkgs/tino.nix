@@ -1,16 +1,8 @@
 # tino — the `tino` Python package (github:confirm/tino), registered into
-# python3Packages rather than built standalone: no console-script entry
-# point (upstream runs it as a gunicorn worker, "tino:create_app()");
-# services/tino.nix composes the run env with python3.withPackages. Upstream
-# supports only Docker; native packaging is deliberate — this fleet runs no
-# containers.
-#
-# Two assets upstream's `make build` vendors are NOT in the git source, so a
-# plain buildPythonPackage misses them: colours.css (every --cd-*/--accent-*
-# CSS custom property the UI styles with — without it the login button is
-# white on an unset background, i.e. invisible) and codemirror.js (an
-# esbuild bundle). Both are fetched/built here and spliced in pre-build so
-# package-data's static/**/* glob picks them up.
+# python3Packages: no console script; services/tino.nix builds the run env.
+# colours.css and codemirror.js are vendored by upstream's `make build`, not
+# in git — without colours.css the login button is invisible — so both are
+# spliced in pre-build here.
 {...}: {
   nixpkgs.overlays = [
     (final: prev: let
@@ -29,18 +21,16 @@
         hash = "sha256-QIMWQAGqD1V15fCZ8vUjGL6QE+BiHrFVdkbRnejvQE4=";
       };
 
-      # package-lock.json is gitignored upstream, so fetchNpmDeps has
-      # nothing to lock against in src; generated once per tag and carried
-      # here — bump it by hand alongside `version`.
+      # package-lock.json is gitignored upstream; carried here — bump by hand
+      # alongside `version`.
       srcWithNpmLock = final.runCommand "tino-src-with-npm-lock" {} ''
         cp -r ${src} $out
         chmod -R u+w $out
         install -Dm444 ${./_tino/package-lock.json} $out/package-lock.json
       '';
 
-      # esbuild's npm postinstall downloads a prebuilt binary — no network
-      # in the sandbox. ESBUILD_BINARY_PATH + --ignore-scripts point it at
-      # nixpkgs' esbuild instead.
+      # esbuild's postinstall downloads a binary (no network in the sandbox);
+      # point it at nixpkgs' esbuild instead.
       codemirrorBundle = final.buildNpmPackage {
         pname = "tino-codemirror-bundle";
         inherit version;
@@ -168,9 +158,8 @@
                 EOF
               '';
 
-              # gitattributes sits at the repo root (git-lfs routing —
-              # services/tino.nix), so package-data never installs it;
-              # carried as a share/ file instead.
+              # gitattributes sits at the repo root, so package-data never
+              # installs it.
               postInstall = ''
                 install -Dm444 tino/gitattributes $out/share/tino/gitattributes
               '';

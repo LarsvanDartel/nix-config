@@ -40,11 +40,7 @@
           mode = "0750";
         }
         {
-          # Persisted with user postgres. For months this was wrong-but-harmless:
-          # the initrd rollback was equally broken (core/impermanence.nix), so
-          # nothing ever wiped the real PGDATA — fixing the rollback first would
-          # have destroyed the database. Here, not a postgres aspect, because
-          # immich is this host's only postgres user.
+          # Here, not a postgres aspect: immich is this host's only postgres user.
           directory = "/var/lib/postgresql";
           user = "postgres";
           group = "postgres";

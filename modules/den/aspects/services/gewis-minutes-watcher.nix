@@ -1,11 +1,5 @@
 # services.gewis-minutes-watcher — regenerates a TINO meeting bucket's
-# minutes.typ outline from agenda.typ whenever a commit touches it. See
-# _gewis/minutes-watcher.py's own docstring for the full design (bucket
-# discovery, the heading-title merge, why writes go through TINO's API but
-# reads hit the filesystem directly).
-#
-# TINO has no webhook, so this polls rather than reacts — see
-# cosmos.services.gewisMinutesWatcher.pollSeconds.
+# minutes.typ outline from agenda.typ; design in _gewis/minutes-watcher.py.
 {...}: {
   den.aspects.services.gewisMinutesWatcher.nixos = {
     config,
@@ -31,20 +25,9 @@
     };
 
     config = {
-      # The token itself has to be minted once through TINO's own UI —
-      # POST /api/keys requires an authenticated user session, and there is
-      # deliberately no admin bootstrap path around that. *editor* access
-      # per bucket is all the watcher needs: its writes are PUTs to
-      # .../files/{path} (the editor's own save route, require_editor) and
-      # deliberately nothing more — no git/commit, the regenerated files
-      # land as unsaved working-tree modifications and committing stays a
-      # human action in TINO's UI. (It used to POST /git/commit too, which
-      # needed *committer* — API keys resolve their role solely from their
-      # per-bucket access map, auth.py resolve_role — and put
-      # `apikey:...` machine authorship into committee history.) Mint the
-      # key (or edit /var/lib/tino/api_keys.yml, which TINO re-reads on
-      # mtime change) as editor; a new committee bucket needs the key's
-      # access map extended with it before the watcher can write there.
+      # Mint the key once via TINO's UI (or /var/lib/tino/api_keys.yml) with
+      # *editor* access only — the watcher must not commit; committing stays a
+      # human action. New committee buckets must be added to the key's access map.
       sops.secrets."keys/gewis-minutes-watcher/tino-api-key".owner = "tino";
 
       systemd.services.gewis-minutes-watcher = {
@@ -62,10 +45,7 @@
         };
 
         serviceConfig = {
-          # Runs as tino directly rather than its own user + group
-          # membership: it needs to read every meeting bucket under
-          # /var/lib/tino/buckets, which is exactly what that user already
-          # has, and nothing here needs privilege beyond that.
+          # Runs as tino: it needs read access to every bucket that user owns.
           User = "tino";
           Group = "tino";
           StateDirectory = "gewis-minutes-watcher";

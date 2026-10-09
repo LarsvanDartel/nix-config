@@ -1,9 +1,7 @@
 # home.taskwarrior (+ taskwarrior-tui, and the sync block for services.taskchampion)
 #
-# Split across nixos and homeManager because taskrc wants
-# sync.encryption_secret as a literal: the nixos half renders the whole sync
-# stanza into a user-owned sops template, and the homeManager half just
-# `include`s it — taskrc cannot read a value from a file, only include one.
+# Split across nixos and homeManager: taskrc can't read a secret from a file,
+# only `include` one, so the nixos half renders the sync stanza into a sops template.
 {
   den,
   inputs,
@@ -39,11 +37,8 @@
       };
 
       config = mkIf (cfg.serverUrl != null) {
-        # Every replica presents the same UUID: TaskChampion's "client" means
-        # all replicas of one task history, so a different id is a different,
-        # empty task list, not a second seat at the same one. A credential
-        # (the server is published — services/taskchampion.nix), hence sops;
-        # hosts/common holds the same value for endeavour's allow-list.
+        # Every replica presents the same UUID (a different id is a different,
+        # empty task list). hosts/common holds the same value for endeavour's allow-list.
         sops.secrets = {
           "keys/taskwarrior/client-id" = {
             sopsFile = "${builtins.toString inputs.nix-secrets}/hosts/common/secrets.yaml";
@@ -52,8 +47,6 @@
           "keys/taskwarrior/encryption-secret".owner = userName;
         };
 
-        # The whole stanza, not just the secrets: taskrc's include takes a
-        # file, so the url lives here too — one include, one place for sync.
         sops.templates."taskwarrior-sync.conf" = {
           content = ''
             sync.server.url=${cfg.serverUrl}
@@ -84,11 +77,8 @@
         enable = true;
         package = pkgs.taskwarrior3;
 
-        # rule.color.merge (default on) combines colors from every matching
-        # rule, so an overdue+scheduled task gets overdue's red fg on
-        # scheduled's dark navy bg — unreadable; off makes the
-        # highest-precedence rule win outright. Last line of taskrc: later
-        # definitions win, so this overrides anything set via `task config`.
+        # rule.color.merge combines matching rules (overdue+scheduled becomes
+        # unreadable). Last line of taskrc, so it overrides `task config`.
         extraConfig =
           ''
             rule.color.merge=0

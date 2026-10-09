@@ -1,22 +1,7 @@
 # services.opencloud — file sync and share, with Collabora for editing in the
-# browser. Three domains, because that is what the WOPI protocol needs:
-#
-#   cloud   OpenCloud itself, and the only one a person types
-#   docs    Collabora, loaded into an iframe by the browser
-#   wopi    OpenCloud's `collaboration` service, which Collabora fetches the
-#           document from — server to server, not through the browser
-#
-# All three are published, and none is gated at the edge: OpenCloud runs its
-# own OIDC against kanidm, and the other two are machine-to-machine legs that
-# cannot answer an interactive login.
-#
-# This replaces an earlier attempt where OpenCloud worked but editing did
-# not. Two things had to be true and neither was: the collaboration service
-# needs AF_NETLINK to pass its own startup probe, and the CSP must not name
-# `form-action` at all. Both are below, with the evidence. The reference for
-# the policy is OpenCloud's own csp.yaml from opencloud-compose — worth
-# diffing against on upgrade; reasoning from first principles is how the
-# form-action mistake got made.
+# browser. WOPI needs three domains: cloud (OpenCloud), docs (Collabora, framed
+# by the browser), wopi (collaboration service, fetched server to server).
+# Diff the CSP against opencloud-compose's csp.yaml on upgrade.
 {...}: {
   den.aspects.services.opencloud.nixos = {
     config,
@@ -80,11 +65,7 @@
         enable = mkEnableOption "CalDAV and CardDAV via Radicale" // {default = true;};
         port = mkOption {
           type = port;
-          # Not Radicale's own 5232: traccar listens on 241 ports covering
-          # 5001-5263, one per GPS tracker protocol, and quietly owns that one.
-          # Nor anything in the 9000s, where OpenCloud's own services sprawl
-          # across some seventy ports. Loopback either way, so the number only
-          # has to be free.
+          # Not 5232: traccar owns 5001-5263. Not the 9000s: OpenCloud's own.
           default = 8231;
         };
       };
@@ -122,10 +103,8 @@
 
     config = {
       cosmos.system.impermanence.persist = {
-        # The machine's own secrets — JWT signing key, machine-auth key, the
-        # per-service account credentials, LDAP bind passwords. Generated once
-        # and then load-bearing: lose this and every account and blob under
-        # dataDir is orphaned.
+        # JWT key, machine-auth key, service credentials: lose this and
+        # everything under dataDir is orphaned.
         files = ["/etc/opencloud/opencloud.yaml"];
         directories =
           [
@@ -136,11 +115,7 @@
               mode = "0750";
             }
           ]
-          # The calendars and contacts themselves: one tree of .ics and .vcf
-          # per user, and the only thing here that is irreplaceable. Safe to
-          # bind-mount because the unit has a static user — Tika's state is
-          # scratch and runs under DynamicUser, which would fight the mount, so
-          # it is deliberately left alone.
+          # Tika's state is deliberately not persisted: DynamicUser fights the mount.
           ++ lib.optional cfg.radicale.enable {
             directory = "/var/lib/radicale";
             user = config.services.radicale.user;
@@ -155,8 +130,6 @@
         inherit (cfg) port;
         stateDir = cfg.dataDir;
 
-        # Reached from the mesh rather than a local vhost, like every other
-        # published service on this host.
         address = "0.0.0.0";
 
         environmentFile =
@@ -167,23 +140,16 @@
           {
             OC_INSECURE = "true";
             OC_LOG_LEVEL = "warn";
-            # TLS terminates at the edge; the mesh hop behind it is plain HTTP.
             PROXY_TLS = "false";
             PROXY_INSECURE_BACKENDS = "true";
-            # kanidm is the IdP, so OpenCloud's built-in one stays out of the
-            # way. Its own `idp` service would otherwise claim the OIDC routes.
+            # The built-in `idp` would otherwise claim the OIDC routes.
             OC_EXCLUDE_RUN_SERVICES = "idp";
             OC_OIDC_ISSUER = "https://auth.lvdar.nl/oauth2/openid/opencloud";
-            # Set globally, not just under `web`, because OpenCloud defaults it
-            # to "web" in more than one place and only one of them has to fall
-            # back for kanidm to answer `invalid_client_id` — the client is
-            # registered as `opencloud`, which is also the name kanidm builds
-            # the issuer path from, so the two cannot be allowed to disagree.
+            # Set globally: OpenCloud defaults it to "web" in several places,
+            # and any one falling back makes kanidm answer `invalid_client_id`.
             OC_OIDC_CLIENT_ID = "opencloud";
           }
           // lib.optionalAttrs cfg.tika.enable {
-            # Search reads what is inside a document rather than only its name.
-            # Tika does the extraction; without it a PDF is just a filename.
             SEARCH_EXTRACTOR_TYPE = "tika";
             SEARCH_EXTRACTOR_TIKA_TIKA_URL = "http://127.0.0.1:${toString config.services.tika.port}";
           }
@@ -194,25 +160,19 @@
             NOTIFICATIONS_SMTP_USERNAME = cfg.smtp.username;
             NOTIFICATIONS_SMTP_AUTHENTICATION = "login";
             NOTIFICATIONS_SMTP_ENCRYPTION = "starttls";
-            # NOTIFICATIONS_SMTP_PASSWORD arrives through the environment file
-            # below, never from here: this attrset lands in the unit file, in
-            # the store, world-readable.
+            # NOTIFICATIONS_SMTP_PASSWORD comes via environmentFile: this
+            # attrset lands in the world-readable store.
           }
           // lib.optionalAttrs cfg.collabora.enable {
             OC_ADD_RUN_SERVICES = "collaboration";
-            # The collaboration service defaults to loopback, which is right
-            # only when Collabora is on the same host *and* talking to it
-            # directly. It goes out to wopiDomain and comes back through the
-            # edge, so it has to answer on the mesh interface too.
+            # Not loopback: Collabora reaches it back through the edge.
             COLLABORATION_HTTP_ADDR = "0.0.0.0:${toString cfg.wopiPort}";
           };
 
         settings = {
           proxy = {
             auto_provision_accounts = true;
-            # Roles come from the claim below, so the group claim must not also
-            # drive provisioning — a real claim name here would have OpenCloud
-            # create a group per value and fight the role mapper for them.
+            # A real claim would create groups that fight the role mapper.
             auto_provision_claims.groups = "not-a-real-claim";
             oidc.rewrite_well_known = true;
             role_assignment = {
@@ -237,46 +197,26 @@
             };
             csp_config_file_location = "/etc/opencloud/csp.yaml";
 
-            # `additional_policies`, not `policies`: this appends to
-            # OpenCloud's own routing rather than replacing it, so the default
-            # policy set does not have to be restated here to keep working.
-            #
-            # Radicale is reached through OpenCloud's proxy and nowhere else,
-            # which is what makes single sign-on work: the proxy authenticates
-            # and names the user in X-Remote-User, and Radicale believes it
-            # unconditionally — hence loopback-only and absent from
-            # exposedPorts: anything reaching it directly could claim to be
-            # anyone.
+            # Radicale trusts X-Remote-User unconditionally, so it must stay
+            # loopback-only and out of exposedPorts.
             additional_policies = lib.mkIf cfg.radicale.enable [
               {
-                # "default", not "radicale": appended policies are added to
-                # the one the selector actually chooses, and it only ever
-                # chooses that one. Any other name loads fine and is never
-                # consulted — looks exactly like the routes being ignored.
+                # Must be "default": appended policies under any other name
+                # load fine and are silently never consulted.
                 name = "default";
                 routes = let
-                  # Radicale must be told the prefix: it builds redirects and
-                  # hrefs from it and otherwise assumes the root. The web UI
-                  # decides a calendar exists at all by asking
-                  # .well-known/caldav and checking the URL it lands on
-                  # contains /caldav; Radicale answers with a 301 to
-                  # base_prefix + "/", so without the header the check fails
-                  # and OpenCloud says the calendar is not configured.
+                  # Without X-Script-Name, Radicale's .well-known redirect lacks
+                  # /caldav and the web UI reports the calendar as not configured.
                   route = prefix: endpoint: {
                     inherit endpoint;
                     backend = "http://127.0.0.1:${toString cfg.radicale.port}";
                     remote_user_header = "X-Remote-User";
-                    # Otherwise the proxy also forwards OpenCloud's access
-                    # token, which Radicale has no idea what to do with.
                     skip_x_access_token = true;
                     additional_headers."X-Script-Name" = prefix;
                   };
                 in [
                   (route "/caldav" "/caldav/")
                   (route "/carddav" "/carddav/")
-                  # Clients are given the bare domain and discover the rest
-                  # from here, which is what makes "add account" work with
-                  # nothing but a URL and a username.
                   (route "/caldav" "/.well-known/caldav")
                   (route "/carddav" "/.well-known/carddav")
                 ];
@@ -284,10 +224,7 @@
             ];
           };
 
-          # OpenCloud ships a default CSP that knows nothing about Collabora.
-          # The editor is an iframe, so `docs` has to be allowed to be framed
-          # by `cloud` and to frame it back — miss either and the editor loads
-          # as a blank rectangle with the reason only in the browser console.
+          # docs must frame and be framed by cloud, or the editor is blank.
           csp.directives = {
             child-src = ["'self'"];
             connect-src = [
@@ -295,8 +232,7 @@
               "blob:"
               "https://auth.lvdar.nl/"
               "https://raw.githubusercontent.com/opencloud-eu/awesome-apps/"
-              # Fetched, not just displayed — the file-details map asks for
-              # tiles over XHR, so it needs to be here as well as in img-src.
+              # Map tiles are fetched over XHR, not only displayed.
               "https://tile.openstreetmap.org/"
             ];
             default-src = ["'none'"];
@@ -307,10 +243,7 @@
               "blob:"
               "https://embed.diagrams.net/"
               "https://${docsDomain}/"
-              # The IdP, because silent token renewal runs the authorization
-              # request in a hidden iframe. Without it the session dies at the
-              # first renewal instead of at login, which is a far more annoying
-              # way to find out.
+              # Silent token renewal runs in a hidden iframe.
               "https://auth.lvdar.nl/"
             ];
             img-src = [
@@ -324,26 +257,17 @@
             manifest-src = ["'self'"];
             media-src = ["'self'"];
 
-            # Present in OpenCloud's own reference policy, and absent here,
-            # which is why Firefox fell back to `default-src 'none'` for the
-            # module chunks the web UI loads in a worker.
+            # Without it Firefox falls back to default-src 'none' for worker chunks.
             worker-src = ["'self'" "blob:"];
 
-            # NO form-action. It is a navigation directive, so unlike the
-            # fetch directives above it does *not* inherit from default-src —
-            # leaving it out means unrestricted, which is what OpenCloud's
-            # reference policy does and what WOPI needs: an editing session
-            # POSTs a form at Collabora, access token in the body, and naming
-            # only 'self' here blocked that POST and left the editor a black
-            # rectangle.
+            # NO form-action: it does not inherit default-src, and WOPI POSTs a
+            # form to Collabora — restricting it to 'self' broke the editor.
             object-src = ["'self'" "blob:"];
             script-src = ["'self'" "'unsafe-inline'" "https://auth.lvdar.nl/"];
             style-src = ["'self'" "'unsafe-inline'"];
           };
 
           graph.api = {
-            # Roles are the OIDC claim's business, not a default handed out at
-            # first login.
             graph_assign_default_user_role = false;
             graph_username_match = "none";
           };
@@ -365,15 +289,9 @@
               insecure = false;
               licensecheckenable = false;
 
-              # Proof keys let the host tell Collabora's WOPI requests from a
-              # forgery. Collabora 25.04 has no switch for them and keeps the
-              # key at /etc/coolwsd/proof_key, which does not exist when the
-              # config comes from the store; the previous attempt generated
-              # one into the package at build time — a private key in the
-              # world-readable store, and the two ends still disagreed.
-              # Verification off instead: both ends of this hop are services
-              # on one machine talking over the mesh, behind an edge that
-              # already authenticates.
+              # Collabora 25.04 cannot find a proof key with a store config, and
+              # generating one put a private key in the store. Both ends are
+              # on this host behind an authenticating edge.
               proofkeys.disable = true;
             };
             wopi.wopisrc = "https://${wopiDomain}";
@@ -381,22 +299,15 @@
         };
       };
 
-      # The collaboration service will not start without netlink: its startup
-      # probe is a "web reachability" check, and Go's route lookup opens an
-      # AF_NETLINK socket; nixpkgs' sandbox allows only AF_UNIX, AF_INET and
-      # AF_INET6, so the call fails, the check never passes, the service never
-      # registers, and every document open ends at "service not found" over a
-      # black screen. This, not proof keys, is why editing never worked.
-      # Same boot-race cause as services/ddns.nix: opencloud is only ordered
-      # After=network.target, so at boot `collaboration` cannot resolve
-      # docs.lvdar.nl, the `search` subservice trips the supervisor's
-      # five-failure threshold and the unit exits 1 — Restart=always puts it
-      # back within a second, but not before an alert fires.
+      # Without network-online, `collaboration` cannot resolve docs.lvdar.nl at
+      # boot and the unit fails and alerts before restarting (as services/ddns.nix).
       systemd.services.opencloud = {
         wants = ["network-online.target"];
         after = ["network-online.target" "nss-lookup.target"];
       };
 
+      # Go's route lookup needs AF_NETLINK; without it the collaboration startup
+      # probe never passes and every document open fails.
       systemd.services.opencloud.serviceConfig.RestrictAddressFamilies = lib.mkForce [
         "AF_UNIX"
         "AF_INET"
@@ -404,22 +315,13 @@
         "AF_NETLINK"
       ];
 
-      # OpenCloud's own provisioning writes that file into /etc/opencloud,
-      # which here is an impermanence bind mount; the writing unit runs under
-      # ProtectSystem=strict, races the mount and lands on a read-only /etc —
-      # `opencloud init` fails with EROFS and the server then refuses to start
-      # over a missing jwt_secret. Generate it on the persistent side instead,
-      # before anything mounts it; the module's own init unit still runs,
-      # finds the file non-empty and does nothing. Seeding keeps all of those
-      # secrets out of the store.
+      # Seeded on the persistent side: the module's init unit races the /etc
+      # bind mount under ProtectSystem=strict and fails with EROFS.
       systemd.services.opencloud-seed-config = {
         description = "Seed OpenCloud's machine config on the persistent volume";
         wantedBy = ["multi-user.target"];
-        # After the bind mount, not before: that mount belongs to
-        # local-fs.target, so ordering ahead of it puts this unit before
-        # sysinit.target while still depending on it — systemd breaks the
-        # cycle by dropping the job. Writing through the mount is fine: it
-        # lands on /persist, and this unit carries no sandboxing.
+        # After the bind mount: ordering before local-fs.target makes a cycle
+        # that systemd breaks by dropping this job.
         after = ["persist-persist-etc-opencloud-opencloud.yaml.service"];
         before = [
           "opencloud-init-config.service"
@@ -471,32 +373,19 @@
         "keys/opencloud/smtp".owner = config.services.opencloud.user;
       };
 
-      # CalDAV and CardDAV, served under OpenCloud's own domain at /caldav/ and
-      # /carddav/ rather than a host of its own — the proxy routes above are
-      # what put it there, and what let a client authenticate with the same
-      # account rather than a second password.
       services.radicale = mkIf cfg.radicale.enable {
         enable = true;
         settings = {
           server.hosts = "127.0.0.1:${toString cfg.radicale.port}";
 
-          # Trusts the proxy's word for who the user is, and does no
-          # authentication of its own. That is only safe while nothing else can
-          # reach the port, which is why `hosts` is loopback and the port is
-          # absent from netbird.client.exposedPorts.
+          # No auth of its own: safe only while the port is loopback and unexposed.
           auth.type = "http_x_remote_user";
 
           storage = {
-            # Default, stated because it is the thing worth backing up: one
-            # directory tree of .ics and .vcf files, per user.
             filesystem_folder = "/var/lib/radicale/collections";
 
-            # What a new user is given: Radicale creates a principal on first
-            # login and nothing inside it, so without this a client connects,
-            # finds no collections and reports no calendars at this address —
-            # true, and reads like a configuration error. Created once, with
-            # the principal; adding an entry here does not reach users who
-            # have already logged in.
+            # Without these a new principal is empty, which looks like a config
+            # error. Created once; new entries do not reach existing users.
             predefined_collections = builtins.toJSON {
               def-calendar = {
                 "D:displayname" = "Personal Calendar";
@@ -512,18 +401,14 @@
         };
       };
 
-      # Extracts text from documents so search can look inside them. Local and
-      # loopback-only: it is a JVM that will read anything it is handed.
+      # Loopback-only: a JVM that will parse anything it is handed.
       services.tika = mkIf cfg.tika.enable {
         enable = true;
         listenAddress = "127.0.0.1";
-        # Scanned images become searchable too, at the cost of tesseract in the
-        # closure and rather more CPU per upload.
         enableOcr = true;
       };
 
-      # Collabora renders documents server-side, so the fonts a document asks
-      # for have to exist here or it silently substitutes.
+      # Rendered server-side; missing fonts are silently substituted.
       fonts.packages = mkIf cfg.collabora.enable (with pkgs; [
         atkinson-hyperlegible-next
         corefonts
@@ -538,9 +423,6 @@
         enable = true;
         port = cfg.docsPort;
 
-        # Collabora refuses to serve a document whose WOPI host it does not
-        # recognise. The group's first entry is the name it is asked for; the
-        # aliases are the forms the same host can arrive as.
         aliasGroups = [
           {
             host = "https://${wopiDomain}";
@@ -557,14 +439,11 @@
             alias_groups = {"@mode" = "groups";};
           };
 
-          # Who may put the editor in an iframe. The counterpart of
-          # frame-ancestors above, and just as fatal to get wrong.
+          # Counterpart of OpenCloud's frame-ancestors above.
           net.content_security_policy =
             lib.concatStringsSep " " ["frame-ancestors" "'self'" "https://${domain}"];
 
-          # TLS ends at the edge, so coolwsd speaks plain HTTP and is told the
-          # world still sees it as HTTPS — without `termination` it generates
-          # http:// URLs and the browser blocks them as mixed content.
+          # Without `termination`, coolwsd emits http:// URLs blocked as mixed content.
           ssl = {
             enable = false;
             termination = true;
@@ -572,8 +451,6 @@
         };
       };
 
-      # coolwsd builds a chroot per document to sandbox the conversion, which
-      # needs rather more than a web service usually would.
       systemd.services.coolwsd.serviceConfig = mkIf cfg.collabora.enable {
         ProtectSystem = "strict";
         ProtectHome = true;

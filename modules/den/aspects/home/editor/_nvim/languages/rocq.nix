@@ -22,11 +22,8 @@ in {
             pynvim
           ]))
       ];
-      # No overrideAttrs: the old patch rewrote expand('<sfile>:p:h:h') in
-      # autoload/coqtail.vim, but that call only exists in plugin/coqtail.vim
-      # — it never matched and the derivation was unchanged. If the symlink
-      # issue is ever real, patch plugin/coqtail.vim with --replace-fail so
-      # an upstream move breaks the build instead of silently reverting.
+      # If a symlink issue appears, patch plugin/coqtail.vim (not autoload/)
+      # with --replace-fail so an upstream move breaks the build.
       extraPlugins = [pkgs.vimPlugins.Coqtail];
     };
   };

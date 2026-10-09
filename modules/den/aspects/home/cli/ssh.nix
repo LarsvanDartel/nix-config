@@ -37,21 +37,16 @@ in {
         enable = true;
         enableDefaultConfig = false;
 
-        # The servers' primary account is `nixos`, not the local username:
-        # without this, ssh from voyager asks for an account that doesn't
-        # exist there and is refused with a bare "Permission denied
-        # (publickey)", which reads like a key problem. A literal because den
-        # can't read another host's cosmos.user.name. `settings` is a DAG and
-        # ssh keeps the first value per keyword, so these must precede the
-        # catch-all below. Port 2222 likewise: NetBird redirects the mesh
-        # address's :22 to its own SSH server, which doesn't want these keys
-        # — reach that one with `netbird ssh <peer>`. See core/ssh.nix.
+        # Servers' account is `nixos` (else a misleading "Permission denied
+        # (publickey)"); a literal because den can't read another host's
+        # cosmos.user.name. Must precede the catch-all (ssh keeps the first value).
+        # Port 2222: NetBird hijacks :22 on mesh addresses. See core/ssh.nix.
         settings."*.nb.lvdar.nl" = entryBefore ["*"] {
           User = "nixos";
           Port = 2222;
         };
 
-        # So the short name works too: the qualified one is all that resolves.
+        # Only the qualified name resolves.
         settings."endeavour gaia pioneer" = entryBefore ["*"] {
           HostName = "%h.nb.lvdar.nl";
           User = "nixos";

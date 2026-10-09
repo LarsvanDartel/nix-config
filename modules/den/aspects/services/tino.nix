@@ -1,8 +1,5 @@
 # services.tino — TINO (github:confirm/tino), a git+Typst-backed
-# collaborative document editor. See pkgs/tino.nix for why it is packaged
-# natively. Integrated with kanidm like immich/grafana/opencloud: a
-# confidential OAuth2 client in services/kanidm.nix, published ungated
-# through gaia's netbird-proxy because TINO does its own OIDC login.
+# collaborative document editor. Published ungated: TINO does its own OIDC.
 {den, ...}: {
   den.aspects.services.tino = {
     includes = [den.aspects.services.netbird.client];
@@ -21,10 +18,8 @@
 
       pythonEnv = pkgs.python3.withPackages (ps: [ps.tino]);
 
-      # Upstream's Dockerfile does `git lfs install --system`; there is no
-      # writable system gitconfig in the store, so it is handed to git via
-      # GIT_CONFIG_SYSTEM (git 2.32+ reads that in place of the compiled-in
-      # path), with core.attributesFile pointing at the repo's gitattributes.
+      # Replaces upstream's `git lfs install --system`: the store has no
+      # writable system gitconfig, so it goes in via GIT_CONFIG_SYSTEM.
       gitConfig = pkgs.writeText "tino-gitconfig" ''
         [core]
             attributesFile = ${pkgs.python3Packages.tino}/share/tino/gitattributes
@@ -107,14 +102,8 @@
 
         systemd.tmpfiles.rules = [
           "d /var/lib/tino 0750 ${user} ${user} - -"
-          # TINO reads no ambient font env var: it builds its own
-          # `typst --font-path` from TINO_FONT_DIR (config.py), a writable
-          # subdir of TINO_DATA_DIR backing a FontService (per-instance font
-          # upload in the UI). So the fix is seeding that directory with `C` —
-          # copy once if absent — so a font uploaded later is never clobbered
-          # by activation. Lato Black is the GEWIS letterhead wordmark,
-          # embedded in the corporate PDFs, not a system font typst would
-          # discover on its own.
+          # TINO only reads fonts from TINO_FONT_DIR (user-uploadable), so seed
+          # it with `C` (copy once if absent). Lato Black is the GEWIS wordmark.
           "C /var/lib/tino/fonts/lato - ${user} ${user} - ${pkgs.lato}/share/fonts"
         ];
         cosmos.system.impermanence.persist.directories = [
@@ -126,18 +115,12 @@
           }
         ];
 
-        # Owned by kanidm, not tino: services/kanidm.nix's provisioning reads
-        # the same file as `basicSecretFile` so both sides of the client agree
-        # on the secret. tino still reaches it via LoadCredential, which
-        # systemd loads as root before ownership would apply.
+        # Owned by kanidm: its provisioning reads the same file as
+        # `basicSecretFile`. tino gets it via LoadCredential.
         sops.secrets."keys/tino/oidc-client-secret".owner = "kanidm";
 
-        # Left unset, TINO generates a random session-signing key on every
-        # process start, and a gunicorn respawning the worker (worker timeout
-        # on a slow OIDC call, a crash, a deploy) silently invalidates every
-        # session cookie mid-flight — "log in successfully, land back on the
-        # login page": the callback and the next request hit different
-        # secrets. A stable key removes the respawn as a variable.
+        # Unset, TINO picks a random key per process, so every gunicorn worker
+        # respawn silently invalidates all sessions (login loops).
         sops.secrets."keys/tino/session-secret-key".owner = user;
 
         systemd.services.tino = {
@@ -151,12 +134,8 @@
             TINO_BASE_URL = "https://${cfg.domain}";
             TINO_OIDC_DISCOVERY_URL = "https://auth.lvdar.nl/oauth2/openid/tino/.well-known/openid-configuration";
             TINO_OIDC_CLIENT_ID = "tino";
-            # kanidm's raw "groups" claim is the identity's entire fleet-wide
-            # membership (see services/kanidm.nix); TINO stores the whole
-            # userinfo response in its session cookie, and the pushed
-            # Set-Cookie blew past the ~4KB cap browsers silently enforce —
-            # login completed server-side and never stuck client-side.
-            # tino_groups is the small mapped claim instead.
+            # Not "groups": that claim is fleet-wide and pushed the session
+            # cookie past the ~4KB browser cap, so logins never stuck.
             TINO_OIDC_GROUPS_CLAIM = "tino_groups";
             TINO_ACCENT_COLOUR = cfg.accentColour;
             GIT_CONFIG_SYSTEM = toString gitConfig;
@@ -177,8 +156,6 @@
           };
         };
 
-        # netbird-proxy dials over the mesh, so the port opens on wt0 only —
-        # endeavour is edgeTerminated.
         cosmos.services.netbird.client.exposedPorts = [cfg.port];
       };
     };

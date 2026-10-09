@@ -74,18 +74,13 @@
             port = cfg.vpnTestService.port;
             protocol = "tcp";
           };
-          # Each entry becomes a route back out through the bridge; anything
-          # else is answered via the namespace default route — the tunnel —
-          # so the reply leaves through the VPN and is never seen again. That
-          # made sabnzbd/transmission unreachable from the mesh while fine
-          # locally: DNAT'd requests arrived, SYN/ACKs went out ProtonVPN,
-          # presenting as a plain timeout.
+          # Sources not listed here get replies via the tunnel, so mesh requests
+          # time out silently.
           accessibleFrom =
             [
               "192.168.1.0/24"
               "192.168.0.0/24"
               "127.0.0.1"
-              # NetBird's peer range, so the edge can reach these at all.
               "100.64.0.0/10"
             ]
             ++ cfg.accessibleFrom;
@@ -94,13 +89,9 @@
 
         systemd.services.arr.postStart = cfg.postUp;
 
-        # VPN-Confinement pings the endpoint five times, 1s apart, before
-        # configuring the tunnel — not enough at boot: network-online.target
-        # (dhcpcd lease) precedes WAN traffic actually flowing, so arr-up
-        # failed and took sabnzbd/transmission (both BindsTo it) down with it.
-        # Type=oneshot forbids Restart=, so wait for the same endpoint instead,
-        # with a minutes-long budget, parsed from the config so the wait is
-        # exactly the thing needed next.
+        # VPN-Confinement's 5×1s endpoint ping is too short at boot and arr-up
+        # failing takes sabnzbd/transmission down (BindsTo); Type=oneshot
+        # forbids Restart=, so wait for the endpoint first.
         systemd.services.arr.serviceConfig.ExecStartPre = [
           (getExe (pkgs.writeShellApplication {
             name = "arr-wait-for-endpoint";

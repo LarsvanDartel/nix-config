@@ -1,20 +1,11 @@
 # services.sanoid — automatic ZFS snapshots on the array.
 #
-# The mechanism for the auto-snapshot property `_hw/endeavour/disko.nix` has
-# set on tank/encrypted/main since the pool was created while nothing ever
-# read it — sanoid does not consult com.sun:auto-snapshot, hence its own
-# dataset list.
+# sanoid ignores com.sun:auto-snapshot (set in disko.nix), hence its own list.
+# Root is btrfs, so the SSD databases are outside this pool: restic is their
+# only copy.
 #
-# Covers deleted files, misrenames, bad transcodes (instant local rollback).
-# Does NOT cover pool death, fire or ransomware with root — that is restic's
-# job. Scope limit: the root filesystem is btrfs, so every database on the
-# SSD (postgres/immich, kanidm, traccar, arr SQLite, grafana) is outside this
-# pool; for those, restic is the only copy.
-#
-# The delegation looks broken twice over and is not: the module's DynamicUser
-# `sanoid` is granted snapshot,mount,destroy in ExecStartPre and revoked in
-# ExecStopPost, so `zfs allow tank` prints nothing after a run, and the user
-# only exists while the unit is active.
+# `zfs allow tank` printing nothing after a run is normal: the DynamicUser is
+# granted permissions in ExecStartPre and revoked in ExecStopPost.
 {...}: {
   den.aspects.services.sanoid = {
     nixos = {
@@ -31,33 +22,22 @@
         datasets = mkOption {
           type = attrsOf (attrsOf ints.unsigned);
           default = {
-            # 40 GB of immich originals under /tank/media/library/images/upload;
-            # the library itself is 700 GB the arr stack could re-acquire, but
-            # slowly.
             "tank/media" = {
               hourly = 24;
               daily = 14;
               monthly = 3;
             };
-            # The knot's repositories — a dataset of their own because `tank`
-            # itself is not snapshotted (see below), so a directory there would
-            # get no coverage. Also in restic; a regretted force-push is noticed
-            # in minutes, not months.
+            # Own dataset because `tank` itself is not snapshotted.
             "tank/git" = {
               hourly = 48;
               daily = 30;
               monthly = 6;
             };
-            # Minecraft worlds — the rollback that actually gets used (creeper
-            # in spawn, bad WorldEdit, insider griefer; all noticed within the
-            # hour). Also in restic: the fast path, not the last copy.
             "tank/minecraft" = {
               hourly = 48;
               daily = 30;
               monthly = 6;
             };
-            # Empty today, but the encrypted dataset: whatever lands here was
-            # worth encrypting, so it gets the long tail.
             "tank/encrypted/main" = {
               hourly = 12;
               daily = 30;
@@ -109,22 +89,15 @@
           datasets = lib.mapAttrs (_: retention:
             retention
             // {
-              # autoprune without autosnap would expire snapshots nothing is
-              # creating; the pair is what makes the retention counts mean
-              # anything.
+              # autoprune without autosnap would expire snapshots nothing creates.
               autosnap = true;
               autoprune = true;
 
-              # Not recursive: every dataset is named explicitly; `recursive`
-              # on tank/media would silently pick up future children.
+              # `recursive` on tank/media would silently pick up future children.
               recursive = false;
             })
           cfg.datasets;
         };
-
-        # sanoid runs as root and writes no state (snapshots live in pool
-        # metadata) — nothing to persist. Alerts via the OnFailure drop-in in
-        # core/notify-failure.nix.
       };
     };
   };

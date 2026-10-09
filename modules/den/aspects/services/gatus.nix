@@ -1,10 +1,7 @@
 # services.gatus — probe the published surface from outside, and say so.
 #
-# On gaia deliberately: prometheus, loki, grafana and alertmanager all live
-# on endeavour and die with it — this is the one probe left answering, and it
-# alerts through the ntfy topic that also lives here. It probes the *public*
-# names over the internet, not mesh peers: DNS, the edge's TLS,
-# netbird-proxy's routing and the service, in the order a person meets them.
+# On gaia deliberately: the rest of monitoring lives on endeavour and dies
+# with it. Probes the *public* names, exercising DNS, edge TLS and routing.
 {
   den,
   inputs,
@@ -33,15 +30,12 @@
         client.timeout = "15s";
         conditions = [
           "[STATUS] < 400"
-          # 5 days is enough warning to renew by hand if ACME has quietly
-          # stopped working.
           "[CERTIFICATE_EXPIRATION] > 120h"
         ];
         alerts = [
           {
             type = "ntfy";
             enabled = true;
-            # Three consecutive misses — a single timeout on a 2m interval is a blip.
             failure-threshold = 3;
             success-threshold = 2;
             send-on-resolved = true;
@@ -81,26 +75,17 @@
           secrets."keys/ntfy/password".sopsFile =
             builtins.toString inputs.nix-secrets + "/hosts/common/secrets.yaml";
 
-          # Gatus expands ${VAR} in its config, so the credential arrives via
-          # the environment and the store-path YAML carries only the name.
+          # Gatus expands ${VAR}, keeping the credential out of the store.
           templates."gatus.env".content = ''
             NTFY_PASSWORD=${config.sops.placeholder."keys/ntfy/password"}
           '';
         };
 
-        # netbird-proxy dials this over the mesh like any other target.
         cosmos.services.netbird.client.exposedPorts = [cfg.port];
 
-        # A static user, not DynamicUser: under DynamicUser StateDirectory
-        # lives at /var/lib/private/gatus behind a symlink, so persisting
-        # /var/lib/gatus would persist the symlink and lose the database on
-        # every boot — same reason as microbin and ollama.
-        #
-        # One-time manual step when switching an already-running service: the
-        # old DynamicUser symlink outlives the change and the bind mount
-        # rejects it ("Mount path /var/lib/gatus is not canonical"), failing
-        # the mount and gatus with it. Remove /var/lib/gatus and let the mount
-        # create a real directory; nothing to migrate, old storage was memory.
+        # Static user, not DynamicUser: its /var/lib/private symlink would be
+        # persisted instead of the database. When switching a running host,
+        # remove the old /var/lib/gatus symlink first ("not canonical" mount).
         users.users.gatus = {
           isSystemUser = true;
           group = "gatus";
@@ -129,21 +114,17 @@
           settings = {
             web.port = cfg.port;
 
-            # On disk, so uptime history survives a restart. Used to be
-            # `memory` because of the same DynamicUser/EBUSY trap — see the
-            # static user above.
+            # Was `memory` because of the DynamicUser trap above.
             storage = {
               type = "sqlite";
               path = "${stateDir}/data.db";
             };
 
             alerting.ntfy = {
-              # Scheme included: gatus takes a base URL, not a hostname.
               url = "https://${ntfy.domain}";
               topic = ntfy.topic;
               priority = 4;
-              # The topic is deny-all, so this authenticates like every other
-              # publisher in the fleet.
+              # The topic is deny-all.
               username = ntfy.user;
               password = "\${NTFY_PASSWORD}";
             };

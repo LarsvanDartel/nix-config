@@ -1,8 +1,6 @@
 # services.node-exporter — host metrics, scraped over the mesh.
 #
-# In roles.server: endeavour, gaia, pioneer — not voyager, a sleeping laptop
-# would sit permanently "target down". Cheap enough for the Pi: no local
-# writes, so it does not touch pioneer's SD card.
+# Not on voyager: a sleeping laptop would sit permanently "target down".
 {den, ...}: {
   den.aspects.services.node-exporter = {
     includes = [den.aspects.services.netbird.client];
@@ -60,13 +58,10 @@
           inherit (cfg) port;
           enabledCollectors = cfg.collectors;
 
-          # 0.0.0.0 firewalled to the mesh, like kanidm and the arrs: the mesh
-          # address is assigned by NetBird at enrollment, unknown at eval time.
+          # Firewalled to the mesh; the mesh address is unknown at eval time.
           openFirewall = false;
         };
 
-        # Mesh-only reach; otherwise the scrape times out silently instead of
-        # failing loudly.
         cosmos.services.netbird.client.exposedPorts = [cfg.port];
       };
     };

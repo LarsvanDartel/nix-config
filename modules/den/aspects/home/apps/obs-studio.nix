@@ -12,8 +12,7 @@
 
     cfg = config.cosmos.programs.obs-studio;
 
-    # A sink that goes nowhere, so its monitor is a recording of whatever was
-    # played into it. Created by a client on purpose — see the unit below.
+    # A null sink whose monitor records whatever is played into it.
     createSink = pkgs.writeShellScript "obs-virtual-audio" ''
       exec ${pkgs.pipewire}/bin/pw-cli -m create-node adapter '{
         factory.name = support.null-audio-sink
@@ -69,25 +68,14 @@
       };
       cosmos.system.impermanence.persist.directories = [".config/obs-studio"];
 
-      # A pipewire client, not a pipewire.conf.d context.modules entry: an
-      # earlier attempt (libpipewire-module-loopback, media.class
-      # Audio/Source/Virtual) segfaulted pipewire 1.6.8 ("can't add port:
-      # -28") and took the daemon down in a restart loop — no sound at all.
-      # As a separate process the worst case is no virtual device.
-      #
-      # Hence a sink monitor rather than a virtual source: Audio/Source/Virtual
-      # is the class that crashes, and monitors are listed everywhere
-      # microphones are.
-      #
-      # Two OBS-side settings finish this and can't be set from here (its
-      # config is persisted and OBS rewrites it): Settings → Audio → Advanced
-      # → Monitoring Device = this sink, and per source, Advanced Audio
-      # Properties → Audio Monitoring → "Monitor and Output".
+      # A pipewire client, not a pipewire.conf.d module: loopback with
+      # Audio/Source/Virtual segfaulted pipewire 1.6.8 into a restart loop (no
+      # sound at all). Hence a sink monitor rather than a virtual source.
+      # OBS-side (not settable here): Monitoring Device = this sink, and per
+      # source Audio Monitoring → "Monitor and Output".
       systemd.user.services.obs-virtual-audio = mkIf cfg.virtualAudio.enable {
         Unit = {
           Description = "Virtual audio sink to accompany OBS's virtual camera";
-          # The node lives only as long as this client; nothing owns it
-          # outside pipewire's lifetime.
           After = ["pipewire.service"];
           BindsTo = ["pipewire.service"];
         };
@@ -96,7 +84,7 @@
           Restart = "on-failure";
           RestartSec = 2;
         };
-        # Wanted by pipewire, not at login, so it follows daemon restarts.
+        # Wanted by pipewire, so it follows daemon restarts.
         Install.WantedBy = ["pipewire.service"];
       };
     };

@@ -1,14 +1,8 @@
 # core.reboot-required — say so when the running kernel is not the built one.
-# comin's switch replaces userspace only — kernel/initrd/modules keep running
-# until a reboot, and nothing here reboots (no autoUpgrade, no reboot window,
-# no comin reboot option). This does NOT reboot either: comin has no magic
-# rollback (services/comin.nix), so a kernel that does not come back needs the
-# console — IPMI on endeavour, provider console on gaia, keyboard on pioneer.
-# It nags on purpose: the condition persists until acted on.
+# Deliberately does NOT reboot: there is no automatic rollback, so a kernel
+# that does not come back needs the console.
 {den, ...}: {
   den.aspects.core.reboot-required = {
-    # For the ntfy options and the keys/ntfy/password secret, keeping one
-    # notification identity for the fleet.
     includes = [den.aspects.core.notify-failure];
 
     nixos = {
@@ -99,7 +93,6 @@
             ExecStart = lib.getExe check;
             LoadCredential = "ntfy-password:${config.sops.secrets."keys/ntfy/password".path}";
 
-            # Reads two symlinks and one credential, and talks to ntfy.
             DynamicUser = true;
             CapabilityBoundingSet = [""];
             LockPersonality = true;
@@ -127,7 +120,6 @@
           wantedBy = ["timers.target"];
           timerConfig = {
             OnCalendar = cfg.interval;
-            # Not at the same instant on every host or as the backup.
             RandomizedDelaySec = "30m";
             Persistent = true;
           };

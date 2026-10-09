@@ -11,15 +11,10 @@
     core.yubikey
     core.ssh
     core.sops
-    # Every host should know which commit it is running — pioneer most of
-    # all, as the one most likely to be quietly out of date.
     core.revision
-    # A bounded journal is wanted on every host. Failure *notifications* are
-    # in roles.server — see the note there.
+    # Failure *notifications* are in roles.server — see the note there.
     core.journald
-    # Pull side of the binary cache only: reading is universally useful
-    # (voyager most — it builds pioneer's aarch64 closure under emulation),
-    # serving is not, so services.attic stays on endeavour.
+    # Pull side only; serving stays on endeavour.
     services.attic.client
   ];
 }

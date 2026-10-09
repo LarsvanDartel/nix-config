@@ -1,45 +1,16 @@
 # services.minecraft.control — a web page for running the Minecraft servers,
 #
-# The two commands that need root go through a path unit that never sees
-# input; everything else added since is a plain read or a line written to
-# the server's own console FIFO. When adding to it, reaching for root is
-# almost never the answer — nix-minecraft already exposes the console and
-# the log to group `minecraft`.
+# Only start/stop need root, via path units that never see input; everything
+# else uses group `minecraft` (console FIFO, log). Keep it that way.
 #
-# Not a general server panel: nixpkgs' only general-purpose option, cockpit,
-# is a systems-administration console with a terminal in it — handing that
-# to somebody so they can restart a survival world is root with extra
-# steps. What this grants is bounded by the five commands per server below
-# and the game's own authority model. The console is the part to think
-# twice about: anyone who reaches this page can `op` themselves, `ban`
-# anyone, or `stop` the server — membership of the gating kanidm group is
-# server administration, not merely restart power. That is the intended
-# grant, and why the group exists separately from every other one.
+# Not cockpit (a root terminal with extra steps). The console lets anyone
+# reaching this page `op`/`ban`/`stop` — the gating kanidm group is server
+# administration by design.
 #
-# Three pieces, each doing one thing:
+# Not sudo: roles/server.nix sets execWheelOnly, so non-wheel users are
+# refused at exec; polkit is disabled on headless hosts.
 #
-#   * webhook (nixpkgs' own), loopback, never reached directly.
-#   * nginx serves a static page (in _minecraft-control/index.html) and
-#     proxies /hooks to webhook — one origin, one port to publish.
-#   * a systemd path unit per lifecycle action carries the privilege: the
-#     unprivileged side can only create one specific empty file; a root
-#     oneshot watching for it runs the one command it exists to run.
-#
-# That last piece was sudo first and could not work: roles/server.nix sets
-# security.sudo.execWheelOnly, so the wrapper is 4550 root:wheel and a
-# non-wheel user is refused at exec, before any rule — and putting this user
-# in wheel is a far larger grant than the rule withholds. polkit is
-# unavailable (security.polkit.enable is false on headless hosts, the same
-# wall services/crowdsec.nix hit). The path units are the better boundary
-# anyway: no setuid binary, nothing parses an argument, the privileged half
-# never sees input — triggered by the *existence* of a filename fixed at
-# build time.
-#
-# Authentication is deliberately not implemented here: gaia publishes this
-# *gated*, netbird-proxy demands the identity, kanidm decides membership
-# via `gatedServices` (services/kanidm.nix). Adding a person is a group
-# membership and nothing else; no account, password or session in this
-# aspect at all.
+# Authentication lives in gaia's gated netbird-proxy + kanidm `gatedServices`.
 {den, ...}: {
   den.aspects.services.minecraft.control = {
     includes = [den.aspects.services.minecraft den.aspects.services.nginx];
@@ -62,53 +33,26 @@
       minecraft = config.cosmos.services.minecraft;
       unit = server: "minecraft-server-${server}.service";
 
-      # nix-minecraft's systemd-socket console, chosen in services/minecraft.nix
-      # over tmux. Mode 0660 minecraft:minecraft, so writing to it is what the
-      # SupplementaryGroups grant below is for. RCON is not an option here and
-      # deliberately so — that file explains why.
+      # nix-minecraft's systemd-socket console (0660 minecraft:minecraft).
       fifo = server: "/run/minecraft/${server}.stdin";
 
-      # The server's own log rather than the journal. Both exist (that is the
-      # point of the systemd-socket choice), but the journal is readable only by
-      # systemd-journal/adm, and joining this user to either would hand it every
-      # service's log on the host to show a Minecraft one.
+      # Not the journal: reading it needs systemd-journal/adm, i.e. every log.
       logFile = server: "${minecraft.dataDir}/${server}/logs/latest.log";
 
-      # Where the unprivileged half drops its request. tmpfs, so a pending flag
-      # never survives a reboot into an action nobody asked for any more.
+      # tmpfs, so a pending flag never survives a reboot.
       flagDir = "/run/minecraft-control";
       flag = server: verb: "${flagDir}/${verb}-${server}";
 
-      # Where the *desired* state lives, which is a different thing entirely
-      # and therefore not on tmpfs. Present means "this server is meant to be
-      # down"; the unit below refuses to start while it exists.
-      #
-      # Without it, stopping a server from the page held only until the next
-      # deploy. The unit is wantedBy=multi-user.target, and
-      # switch-to-configuration starts every enabled unit that is not running —
-      # so a stop lasted until comin's next switch and then quietly undid
-      # itself. `systemctl disable` does not help either: the .wants symlinks
-      # are regenerated from the generation on every switch.
+      # Desired state, not on tmpfs: present = "meant to be down". Without it
+      # switch-to-configuration restarted stopped servers on every deploy
+      # (`systemctl disable` doesn't help; .wants are regenerated).
       stateDir = "/var/lib/minecraft-control";
       stopped = server: "${stateDir}/${server}.stopped";
 
       script = name: text: pkgs.writeShellApplication {inherit name text;};
 
-      # Who is online, via the server's own status ping.
-      #
-      # Not `mcstatus <addr> json`, which is what this was and which cost 3.24s
-      # a call against 0.22s for the same data. That subcommand also runs a
-      # *query*, and query is a separate protocol that services/minecraft.nix
-      # leaves off (enable-query=false) — so every single call sat through a UDP
-      # timeout that could only ever time out.
-      #
-      # It mattered more than a slow hook: the page polled servers one after
-      # another, so two servers cost 6.5s a round, the second card looked like
-      # it never loaded, and CPU — which needs two samples to subtract — took
-      # the better part of half a minute to show anything.
-      #
-      # The port is an argument because it comes from the nix config, not from
-      # a request. Nothing a caller sends reaches this.
+      # Status ping only. Not `mcstatus <addr> json`: it also runs a query,
+      # which is disabled, so every call waited out a UDP timeout (3.24s).
       players =
         pkgs.writers.writePython3Bin "mc-players" {
           libraries = [pkgs.python3Packages.mcstatus];
@@ -132,17 +76,12 @@
               print("null")
         '';
 
-      # start/stop: the two that need root, and the only two that still go
-      # through a path unit. No request data reaches these at all — the URL
-      # selects a filename fixed at build time, and that is the whole grant.
+      # No request data reaches these; the URL selects a fixed filename.
       lifecycle = server: verb:
         script "mc-${verb}-${server}" ''
           ${pkgs.coreutils}/bin/touch ${flag server verb}
         '';
 
-      # Everything the page polls, in one request. Four round trips per server
-      # per tick is what this replaces, and they were never independently
-      # useful: the player count is meaningless without knowing the unit is up.
       info = server:
         script "mc-info-${server}" ''
           state="$(${systemctl} is-active ${unit server} || true)"
@@ -180,13 +119,8 @@
             ${logFile server} 2>/dev/null || true
         '';
 
-      # The console. Unlike every other hook here this one takes input, and it
-      # is the reason this page is a bigger grant than start/stop: whoever
-      # reaches it can run any command the server accepts, `op` and `stop`
-      # included. That is a deliberate choice — see the option description.
-      #
-      # The input never reaches a shell as code. writeShellApplication runs
-      # under `set -euo pipefail`, "$1" is quoted, and printf writes it as data.
+      # The only hook taking input — any server command, `op` included. The
+      # input is only ever passed to printf as quoted data.
       command = server:
         script "mc-cmd-${server}" ''
           # First line only. A body with embedded newlines would otherwise be
@@ -215,8 +149,6 @@
           fi
         '';
 
-      # Hook id -> { script, whether it takes the request body }. The id becomes
-      # the URL, so `start-smp` is served at /hooks/start-smp.
       scripts = lib.listToAttrs (lib.concatMap (server:
         [
           (lib.nameValuePair "info-${server}" {script = info server;})
@@ -238,31 +170,21 @@
           include-command-output-in-response = true;
         }
         // lib.optionalAttrs (h.takesBody or false) {
-          # The POST body verbatim as $1 — not a JSON field, because a console
-          # line is text and wrapping it in JSON only adds a parse that can
-          # disagree with the sender about escaping.
+          # Raw body, not JSON: avoids escaping disagreements with the sender.
           pass-arguments-to-command = [{source = "raw-request-body";}];
         })
       scripts;
 
-      # start/stop only: the rest are reads or go through the FIFO.
       privilegedActions =
         lib.concatMap (server: map (verb: {inherit server verb;}) ["start" "stop"])
         cfg.servers;
 
-      # One nginx variable per server, holding 1 when the caller's groups admit
-      # them. Dashes are not legal in an nginx variable name.
+      # Dashes are not legal in nginx variable names.
       mayVar = server: "mc_may_${lib.replaceStrings ["-"] ["_"] server}";
 
-      # X-NetBird-Groups is a comma-separated list of group *display names* —
-      # exactly the netbird-* names kanidm puts in the `groups` claim. netbird
-      # drops any label containing a comma before joining (reverseproxy.go:934),
-      # so anchoring on comma-or-end is an exact membership test rather than a
-      # substring one: netbird-minecraft-smp2 cannot match netbird-minecraft-smp.
-      #
-      # `default 0` is the entire safety property. A server with no groups
-      # listed, a request that arrived without the header, a name nobody has —
-      # all of them land on 0 and are refused.
+      # netbird drops labels containing commas (reverseproxy.go:934), so the
+      # comma-or-end anchor is an exact membership test. `default 0` is the
+      # safety property: anything unmatched is refused.
       groupMaps =
         lib.concatMapStringsSep "\n" (server: ''
           map $http_x_netbird_groups ${"$" + mayVar server} {
@@ -272,9 +194,7 @@
         '')
         cfg.servers;
 
-      # The page and its data, kept apart on purpose: index.html carries no
-      # nix interpolation at all, so it stays a file a browser can open and a
-      # linter can read, and changing the server list never touches it.
+      # index.html carries no nix interpolation on purpose.
       root = pkgs.runCommand "minecraft-control-page" {} ''
         mkdir -p $out
         cp ${./_minecraft-control/index.html} $out/index.html
@@ -405,21 +325,6 @@
           inherit hooks;
         };
 
-        # The console and the log both live behind group `minecraft`: the FIFO
-        # is 0660 minecraft:minecraft and latest.log is 0660 under a 0770 data
-        # directory. This is the one grant in this aspect that is broader than
-        # the thing it enables — it also means read and write access to the
-        # world data on disk.
-        #
-        # Taken deliberately rather than built around, because the alternative
-        # is worse in both directions. Reaching the journal instead would need
-        # systemd-journal or adm, which is *every* service's log on this host.
-        # Routing reads through the root path units too would mean a
-        # request/response protocol over files for what is a `tail` — more
-        # moving parts guarding a smaller gap, since a full console can already
-        # `stop` the server and `op` anyone.
-        # The drop box. Only this user may create anything in it, and the only
-        # names that mean anything are the ones a path unit below watches for.
         systemd.tmpfiles.settings."10-minecraft-control" = {
           ${flagDir}.d = {
             inherit user;
@@ -427,9 +332,7 @@
             mode = "0700";
           };
 
-          # The desired-state directory, root-owned: the unprivileged side must
-          # not be able to pin a server down by writing here directly. It only
-          # ever asks, and the root oneshot records the answer.
+          # Root-owned: the unprivileged side must not pin a server down.
           ${stateDir}.d = {
             user = "root";
             group = "root";
@@ -437,9 +340,6 @@
           };
         };
 
-        # Survives the rollback, or "stopped" would mean "stopped until the
-        # next reboot" — which is the same surprise as "stopped until the next
-        # deploy", just rarer and harder to spot.
         cosmos.system.impermanence.persist.directories = [
           {
             directory = stateDir;
@@ -449,13 +349,8 @@
           }
         ];
 
-        # The privilege boundary, one pair of units per action.
-        #
-        # The path unit fires on the file existing and starts the service; the
-        # service deletes the flag first, so the path unit re-arms instead of
-        # looping on a file that is still there. systemd holds the path unit
-        # inactive while the service runs, which is also what keeps a
-        # double-click from stacking two `systemctl stop`s.
+        # The service deletes the flag first so the path unit re-arms; systemd
+        # holding the path unit inactive meanwhile prevents stacked requests.
         systemd.paths = lib.listToAttrs (map ({
           server,
           verb,
@@ -472,29 +367,11 @@
 
         systemd.services =
           {
-            # The console and the log both live behind group `minecraft`: the
-            # FIFO is 0660 minecraft:minecraft and latest.log is 0660 under a
-            # 0770 data directory. This is the one grant in this aspect that is
-            # broader than the thing it enables — it also carries read and write
-            # access to the world data on disk.
-            #
-            # Taken deliberately rather than built around, because both
-            # alternatives are worse. Reading the journal instead would need
-            # systemd-journal or adm, which is *every* service's log on this
-            # host. Routing the reads through the root path units below would
-            # mean a request/response protocol over files to run a `tail` —
-            # more moving parts guarding a smaller gap, given a full console can
-            # already `stop` the server and `op` anyone.
+            # Broader than needed (also world data access), but the
+            # alternatives — journal groups or file-based RPC — are worse.
             webhook.serviceConfig.SupplementaryGroups = ["minecraft"];
           }
-          # What makes a stop outlast a deploy. A failed condition is not a
-          # failure: systemd skips the unit and reports it inactive, which is
-          # exactly what an operator asked for and exactly what the page then
-          # displays.
-          #
-          # It governs `systemctl start` by hand as well, which is the point
-          # rather than a side effect — the file is the desired state, and one
-          # way to change it is the page. The other is deleting the file.
+          # Makes a stop outlast a deploy; also governs manual `systemctl start`.
           // lib.listToAttrs (map (server:
             lib.nameValuePair "minecraft-server-${server}" {
               unitConfig.ConditionPathExists = "!${stopped server}";
@@ -512,21 +389,14 @@
                   [
                     "${pkgs.coreutils}/bin/rm -f ${flag server verb}"
                   ]
-                  # Record the intent before acting on it, so a crash between
-                  # the two leaves the server running with a stop recorded
-                  # rather than stopped with nothing to keep it that way.
+                  # Record intent first so a crash can't lose a stop.
                   ++ (
                     if verb == "stop"
                     then ["${pkgs.coreutils}/bin/touch ${stopped server}"]
                     else ["${pkgs.coreutils}/bin/rm -f ${stopped server}"]
                   );
-                # The entire grant. No argument reaches this from anywhere.
                 ExecStart = "${systemctl} ${verb} ${unit server}";
-                # Blocking is deliberate — systemd keeps the path unit inactive
-                # while this runs, which is what stops a double click stacking two
-                # of these. But nix-minecraft gives the server TimeoutStopSec=75s
-                # to save its world, and the default 90s here leaves almost no
-                # margin over that; a slow save would land as a failed unit.
+                # Must exceed nix-minecraft's TimeoutStopSec=75s world save.
                 TimeoutStartSec = 180;
               };
             })
@@ -535,40 +405,22 @@
         services.nginx.virtualHosts."minecraft-control" = {
           listen = [
             {
-              # The mesh, not loopback: netbird-proxy on gaia dials
-              # `endeavour:<port>` and a loopback socket refuses that.
+              # Not loopback: netbird-proxy on gaia dials endeavour:<port>.
               addr = "0.0.0.0";
               inherit (cfg) port;
             }
           ];
 
-          # The firewall opening this on wt0 alone is NOT a gate. The fleet runs
-          # one NetBird policy — All -> All, every protocol, bidirectional — so
-          # "reachable on the mesh" means reachable by every enrolled peer, and
-          # for a while that is exactly what this page was: anyone with a peer
-          # could skip gaia, call /hooks/stop-smp directly and never meet the
-          # kanidm gate at all.
-          #
-          # Pinning the source to gaia's mesh address is what makes the gate the
-          # only way in, and it is also what makes the identity headers below
-          # mean anything: they are trustworthy precisely because the only peer
-          # that can set them is the proxy that authenticates the user.
-          #
-          # A literal for the same reason every other cross-host value here is
-          # one — den cannot read gaia's config. It matches the address in
-          # PerSourcePenaltyExemptList on this host.
+          # NOT gated by the wt0 firewall: the NetBird policy is All -> All, so
+          # any peer could bypass gaia's kanidm gate and spoof identity headers.
+          # Literal gaia mesh address; matches PerSourcePenaltyExemptList here.
           extraConfig = ''
             allow ${cfg.proxyAddress};
             deny all;
           '';
 
-          # Same origin as the page, so the fetch() calls above need no CORS
-          # and no second published port.
-          #
-          # Per-server authorisation lives here rather than in the hooks: this
-          # is the only path to webhook, which binds loopback, and a `map` that
-          # defaults to 0 fails closed in a way a shell test repeated in ten
-          # scripts does not.
+          # Per-server authorisation is here, not in the hooks: the only path
+          # to webhook, and a default-0 `map` fails closed.
           locations =
             {
               "/" = {
@@ -576,26 +428,19 @@
                 index = "index.html";
               };
 
-              # Who the gate says you are. Plain text rather than JSON because a
-              # display name may legally contain a quote — netbird only
-              # guarantees printable ASCII — and assembling JSON from it in an
-              # nginx string would let that break the document.
+              # Plain text, not JSON: display names may contain quotes.
               "= /whoami".extraConfig = ''
                 default_type text/plain;
                 return 200 "$http_x_netbird_user\n$http_x_netbird_groups\n";
               '';
 
-              # The catch-all, and it refuses. Every real hook is matched by a
-              # regex location below, which nginx prefers over this prefix; what
-              # lands here is a hook for a server that is not in `servers`, or a
-              # name that does not exist. Neither should reach webhook.
+              # Refuses unknown hooks; real ones match the regex locations.
               "/hooks/".extraConfig = "return 403;";
             }
             // lib.listToAttrs (map (server:
               lib.nameValuePair
               "~ ^/hooks/(info|logs|start|stop|cmd)-${server}$" {
-                # No URI part: nginx forbids one in a regex location, and the
-                # path wants passing through unchanged anyway.
+                # No URI part: nginx forbids one in a regex location.
                 proxyPass = "http://127.0.0.1:${toString cfg.webhookPort}";
                 extraConfig = ''
                   if (${"$" + mayVar server} = 0) { return 403; }
@@ -604,7 +449,7 @@
             cfg.servers);
         };
 
-        # The maps have to live in the http block, not the server block.
+        # Maps must live in the http block.
         services.nginx.appendHttpConfig = groupMaps;
       };
     };

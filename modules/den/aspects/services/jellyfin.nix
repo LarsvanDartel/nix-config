@@ -2,19 +2,10 @@
 {inputs, ...}: {
   flake-file.inputs.jellarr.url = "github:venkyr77/jellarr";
 
-  # jellarr pins pnpmDeps.hash against pnpm 11.15.0 (its own locked
-  # nixpkgs); our shared pkgs is newer, and pnpm's store-fetch format
-  # changes the fixed-output hash for the same pnpm-lock.yaml across pnpm
-  # major/minor bumps alike — this has now broken twice on unrelated
-  # nixpkgs bumps (pnpm 11→12.3.4 on 2026-09-26, then 12.3.4→12.9.0 on
-  # 2026-10-06, the latter surfacing as the jellarr build succeeding at
-  # the pnpmDeps fetch but failing offline-install with
-  # ERR_PNPM_NO_OFFLINE_TARBALL — the fetched store's format didn't match
-  # what the newer pnpm binary expected). Patch the one stale hash instead
-  # of forking the whole nixosModule; drop once upstream regenerates it
-  # against a current nixpkgs. Regenerate via: set the replacement hash to
-  # "", build `services.jellyfin`'s jellarr derivation, and copy the
-  # "got:" hash from the mismatch error.
+  # jellarr's pinned pnpmDeps.hash was computed with an older pnpm; pnpm's
+  # store format changes the hash across versions (broke twice, surfacing as
+  # ERR_PNPM_NO_OFFLINE_TARBALL). Drop once upstream regenerates it. To
+  # regenerate: set the replacement hash to "", build jellarr, copy "got:".
   nixpkgs.overlays = [
     (final: prev: {
       fetchPnpmDeps = args:
@@ -42,19 +33,10 @@
 
     cfg = config.cosmos.services.jellyfin;
 
-    # jellarr's client only ever sends the legacy X-Emby-Token header, but
-    # our Jellyfin has EnableLegacyAuthorization=false (upstream's current
-    # default), so that header is never even read and every request
-    # 401s. jellarr's own HTTP wrapper doesn't treat that as an error
-    # (openapi-fetch never populates `error` for a body-less 401), so it
-    # silently feeds `undefined` in as the "current" server state — which
-    # is what actually throws ("Cannot set properties of undefined
-    # (setting '$root')") once the encoding-diff step tries to compute a
-    # patch against it. Confirmed live against endeavour's Jellyfin:
-    # sending both headers, i.e. adding the modern `Authorization`
-    # header Jellyfin reads unconditionally, fixes auth and jellarr
-    # applies cleanly. Patch the one line in the built bundle rather than
-    # fork the module; drop once jellarr grows a non-legacy client.
+    # jellarr sends only the legacy X-Emby-Token header, which our Jellyfin
+    # ignores (EnableLegacyAuthorization=false); the silent 401 surfaces as
+    # "Cannot set properties of undefined (setting '$root')". Add the modern
+    # Authorization header; drop once jellarr grows a non-legacy client.
     jellarrPkg = pkgs.callPackage "${inputs.jellarr}/nix/package.nix" {};
     jellarrPatched = jellarrPkg.overrideAttrs (old: {
       postInstall =
@@ -165,8 +147,7 @@
               libraryOptions.pathInfos = [{path = "/tank/media/library/shows";}];
             }
             {
-              # No movie/show metadata to scrape here, so "homevideos" — plain
-              # video files, no online identification.
+              # No online metadata to scrape.
               name = "Lectures";
               collectionType = "homevideos";
               libraryOptions.pathInfos = [{path = "/tank/media/library/lectures";}];
@@ -237,13 +218,9 @@
         };
       };
 
-      # jellarr's own build always resolves the systemd unit's ExecStart
-      # to `pkgs.callPackage ../package.nix {}` internally (no package
-      # option to override); mkForce it to the auth-patched build above.
+      # jellarr's module has no package option.
       systemd.services.jellarr.serviceConfig.ExecStart = mkForce (lib.getExe jellarrPatched);
 
-      # Dropped when the edge terminates TLS: netbird-proxy forwards straight to
-      # cfg.port over the mesh, so there is nothing for a local vhost to do.
       services.nginx.virtualHosts = mkIf (cfg.expose && !config.cosmos.networking.edgeTerminated) {
         "jellyfin.lvdar.nl" = {
           forceSSL = true;

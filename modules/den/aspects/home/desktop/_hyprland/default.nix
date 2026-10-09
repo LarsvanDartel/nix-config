@@ -12,18 +12,15 @@
 
   cfg = config.cosmos.desktops.hyprland;
 
-  # Sibling non-default parts (import-tree ignores this _impl dir).
+  # import-tree ignores this _impl dir.
   nonDefault = dir:
     map (n: dir + "/${n}")
     (builtins.attrNames (filterAttrs (n: t: t == "regular" && n != "default.nix" && hasSuffix ".nix" n) (builtins.readDir dir)));
 in {
-  # Addons (waybar, mako, rofi, hyprlock, hyprpaper, hyprshot) are now sibling
-  # aspects (home.hyprland.*), included by the home.hyprland aspect.
   imports = nonDefault ./.;
 
   options.cosmos.desktops.hyprland = {
-    # Internal: on when the feature is imported. The many part-files self-gate
-    # on this, so it defaults true rather than being a composition switch.
+    # Part-files self-gate on this, hence default true.
     enable = mkEnableOption "hyprland" // {default = true;};
 
     exec-once-extras = mkOption {

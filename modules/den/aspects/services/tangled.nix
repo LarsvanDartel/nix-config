@@ -1,28 +1,10 @@
 # services.tangled — a self-hosted Tangled knot: git repositories addressed by
 # ATProto identity rather than by an account on someone else's forge.
 #
-# A knot is the part that actually holds the code. Identity, issues and pull
-# requests live as ATProto records; the knot serves git over HTTP and SSH and
-# answers to a DID. That is the whole reason this is worth running: the repos
-# are on the array here, and the social layer is data rather than a database in
-# a company.
-#
-# Two halves reach this host, and they arrive very differently:
-#
-#   HTTP   :5555, over the mesh, published by gaia's netbird-proxy like every
-#          other service.
-#   SSH    port 22 on gaia, forwarded at L4 to *:2222 here — deliberately not
-#          :22. NetBird's agent redirects <mesh-ip>:22 to its own embedded SSH
-#          server (core/ssh.nix documents this at length), so a forward to :22
-#          would reach that instead of OpenSSH and every git push would fail
-#          with a host key warning and "Permission denied (password)".
-#
-# The knot does not run an SSH daemon of its own. It appends a `Match User git`
-# block with an AuthorizedKeysCommand to the system sshd, which is why nothing
-# here touches ports or authentication: root key auth, deploy-rs and :2222 are
-# all untouched. One consequence worth knowing — anything that later adds to
-# `services.openssh.extraConfig` lands *inside* that Match block, because
-# nixpkgs appends extraConfig to the end of sshd_config.
+# SSH arrives as gaia :22 forwarded to :2222 here, never :22: NetBird redirects
+# <mesh-ip>:22 to its own SSH server (see core/ssh.nix).
+# The knot appends a `Match User git` block to sshd_config, so anything later
+# added to `services.openssh.extraConfig` lands inside that Match block.
 {
   den,
   inputs,
@@ -95,15 +77,9 @@
       };
 
       config = {
-        # No sops secret and no environmentFile. The module sets every KNOT_*
-        # variable from its own options, and this version has no
-        # KNOT_SERVER_SECRET — registration is proved by the owner DID plus the
-        # `verify` button on tangled.org/settings/knots, not by a shared secret.
-        # An env file was planned here and dropped once that turned out to be
-        # true; if a future release reintroduces one, this is where it goes.
+        # No KNOT_SERVER_SECRET in this version: registration is proved by the
+        # owner DID, so no sops secret. If a release reintroduces one, add it here.
 
-        # The module points the git user's home at stateDir and creates it, but
-        # the parent has to exist on the pool first — same shape as loki.nix.
         systemd.tmpfiles.rules = [
           "d ${cfg.stateDir} 0755 git git - -"
         ];
@@ -118,39 +94,20 @@
             listenAddr = "0.0.0.0:${toString cfg.port}";
           };
 
-          # sshd already opens 22 and 2222 for the whole fleet, and the mesh
-          # exposure below is what actually matters. Letting this module also
-          # manage the firewall would just add a second owner of the same rule.
           openFirewall = false;
         };
 
-        # Reachable from gaia over WireGuard, and from nowhere else. Note the
-        # public :22 half does NOT come through here — netbird-proxy's L4 mode
-        # would not forward to this target, so gaia DNATs it in the kernel
-        # instead (hosts/gaia.nix).
-        #
-        # 2222 as well as the HTTP port, because the knot's *other* half arrives
-        # that way: gaia publishes public :22 as an L4 service and forwards it
-        # here, to OpenSSH on 2222 rather than 22 (see the header). Without this
-        # the forward connects to gaia and then hangs with no banner — the mesh
-        # is up, the knot answers on 5555, and only the SSH hop is filtered.
-        # sshd already listens on 2222 fleet-wide; this is purely the mesh ACL.
+        # 2222: gaia DNATs public :22 here in the kernel (hosts/gaia.nix), not
+        # via netbird-proxy. Without it the SSH hop hangs with no banner.
         cosmos.services.netbird.client.exposedPorts = [cfg.port 2222];
       };
     };
   };
 
-  # The CI runner. Separate aspect so a host can carry repositories without
-  # also volunteering to build them, but it `includes` the knot: the owner DID
-  # is declared there, and a spindle with no knot to serve is not a
-  # configuration this fleet has a use for.
+  # The CI runner, separate so a host can carry repositories without building them.
   den.aspects.services.tangled.spindle = {
     includes = [
       den.aspects.services.tangled
-      # For the binary cache below. roles.default already pulls this in on
-      # every host, so this is belt and braces — but the spindle reads the
-      # client's options directly, and a dependency you read should be a
-      # dependency you declare.
       den.aspects.services.attic.client
     ];
 
@@ -166,29 +123,10 @@
       cfg = config.cosmos.services.tangled;
       sCfg = cfg.spindle;
 
-      # The guest image, resized — memory, vCPUs and disk.
-      #
-      # Upstream's image declares 4096 MiB, 2 vCPUs and a 24 GiB writable
-      # volume in its spec.json. Those suit the `go test` pipelines tangled
-      # runs on it and none of them survive a NixOS closure; both failures were
-      # found by running it, one after the other:
-      #
-      #   guest out of memory (process 'nix' killed by guest kernel OOM)
-      #   mkdir: cannot create directory '…-unit-loki.service':
-      #     No space left on device
-      #
-      # The second one is the subtler of the two. That 24 GiB volume is the
-      # *whole* writable surface of the build — nix store, eval cache and
-      # workspace together — so gaia's closure fits and endeavour's does not.
-      # `limits.total.diskMiB` below looks like it governs this and does not:
-      # it is a scheduler budget across concurrent workflows and never resizes
-      # a guest.
-      #
-      # Only the spec is rewritten, not the image. All three are arguments QEMU
-      # is launched with, so the kernel, initrd and store disk are reused
-      # verbatim by symlink — a few kilobytes of jq rather than a second NixOS
-      # guest build, and it stays correct across an input bump because it
-      # patches whatever upstream produced rather than reimplementing it.
+      # Upstream's guest (4 GiB, 2 vCPUs, 24 GiB disk) OOMs and runs out of disk
+      # on a NixOS closure. Only spec.json is rewritten; the rest is symlinked.
+      # The disk volume is the build's whole writable surface; limits.total.diskMiB
+      # is only a scheduler budget and never resizes a guest.
       guestImage =
         pkgs.runCommand "spindle-nixos-image-${toString sCfg.guestMemoryMiB}mib" {
           nativeBuildInputs = [pkgs.jq];
@@ -334,28 +272,11 @@
 
       config = {
         systemd.tmpfiles.rules = [
-          # Enough for the pool; the module creates the leaf directories itself.
           "d ${sCfg.stateDir} 0750 root root - -"
 
-          # The microVM guest image, and nothing provides it by default — the
-          # NixOS module exposes `imageDir` as "directory containing microVM
-          # image spec JSONs" and then leaves filling it to the operator. An
-          # empty directory is not a loud failure: the spindle starts happily,
-          # accepts pushes, creates pipelines, and fails every workflow in the
-          # same second with
-          #
-          #   init workflow: microVM image "nixos" was not found;
-          #   looked in: /var/lib/spindle/images/nixos, …/nixos.json
-          #
-          # which is only visible in the pipeline status record, not the
-          # journal. Discovered by reading the spindle's own database after the
-          # first real push produced three instant failures and no logs.
-          #
-          # `L+` replaces whatever is there, so a version bump of the tangled
-          # input relinks rather than colliding. Interpolating the derivation
-          # here also puts it in this host's system closure, which is what
-          # keeps `nix-collect-garbage` from deleting a live CI image — a bare
-          # symlink under /var/lib would not be a GC root.
+          # Nothing populates imageDir by default, and an empty one fails every
+          # workflow silently (visible only in the pipeline status record).
+          # Interpolating the derivation keeps the image a GC root.
           "L+ ${sCfg.imageDir}/nixos - - - - ${guestImage}"
         ];
 
@@ -368,52 +289,18 @@
             listenAddr = "0.0.0.0:${toString sCfg.port}";
             repoDir = "${sCfg.stateDir}/repos";
 
-            # Upstream defaults this to 127.0.0.1:9091, which on endeavour is
-            # already transmission's — nginx bridges it out of the VPN network
-            # namespace and binds 0.0.0.0:9091, so the spindle loses the bind
-            # and exits 255. It restarts five times, hits the start limit, and
-            # stays down: no CI runs, while the knot next to it keeps serving
-            # git, so pushes look entirely healthy.
-            #
-            # Arrived with a lock bump rather than a change here (tangled
-            # eab1f12, 2026-08-29), which is the awkward kind — a new upstream
-            # default colliding with a port this host already used.
-            #
-            # 9501 by the same reasoning as node-exporter's 9500, documented at
-            # length in services/node-exporter.nix: opencloud sprawls across
-            # most of 9091-9304 on this host, and endeavour holds nothing else
-            # between 9304 and 9696. Nothing scrapes this yet — prometheus.nix
-            # has jobs for node, netbird and itself only — so it is a listener
-            # kept alive for when something does, not a metric in use.
+            # Upstream's default 127.0.0.1:9091 collides with transmission on
+            # endeavour, crash-looping the spindle. 9501: see services/node-exporter.nix.
             metricsListenAddr = "127.0.0.1:9501";
           };
 
           pipelines.microvm = {
-            # Images and overlays stay on the SSD, and this is the one place in
-            # this repo where that is the *performance* answer rather than the
-            # convenient one. The array is six SAS spindles in two raidz1 vdevs:
-            # good at sequential bulk, poor at the random reads a VM boot does
-            # and the small random writes a copy-on-write overlay does. A SATA
-            # SSD wins that profile by an order of magnitude on latency.
-            #
-            # Persisted, unlike the overlays: an image is expensive to fetch or
-            # build, and now that the rollback actually works an unpersisted
-            # cache would be re-fetched after every reboot.
+            # On the SSD, not the raidz array: VM boots and overlays are random I/O.
             inherit (sCfg) imageDir;
 
-            # overlayDir is left at the module's default of /tmp, which on this
-            # host is the root subvolume — so overlays are on the SSD *and*
-            # impermanence discards them at every boot. For scratch that is
-            # exactly right; the only reason to move it to /tank would be
-            # space, and limits.total below is what keeps that from arising.
-            #
-            # Ceilings on what the scheduler may have in flight at once, so
-            # raising the per-guest figures above cannot quietly become an
-            # overcommit of the host. All three are exactly two guests' worth,
-            # matching maxJobCount — the scheduler queues a third workflow
-            # rather than starting it, which is the behaviour you want when the
-            # alternative is the host swapping, or filling its root filesystem,
-            # while two Minecraft servers are live on it.
+            # overlayDir stays at the /tmp default: SSD, wiped at boot.
+            # Totals are two guests' worth, matching maxJobCount, so a third
+            # workflow queues instead of overcommitting the host.
             limits.total = {
               memoryMiB = 2 * sCfg.guestMemoryMiB;
               vcpus = 2 * sCfg.guestVcpus;
@@ -423,40 +310,13 @@
 
           pipelines.workflowTimeout = sCfg.workflowTimeout;
 
-          # No S3 artifact store. The module defaults the bucket to
-          # "tangled-logs", and a non-empty bucket is the *only* condition for
-          # registering the store (artifactstore.go:173) — credentials are
-          # never checked. So every finished workflow tries to PutObject, finds
-          # no AWS credentials, and falls back to querying the EC2 instance
-          # metadata service at 169.254.169.254, which on a machine that is not
-          # an EC2 instance can only time out. Three attempts of that is
-          # nineteen seconds of dead time bolted onto the end of every run:
-          #
-          #   ERRO archive workflow log err="s3: … no EC2 IMDS role found …"
-          #
-          # Emptying it leaves the disk store as the only one, which is where
-          # these logs were always going — see SPINDLE_MILL_ARTIFACT_STORE
-          # below, which was the other half of the same problem.
+          # Any non-empty bucket registers the S3 store (artifactstore.go:173)
+          # without checking credentials, adding ~19 s of EC2 IMDS timeouts per run.
           artifactStores.s3.bucket = "";
 
-          # Let pipelines read from the fleet's own binary cache.
-          #
-          # This looks like it should be impossible: the microVM sandbox
-          # blackholes every RFC 6890 special-use range, which includes the
-          # 100.64.0.0/10 the mesh lives on, precisely so a workflow cannot
-          # reach the host or anything private. It works because the guest does
-          # not connect to the cache at all — the spindle proxies substituter
-          # reads host-side over vsock, and endeavour is where atticd runs.
-          #
-          # Worth having rather than a nicety: a NixOS closure built entirely
-          # from cache.nixos.org is tens of minutes of downloading, and most of
-          # what CI needs has already been built by voyager and pushed here.
-          #
-          # Read from the client aspect's options rather than repeating the URL
-          # and key, which is a rule this repo has broken before — the values
-          # in services/attic.nix are already literals kept in sync by hand
-          # because den cannot read another host's config, and a third copy
-          # would be a third thing to forget.
+          # Works despite the sandbox blackholing 100.64.0.0/10: the spindle
+          # proxies substituter reads host-side over vsock. Read from the attic
+          # client options; do not add a third copy of the URL and key.
           pipelines.nixCache = {
             readUrls = [config.cosmos.services.attic.client.endpoint];
             trustedPublicKeys =
@@ -464,51 +324,20 @@
               (config.cosmos.services.attic.client.publicKey != null)
               config.cosmos.services.attic.client.publicKey;
 
-            # uploadUrl deliberately unset. It was briefly "daemon" — the
-            # host's own store, which is the only shape that works, since
-            # spindle's upload backend takes http(s), ssh or daemon/local and
-            # attic's API is none of those. Paths a guest built would land here
-            # and watch-store would publish them.
-            #
-            # Off again because it forced pull_request out of every workflow's
-            # triggers: a fork's pipeline could otherwise put paths into this
-            # host's store and from there into the cache the whole fleet
-            # substitutes from. With the per-push build gate gone that trade
-            # stopped being worth it — what remains to upload is lint output,
-            # which nothing is waiting on.
+            # uploadUrl deliberately unset: "daemon" would let a fork's
+            # pull_request pipeline push paths into the fleet's cache.
           };
         };
 
-        # The host half of vsock, which is how the spindle talks to the agent
-        # inside each microVM — and how the binary cache proxy above reaches
-        # the guest without giving it network access to this host.
-        #
-        # Not loaded by default here. The modules that *were* loaded are all
-        # guest-side transports (vsock_loopback, vmw_vsock_*), which is exactly
-        # the sort of thing that makes `lsmod | grep vsock` look reassuring
-        # while the host cannot listen at all. Without this every workflow dies
-        # in setup with
-        #
-        #   listen vsock host(2):10240: bind: cannot assign requested address
-        #
-        # /dev/vhost-vsock existing is not evidence to the contrary; the device
-        # node is there regardless.
+        # Host-side vsock, not loaded by default; without it every workflow fails
+        # with "listen vsock host(2):10240: bind: cannot assign requested address".
         boot.kernelModules = ["vhost_vsock"];
 
-        # Send finished workflow logs to the local disk store instead of S3.
-        #
-        # The module hardcodes SPINDLE_MILL_ARTIFACT_STORE=s3 with no option to
-        # change it, while also exposing artifactStores.disk.dir — so archiving
-        # always fails here with an AWS credential error, and the appview loses
-        # the logs of any workflow that has finished, because that is exactly
-        # when it switches from tailing the file to reading the artifact store.
-        # mkAfter to land after the module's own list; systemd takes the last
-        # assignment of a repeated Environment= variable.
+        # The module hardcodes SPINDLE_MILL_ARTIFACT_STORE=s3, so finished logs
+        # are lost. mkAfter: systemd takes the last assignment of a repeated variable.
         systemd.services.spindle.serviceConfig.Environment =
           lib.mkAfter ["SPINDLE_MILL_ARTIFACT_STORE=disk"];
 
-        # The job database and the tap state. Small, and worth keeping across a
-        # rollback so a reboot does not lose the record of what ran.
         cosmos.system.impermanence.persist.directories = [
           {
             directory = "/var/lib/spindle";

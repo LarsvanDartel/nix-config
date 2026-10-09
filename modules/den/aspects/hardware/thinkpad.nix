@@ -1,9 +1,6 @@
 # hardware.thinkpad — the sysfs/procfs write access ThinkPad control tools need.
-#
-# Both knobs below are root-owned by default, and the noctalia plugins that use
-# them (battery-threshold, thinkpad-fan) run as the user with no privilege
-# escalation — this is the declarative equivalent of upstream's hand-run
-# setup scripts.
+# The noctalia plugins (battery-threshold, thinkpad-fan) run as the user, so
+# these root-owned knobs are opened up declaratively.
 {...}: {
   den.aspects.hardware.thinkpad.nixos = {
     config,
@@ -11,21 +8,18 @@
     pkgs,
     ...
   }: let
-    # Absolute, because udev has no PATH. Store paths rather than
-    # /run/current-system/sw/bin: NixOS validates every absolute path in a udev
-    # rule at build time, and the current system does not exist yet then.
+    # Store paths: udev has no PATH, and NixOS validates absolute udev paths at
+    # build time, before /run/current-system exists.
     chgrp = lib.getExe' pkgs.coreutils "chgrp";
     chmod = lib.getExe' pkgs.coreutils "chmod";
   in {
-    # Charge thresholds: hand the sysfs attribute to a group instead of making
-    # it world-writable. udev re-applies this on every battery hotplug/resume,
-    # which is why a one-off chmod does not stick.
+    # udev re-applies this on every battery hotplug/resume; a one-off chmod
+    # does not stick.
     users.groups.battery_ctl = {};
     users.users.${config.cosmos.user.name}.extraGroups = ["battery_ctl"];
 
-    # Fan control is refused by the driver unless explicitly opted in, and the
-    # interface is procfs, which has no group ownership to hand out — 0666 is
-    # what upstream's setup script does and the only option here.
+    # procfs has no group ownership to hand out, so 0666 is the only option
+    # (as upstream's setup script does).
     boot.extraModprobeConfig = ''
       options thinkpad_acpi fan_control=1
     '';

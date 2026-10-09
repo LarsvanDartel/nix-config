@@ -1,5 +1,4 @@
 # core.sops — sops-nix + per-host secrets, user password, age key ownership.
-# Owns the sops-nix + nix-secrets inputs (home.core also references sops-nix).
 {inputs, ...}: {
   flake-file.inputs = {
     sops-nix = {

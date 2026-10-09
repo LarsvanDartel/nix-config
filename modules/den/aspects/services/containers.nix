@@ -1,4 +1,4 @@
-# services.containers — podman (docker-compat). Uses the extraGroups collector.
+# services.containers — podman (docker-compat).
 {...}: {
   den.aspects.services.containers.nixos = {...}: {
     cosmos.user.extraGroups = ["podman" "kvm"];

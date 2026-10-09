@@ -1,17 +1,8 @@
 # services.tile-traccar — feed Tile tracker locations into Traccar.
 #
-# Tile trackers have no GPS: a tag is found by whichever phone running the
-# Tile app walks past it, so this is a poller, not a receiver — it asks Tile
-# where each tag was last seen and forwards that to Traccar's OsmAnd decoder,
-# the one protocol that takes a plain HTTP request.
-#
-# Three decisions from the throwaway script this grew out of: one login for
-# the life of the process, with the client UUID kept on disk so Tile sees the
-# same client rather than a new device sign-in every restart; a position is
-# forwarded only when its timestamp moves, else the same fix lands in
-# Traccar's history a few thousand times a day; localhost, not the published
-# edge — the script used to post to the public name, sending every fix out
-# to gaia and back over WireGuard to a decoder on this very host.
+# Tile tags have no GPS, so this polls Tile and forwards to Traccar's OsmAnd
+# decoder. The client UUID is kept on disk so Tile does not see a new device
+# sign-in every restart.
 {den, ...}: {
   den.aspects.services.tile-traccar = {
     includes = [den.aspects.services.traccar];
@@ -270,8 +261,6 @@
           }
         ];
 
-        # Read by systemd as root and handed to the unit as a credential, so
-        # it needs no owner of its own.
         sops.secrets."keys/tile/password" = {};
 
         users.users.${user} = {
@@ -304,16 +293,12 @@
             LoadCredential = "tile-password:${config.sops.secrets."keys/tile/password".path}";
             ExecStart = "${python}/bin/python ${script}";
 
-            # Tile's API goes down, the network flaps, a poll raises: none of
-            # that should end the feed. Bad credentials exit 1 and still come
-            # back every 30s, which is loud in the journal but harmless.
+            # Bad credentials exit 1 and come back every 30s: loud but harmless.
             Restart = "always";
             RestartSec = 30;
 
-            # DynamicUser is deliberately off: it pairs with StateDirectory to
-            # relocate state under /var/lib/private, which cannot work once
-            # impermanence has bind-mounted the directory (the same EBUSY that
-            # broke crowdsec's registration).
+            # No DynamicUser: /var/lib/private + impermanence bind mount is the
+            # EBUSY that broke crowdsec.
             StateDirectory = baseNameOf stateDir;
             WorkingDirectory = stateDir;
 

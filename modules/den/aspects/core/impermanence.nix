@@ -1,11 +1,6 @@
 # Root-on-btrfs impermanence: rolls the root subvolume back to a blank snapshot
 # each boot and bind-mounts cosmos.system.impermanence.persist.* from /persist.
-# Opt-in per host (btrfs root + /persist required), so NOT in roles.default.
-# The home side reaches every user via home-manager.sharedModules; the nixos
-# module auto-injects the HM impermanence module (home.persistence option).
 {inputs, ...}: let
-  # Option schema is declared by impermanence-options (present on every
-  # host); here we only set values.
   homeImpermanence = {config, ...}: {
     cosmos.system.impermanence.active = true;
     home.persistence."/persist" = {
@@ -26,15 +21,12 @@ in {
 
     cfg = config.cosmos.system.impermanence;
 
-    # persist.directories takes a bare path or an attrset with ownership.
     persistedPaths = map (d:
       if builtins.isAttrs d
       then d.directory
       else d)
     cfg.persist.directories;
 
-    # The systemd .device unit for the root device. escapeSystemdPath lives in
-    # NixOS's `utils`, not in lib.
     rootDeviceUnit = "${utils.escapeSystemdPath cfg.device}.device";
   in {
     imports = [inputs.impermanence.nixosModules.impermanence];
@@ -47,10 +39,8 @@ in {
       boot.initrd.systemd.services.rollback = {
         description = "Roll back BTRFS root subvolume to a blank snapshot";
         wantedBy = ["initrd.target"];
-        # Wait for the .device unit, not merely for cryptsetup: on gaia (plain
-        # partition, no LUKS) the cryptsetup unit doesn't exist and the script
-        # raced udev, failing with "special device /dev/disk/by-label/nixos
-        # does not exist". The .device unit covers both shapes.
+        # Wait for the .device unit, not cryptsetup: on gaia (no LUKS) the
+        # cryptsetup unit doesn't exist and the script raced udev.
         after = [
           "systemd-cryptsetup@${builtins.baseNameOf cfg.device}.service"
           rootDeviceUnit
@@ -129,10 +119,9 @@ in {
 
         inherit (cfg.persist) files;
 
-        # /etc/machine-id is deliberately NOT in `files`: impermanence's
-        # mount-file bails ("A file already exists at /etc/machine-id!") and
-        # fails activation; pre-creating the bind mount leaves the unit failing
-        # every boot. It is seeded in the rollback script instead — see above.
+        # /etc/machine-id is deliberately NOT in `files`: impermanence refuses
+        # to bind over the existing one and fails activation. Seeded in the
+        # rollback script instead.
 
         directories =
           cfg.persist.directories
@@ -140,26 +129,17 @@ in {
             "/var/log"
             "/var/lib/nixos"
             "/var/lib/systemd/coredump"
-            # systemd's record of when each Persistent=true timer last ran;
-            # lose it and every such timer fires immediately on the next boot
-            # (here: a full restic backup + GC competing with boot itself).
+            # Lose this and every Persistent=true timer fires on next boot.
             "/var/lib/systemd/timers"
           ];
       };
 
-      # Re-create tmpfiles entries once the persist bind mounts are up.
-      # NixOS activation runs `systemd-tmpfiles --create` before starting
-      # units, so the switch that *first* persists a directory creates its
-      # subdirs on the root subvolume and the bind mount then covers them with
-      # the empty /persist copy (kavita and paperless died to this on
-      # 2026-08-30; a reboot hides it — at boot the mounts precede
-      # systemd-tmpfiles-setup, so it only bites on first deploy).
-      # RequiresMountsFor orders this after every persist mount and re-triggers
-      # whenever the persisted set changes.
-      # Do NOT replace this ordering with wantedBy + before local-fs.target:
-      # services get an implicit After=sysinit.target, which is already after
-      # local-fs.target — a cycle. systemd refused the transaction on endeavour
-      # ("Transaction order is cyclic", 2026-08-30).
+      # Re-create tmpfiles entries once the persist bind mounts are up: on the
+      # switch that first persists a directory, activation's tmpfiles run
+      # before the mount, which then hides the subdirs (killed kavita and
+      # paperless, 2026-08-30).
+      # Do NOT order this wantedBy + before local-fs.target: services get an
+      # implicit After=sysinit.target — a cycle systemd refuses.
       systemd.services.impermanence-tmpfiles = {
         description = "Re-create tmpfiles entries under the persisted mounts";
         wantedBy = ["sysinit.target"];

@@ -1,12 +1,8 @@
-# services.ntfy — the alert sink, deliberately the only monitoring piece not
-# on endeavour: an alert path there cannot report endeavour's own outage, and
-# gaia is independent of it, public, and phone-reachable over the plain
-# internet.
+# services.ntfy — the alert sink.
 #
-# Published and ungated on purpose: the ntfy app authenticates with
-# username/password and cannot complete an interactive kanidm login. It
-# carries its own auth — `auth-default-access: deny-all` means the topic name
-# is not the secret.
+# On gaia, not endeavour: an alert path there cannot report endeavour's own
+# outage. Ungated: the ntfy app cannot complete a kanidm login; it relies on
+# `auth-default-access: deny-all` instead.
 {
   den,
   inputs,
@@ -27,9 +23,7 @@
       cfg = config.cosmos.services.ntfy;
       passwordFile = config.sops.secrets."keys/ntfy/password".path;
 
-      # ntfy keeps users in a sqlite auth file — runtime state, not config.
-      # Reconciled from the sops value on every start, so the secret is the
-      # source of truth.
+      # The sqlite auth db is reconciled from sops on every start.
       provision = pkgs.writeShellApplication {
         name = "ntfy-provision";
         runtimeInputs = [config.services.ntfy-sh.package pkgs.gnugrep];
@@ -112,15 +106,10 @@
         sops.secrets."keys/ntfy/password".sopsFile =
           builtins.toString inputs.nix-secrets + "/hosts/common/secrets.yaml";
 
-        # Deliberately NOT persisted. DynamicUser + StateDirectory relocates
-        # state to /var/lib/private/ntfy-sh, where an impermanence entry is the
-        # EBUSY that killed crowdsec and tile-traccar. No workaround needed:
-        # the auth db is one account reconciled from sops on every start, and
-        # the cache is stale push messages. Reproducible state does not need
-        # persisting.
+        # Deliberately NOT persisted: under DynamicUser an impermanence entry
+        # on /var/lib/private is the EBUSY that killed crowdsec and
+        # tile-traccar. The auth db is rebuilt from sops on every start.
 
-        # netbird-proxy reaches it over the mesh like any other target, so the
-        # port opens on wt0 and nowhere else.
         cosmos.services.netbird.client.exposedPorts = [cfg.port];
 
         services.ntfy-sh = {
@@ -138,16 +127,12 @@
           };
         };
 
-        # Provisioning rides on ntfy's own unit: under DynamicUser the uid is
-        # allocated per-start, so a separate unit cannot reliably be the same
-        # user or see the same StateDirectory; ExecStartPost inherits both.
+        # ExecStartPost, not a separate unit: under DynamicUser only this
+        # inherits the same uid and StateDirectory.
         systemd.services.ntfy-sh.serviceConfig = {
           LoadCredential = "password:${passwordFile}";
-          # The `-` prefix ignores this step's exit status: provisioning must
-          # not be able to kill the notification server. A unit failing during
-          # activation makes deploy-rs roll the whole deploy back — that
-          # happened, leaving gaia undeployable until the script was fixed.
-          # Alerting must degrade, not cascade.
+          # `-`: a failing provision must not fail activation — deploy-rs
+          # then rolls the whole deploy back (happened; gaia was undeployable).
           ExecStartPost = "-${lib.getExe provision}";
         };
       };

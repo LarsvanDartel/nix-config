@@ -196,7 +196,6 @@
       };
 
       services = {
-        # Dropped when the edge terminates TLS.
         nginx.virtualHosts = mkIf (cfg.expose && !config.cosmos.networking.edgeTerminated) {
           "traccar.lvdar.nl" = {
             forceSSL = true;
