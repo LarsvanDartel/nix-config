@@ -25,6 +25,7 @@
       "sonarr"
       "lidarr"
       "bazarr"
+      "lingarr"
 
       # The only entry shared with people who administer nothing else — the
       # point of it being a group of its own rather than folded into another.
