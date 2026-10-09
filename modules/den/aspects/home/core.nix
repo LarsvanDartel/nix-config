@@ -52,6 +52,8 @@
     config = {
       programs.home-manager.enable = true;
 
+      cosmos.system.impermanence.persist.directories = [".local/share/nix"];
+
       nix.settings = {
         # Plain `substituters` would replace the system list (dropping attic), not extend it.
         extra-substituters = ["https://nix-community.cachix.org"];
