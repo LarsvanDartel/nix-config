@@ -1,12 +1,8 @@
 # core.notify-failure — push a notification when any systemd service fails.
-# Works on every host including pioneer, which cannot carry a metrics agent.
 #
-# One type-wide drop-in (/etc/systemd/system/service.d/) covers every
-# .service unit, present and future — mapping over config.systemd.services
-# instead reads the option it is defining and recurses infinitely. The
-# notifier itself needs a *unit-specific* drop-in to clear OnFailure (drop-ins
-# apply unit file first, then <type>.d, then <unit>.d — only the last can
-# reset it), else a failed notifier retriggers itself forever.
+# One type-wide drop-in covers every .service — mapping over
+# config.systemd.services instead recurses infinitely. The notifier needs a
+# unit-specific drop-in clearing OnFailure, else it retriggers itself forever.
 {inputs, ...}: {
   den.aspects.core.notify-failure.nixos = {
     config,

@@ -1,5 +1,4 @@
-# desktop.networkmanager (the networkmanager group is added by the primary-user
-# battery, so it is not re-added here).
+# desktop.networkmanager
 {...}: {
   den.aspects.desktop.networkmanager.nixos = {
     config,

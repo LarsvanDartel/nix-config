@@ -7,11 +7,8 @@
   lib,
   ...
 }: let
-  # Every host needs an entry — the bare config name resolves nowhere. Mesh
-  # peers are addressable by name from anywhere; gaia is the exception, on
-  # its public name deliberately: it runs the control plane, so the mesh is
-  # not how to reach it when the mesh is what needs fixing. `--hostname <ip>`
-  # overrides any of these when a host is off the mesh.
+  # gaia uses its public name deliberately: it runs the mesh control plane,
+  # so it must be reachable when the mesh is broken.
   addresses = {
     gaia = "lvdar.nl";
     endeavour = "endeavour.${dnsDomain}";
@@ -34,20 +31,16 @@ in {
     in {
       hostname = addresses.${name} or name;
 
-      # Not :22 — NetBird redirects the mesh address's :22 to its own SSH
-      # server (key-less, "Permission denied (password)"). OpenSSH answers
-      # on :2222 (core.ssh); used for gaia too so one rule covers all hosts.
+      # Not :22 — NetBird redirects the mesh address's :22 to its own
+      # key-less SSH server; OpenSSH listens on :2222 (core.ssh).
       sshOpts = ["-p" "2222"];
 
       profiles.system = {
         user = "root";
-        # deploy-rs would use the local username, which only exists on
-        # voyager; core.ssh permits root with the same keys (root skips sudo).
+        # The local username only exists on voyager; core.ssh permits root.
         sshUser = "root";
         magicRollback = true;
-        # Build here and push the closure: remoteBuild on the Pi means a
-        # 4x A53 / 1 GB compiling the uncached rpi kernel — about a day, and
-        # it OOMs.
+        # Building the uncached rpi kernel on the Pi takes ~a day and OOMs.
         remoteBuild = false;
         path = inputs.deploy-rs.lib.${system}.activate.nixos nixos;
       };

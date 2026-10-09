@@ -6,12 +6,9 @@
     pkgs,
     ...
   }: let
-    # `runuser -l` resets the environment and a udev worker has none of
-    # XDG_RUNTIME_DIR / WAYLAND_DISPLAY / DBUS_SESSION_BUS_ADDRESS to begin
-    # with — noctalia's IPC needs all three. Lift them from one of the user's
-    # own processes that has a Wayland display open (no hardcoded compositor,
-    # works under either specialisation); a script file also avoids nested
-    # quoting in the udev RUN+= line.
+    # `runuser -l` resets the environment and udev has none to begin with;
+    # noctalia's IPC needs these three, so lift them from a user process with
+    # a Wayland display open.
     lockScript = pkgs.writeShellScript "yubikey-lock" ''
       user=${config.cosmos.user.name}
       uid=$(${pkgs.coreutils}/bin/id -u "$user")
@@ -57,9 +54,8 @@
         udev.packages = with pkgs; [yubikey-personalization];
         dbus.packages = [pkgs.gcr_4];
 
-        # `loginctl lock-sessions` only emits logind's Session.Lock() signal,
-        # which nothing here listens for — hyprlock and noctalia only lock
-        # when run directly (lockCommand/lockScript above), so that's this.
+        # `loginctl lock-sessions` would do nothing: no locker here listens for
+        # logind's Lock signal, so run lockCommand directly.
         udev.extraRules = lib.mkIf (config.cosmos.profiles.desktop.lockCommand != "") ''
           ACTION=="remove",\
            ENV{ID_BUS}=="usb",\
@@ -77,8 +73,7 @@
         sudo.u2fAuth = true;
       };
 
-      # A pam_u2f mapping is a key handle + public key, not a credential —
-      # safe to commit in the open. Regenerate per key (one line each) with:
+      # A pam_u2f mapping is public, safe to commit. Regenerate per key with:
       #   nix-shell -p pam_u2f --run pamu2fcfg
       security.pam.u2f.settings = {
         authfile = "/etc/u2f_mappings";

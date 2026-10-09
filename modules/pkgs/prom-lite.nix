@@ -1,9 +1,5 @@
 # prom-lite — ProM Lite 1.4, the process mining framework used in 2AMI10.
-# jdk8, not a newer JDK that merely "works": importing an XES log reaches
-# javax.xml.bind.DatatypeConverter, removed from the JDK after 8. The
-# launcher runs it out of a writable state directory (ProM resolves its
-# package set/workspace/config relative to the cwd), and exports
-# _JAVA_AWT_WM_NONREPARENTING — Swing paints nothing under niri without it.
+# jdk8 deliberately: importing an XES log needs javax.xml.bind, removed after 8.
 {...}: {
   nixpkgs.overlays = [
     (final: _prev: {

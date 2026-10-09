@@ -3,14 +3,8 @@
 # to this machine, which needs a hole in the host firewall (NixOS level).
 {...}: {
   den.aspects.home.kde-connect.nixos = {...}: {
-    # Full 1714-1764 range, TCP and UDP: a device claims the first free port
-    # in the range and advertises it in its identity packet, so pinning 1716
-    # fails invisibly once something else took it; discovery is UDP broadcast
-    # answered by a TCP connection back, so one protocol alone leaves the
-    # handshake half-finished. Open on every interface, like the catt and
-    # Minecraft ports in voyager.nix: the untrusted network rides the same
-    # interface as the trusted one, and pairing is the real boundary — an
-    # unpaired peer only gets a pairing request to accept, not access.
+    # Full range, TCP and UDP: devices claim the first free port and discovery
+    # needs both protocols. Open on every interface; pairing is the boundary.
     networking.firewall = {
       allowedTCPPortRanges = [
         {

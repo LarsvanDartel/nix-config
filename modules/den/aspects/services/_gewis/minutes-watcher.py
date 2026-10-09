@@ -1,105 +1,31 @@
 '''gewis-minutes-watcher — regenerate a meeting's minutes.typ outline from
-its agenda.typ's own heading structure, via TINO's API, whenever a commit
-touches that agenda.typ. Also carries a completed meeting's still-open
-action items forward into the *next* meeting, once, the first time that
-meeting is seen.
+its agenda.typ headings whenever a commit touches agenda.typ, and carry a
+previous meeting's open action items forward once.
 
-Design notes (see the nix-config service that runs this):
-
-- A "meeting" is any directory, at any depth inside any TINO bucket except
-  the reserved `packages` one, that itself contains both agenda.typ and
-  minutes.typ — not a bucket of its own. One committee's bucket can hold
-  many meetings this way (e.g. `2026/61/`, `2026/62/`), sharing one
-  committee-info.typ at the bucket root that each meeting imports via a
-  relative path (`"../../committee-info.typ"`) — the gewis-meeting
-  template no longer dictates a fixed nesting depth, just that the pair
-  sits together somewhere under a bucket. Add a new meeting by copying the
-  template's agenda.typ/minutes.typ into a new directory; nothing else to
-  register.
-- Every `typst` invocation below passes `--root <bucket>` for exactly this
-  reason: Typst sandboxes relative imports to a project root, and without
-  it a meeting's own `"../../committee-info.typ"` fails with "path would
-  escape the project root" the moment it's nested below the bucket's own
-  top level (confirmed empirically — a bare `--in` with no `--root` uses
-  the input file's *own* directory as the root, which a relative import
-  reaching for a shared file above it can never satisfy).
-- Reads (detecting new commits, extracting agenda.typ's headings, reading
-  minutes.typ's current content for the merge) go straight to the
-  filesystem — this runs on the same host as TINO, so that's just a local
-  read, no reason to round-trip through HTTP for it.
-- Writes go through TINO's own REST API (PUT .../files/{path}) with the
-  file path relative to the *bucket*, not the meeting directory (e.g.
-  `2026/62/minutes.typ`), authenticated with a TINO API key — the same
-  write path the editor's own save button uses, so TINO's app layer
-  (path validation, git-status view) sees the change exactly like a
-  human edit. Deliberately PUT-only, no POST /git/commit: the file
-  lands in the bucket's working tree as an unsaved modification and
-  *committing stays a human action in TINO's UI* — the watcher used to
-  commit as `apikey:...`, which put machine authorship in the
-  committee's document history; now it just prepares the change and
-  whoever reviews it presses commit. (Cost, accepted: the PUT route
-  doesn't broadcast the `files-changed` websocket event the commit
-  route does, so an open TINO tab refreshes its git-status badge only
-  on its next interaction — the editor buffer itself was never
-  force-reloaded by that event anyway, and a stale editor save would
-  clobber the regeneration with or without the commit.)
-- The merge is by heading *title*, not position: existing prose under a
-  heading survives verbatim as long as that heading's title still exists
-  somewhere in the agenda. A renamed point starts a fresh (empty) section
-  rather than silently carrying old notes onto an unrelated heading, and a
-  removed point's notes are simply dropped along with the heading — the
-  agenda is the source of truth for structure.
-- Point titles must be plain text — no Typst code/interpolation in the
-  heading itself (e.g. `= Minutes of the previous meeting`, not
-  `= Minutes #ordinal(n) meeting`). agenda_headings() below reads titles
-  *rendered* (via `typst eval`, which evaluates any interpolation), but
-  existing_sections() reads minutes.typ's current titles from raw *source*
-  text (a plain regex over `= ` lines, deliberately — mapping a compiled
-  heading's location back to a source byte range isn't something Typst's
-  query API exposes). A title that differs between rendered and source
-  form can never match itself across a regeneration, silently orphaning
-  whatever prose was under it. Put anything dynamic in the body instead.
-- Only the region between the "BEGIN GENERATED OUTLINE" / "END GENERATED
-  OUTLINE" markers in minutes.typ is ever rewritten; the preamble (imports,
-  page style, meeting-title/presence) and the appendix (action-item-list/
-  decision-list) are untouched.
-
-Carrying action items forward, separately:
-
-- gewis-agenda-page/gewis-minutes-page publish each meeting's resolved
-  chair/meeting-number (<gewis-meeting-info>) and action-item-list()
-  publishes its resolved rows — id/deadline/owner/description, *raw*, not
-  display-formatted (<gewis-open-action-items>) — as queryable Typst
-  metadata. Meeting order is determined from meeting-number, not a
-  directory's name or creation time, and scoped to meetings sharing the
-  *same bucket* — two different committees each numbering their own
-  meetings from 1 must never be treated as one series just because they
-  happen to sort adjacently.
-- A `datetime` value round-trips through `typst eval`'s own JSON
-  serialization as the literal Typst source that constructs it (confirmed
-  empirically: `{"deadline": "datetime(year: 2026, month: 7, day: 1)"}`),
-  so it's reused verbatim rather than reconstructed by hand; a plain
-  string deadline serializes as just that string. A `person` is a plain
-  {first, prefix, last} dict either way, reconstructed as a person(...)
-  call — Typst dictionaries compare structurally, not by identity, so a
-  freshly-reconstructed person() is `==` to the committee-info.typ value
-  it was resolved from, and short-name()'s collision detection still
-  works.
-- This only ever runs *once* per meeting (tracked in state as
-  "<bucket>/<rel path>:carried"), the first time that meeting's previous
-  one is found to actually have open items recorded — not on every poll —
-  so a secretary who has since deleted a resolved item from
-  open-action-items by hand never sees it silently reappear. If the
-  previous meeting's minutes.typ exists but has no action points recorded
-  yet (still being written), this is left as *not yet settled* and
-  retried on a later poll rather than treated as "nothing to carry,
-  forever."
-- Only the region between "BEGIN CARRIED ACTION ITEMS" / "END CARRIED
-  ACTION ITEMS" markers is touched, in both agenda.typ and minutes.typ —
-  the same reasoning as the outline markers above. minutes.typ's pair
-  sits *inside* the outline region (under the "Action points" heading);
-  the outline-sync mechanism treats that heading's whole body as opaque
-  existing prose to preserve, so the two mechanisms don't conflict.
+- A meeting is any directory under a TINO bucket (except `packages`) holding
+  both agenda.typ and minutes.typ; buckets may nest many meetings sharing a
+  committee-info.typ at the bucket root.
+- Every `typst` call passes `--root <bucket>`: without it Typst roots at the
+  input file's directory and a nested meeting's `"../../committee-info.typ"`
+  import fails with "path would escape the project root".
+- Writes are PUT-only through TINO's API, never committed: committing stays a
+  human action in TINO's UI (machine-authored commits polluted history).
+- The outline merge is by heading *title*: renamed points start empty,
+  removed points drop their notes.
+- Point titles must be plain text: agenda titles are read rendered but
+  minutes titles from raw source, so interpolated titles never match and
+  orphan their prose.
+- Previous meeting = highest lower meeting-number in the *same bucket*.
+- `typst eval` serializes a datetime as its constructing Typst source
+  (`datetime(year: ..., ...)`), reused verbatim. Reconstructed person()
+  values compare structurally equal, so short-name() collision detection
+  still works.
+- Carrying runs once per meeting (state key "<key>:carried") so hand-deleted
+  items never reappear; if the previous minutes have no action points yet
+  it's retried later rather than settled.
+- Only marker-delimited regions are rewritten. minutes.typ's CARRIED pair
+  sits inside the OUTLINE region under "Action points", whose body the
+  outline merge preserves as opaque prose.
 '''
 
 import json
@@ -137,25 +63,18 @@ log = logging.getLogger('gewis-minutes-watcher')
 
 @dataclass(frozen=True)
 class Meeting:
-    '''One agenda.typ+minutes.typ pair. `bucket` is the TINO bucket (and
-    git repository) it lives under; `dir` is the meeting's own directory,
-    which may be the bucket root itself or nested arbitrarily deep.
-    '''
+    '''`dir` may be the bucket root itself or nested arbitrarily deep.'''
     bucket: Path
     dir: Path
 
     @property
     def rel(self) -> Path:
-        '''This meeting's directory, relative to its bucket — `.` if the
-        meeting *is* the bucket root.
-        '''
+        '''`.` if the meeting *is* the bucket root.'''
         return self.dir.relative_to(self.bucket)
 
     @property
     def key(self) -> str:
-        '''Identity used for state-file keys and log lines — stable
-        across polls regardless of what TINO calls the bucket internally.
-        '''
+        '''State-file key and log label.'''
         if self.rel == Path('.'):
             return self.bucket.name
         return f'{self.bucket.name}/{self.rel.as_posix()}'
@@ -164,20 +83,14 @@ class Meeting:
         return self.dir / filename
 
     def api_path(self, filename: str) -> str:
-        '''This meeting's file path relative to the *bucket* — what TINO's
-        file-write API expects, as opposed to `path()` above which is an
-        absolute filesystem path for local reads.
-        '''
+        '''Path relative to the *bucket*, as TINO's file API expects.'''
         return filename if self.rel == Path(
             '.') else f'{self.rel.as_posix()}/{filename}'
 
 
 def flatten(node) -> str:
-    '''Turn a Typst content JSON node (as returned by `typst eval --format
-    json`) back into plain text. A heading's body is a single `text` leaf
-    for a plain title, but becomes a `sequence` of leaves the moment it
-    contains anything Typst treats specially (e.g. "&"), so this has to
-    walk the tree rather than assume `.text` is always present.
+    '''Turn a Typst content JSON node back into plain text. Headings with
+    special characters (e.g. "&") become a `sequence`, not a `text` leaf.
     '''
     if isinstance(node, str):
         return node
@@ -192,13 +105,7 @@ def flatten(node) -> str:
 
 
 def typst_eval_json(meeting: Meeting, filename: str, expression: str):
-    '''Run `typst eval <expression> --in <meeting's file> --root <bucket>
-    --format json` and parse the result. Shared by every query below —
-    agenda headings, meeting info, open action items. `--root` is the
-    meeting's *bucket*, not its own directory, so a nested meeting's
-    relative import of a shared committee-info.typ above it can resolve —
-    see the module docstring.
-    '''
+    '''`typst eval` with `--root` at the bucket — see module docstring.'''
     proc = subprocess.run(
         [
             'typst', 'eval', expression,
@@ -213,30 +120,20 @@ def typst_eval_json(meeting: Meeting, filename: str, expression: str):
 
 
 def agenda_headings(meeting: Meeting) -> list[dict]:
-    '''Query agenda.typ's own heading structure directly — this is the
-    entire point of using plain headings instead of a bespoke data format:
-    nothing here needs to understand GEWIS's document model, only Typst's.
-    '''
+    '''Query agenda.typ's heading structure.'''
     raw = typst_eval_json(meeting, 'agenda.typ', 'query(heading)')
     return [{'level': h['level'], 'title': flatten(h['body'])} for h in raw]
 
 
 def meeting_info(meeting: Meeting,
                  filename: str = 'agenda.typ') -> dict | None:
-    '''gewis-agenda-page/gewis-minutes-page publish `meeting.get()`
-    unconditionally, so this is None only if the file doesn't use one of
-    those page shells at all (not a real GEWIS meeting document).
-    '''
+    '''None if the file doesn't use a gewis page shell.'''
     raw = typst_eval_json(meeting, filename, 'query(<gewis-meeting-info>)')
     return raw[0]['value'] if raw else None
 
 
 def open_action_items(meeting: Meeting) -> list[dict]:
-    '''action-item-list() only publishes <gewis-open-action-items> if it
-    actually found at least one action point figure to build a table
-    from — so an empty result here is the ordinary "no action points were
-    recorded in this meeting" case, not an error.
-    '''
+    '''Empty when no action points were recorded — not an error.'''
     raw = typst_eval_json(
         meeting,
         'minutes.typ',
@@ -257,10 +154,7 @@ HEADING_RE = re.compile(r'^(=+) (.+)$', re.MULTILINE)
 
 
 def existing_sections(generated_region: str) -> dict[str, str]:
-    '''Map heading title -> its body (everything up to the next heading)
-    from the *current* generated region of minutes.typ, so regenerating
-    doesn't discard prose that's already been written.
-    '''
+    '''Map heading title -> body in minutes.typ's current generated region.'''
     matches = list(HEADING_RE.finditer(generated_region))
     sections = {}
     for i, m in enumerate(matches):
@@ -286,10 +180,7 @@ def render_generated_region(
 
 def replace_marked_region(text: str, begin: str, end: str,
                           new_region: str) -> str | None:
-    '''Returns None if the markers aren't both present (a hand-edited file
-    that opted out of auto-generation — leave it alone rather than
-    guessing), the same convention regenerate_minutes() already used.
-    '''
+    '''None if either marker is missing: a hand-edited file opted out.'''
     if begin not in text or end not in text:
         return None
     before, rest = text.split(begin, 1)
@@ -307,19 +198,12 @@ def regenerate_minutes(minutes_text: str, headings: list[dict]) -> str | None:
 
 
 def typst_string(s: str) -> str:
-    '''A Typst string literal. Typst's own escapes for "..." (quotes,
-    backslash) match JSON's closely enough for our purposes that reusing
-    json.dumps is safe rather than hand-rolling an escaper.
-    '''
+    '''Typst's string escapes match JSON's closely enough for json.dumps.'''
     return json.dumps(s)
 
 
 def typst_person(value) -> str:
-    '''`owner` came back from meta.value as either a plain string or the
-    {first, prefix, last} shape person() always produces — reconstructed
-    as a person() call rather than a bare dict literal so it reads like
-    something a human would actually write.
-    '''
+    '''`owner` is a plain string or person()'s {first, prefix, last} dict.'''
     if isinstance(value, str):
         return typst_string(value)
     parts = [typst_string(value['first'])]
@@ -369,12 +253,7 @@ def api_request(method: str, path: str, body: dict | None = None) -> dict:
 
 
 def write_files_via_api(meeting: Meeting, files: dict[str, str]) -> None:
-    '''`files` maps filename (e.g. "minutes.typ") to new content — turned
-    into bucket-relative paths here so every caller just thinks in terms
-    of the meeting's own two files. PUT-only, no commit: see the module
-    docstring — the change lands as an unsaved working-tree
-    modification, committing stays a human action in TINO's UI.
-    '''
+    '''`files` maps meeting filename -> content. PUT-only, no commit.'''
     for filename, content in files.items():
         api_request('PUT',
                     f'/api/buckets/{
@@ -395,10 +274,7 @@ def save_state(state: dict) -> None:
 
 
 def all_meetings() -> list[Meeting]:
-    '''Every meeting across every bucket — see Meeting's own docstring for
-    what makes a directory count as one. `packages` is reserved (it's
-    where gewis's own Typst packages live, not a committee's documents).
-    '''
+    '''Every meeting across every bucket; `packages` holds Typst packages.'''
     if not BUCKETS_DIR.is_dir():
         return []
     meetings = []
@@ -414,12 +290,8 @@ def all_meetings() -> list[Meeting]:
 
 def find_previous_meeting(meeting: Meeting,
                           siblings: list[Meeting]) -> Meeting | None:
-    '''The meeting with the highest meeting-number strictly less than this
-    one's, among meetings in the *same bucket* only — two different
-    committees numbering their own meetings from 1 must never be treated
-    as one series just because they happen to share a poll cycle. Order
-    comes from each meeting's own queryable meeting-number, not its
-    directory name or creation time (either of which could be anything).
+    '''Highest lower meeting-number in the *same bucket* only — committees
+    each number from 1. Directory names/ctimes are not trusted for order.
     '''
     current = meeting_info(meeting)
     if current is None:
@@ -440,12 +312,9 @@ def find_previous_meeting(meeting: Meeting,
 
 def carry_forward_action_items(
         meeting: Meeting, siblings: list[Meeting]) -> str:
-    '''Populates this meeting's open-action-items (agenda.typ) and
-    minutes-actionlist() argument (minutes.typ) from the previous
-    meeting's still-open items, if any. Returns 'done' (settled — a
-    caller should stop retrying, whether or not anything was written),
-    or 'pending' (the previous meeting exists but has no action points
-    recorded yet — worth checking again on a later poll).
+    '''Fill this meeting's carried regions from the previous meeting's open
+    items. Returns 'done' (settled) or 'pending' (previous meeting has no
+    action points yet; retry later).
     '''
     prev = find_previous_meeting(meeting, siblings)
     if prev is None:

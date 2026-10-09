@@ -1,11 +1,10 @@
-# endeavour (x86_64 media/services server, intel+nvidia, ZFS). den-produced;
-# named `endeavour` during the migration to avoid colliding with the old one.
+# endeavour (x86_64 media/services server, intel+nvidia, ZFS). den-produced.
 #
-# Hardware from a nixos-facter report; filesystems from disko. Generate on it:
+# Generate the facter report on it:
 #   sudo nix run nixpkgs#nixos-facter -- -o modules/den/hosts/_facter/endeavour.facter.json
 #
-# Hardware: a Dell Precision R7910 — Xeon + Tesla P100 (compute only, no display),
-# an Intel Arc A310 for transcoding, and the BMC's Matrox for the console.
+# Dell Precision R7910: Xeon + Tesla P100 (compute only), Intel Arc A310 for
+# transcoding, the BMC's Matrox for the console.
 {
   den,
   inputs,
@@ -14,13 +13,10 @@
   den.hosts.x86_64-linux.endeavour.users.nixos = {};
 
   den.aspects.endeavour = {
-    # `, <cmd>` and nix-index's command-not-found suggestions for the `nixos`
-    # user. Reaches the user through the host rather than through
-    # roles.home-base because the prebuilt index is 100 MiB and pioneer has no
-    # room for it — see the aspect.
+    # Via the host, not roles.home-base: pioneer has no room for the
+    # 100 MiB index.
     provides.to-users.includes = [den.aspects.home.comma];
 
-    # host provides this home config to its users (just `nixos` here).
     provides.to-users.homeManager = {...}: {
       cosmos.system.impermanence.persist.directories = ["dev"];
     };
@@ -42,15 +38,13 @@
       services.tile-traccar
       services.netbird.client
       services.comin
-      # The scheduled lock bump. On this host because it has the build
-      # capacity and the knot; nowhere else because it pushes to main.
+      # Only here: it pushes to main.
       services.flake-bump
       services.build-gate
       services.suwayomi
       services.flaresolverr
-      # Keeps home.lvdar.nl pointed at this connection, which is what lets
-      # gaia's crowdsec whitelist name the home address instead of pinning a
-      # literal that drifts. This is the host actually behind that connection.
+      # Lets gaia's crowdsec whitelist name home.lvdar.nl instead of a
+      # drifting literal.
       services.ddns
       services.opencloud
       services.typstnique
@@ -94,31 +88,17 @@
       pkgs,
       ...
     }: let
-      # The Arc A310, addressed by PCI slot rather than by render node number.
-      #
-      # renderD12x is handed out in probe order across every DRM device on the
-      # host, so it names a card only by accident: this box also has a Tesla
-      # P100, and on the boot of 2026-08-28 the Arc failed to bind and the
-      # Tesla inherited renderD128 — at which point everything pointed at that
-      # number was silently talking to a card with no VAAPI at all. by-path is
-      # tied to the slot the card is in, so it either resolves to the Arc or is
-      # absent, and a service that wanted the Arc fails loudly instead of
-      # quietly encoding against the wrong GPU.
+      # By PCI slot, not renderD12x: probe order once (2026-08-28) handed
+      # renderD128 to the Tesla, silently breaking VAAPI. by-path fails loudly.
       arcRenderNode = "/dev/dri/by-path/pci-0000:07:00.0-render";
     in {
       imports = [
         inputs.nixos-facter-modules.nixosModules.facter
         {
           facter.reportPath = ./_facter/endeavour.facter.json;
-          # facter turns its graphics module on when the report lists a monitor,
-          # and then puts *every* detected GPU driver into the initrd. Here that
-          # is nvidia (a Tesla P100, so ~100 MB of GSP firmware plus nvidia.ko),
-          # i915 for the Arc card and mgag200 for the BMC console — none of which
-          # is needed before stage 2. The report happens to have been taken with
-          # nothing plugged in, so this is already off; pin it so plugging a
-          # monitor in before the next `nixos-facter` run cannot silently change
-          # the initrd. `hardware.graphics.enable` is set explicitly below, so
-          # the userspace stack is unaffected.
+          # Pinned off: otherwise a monitor present at the next facter run
+          # puts every GPU driver (~100 MB nvidia firmware) in the initrd.
+          # hardware.graphics.enable is set explicitly below.
           facter.detected.graphics.enable = false;
         }
         inputs.nixos-hardware.nixosModules.common-cpu-intel
@@ -127,85 +107,40 @@
         ./_hw/endeavour/disko.nix
       ];
 
-      # UEFI, not legacy BIOS. The scaffold commit copied gaia's settings here,
-      # but gaia is a QEMU VM that really does boot BIOS off /dev/sda — this
-      # host does not. disko gives `main` a 512M EF00 ESP mounted at /boot and
-      # no bios_grub partition, so a BIOS grub-install has nowhere to embed
-      # core.img and refuses ("will not proceed with blocklists"). /dev/sda is
-      # also the wrong disk: with nine drives attached that is a SAS member of
-      # the tank pool, not the Samsung M.2 the system lives on.
-      #
-      # Defaults are what this host wants: legacy = false gives efiSupport and
-      # canTouchEfiVariables, and grub-device = null becomes device = "nodev".
+      # Boot defaults (UEFI, device "nodev") are correct; don't copy gaia's
+      # legacy settings: there's no bios_grub partition, and /dev/sda is a
+      # tank SAS member, not the system M.2.
 
-      # The DID of @lvdar.nl, the account on this host's own PDS. The knot is
-      # owned by an identity we host rather than one Bluesky hosts, which is
-      # the whole reason the PDS went in first.
+      # DID of @lvdar.nl on this host's own PDS.
       cosmos.services.tangled.owner = "did:plc:wj6rsizbzc7fruoopsxg2k2a";
 
-      # This host both serves the cache and pushes to it. Not redundant: the
-      # nightly lock bump builds all three x86_64 closures here, and without
-      # this they would exist only in the local store — CI would still fetch
-      # nothing and rebuild them inside the microVM the next morning.
+      # Push what the nightly lock bump builds here, or CI rebuilds it.
       cosmos.services.attic.client.watchStore.enable = true;
 
       cosmos.services.tino.accentColour = "red";
 
-      # The Tesla P100 finally has something to do. See services/ollama.nix for
-      # why the package is overridden — a stock ollama-cuda would run on the
-      # CPU here without saying so.
-      #
-      # Three models, ~23 G on /tank: a general one, a coding one, and a small
-      # fast one. All comfortably inside 16 G of VRAM at Q4, with room left for
-      # context — the 14B pair are ~9 G each, so only one is resident at a time
-      # and swapping between them costs a reload.
+      # See services/ollama.nix for the package override (stock ollama-cuda
+      # silently runs on CPU). The 14B pair are ~9 G each: one resident at a time.
       cosmos.services.ollama = {
         models = [
           "qwen3:14b"
           "qwen2.5-coder:14b"
           "llama3.1:8b"
 
-          # For inline completion rather than chat, which is a different job
-          # with a different constraint: ghost-text has to arrive inside the
-          # pause between keystrokes, and the 14B above generates at 12.5 tok/s
-          # — an order of magnitude too slow to ever feel like completion.
-          #
-          # 3B is the compromise. ~2 G, so it sits alongside a resident 14B in
-          # the 16 G rather than evicting it, which matters because chat and
-          # completion are wanted at the same time. Both tags carry the same
-          # fill-in-middle template, so this understands <|fim_prefix|> and a
-          # `suffix` parameter exactly as its larger sibling does.
+          # Inline completion: 14B (12.5 tok/s) is too slow; 3B (~2 G) fits
+          # beside a resident 14B and shares the FIM template.
           "qwen2.5-coder:3b"
         ];
 
-        # Reachable from the rest of the mesh, not just from the web UI on
-        # this host. Turned on knowingly: the option's own description spells
-        # out that ollama has no authentication whatsoever, so this gives every
-        # peer free use of the GPU and of whatever is loaded into it.
-        #
-        # Acceptable here because the mesh is not a public network — it is four
-        # machines and a phone, all enrolled — and because the alternative is
-        # that the card is only usable through a browser. Nothing on the
-        # internet reaches this: gaia publishes no service pointing at 11434,
-        # and the firewall opens the port on the NetBird interface alone.
+        # ollama has no auth: every mesh peer gets free GPU use. Accepted:
+        # the mesh is all enrolled devices; gaia publishes nothing on 11434
+        # and the port opens on the NetBird interface only.
         meshExposed = true;
       };
 
-      # The survival server, published as `smp.lvdar.nl`. It holds the default
-      # port, which is what keeps that address free of a port suffix: gaia
-      # forwards its 25565 straight here, and L4 has only one 25565 to give.
-      # The other world is on 25566 and buys the same bare address with an SRV
-      # record instead — see the comment on `hardcore` below.
-      #
-      # `minecraft.lvdar.nl` is no longer this; it is the control page.
-      #
-      # The whitelist is enforced, so this list is exactly who can join and the
-      # internet is everyone else. Taken from the restored world itself —
-      # world/players/data/<uuid>.dat is the record of who has actually played
-      # — and resolved to names through Mojang's session server, rather than
-      # typed from memory. The UUID is the identity; the name is a label that
-      # its owner can change without telling anyone, and Minecraft will follow
-      # the UUID when they do.
+      # Holds 25565: gaia's L4 has only one 25565 to give (hardcore uses
+      # 25566 + SRV). Whitelist UUIDs from world/players/data; the UUID is
+      # the identity, the name a mutable label.
       cosmos.services.minecraft.servers.smp = {
         motd = "lvdar.nl";
         whitelist = {
@@ -217,24 +152,14 @@
         operators = {};
       };
 
-      # Run the servers from a browser, for the people who play here and
-      # administer nothing: start/stop, who is online, the console, the log.
-      #
-      # Two layers of kanidm groups. `netbird-minecraft-control` is the gate on
-      # gaia and decides who sees the page at all; the per-server groups below
-      # decide which servers they then get, and are checked against the
-      # X-NetBird-Groups header. Being in the gate group alone now shows an
-      # empty page — deliberately, so handing someone one server is the default
-      # shape rather than an afterthought.
-      #
-      # netbird-minecraft-control stays on both because it is the group the
-      # people who look after the whole thing are in.
+      # `netbird-minecraft-control` is the gate on gaia; the per-server
+      # groups below (checked against X-NetBird-Groups) decide which servers
+      # a user gets. Gate group alone shows an empty page.
       cosmos.services.minecraft.control = {
         enable = true;
 
-        # netbird-proxy's own embedded client peer, which is a different
-        # address from gaia's agent. A literal because den cannot read another
-        # host's config, and the page is served only to that one address.
+        # netbird-proxy's embedded client peer, not gaia's agent. Literal:
+        # den can't read another host's config.
         proxyAddress = "100.68.242.26";
 
         access = {
@@ -243,171 +168,81 @@
         };
       };
 
-      # The second server, and the thing the comment above warned about: two
-      # servers cannot both have the default port. Upstream's duplicate-port
-      # assertion only inspects servers with openFirewall set, and this aspect
-      # turns that off, so nothing would have caught it at eval — the first
-      # server to start would take 25565 and the second would fail to bind,
-      # trigger its OnFailure notification, and roll the deploy back.
-      #
-      # 25566 is published from gaia as its own L4 service, because L4 routes by
-      # listen port and 25565 is already smp's. The port is invisible to players
-      # anyway, via a Cloudflare SRV record the Java client resolves before it
-      # connects:
-      #
-      #   _minecraft._tcp.hardcore.lvdar.nl  SRV  0 0 25566 hardcore.lvdar.nl
-      #
-      # so the address typed is a bare `hardcore.lvdar.nl`. That record is
-      # manual — the *.lvdar.nl wildcard answers A lookups but not SRV — and if
-      # it is missing this is still reachable as hardcore.lvdar.nl:25566.
+      # Upstream's duplicate-port assertion only checks servers with
+      # openFirewall, which this aspect disables — a clash would fail to bind
+      # and roll back the deploy. SRV record is manual (see gaia.nix).
       cosmos.services.minecraft.servers.hardcore = {
         port = 25566;
         motd = "lvdar.nl — hardcore";
         whitelist = {
           DutchRD = "7239bc30-af4e-482c-9434-7ce3005cb917";
           PittyPfert = "f2bfe527-e914-4d2b-b72b-3f1708452082";
-          # Same UUID as on smp above — the account is the identity, the name
-          # is a label its owner can change.
+          # Same UUID as on smp.
           Svenie23 = "1fd240dc-faa7-4a34-a12b-5465dec604d1";
         };
         operators = {};
 
-        # Proximity voice chat, on this world only — hence extraMods rather
-        # than the shared packwiz pack, which every server gets.
-        #
-        # It listens on UDP 24454 of its own, separate from the game's TCP
-        # 25566, so it needs its own hole in the mesh firewall below and its own
-        # L4 service on gaia. A server whose voice port is unreachable does not
-        # fail: players connect, hear nothing, and see "voice chat unavailable",
-        # which is a much quieter symptom than it deserves.
-        #
-        # The client mod is optional. Vanilla clients still join and play, they
-        # just cannot talk; anyone who wants voice installs the same major
-        # version from Modrinth.
+        # Here, not the shared packwiz pack: this world only. UDP 24454 needs
+        # its own firewall hole and gaia L4 service; unreachable = silent
+        # "voice chat unavailable".
         extraMods = [pkgs.simple-voice-chat];
 
         serverProperties = {
-          # What actually makes it hardcore. The server locks difficulty to
-          # hard and puts a player who dies into spectator mode rather than
-          # respawning them — on a multiplayer world that is the whole game.
           hardcore = true;
 
-          # Redundant while hardcore is true, which forces hard regardless, and
-          # set anyway: it is the line that keeps meaning what it says if
-          # hardcore is ever turned off, instead of silently dropping the world
-          # back to normal difficulty.
+          # Redundant under hardcore; pinned in case hardcore is turned off.
           difficulty = "hard";
 
-          # A death is permanent here, so the two settings that quietly undo
-          # that are worth pinning rather than inheriting. Both are already the
-          # vanilla defaults; the point is that a future edit has to be
-          # deliberate.
+          # Vanilla defaults, pinned so changing them is deliberate.
           pvp = true;
           spawn-monsters = true;
 
-          # Off. The default 16-block radius stops anyone who is not an
-          # operator from building near spawn, which is a defence against
-          # strangers griefing the spawn point on a public server — and this
-          # server has an enforced whitelist of two, so it protects nobody and
-          # only gets in the way of the first shelter.
+          # Spawn protection is pointless with a whitelist of two.
           spawn-protection = 0;
 
-          # How far the server *sends* chunks, and therefore the ceiling on
-          # what any client can render however high it sets its own slider.
-          # 10 is the vanilla default; chunks scale with the square of this, so
-          # 16 is about 2.5x the load per player.
-          #
-          # Affordable here for reasons specific to this setup: 36 cores, 35
-          # GiB free, two players — and the pack carries C2ME, which
-          # parallelises chunk loading, and VMP, which optimises chunk sending.
-          # Chunk sending is precisely the view-distance bottleneck, so this is
-          # the one place those two mods pay for themselves.
-          #
-          # simulation-distance is deliberately left at 10. It governs where
-          # entities tick, redstone runs and mobs spawn — raising it changes
-          # gameplay and costs CPU every tick, which is a different decision
-          # from "can I see further".
+          # Server-side render ceiling; ~2.5x load per player vs 10.
+          # Affordable: 36 cores, two players, C2ME + VMP in the pack.
+          # simulation-distance stays 10: raising it changes gameplay.
           view-distance = 16;
         };
       };
 
       networking.hostId = "b8433556";
 
-      # network-online.target was firing about four seconds before this host
-      # actually had a usable address, and services that need one to advertise
-      # themselves died in that window:
-      #
-      #   25.621  idrac: leased 169.254.0.2      <- satisfies wait = "any"
-      #   25.716  Reached target Network is Online
-      #   25.761  loki          "no useable address found for interfaces"
-      #   25.910  alertmanager  "no private IP found"
-      #   29.895  eno1: leased 192.168.2.101     <- the address they needed
-      #
-      # Both then burned their restart budget in seconds and stayed in
-      # start-limit-hit, so the host booted with no log ingestion and no alert
-      # delivery — the second of which means the failure could not report
-      # itself. Ordering them after network-online.target fixes nothing, since
-      # they already are: the target was simply lying.
-      #
-      # The liar is the iDRAC's out-of-band management NIC, which self-assigns a
-      # link-local 169.254 address almost immediately. dhcpcd counts that as
-      # "an address" and declares the network up. It is a BMC that the host has
-      # no business configuring, so it is denied outright, and the wait is
-      # narrowed to a real IPv4 lease.
-      #
-      # Only surfaced now because this host had been up since 10 June; the
-      # impermanence work is what made anyone reboot it.
+      # The iDRAC NIC self-assigns 169.254 instantly and dhcpcd counted it as
+      # "online"; loki/alertmanager then died needing a real address and hit
+      # start-limit. Deny it and wait for a real IPv4 lease.
       networking.dhcpcd = {
         wait = "ipv4";
         denyInterfaces = [
           "idrac"
-          # dhcpcd was also soliciting leases on the *arr container's veth and
-          # bridge, which have their own static addressing.
+          # The *arr container's veth/bridge have static addressing.
           "veth-*"
           "arr-br"
         ];
       };
 
-      # TLS for every published service now terminates on gaia, at
-      # netbird-proxy, which forwards to each app's own port over the mesh.
-      # Drops the local `<name>.lvdar.nl` vhosts — nothing reaches this host
-      # by name any more, only by peer and port.
+      # TLS terminates at gaia's netbird-proxy; no local vhosts.
       cosmos.networking.edgeTerminated = true;
 
-      # idrac.lvdar.nl is deliberately absent from public DNS: the wildcard
-      # sends every lvdar.nl name to the edge, so off the mesh it resolves to
-      # gaia and finds nothing. The BMC is reachable from the mesh and nowhere
-      # else — services/idrac.nix on pioneer explains why.
-      #
-      # A literal peer address, like every other cross-host reference here.
-      # This must match the other resolver's copy; both hosts answer it so the
-      # name keeps resolving when either is down, which is the entire point of
-      # publishing the BMC away from endeavour.
+      # Mesh-only (not in public DNS). Must match the other resolver's copy.
       cosmos.services.unbound.localRecords."idrac.lvdar.nl" = "100.68.78.148";
 
-      # Deployment facts that used to sit in aspect defaults. They describe
-      # this machine — its pool layout, its git remote, where its data lives —
-      # so they belong with the machine, not with the modules.
       cosmos.services = {
         attic.dataDir = "/tank/atticd";
         loki.dataDir = "/tank/monitoring/loki";
         ollama.modelsDir = "/tank/ollama/models";
 
-        # The offsite repository. Its password and the storage-box key are
-        # themselves sops secrets — see docs/RESTORE.md before needing them.
+        # Credentials are sops secrets — see docs/RESTORE.md.
         restic.repository = "sftp:u649268@u649268.your-storagebox.de:/endeavour";
 
-        # This host is the knot, so it holds the repositories it also deploys
-        # itself from.
         tangled = {
           stateDir = "/tank/git";
           spindle.stateDir = "/tank/spindle";
         };
 
-        # The gate and the lock-bumper both push to the knot over SSH. The
-        # watchPath is a literal into the knot's on-disk layout and hardcodes a
-        # DID — the fragile part, and the first thing to check when a push
-        # stops triggering a build.
+        # watchPath hardcodes the knot's on-disk layout and a DID: first
+        # thing to check when a push stops triggering a build.
         build-gate = {
           repository = "git@knot.lvdar.nl:lvdar.nl/nix-config";
           watchPath = "/tank/git/did:plc:a3erncqfgkcxu3yl6fpjfmwf/refs/heads/main";
@@ -418,136 +253,69 @@
         };
       };
 
-      # The knot, over public HTTPS. The arrow points inward: comin pulls, so
-      # no credential here grants anything on the fleet.
+      # comin pulls, so no credential here grants anything on the fleet.
       cosmos.services.comin.repository = "https://knot.lvdar.nl/did:plc:a3erncqfgkcxu3yl6fpjfmwf";
 
-      # The one task history this server accepts, and the whole of what it
-      # checks: TaskChampion has no other authentication and the port is
-      # published, so this id is a credential rather than a name. From
-      # hosts/common in nix-secrets because voyager needs the same value to put
-      # in its taskrc.
+      # TaskChampion's only authentication (the port is published). In
+      # hosts/common so voyager shares it.
       cosmos.services.taskchampion.clientIdFile =
         config.sops.secrets."keys/taskwarrior/client-id".path;
 
-      # What on this host cannot be rebuilt from the flake. Listed here rather
-      # than defaulted in services/restic.nix: which paths hold irreplaceable
-      # state is a fact about this machine, and a default there decided it
-      # silently for every host including the aspect.
-      #
-      # The postgres dump directory is absent on purpose — restic creates it
-      # and appends it itself.
+      # The postgres dump dir is absent on purpose: restic appends it itself.
       cosmos.services.restic.paths = [
         "/persist/var/lib/kanidm"
         "/persist/var/lib/traccar"
         "/persist/var/lib/arr"
         "/persist/var/lib/grafana"
-        # The ATProto identity. Small, and the highest-value path in this list
-        # per byte: the PLC rotation key in here is what proves control of the
-        # DID, and no amount of the rest reconstructs it.
+        # Holds the PLC rotation key that proves control of the DID.
         "/persist/var/lib/pds"
         "/persist/var/lib/opencloud"
-        # LibreChat: conversations and accounts in MongoDB, uploads in its
-        # dataDir. Small, and the only part of the LLM stack worth backing
-        # up — the models it talks to are a re-download and are deliberately
-        # excluded.
+        # LibreChat (MongoDB + uploads); models are re-downloadable.
         "/persist/var/lib/librechat"
         "/persist/var/db/mongodb"
-        # typstnique's leaderboard. Tiny, and the only thing this host runs
-        # which cannot be rebuilt from the flake — the scores are the one part
-        # not derivable from source.
+        # typstnique's leaderboard.
         "/persist/var/lib/typstnique"
-        # The TaskChampion sync history. Kilobytes, and convenience rather
-        # than survival: every Taskwarrior replica holds the full task list, so
-        # this only saves re-initialising sync on each client. Encrypted with a
-        # key this host does not have, so the backup is opaque here too.
+        # Convenience only: every replica holds the full list; encrypted.
         "/persist/var/lib/taskchampion-sync-server"
         "/persist/home"
-        # The whole of /etc. 20 KB in total, and the ssh host key inside it is
-        # what makes any of the rest restorable. sops decrypts with
-        # /persist/etc/ssh/ssh_host_ed25519_key (core/sops.nix), and one of the
-        # secrets it guards is keys/zfs/tank, which unlocks the array below.
-        # Without this path a rebuilt endeavour can decrypt nothing, so the
-        # /tank entries would restore into a pool that cannot be opened and
-        # every credential would have to be re-keyed by hand. Carries
-        # machine-id too.
+        # The ssh host key decrypts sops, incl. keys/zfs/tank: without it
+        # nothing else (including /tank) is restorable.
         "/persist/etc"
-        # The uid/gid map. Without it a rebuilt host hands out different
-        # numeric owners than the restored files expect.
+        # uid/gid map, so restored files keep their owners.
         "/persist/var/lib/nixos"
-        # radicale's CalDAV/CardDAV trees — 32 KB, and services/opencloud.nix
-        # calls them the only irreplaceable thing it owns. They sit on the root
-        # SSD, which is btrfs, so sanoid does not cover them either: this is
-        # their only copy.
+        # On btrfs root SSD, so sanoid doesn't cover it: only copy.
         "/persist/var/lib/radicale"
-        # suwayomi's library: what is tracked, and how far it has been read.
-        # Small — database.mv.db is 3.5 MB — but the directory around it is
-        # 1.4 GB of re-downloadable Chromium and page cache, which is what the
-        # excludes are for. Deliberately without
-        # /persist/var/lib/suwayomi-downloads: those are re-fetchable, and the
-        # download-retry timer refills them unattended.
+        # database.mv.db matters; the 1.4 GB around it is excluded.
+        # suwayomi-downloads is re-fetched by the download-retry timer.
         "/persist/var/lib/suwayomi-server"
         "/tank/opencloud"
         "/tank/media/library/images"
-        # The tangled knot's repositories. sanoid snapshots these too, but
-        # snapshots live inside the pool they protect — if the knot is where
-        # the code actually lives, this is the only copy that survives the
-        # array.
+        # sanoid snapshots live in the pool they protect; this survives the array.
         "/tank/git"
-        # Minecraft worlds. Same argument as the knot: sanoid covers the
-        # accidents, this covers the array.
+        # Same as the knot.
         "/tank/minecraft"
       ];
 
-      # roles/server.nix sets 20s, which is too tight for the host that builds
-      # the fleet. On 2026-08-28 flake-bump's nixpkgs bump rebuilt obs-studio,
-      # mcrl2 and the nvidia stack at once; every local service stalled for
-      # seconds (loki timing out to its own ingester on 127.0.0.1, nats
-      # readloops at 7.6s), PID 1 missed the 20s deadline, and iTCO_wdt reset
-      # the box mid-build. The journal simply stops at 05:41:33; the SEL
-      # recorded `Watchdog2 | Hard reset` at 05:42:29.
-      #
-      # 60s, matching hosts/pioneer.nix, which raised it for exactly the same
-      # reason — a host that legitimately stalls under IO should not be reset
-      # for surviving it slowly. This does not paper over the hang: max-jobs
-      # below is what stops the machine getting there.
+      # roles/server.nix's 20s reset the box mid-build on 2026-08-28 (SEL:
+      # Watchdog2 Hard reset). Same as pioneer. max-jobs below fixes the hang.
       systemd.settings.Manager.RuntimeWatchdogSec = lib.mkForce "60s";
 
-      # 72 threads meant `max-jobs = auto` resolved to 72, and `cores = 0`
-      # gives each of those every core — so nix was free to run 72 concurrent
-      # derivations with no bound on total compiler processes. Memory is what
-      # ran out first, and with no swap and an uncapped ARC there was no
-      # reclaim path: the kernel livelocked instead of OOM-killing anything,
-      # which is why the journal has no OOM entry.
-      #
-      # 8 x 8 bounds it to 64 concurrent compilers, close to the same CPU
-      # utilisation with a fraction of the peak RSS. It slows a cold rebuild of
-      # the whole fleet, which is a fair trade against a host that stops
-      # answering: build-gate and flake-bump both already run at Nice 10 with
-      # idle IO precisely because finishing quickly is not the point here.
+      # max-jobs=auto (72) x cores=0 livelocked the host on memory (no swap,
+      # uncapped ARC, no OOM entry). 8 x 8 bounds it to 64 compilers.
       nix.settings = {
         max-jobs = 8;
         cores = 8;
       };
 
       cosmos.services.netbird.client = {
-        # A stable port for the agent's resolver, so unbound has something to
-        # forward the mesh domain to. Without it the agent picks an ephemeral
-        # port, unbound answers *.lvdar.nl from public DNS, and every mesh name
-        # on this host resolves to the edge's public address.
-        #
-        # 15353 rather than the conventional 5053, which traccar already owns
-        # here as part of its 5001-5263 decoder range.
+        # Fixed port so unbound can forward the mesh domain to the agent
+        # (else mesh names resolve to the edge). Not 5053: traccar owns it.
         dnsResolverAddress = "127.0.0.1:15353";
 
-        # Publishes 192.168.2.0/24 into the mesh, so a roaming voyager reaches
-        # the whole home network and not just the peers. Turns on IP
-        # forwarding, which is why it is opt-in per host.
+        # Advertises 192.168.2.0/24 to roaming peers; enables IP forwarding.
         routingFeatures = "server";
 
-        # What netbird-proxy targets. Must track the service declarations in
-        # gaia.nix — a port missing here is a published service that times
-        # out rather than one that fails loudly.
+        # Must track gaia.nix's services: a missing port times out silently.
         exposedPorts = [
           8443 # kanidm      auth.lvdar.nl
           8096 # jellyfin    jellyfin.lvdar.nl
@@ -561,9 +329,7 @@
           4055 # jellyseerr  seerr.lvdar.nl     (via the netns bridge)
           6336 # sabnzbd     sabnzbd.lvdar.nl   (via the netns bridge)
 
-          # The *arr suite. These run on the host rather than inside the VPN
-          # namespace — only the download clients are confined — so they are
-          # reached directly rather than through a bridge.
+          # *arr suite runs on the host, not in the VPN namespace.
           9696 # prowlarr    prowlarr.lvdar.nl
           7878 # radarr      radarr.lvdar.nl
           8989 # sonarr      sonarr.lvdar.nl
@@ -571,7 +337,6 @@
           6767 # bazarr      bazarr.lvdar.nl
           9876 # lingarr     lingarr.lvdar.nl
 
-          # OpenCloud and the two legs Collabora needs.
           9200 # opencloud   cloud.lvdar.nl
           9300 # wopi host   wopi.lvdar.nl   (server-to-server, from Collabora)
           9980 # collabora   docs.lvdar.nl
@@ -582,47 +347,21 @@
           8084 # librechat  chat.lvdar.nl
           8086 # mc control  minecraft.lvdar.nl
 
-          # ollama's API, mesh-only and deliberately absent from gaia.nix —
-          # unlike every other port in this list, publishing this one would
-          # expose an unauthenticated API that runs arbitrary inference.
+          # Mesh-only, absent from gaia.nix: unauthenticated inference API.
           11434 # ollama     (no public service)
 
-          # Taskwarrior's sync server. Mesh-only for the same reason and absent
-          # from gaia.nix too: a client-id is the whole of its authentication,
-          # so the NetBird ACL is what actually guards it.
+          # Mesh-only, absent from gaia.nix: the NetBird ACL guards it.
           10222 # taskchampion (no public service)
         ];
 
-        # Simple Voice Chat on the hardcore server. UDP because it carries
-        # audio, and on its own port rather than multiplexed onto the game's
-        # TCP 25566 — the two are unrelated sockets and gaia publishes them as
-        # two separate L4 services.
+        # Simple Voice Chat (hardcore); separate L4 service on gaia.
         exposedUdpPorts = [24454];
       };
 
-      # gaia's mesh address, exempted from OpenSSH's per-source penalties.
-      #
-      # gaia DNATs the public :22 to this host's :2222 and masquerades on the
-      # way (see the `networking.nat` block in gaia.nix, which explains why the
-      # masquerade is not optional). The consequence is that every SSH
-      # connection from the entire internet arrives here from one address —
-      # gaia's agent at 100.68.38.155 — and OpenSSH's srclimit, on by default
-      # since 9.8, assumes a source address identifies a client. Behind a NAT
-      # it does not.
-      #
-      # So an internet scanner failing auth against knot.lvdar.nl:22, which
-      # happens continuously on a public VPS, accrues penalty against gaia and
-      # sshd then resets *legitimate* git traffic over the same address: comin's
-      # pulls, build-gate's fetch, and a plain `git push`. It presents as an
-      # intermittent "kex_exchange_identification: Connection reset by peer"
-      # that clears on its own, which is why it read as flakiness rather than
-      # policy. build-gate failed exactly this way on 2026-08-15.
-      #
-      # Exempting the proxy loses little: that address is reachable only over
-      # the mesh, auth here stays publickey-only, and crowdsec on gaia is what
-      # actually sheds scanner traffic at the edge. The alternative — preserving
-      # the client address with TPROXY or proxy-protocol — is a great deal more
-      # machinery for the same result.
+      # gaia's agent address. gaia DNATs+masquerades public :22 here, so all
+      # SSH arrives from one address and OpenSSH's srclimit penalised it,
+      # resetting legitimate git traffic ("kex_exchange_identification:
+      # Connection reset", build-gate 2026-08-15). crowdsec sheds scanners.
       services.openssh.settings.PerSourcePenaltyExemptList = "100.68.38.155";
 
       hardware = {
@@ -647,20 +386,9 @@
           };
         };
         intelgpu = {
-          # i915, not xe, for the Arc A310 (DG2/G11, 8086:56a6).
-          #
-          # xe declines DG2 on this kernel unless force_probe says otherwise
-          # ("Your graphics device 56a6 is not officially supported"), so with
-          # driver = "xe" the only module in the initrd was one that refuses
-          # the card. Whether i915 got loaded afterwards was then up to udev's
-          # modalias autoload — it won the race on some boots and lost it on
-          # others. On the boot of 2026-08-28 21:04 it lost: the Arc came up
-          # with no driver bound at all, /dev/dri/renderD128 was reassigned to
-          # the Tesla, and the nightly transcode died on libva loading
-          # nvidia_drv_video.so against a card that has no VAAPI.
-          #
-          # i915 supports DG2 outright and, listed here, is loaded in stage 1,
-          # so it claims the card before anything else can decline it.
+          # i915, not xe: xe declines DG2 without force_probe, leaving the Arc
+          # to a udev race it lost on 2026-08-28 (transcode broke). i915 here
+          # loads in stage 1 and claims the card.
           driver = "i915";
           vaapiDriver = "intel-media-driver";
           enableHybridCodec = true;
@@ -671,14 +399,8 @@
       boot = {
         kernelParams = ["nohibernate"];
 
-        # Cap the ZFS ARC at 16 GiB of the 62 GiB installed.
-        #
-        # ARC defaults to half of RAM and is reclaimable only slowly and
-        # asynchronously — a build that allocates fast can outrun ARC eviction,
-        # and on 2026-08-28 that ended with the machine hung and the hardware
-        # watchdog hard-resetting it (SEL entry 0x92). Handing 15 GiB back to
-        # the page cache and to builds costs some read cache on a pool that is
-        # mostly cold media anyway.
+        # Cap ARC at 16 GiB: fast builds outran ARC eviction and the watchdog
+        # reset the host on 2026-08-28.
         extraModprobeConfig = ''
           options zfs zfs_arc_max=17179869184
         '';
@@ -701,7 +423,6 @@
         "keys/zfs/tank" = {};
         "keys/proton/private-key" = {};
 
-        # Read by systemd as a credential, so it needs no owner of its own.
         "keys/taskwarrior/client-id".sopsFile = "${builtins.toString inputs.nix-secrets}/hosts/common/secrets.yaml";
         "keys/eweka".owner = config.cosmos.services.arr.sabnzbd.user;
       };
@@ -719,9 +440,7 @@
       };
 
       cosmos.services = {
-        # Answer for the mesh, and resolve mesh names locally. This host's
-        # unbound already carries the oisd blocklist, so making it the fleet
-        # resolver gives every peer ad-blocking DNS as a side effect.
+        # The fleet resolver: gives every peer oisd ad-blocking.
         unbound.mesh.enable = true;
 
         unbound.oisd = {
@@ -729,10 +448,7 @@
           nsfw = true;
         };
 
-        # On the array rather than the system disk: this is the one service
-        # here whose data is expected to grow without limit. /tank is a ZFS
-        # pool outside the persist layer, so it is left out of impermanence on
-        # purpose — the pool is the durable thing.
+        # /tank is outside the persist layer on purpose: the pool is durable.
         opencloud.dataDir = "/tank/opencloud";
 
         jellyfin = {
@@ -740,7 +456,6 @@
           vaapiDevice = arcRenderNode;
         };
 
-        # ollama is on this host, so the model is a local call over loopback.
         paperless.ai = {
           enable = true;
           model = "qwen3:14b";
@@ -752,69 +467,31 @@
 
         ddns.enable = true;
 
-        # Moved here from voyager. The library and downloads do NOT come along
-        # with the config — they live in /var/lib/suwayomi-{server,downloads}
-        # on voyager and have to be copied across.
+        # Library/downloads were not migrated from voyager with the config.
         suwayomi = {
           basicAuth.enable = true;
-          # Explicit rather than the aspect's default of cosmos.user.name,
-          # which is "nixos" on this host and is the fleet's deploy account
-          # rather than a person.
+          # Not cosmos.user.name: "nixos" is the deploy account here.
           basicAuth.username = "lvdar";
-          # Off since the 2.3 bump. Inside the FHS wrapper libcef.so takes a
-          # SIGTRAP and the server exits 133 before ever binding 8080, so the
-          # whole service was down rather than just the bypass. Clearing the
-          # 519 MB kcef cache changed nothing; it re-downloads and dies the same
-          # way.
-          #
-          # What it is NOT, both checked rather than assumed: not a missing
-          # library — every soname libcef.so wants is present inside the FHS
-          # env — and not this host being hostile to browsers, since the same
-          # chromium store path runs headless and sandboxed here as the
-          # suwayomi user, exit 0. voyager only ever looked healthier because it
-          # ran 2.1, whose CEF build worked; the variable is the version, not
-          # the machine.
-          #
-          # The remaining suspect is chromium's sandbox failing to initialise
-          # nested inside bubblewrap, which is what buildFHSEnv uses. Suwayomi
-          # exposes no knob to pass CEF a --no-sandbox, so there is nothing to
-          # try from here without patching it.
-          #
-          # The cost is Cloudflare-protected sources. FlareSolverr was tried as
-          # a replacement and reverted: 3.5.0's undetected-chromedriver cannot
-          # drive chromium 151 and crashlooped on startup, host-independently.
+          # Off since 2.3: libcef SIGTRAPs inside the FHS wrapper (exit 133)
+          # and takes the whole server down. Not a missing lib nor the host;
+          # likely chromium's sandbox nested in bubblewrap, with no knob for
+          # --no-sandbox.
           webview.enable = false;
 
-          # What covers Cloudflare instead. Loopback: flaresolverr is
-          # unauthenticated and fetches whatever URL it is handed.
+          # Loopback: flaresolverr is unauthenticated.
           flareSolverrUrl = "http://127.0.0.1:8191";
-          # Same paths it used on voyager. Putting downloads under /tank would
-          # be the obvious move on the host with the array, but the aspect adds
-          # downloadsDir to impermanence — and /tank is a ZFS pool outside the
-          # persist layer, so it would get a bind mount from /persist over the
-          # top and land on the root disk anyway. Would need the aspect to stop
-          # persisting an explicitly-placed downloadsDir first.
+          # Not /tank: the aspect persists downloadsDir, so a /persist bind
+          # mount would land it on the root disk anyway.
           downloadsDir = "/var/lib/suwayomi-downloads";
           homeLink = "/home/${config.cosmos.user.name}/manga";
 
-          # Comick rate-limits hard enough that a chapter rarely survives the
-          # downloader's three tries. See the aspect for why this needs a
-          # dequeue rather than a restart.
+          # Comick rate-limits past the downloader's three tries; see the
+          # aspect for why it dequeues rather than restarts.
           downloadRetry.enable = true;
         };
 
-        # Sized to the nightly window rather than to the backlog, but the
-        # backlog is winning: it went from 120 files / 85 GiB on 2026-08-28 to
-        # 155 / 140 GiB on 2026-08-30, because the arrs acquire new h264
-        # material faster than eight a night clears it.
-        #
-        # There is room to take that on. The run of 2026-08-30 did its eight
-        # files in 24 minutes of a roughly three-hour window, and spent 2h26m
-        # of CPU doing it — about six cores against one GPU, which is the shape
-        # of a job that is waiting on something other than the encoder. So:
-        # three times the files, two at a time. The big ones still dominate (27
-        # GiB took 24 minutes on its own), so this is sized to finish before
-        # anyone is awake rather than to be exactly full.
+        # Backlog grows (155 files / 140 GiB on 2026-08-30) faster than 8/night;
+        # runs were CPU-bound, not encoder-bound, so 24 files, two at a time.
         transcode = {
           dryRun = false;
           maxPerRun = 24;
@@ -881,14 +558,11 @@
           openFirewall = false;
         };
 
-        # Each tag needs a Traccar device whose identifier is the tag's UUID —
-        # the feeder logs the UUID it is reporting for, which is where to read
-        # them off.
+        # Each tag needs a Traccar device whose identifier is the tag's UUID
+        # (the feeder logs it).
         tile-traccar = {
           email = "larsvandartel73@gmail.com";
-          # The phone the tags are discovered by. It carries the Tile app
-          # rather than being a tag, so its "position" is just wherever the
-          # phone is — which Traccar already gets from the OsmAnd client.
+          # The phone carrying the Tile app; Traccar gets it via OsmAnd.
           ignoredTiles = ["p!fb79d495c0cb30211d73a246a5cc3c13"];
         };
       };

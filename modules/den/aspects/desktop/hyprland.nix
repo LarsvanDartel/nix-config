@@ -18,17 +18,13 @@
         withUWSM = true;
       };
 
-      # Offer ONLY the uwsm-managed entry to the greeter. withUWSM also installs a
-      # plain `hyprland.desktop`; listing both is what produced duplicate rows.
-      # Gated on the program actually being enabled, so a specialisation that
-      # turns Hyprland off (see hosts/voyager.nix) drops the entry too.
+      # Only the uwsm entry (withUWSM also installs a plain one → duplicate
+      # rows); gated so a specialisation disabling Hyprland drops it.
       cosmos.profiles.desktop.addons.greetd.sessions = lib.optional config.programs.hyprland.enable {
         name = "hyprland.desktop";
         path = "${config.programs.hyprland.package}/share/wayland-sessions/hyprland-uwsm.desktop";
       };
 
-      # Same "only when this compositor is actually the active one" gating as
-      # the greetd session entry above — see core.yubikey for the consumer.
       cosmos.profiles.desktop.lockCommand = lib.mkIf config.programs.hyprland.enable "hyprlock";
     };
   };

@@ -23,7 +23,6 @@ in {
       concatStringsCommaIfExists = stringList:
         optionalString (builtins.length stringList > 0) (concatStringsSep "," stringList);
 
-      # sabnzbd's `pp`, which it stores per category as a number.
       ppValues = {
         none = 0;
         repair = 1;
@@ -74,11 +73,9 @@ in {
         };
         whitelistRanges = mkOption {
           type = listOf str;
-          # sabnzbd's `local_ranges`. Empty falls back to RFC1918, which
-          # excludes NetBird's CGNAT peer range — once the edge reached this
-          # over the mesh, sabnzbd itself denied every request. Setting this
-          # *replaces* the fallback, so the private ranges must be repeated
-          # here or the LAN loses access.
+          # Empty falls back to RFC1918, excluding NetBird's CGNAT range, so
+          # sabnzbd denied the mesh. Setting this *replaces* the fallback, so
+          # the private ranges must be repeated here.
           default = [
             "127.0.0.0/8"
             "10.0.0.0/8"
@@ -119,12 +116,9 @@ in {
           inherit (cfg) package user secretFiles;
           configFile = null;
 
-          # nixpkgs installs sabnzbd.ini mode 0400, but sabnzbd writes its own
-          # config constantly (web UI changes, quota counters) — without this
-          # every write fails. Declarative config still wins: the pre-start
-          # merge feeds the live ini first and generated settings second, and
-          # later files win. Caveat: a key nix stops declaring keeps its last
-          # runtime value rather than the default.
+          # sabnzbd writes its own config constantly; nixpkgs' 0400 breaks
+          # that. Declarative settings still win on merge, but a key nix stops
+          # declaring keeps its last runtime value.
           allowConfigWrite = true;
           group = "media";
           stateDir = removePrefix "/var/lib/" cfg.stateDir;
@@ -132,12 +126,9 @@ in {
             recursiveUpdate
             {
               misc = {
-                # Must sit inside `misc` — at top level it lands above the
-                # first section header and is silently ignored. 4 = "web UI
-                # reachable from outside"; anything lower makes check_access
-                # inspect X-Forwarded-For, where netbird-proxy puts the
-                # visitor's public address, so sabnzbd denied browser requests.
-                # The gate in front is SSO and CrowdSec.
+                # Must sit inside `misc` (top level is silently ignored). Below 4,
+                # check_access inspects X-Forwarded-For (the visitor's public
+                # address via netbird-proxy) and denies browsers.
                 inet_exposure = 4;
 
                 host =
@@ -164,8 +155,7 @@ in {
               };
               categories =
                 {
-                  # The default category, which every other one falls back to
-                  # for anything it leaves unset — hence `pp` here above all.
+                  # Every other category falls back to this for unset keys, incl. `pp`.
                   "*" = {
                     name = "*";
                     order = 0;
@@ -203,11 +193,8 @@ in {
           ];
         };
 
-        # Room for an NZB POST: radarr uploads NZBs to /api?mode=addfile
-        # through this vhost, and a UHD remux NZB runs well past nixpkgs'
-        # global 10m client_max_body_size — nginx 413'd exactly the largest
-        # releases. Finite (not 0) because the port is published and nginx
-        # spools request bodies to disk.
+        # UHD remux NZBs exceed nixpkgs' 10m client_max_body_size (nginx 413'd
+        # radarr's addfile). Finite since the port is published and nginx spools to disk.
         services.nginx.virtualHosts = mkIf cfg.vpn.enable (lib.mkMerge [
           (vpnVhost cfg.uiPort)
           {

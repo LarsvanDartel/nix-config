@@ -21,10 +21,7 @@
 
       xdg.mimeApps = mkIf cfg.defaultApplication {
         enable = true;
-        # A curated subset, not mpv.desktop's full ~80 entries: reading the
-        # MimeType from the package would be import-from-derivation, forcing
-        # mpv to build during every host's evaluation. Missed containers
-        # still open from mpv itself.
+        # Curated subset: reading mpv.desktop's MimeType would be IFD.
         defaultApplications = let
           mpv = ["mpv.desktop"];
         in {

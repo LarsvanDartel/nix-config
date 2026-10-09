@@ -13,16 +13,9 @@ in {
       enable = true;
       configType = "lua";
 
-      # OFF, and it has to stay off: the NixOS side runs Hyprland under uwsm
-      # (programs.hyprland.withUWSM, see desktop/hyprland.nix), which owns the
-      # session target. Home Manager's own integration is fatal on top of that:
-      # its exec-once stops and restarts hyprland-session.target, which carries
-      # PropagatesStopTo=graphical-session.target — and uwsm's
-      # wayland-session@<compositor>.target is BindsTo= that target, so the
-      # *stop* half tears the whole session down microseconds after it comes up:
-      # greeter -> login -> black -> greeter, exit 0, no error anywhere. uwsm
-      # already does everything this option would (env exports, xdg-autostart
-      # target), hence no enableXdgAutostart either.
+      # Must stay off: uwsm owns the session target, and HM's restart of
+      # hyprland-session.target propagates a stop that tears the session down
+      # (greeter -> black -> greeter, no error). Hence no enableXdgAutostart either.
       systemd.enable = false;
       xwayland.enable = true;
 
@@ -96,12 +89,8 @@ in {
             shadow.enabled = false;
           };
 
-          # No news screen, no donation nag — not cosmetic. On a version change
-          # Hyprland spawns `hyprland-update-screen --new-version` as a child
-          # of its own unit; that Qt app cannot reach the compositor socket yet
-          # and SIGABRTs — a real coredump under
-          # wayland-wm@hyprland.desktop.service, timed to the second with the
-          # session dying (first fired by the 0.56.2 bump).
+          # Not cosmetic: hyprland-update-screen SIGABRTs on a version change
+          # and takes the session with it (first seen at 0.56.2).
           ecosystem = {
             no_update_news = true;
             no_donation_nag = true;

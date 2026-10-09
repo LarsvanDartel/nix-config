@@ -1,10 +1,6 @@
 # services.smartd — tell me which disk is dying before it dies.
 #
-# SMART monitoring for endeavour's nine disks (two raidz1 vdevs, hot spare
-# wwn-0x5000cca02f3cabb0 pulled in by ZFS on fault). Host-local, not in
-# roles.server: gaia's disk is virtual and pioneer's is an SD card — no SMART
-# on either. Notifications go to ntfy via smartd's run-a-program mail hook
-# rather than a mail stack.
+# Host-local to endeavour: gaia's disk is virtual and pioneer's an SD card.
 {inputs, ...}: {
   den.aspects.services.smartd.nixos = {
     config,
@@ -18,9 +14,7 @@
     cfg = config.cosmos.services.smartd;
     notifyCfg = config.cosmos.system.notifyFailure;
 
-    # Reads the message smartd would have mailed and posts it instead. Runs as
-    # root, from smartd, so it can read the sops secret directly — unlike
-    # notify-failure@, which is DynamicUser and needs LoadCredential.
+    # Runs as root from smartd, so it can read the sops secret directly.
     notify = pkgs.writeShellApplication {
       name = "smartd-ntfy";
       runtimeInputs = with pkgs; [curl coreutils];
@@ -96,13 +90,10 @@
     };
 
     config = {
-      # Also declared by core.notify-failure (identical definitions merge);
-      # repeating it keeps this aspect working on a host without a notifier.
+      # Also declared by core.notify-failure; keeps this working without it.
       sops.secrets."keys/ntfy/password".sopsFile =
         builtins.toString inputs.nix-secrets + "/hosts/common/secrets.yaml";
 
-      # The module runs the daemon from the store and omits `smartctl` from
-      # PATH — the tool you want the moment an alert arrives.
       environment.systemPackages = [pkgs.smartmontools];
 
       services.smartd = {
@@ -119,8 +110,7 @@
           })
           cfg.devices;
 
-        # The mailer is curl; sender/recipient are required by the module and
-        # discarded by the script.
+        # sender/recipient are required by the module and ignored by the script.
         notifications.mail = {
           enable = true;
           sender = "smartd@${config.networking.hostName}";

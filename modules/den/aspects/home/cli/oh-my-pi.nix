@@ -25,8 +25,7 @@
           dark = "titanium";
           light = "light";
         };
-        # OMP's own onboarding marker — carried over so a fresh install
-        # does not replay the setup wizard.
+        # Prevents a fresh install replaying the setup wizard.
         setupVersion = 2;
       };
     };

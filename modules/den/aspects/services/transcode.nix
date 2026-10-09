@@ -1,21 +1,8 @@
 # services.transcode — periodically re-encode library video to AV1 on the GPU.
 #
-# The point is reclaimed space, not uniformity: each file is replaced with an
-# AV1 copy of itself — same path, name, audio, subtitles. Three properties
-# make an unattended, destructive job like this tolerable: every output is
-# probed before it is allowed to replace anything (a lost stream or a short
-# output is discarded, never swapped in); a file that does not actually
-# shrink by `minSaving` is put back and marked so it is not tried again
-# (which is what makes it safe to point at HEVC); and the work is bounded —
-# `maxPerRun` files a night, `parallel` at a time, stopping early if the
-# pool is filling, counting encodes in flight (each holds a second copy of
-# its source).
-#
-# The encoder is the Arc A310's, via jellyfin-ffmpeg — deliberately, not
-# nixpkgs' ffmpeg: intel-media-driver 26.1.6 exports __vaDriverInit_1_24 and
-# needs libva >= 2.24, while nixpkgs' ffmpeg links libva 2.22.0 and cannot
-# load the driver at all. jellyfin-ffmpeg carries libva 2.24.0 of its own;
-# the package choice is the whole fix, nothing else on the host changes.
+# Destructive but guarded: every output is probed before replacing anything,
+# files that do not shrink by `minSaving` are restored and marked, and each
+# night is bounded by `maxPerRun`, `parallel` and free pool space.
 {den, ...}: {
   den.aspects.services.transcode = {
     includes = with den.aspects.services; [
@@ -39,13 +26,10 @@
       user = "transcode";
       stateDir = "/var/lib/transcode";
 
-      # Not pkgs.ffmpeg — see the header. This is the only ffmpeg on the host
-      # that can open the Arc.
+      # Not pkgs.ffmpeg: intel-media-driver 26.1.6 needs libva >= 2.24, which
+      # nixpkgs' ffmpeg (libva 2.22) lacks; jellyfin-ffmpeg carries 2.24.
       ffmpeg = pkgs.jellyfin-ffmpeg;
 
-      # Which *arr owns which library, so a replaced file can be reported to
-      # the right one. Same host, so unlike the cross-host cases elsewhere in
-      # this repo these can be read from config instead of duplicated.
       arrs = [
         {
           name = "radarr";
@@ -61,10 +45,7 @@
         }
       ];
 
-      # The script is a plain file rather than an inline heredoc: it is
-      # ~350 lines of python, and buried in a nix string it loses syntax
-      # highlighting, line numbers that match the traceback, and the
-      # ability to be run by hand. Underscored so import-tree skips it.
+      # Underscored so import-tree skips it.
       script = ./_transcode.py;
     in {
       options.cosmos.services.transcode = {
@@ -234,12 +215,8 @@
           }
         ];
 
-        # `media` as the *primary* group, exactly as the arrs do it in
-        # arr/_lib.nix — not a supplementary one. A replaced file is created by
-        # this service, so it takes this group, and anything landing as
-        # transcode:transcode would be unwritable by the arrs that own the
-        # rest of the library. render/video are what reach the GPU; no
-        # existing user had both halves, which is why this user exists.
+        # `media` as the *primary* group, as the arrs do: replaced files must
+        # stay writable by them. render/video reach the GPU.
         users.users.${user} = {
           isSystemUser = true;
           group = "media";
@@ -250,10 +227,7 @@
         systemd.services.transcode = {
           description = "Re-encode library video to AV1";
           after = ["network-online.target" "radarr.service" "sonarr.service"];
-          # Ordering after network-online.target without wanting it is an
-          # eval warning, and `abort-on-warn` makes that a hard build failure
-          # on a machine that trusts this flake's config — so it built here and
-          # would not have built for anyone else.
+          # After without wants is an eval warning, fatal under abort-on-warn.
           wants = ["network-online.target"];
 
           environment = {
@@ -287,9 +261,7 @@
             Group = "media";
             ExecStart = "${pkgs.python3}/bin/python ${script}";
 
-            # The arrs' own config.xml, which is where their API keys live.
-            # systemd reads them as root and hands over a private copy, so this
-            # service never needs read access to the arr state directories.
+            # Read as root by systemd, so no access to the arr state dirs.
             LoadCredential =
               map (a: "${a.name}-config:${arr.stateDir}/${a.name}/config.xml")
               arrs;
@@ -297,14 +269,11 @@
             StateDirectory = baseNameOf stateDir;
             WorkingDirectory = stateDir;
 
-            # Playback and scrubs win. The encode is GPU-bound anyway; what
-            # actually matters is not competing for the array.
             Nice = 19;
             IOSchedulingClass = "idle";
 
-            # PrivateDevices would hide /dev/dri, and MemoryDenyWriteExecute
-            # breaks the GPU userspace, so neither is set here — the render
-            # node is allowed explicitly instead.
+            # PrivateDevices hides /dev/dri and MemoryDenyWriteExecute breaks the
+            # GPU userspace, so neither is set.
             DeviceAllow = ["${cfg.device} rw"];
             ProtectSystem = "strict";
             ReadWritePaths = cfg.libraries ++ [stateDir];
@@ -330,10 +299,7 @@
           };
         };
 
-        # Nightly rather than interval-style: this competes with playback for
-        # the same GPU, so it wants a quiet window, not a fixed cadence. Not
-        # Persistent — a missed night is skipped, not turned into a burst of
-        # encodes at the next boot.
+        # Not Persistent: a missed night is skipped, not a burst at boot.
         systemd.timers.transcode = {
           description = "Nightly library re-encode";
           wantedBy = ["timers.target"];

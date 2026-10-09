@@ -9,15 +9,9 @@
   rgb = color: "rgb(${color})";
   rgba = color: alpha: "rgba(${color}${alpha})";
 in {
-  # Stylix's Hyprland target stays off in Lua mode — not for the old reason
-  # (the top-level-keys complaint is fixed upstream: stylix branches on
-  # configType now), but the key *form*. Stylix emits the flat hyprlang names
-  # ("col.active_border"), which exist only in the flat HL.ConfigValueTypes
-  # namespace; the table handed to hl.config({}) is the nested HL.ConfigOpt.*
-  # shape, which has no "col.active_border" field at all. The nesting below is
-  # the shape the Lua API actually declares (verified against
-  # hyprland-0.56.2's hl.meta.lua) — re-check that stub before dropping this;
-  # if stylix ever emits nested `col`, the whole file goes.
+  # Stylix's Hyprland target stays off in Lua mode: it emits flat hyprlang names
+  # ("col.active_border") but hl.config({}) takes the nested HL.ConfigOpt shape
+  # (per hyprland-0.56.2's hl.meta.lua). Drop this file if stylix emits nested `col`.
   config = mkIf config.wayland.windowManager.hyprland.enable {
     stylix.targets.hyprland.enable = false;
 
@@ -44,9 +38,7 @@ in {
 
       misc.background_color = rgb colors.base00;
 
-      # Stylix themes this and we were silently dropping it: disabling the
-      # target loses everything it sets, not just the parts that rendered
-      # wrong, so shadows kept Hyprland's default black instead of base00.
+      # Disabling the target loses this too; shadows would stay default black.
       decoration.shadow.color = rgba colors.base00 "99";
     };
   };

@@ -2,13 +2,8 @@
 <!--
   The Minecraft control page served by services/minecraft-control.nix.
 
-  Deliberately free of nix interpolation so it stays a file a browser can open
-  and a linter can read: the server list arrives from servers.json, which the
-  aspect generates from cosmos.services.minecraft.control.servers and nginx
-  serves next to this file. Changing the list therefore never touches this file.
-
-  Everything is same-origin — /hooks/ is proxied to webhook by the same vhost —
-  so there is no CORS, no API base URL and no second published port.
+  Deliberately free of nix interpolation; the server list comes from
+  servers.json.
 -->
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
@@ -30,8 +25,7 @@
   .up { background: #1d3a24; color: #7fd18f }
   .dn { background: #3a1d1d; color: #d18f8f }
 
-  /* Resource line: three fixed cells so the numbers do not jump about as they
-     change width. */
+  /* Fixed cells so the numbers do not jump about as they change width. */
   .m { display: flex; flex-wrap: wrap; gap: 1.25rem; margin: .75rem 0 0;
        font-size: .85rem; color: var(--dim) }
   .m b { font-weight: 600; color: var(--fg); font-variant-numeric: tabular-nums }
@@ -67,14 +61,11 @@
 <script>
   const el = document.getElementById("servers");
 
-  // null means the gate refused this server for this person. nginx decides
-  // that from X-NetBird-Groups; the page only mirrors the answer, so there is
-  // nothing here to get wrong in a way that grants anything.
+  // null means nginx's group gate refused this server; the page only mirrors it.
   async function hook(name, body) {
     const r = await fetch("hooks/" + name, {
       method: "POST",
-      // text/plain keeps this a simple request: no preflight, and the console
-      // line reaches the hook byte for byte as raw-request-body.
+      // text/plain: no preflight, body reaches the hook byte for byte.
       headers: body === undefined ? {} : { "Content-Type": "text/plain" },
       body,
     });
@@ -82,9 +73,7 @@
     return (await r.text()).trim();
   }
 
-  // systemctl is-active's vocabulary, spelled for people who are here to play
-  // Minecraft. Anything unrecognised is shown verbatim rather than guessed at
-  // — "failed" in particular must not read as "stopped".
+  // Unrecognised states are shown verbatim — "failed" must not read as "stopped".
   const LABEL = {
     active: "running",
     inactive: "stopped",
@@ -97,25 +86,15 @@
 
   const gib = n => (n / 1073741824).toFixed(1) + " GiB";
 
-  // Per-server view state. `cpu` holds the previous CPUUsageNSec sample and the
-  // wall clock it was taken at: the counter is cumulative, so a percentage only
-  // exists as a difference between two polls. The first poll therefore shows a
-  // dash rather than a made-up number.
+  // `cpu` is the previous cumulative CPUUsageNSec sample; first poll shows a dash.
   const state = new Map();
 
-  // Returns cores, not a percentage.
-  //
-  // CPUUsageNSec counts every thread, so a JVM across 72 cores reported things
-  // like "827%" — true (8.3 cores busy) and useless to read. Expressing it
-  // against the whole machine is no better: the same figure becomes 11%, and
-  // an idle server 0.8%, so the number is either alarming or invisible and
-  // never informative. "8.3 cores" is the thing a person can act on.
+  // Cores, not a percentage: "827%" or "11% of the machine" are both unreadable.
   function cpuCores(name, cpuNs) {
     const now = Date.now();
     const prev = state.get(name).cpu;
     state.get(name).cpu = { cpuNs, at: now };
-    // cpuNs going backwards means the cgroup was replaced — the unit restarted
-    // between polls — so there is no interval to measure across.
+    // cpuNs going backwards means the unit restarted between polls.
     if (!prev || cpuNs === null || prev.cpuNs === null || cpuNs < prev.cpuNs) return null;
     const elapsedNs = (now - prev.at) * 1e6;
     if (elapsedNs <= 0) return null;
@@ -134,13 +113,9 @@
     let info;
     try {
       const raw = await hook("info-" + name);
-      // Access can be taken away between page loads; treat it like any other
-      // failure to read rather than leaving stale numbers on screen.
       if (raw === null) throw new Error("forbidden");
       info = JSON.parse(raw);
     } catch (err) {
-      // warn, not debug: this is the case worth seeing without having turned
-      // verbose logging on first.
       console.warn("info-" + name + " failed", err);
       v.tag.textContent = "unreachable";
       v.tag.className = "t dn";
@@ -161,22 +136,14 @@
         : cores.toFixed(2) + " of " + info.cpus + " cores (" +
           ((cores / info.cpus) * 100).toFixed(1) + "% of the machine)";
 
-    // Every poll, at debug level — a devtools filter away, and off the console
-    // by default, since this fires once per server every POLL_MS.
-    //
-    // `ms` is here because it is what the two bugs this page has had both
-    // showed up as. A 3.2s reply meant a player lookup waiting on a query
-    // protocol the servers do not run; the round-trip is the number that says
-    // so. cpuCores is null on the first poll by construction: it is a
-    // difference between two samples and there is nothing yet to subtract.
+    // `ms` exposes slow hooks, the symptom of both past bugs on this page.
     console.debug("info-" + name, {
       ...info,
       cpuCores: cores,
       ms: Math.round(performance.now() - started),
     });
 
-    // The status ping only carries a sample, and vanilla caps it at 12 — so
-    // this is "who is on" for a small server and a partial list for a busy one.
+    // The status ping carries only a sample, capped at 12 by vanilla.
     const names = (p && p.sample || []).filter(Boolean);
     v.who.textContent = names.length ? names.join(", ") : "";
 
@@ -189,8 +156,7 @@
     const atBottom =
       v.log.scrollHeight - v.log.scrollTop - v.log.clientHeight < 40;
     v.log.textContent = (await hook("logs-" + name)) || "(no log yet)";
-    // Only chase the bottom if that is where the reader already was, so
-    // scrolling back through the log is not yanked away on the next poll.
+    // Only follow the bottom if the reader was already there.
     if (atBottom) v.log.scrollTop = v.log.scrollHeight;
   }
 
@@ -199,11 +165,7 @@
     v.buttons.forEach(b => b.disabled = true);
     v.tag.textContent = verb === "start" ? "starting…" : "stopping…";
     await hook(verb + "-" + name);
-    // Wait for the state we asked for, not for any settled state. The request
-    // only drops a flag file — a path unit has to notice it, and the server
-    // takes a while either way — so for the first seconds of a stop the unit
-    // is still legitimately "active", and treating that as the answer would
-    // report success before anything had happened.
+    // Wait for the requested state: a stop stays "active" for a few seconds.
     for (let i = 0; i < 60; i++) {
       await new Promise(r => setTimeout(r, 1500));
       const s = await refresh(name);
@@ -217,11 +179,8 @@
     const cmd = v.input.value.trim();
     if (!cmd) return;
     v.input.value = "";
-    // Minecraft's console takes commands without the leading slash; typing it
-    // is the habit everyone has from in-game, so accept both.
     v.sent.textContent = await hook("cmd-" + name, cmd.replace(/^\//, ""));
-    // Give the server a moment to answer into the log, which is where the
-    // reply to a console command actually appears.
+    // Console replies appear in the log.
     setTimeout(() => loadLog(name), 400);
   }
 
@@ -232,9 +191,6 @@
     const head = document.createElement("div");
     head.className = "n";
     const label = document.createElement("span");
-    // textContent, not innerHTML: a server name comes from the nix config
-    // rather than from a user, but building the DOM this way means it never
-    // matters whether that stays true.
     label.textContent = name;
     const tag = document.createElement("span");
     tag.className = "t";
@@ -284,7 +240,6 @@
     sent.className = "sent";
 
     details.append(summary, log, consoleRow, sent);
-    // Opening the log should not wait a whole poll interval to fill in.
     details.ontoggle = () => { if (details.open) loadLog(name); };
 
     d.append(head, metrics, who, ...buttons, details);
@@ -293,7 +248,6 @@
     state.set(name, {
       tag, log, input, sent, buttons,
       players: cells.players, mem: cells.mem, cpuCell: cells.cpu,
-      // Previous CPUUsageNSec sample; null until there are two to compare.
       cpu: null,
     });
   }
@@ -305,8 +259,6 @@
       if (!user) return;
       el.className = "who";
       el.textContent = "signed in as " + user;
-      // The groups are worth showing: "why can I not see the other server" is
-      // otherwise a question only somebody with kanidm access can answer.
       if (groups) el.title = groups.split(",").join("\n");
     } catch { /* the page is still usable without knowing who you are */ }
   }
@@ -316,14 +268,9 @@
 
     const declared = await (await fetch("servers.json")).json();
 
-    // Ask about each server before drawing it. The 403 comes from the same
-    // nginx rule that guards every other hook, so what is on screen is exactly
-    // what this person may act on — there is no second, weaker notion of
-    // visibility to keep in step with the real one.
-    // In parallel, not one after another. Every request here is independent,
-    // and doing them in sequence meant the last server's card appeared a
-    // multiple of one round-trip after the first — which looked exactly like
-    // that server failing to load.
+    // The 403 comes from the same nginx rule guarding every hook, so what is
+    // shown is exactly what this person may act on. Parallel, or later cards
+    // look like failures to load.
     const allowed = await Promise.all(
       declared.map(s => hook("info-" + s).then(r => r !== null).catch(() => false))
     );
@@ -340,12 +287,8 @@
 
     for (const s of servers) card(s);
 
-    // One timer for every server rather than one each, so the requests stay in
-    // step and a slow server cannot make the page drift out of phase — but the
-    // servers within a round go together, so a round costs one round-trip
-    // rather than one per server. That matters for the CPU figure especially:
-    // it is a difference between two samples, so nothing at all is displayed
-    // until the second round completes.
+    // One shared timer, servers in parallel per round, so CPU (needs two
+    // samples) appears after one round-trip, not one per server.
     const tick = async () => {
       try {
         await Promise.all(

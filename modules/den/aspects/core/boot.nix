@@ -1,6 +1,4 @@
-# core.boot — grub bootloader + the cosmos.system.boot options. Opt-in per
-# host (hosts without a bootloader, e.g. the Pi, don't include it), so NOT in
-# roles.default.
+# core.boot — grub bootloader + the cosmos.system.boot options. Opt-in per host.
 {...}: {
   den.aspects.core.boot.nixos = {
     config,

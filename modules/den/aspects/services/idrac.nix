@@ -1,20 +1,9 @@
 # services.idrac — the BMC, reachable over the mesh.
 #
-# Published from pioneer, on the same LAN as the BMC and sharing nothing else
-# with endeavour: iDRAC cannot join the mesh itself, and the only other
-# always-on machine on that LAN is endeavour — the host the BMC exists to
-# recover. That circular dependency turned a 56-second watchdog reset into a
-# seven-hour outage on 2026-08-28.
-#
-#   * Mesh only; nothing on gaia's netbird.services. A BMC grants power
-#     control, a console and a foothold inside the LAN, and the usual
-#     NetBird identity gate authenticates against kanidm — on endeavour, down
-#     in exactly the scenario this is for (gaia.nix documents the same trap
-#     for gatus).
-#   * TLS terminates here. The BMC's self-signed cert has no subjectAltName
-#     and can never match the name it is reached by; nginx serves the real
-#     wildcard and talks to the BMC with verification off — one switch away
-#     on the LAN.
+# Published from pioneer, not endeavour (the host the BMC exists to
+# recover): that circular dependency turned a 56s watchdog reset into a
+# seven-hour outage on 2026-08-28. Mesh only, no NetBird identity gate: it
+# authenticates against kanidm on endeavour, down exactly when this is needed.
 {den, ...}: {
   den.aspects.services.idrac = {
     includes = with den.aspects.services; [nginx netbird.client];
@@ -79,13 +68,11 @@
       };
 
       config = {
-        # Opened on the netbird interface alone. Nothing on the LAN side needs
-        # this — a machine on the LAN can reach the BMC directly.
+        # LAN machines reach the BMC directly.
         cosmos.services.netbird.client.exposedPorts = [cfg.port];
 
-        # Every request paid a fresh TLS handshake to the BMC — 0.53-0.70s
-        # TTFB against 0.03s for the client's own TLS to this host, and the
-        # UI pulls about eighty files. A keepalive pool makes it once.
+        # A fresh TLS handshake to the BMC per request cost 0.5-0.7s TTFB
+        # across ~80 files; the keepalive pool makes it once.
         services.nginx.upstreams.idrac = {
           servers."${cfg.address}:443" = {};
           extraConfig = ''
@@ -118,9 +105,8 @@
 
           locations."/" = {
             proxyPass = "https://idrac";
-            # Not proxyWebsockets: it pins Connection to a map that closes
-            # the upstream connection on every ordinary request. The
-            # equivalent headers below use a map that does not.
+            # Not proxyWebsockets: its map closes the upstream connection on
+            # every ordinary request; the headers below use one that does not.
             proxyWebsockets = false;
             extraConfig = ''
               # The BMC's certificate is self-signed and names a service tag,

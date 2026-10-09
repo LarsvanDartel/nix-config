@@ -1,10 +1,8 @@
 # Shared by the *arr aspects. Underscored so the import-tree leaves it alone:
 # a plain expression to `import`, not a flake-parts module.
 rec {
-  # nginx vhost for a service inside the VPN namespace. A confined service
-  # binds the namespace side of the bridge (192.168.15.1), unroutable from
-  # outside; this proxies the same port in the root namespace so the port
-  # means the same thing whether or not the service is confined.
+  # Confined services bind the namespace side of the bridge (192.168.15.1),
+  # unroutable from outside; this proxies the same port in the root namespace.
   vpnVhost = port: {
     "127.0.0.1:${toString port}" = {
       listen = [
@@ -21,11 +19,7 @@ rec {
     };
   };
 
-  # radarr/sonarr/lidarr are the same service three times over (same nixpkgs
-  # module shape; only name, port and library dir differ) — each file supplies
-  # those three values, this supplies the rest. Anything with its own shape
-  # (prowlarr's ExecStart override, bazarr's hand-rolled unit) is longhand in
-  # its own file.
+  # radarr/sonarr/lidarr: only name, port and library dir differ.
   mkSimpleArr = {
     name,
     defaultPort,

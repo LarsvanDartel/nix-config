@@ -1,15 +1,9 @@
 # services.ddns — publish this host's public address as a name.
 #
-# Exists for gaia's crowdsec whitelist: the home address is dynamic, and a
-# checked-in literal drifts into whitelisting whoever the ISP hands the
-# address to next. crowdsec resolves names for exactly this (s01-whitelist
-# postoverflow, services/crowdsec.nix); this module keeps the name true.
-# Runs on endeavour, the host actually behind the home connection — gaia
-# only sees that address as a source IP.
-#
-# A crowdsec ban is not a 403: the bouncer drops in nftables, so it
-# black-holes the WireGuard handshake too — losing the mesh from home loses
-# the path to the fix.
+# For gaia's crowdsec whitelist (services/crowdsec.nix), which resolves this
+# name; a checked-in literal of the dynamic home address would drift into
+# whitelisting a stranger. Runs on endeavour, the host behind that address.
+# A crowdsec ban black-holes WireGuard too — losing the mesh from home.
 {...}: {
   den.aspects.services.ddns.nixos = {
     config,
@@ -62,9 +56,8 @@
     config = mkIf cfg.enable {
       sops.secrets.${cfg.secret} = {};
 
-      # Upstream orders this After=network.target only. On the 2026-08-24
-      # reboot it ran before DNS answered, failed, and (Restart=no oneshot)
-      # was not retried until the timer.
+      # Upstream orders this After=network.target only; it ran before DNS
+      # answered and (Restart=no oneshot) wasn't retried until the timer.
       systemd.services.cloudflare-dyndns = {
         wants = ["network-online.target"];
         after = ["network-online.target" "nss-lookup.target"];
@@ -75,12 +68,9 @@
         apiTokenFile = config.sops.secrets.${cfg.secret}.path;
         inherit (cfg) domains;
         ipv4 = true;
-        # The v6 prefix rotates independently of the v4 address — a stale AAAA
-        # would send traffic nowhere; crowdsec matches the v4 source address.
+        # The v6 prefix rotates independently; crowdsec matches the v4 source.
         ipv6 = false;
         proxied = false;
-        # Often enough to matter after a re-address, rarely enough to stay well
-        # inside Cloudflare's rate limits.
         frequency = "*:0/15";
       };
     };

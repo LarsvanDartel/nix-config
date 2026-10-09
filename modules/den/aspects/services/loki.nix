@@ -1,11 +1,7 @@
 # services.loki — one place to grep four hosts' journals from.
 #
-# On endeavour; data on /tank because logs grow without bound and the 250 GB
-# system SSD already carries every service's state. Deliberately NOT in
-# cosmos.system.impermanence.persist: /tank is a ZFS pool outside the persist
-# layer, and an entry there bind-mounts /persist over it — putting the logs
-# back on the SSD (hosts/endeavour.nix documents this twice). Shipped to by
-# endeavour, gaia, voyager; not pioneer (SD-card watchdog, see alloy.nix).
+# Data on /tank, deliberately NOT in cosmos.system.impermanence.persist: an
+# entry there bind-mounts /persist over it, putting the logs back on the SSD.
 {den, ...}: {
   den.aspects.services.loki = {
     includes = [den.aspects.services.netbird.client];
@@ -63,8 +59,7 @@
             server = {
               http_listen_address = "0.0.0.0";
               http_listen_port = cfg.port;
-              # Quiet: loki logs every push at info, and this host ships its own
-              # journal to it — it would log about logging.
+              # loki logs every push at info, and this host ships to itself.
               log_level = "warn";
             };
 

@@ -1,17 +1,10 @@
 # services.prometheus — the metrics store, its alert rules, and the bridge
 #
-# On endeavour, the only host with room (gaia: 3.7 GiB RAM / 21 GB free;
-# pioneer: 866 MiB / SD card). Data stays on the SSD, not /tank: 90 days of
-# these series is ~3 GB against 146 GB free, and the nixpkgs module hardcodes
-# --storage.tsdb.path under its StateDirectory — not worth fighting for
-# headroom that is not needed. Loki is the one that will want the array.
-# voyager deliberately absent: see services/node-exporter.nix.
+# On endeavour, the only host with room. Data stays on the SSD: the nixpkgs
+# module hardcodes --storage.tsdb.path under its StateDirectory.
 #
-# Intentional asymmetry with core.notify-failure: that reports unit
-# *transitions* per host and survives this host dying; this reports states
-# and thresholds (a disk filling, a pool degrading, a host gone silent),
-# which no per-host hook can see. The overlap on "unit failed" is cheaper
-# than the gap would be.
+# Complements core.notify-failure: that reports unit transitions and survives
+# this host dying; this reports states and thresholds no per-host hook sees.
 {
   den,
   inputs,
@@ -79,9 +72,7 @@
       };
 
       config = {
-        # The bridge authenticates to ntfy as the same account every host
-        # publishes as. A template rather than a plain secret because
-        # alertmanager-ntfy wants credentials inside its YAML.
+        # A template: alertmanager-ntfy wants credentials inside its YAML.
         sops = {
           secrets."keys/ntfy/password".sopsFile =
             builtins.toString inputs.nix-secrets + "/hosts/common/secrets.yaml";
@@ -93,8 +84,6 @@
           '';
         };
 
-        # Static prometheus user, no DynamicUser, so this is the ordinary
-        # persist shape and not the /var/lib/private EBUSY case that ntfy hit.
         cosmos.system.impermanence.persist.directories = [
           {
             directory = "/var/lib/${config.services.prometheus.stateDir}";
@@ -117,8 +106,7 @@
           scrapeConfigs = [
             {
               job_name = "node";
-              # One static_config per peer, so `instance` is the bare peer name
-              # rather than a host:port nobody can read off a graph.
+              # One static_config per peer so `instance` is the bare peer name.
               static_configs =
                 map (h: {
                   targets = ["${h}.${dnsDomain}:${toString nodePort}"];
@@ -127,8 +115,6 @@
                 cfg.targets;
             }
             {
-              # Already exported by netbird management: peer counts, login
-              # expiry and gRPC health for the mesh's control plane.
               job_name = "netbird";
               static_configs = [
                 {
@@ -178,8 +164,6 @@
                       };
                     }
                     {
-                      # pioneer was at 89% before the journald cap, so this is
-                      # not hypothetical.
                       alert = "DiskFilling";
                       expr = ''
                         100 - (node_filesystem_avail_bytes{fstype!~"tmpfs|ramfs|overlay"}
@@ -193,8 +177,6 @@
                       };
                     }
                     {
-                      # The gap the plan called out: a raidz1 losing a disk
-                      # currently produces one journal line and nothing else.
                       alert = "ZfsPoolUnhealthy";
                       expr = "node_zfs_zpool_state{state!=\"online\"} > 0";
                       for = "5m";
@@ -205,11 +187,8 @@
                       };
                     }
                     {
-                      # core.notify-failure catches a backup that *fails*;
-                      # this catches one that stops being attempted (masked
-                      # unit, dead timer, repository quietly gone) — silent
-                      # by construction, discovered exactly when a restore
-                      # is needed.
+                      # Catches a backup that stops being attempted, which
+                      # core.notify-failure cannot see.
                       alert = "ResticStale";
                       expr = ''
                         time() - node_systemd_timer_last_trigger_seconds{name="restic-backups-stardust.timer"} > 172800
@@ -245,14 +224,10 @@
             configuration = {
               route = {
                 receiver = "ntfy";
-                # Grouped so a host going down produces one notification and
-                # not one per alerting rule that trips as a consequence.
                 group_by = ["alertname" "instance"];
                 group_wait = "30s";
                 group_interval = "5m";
-                # Deliberately long. A phone notification repeated every four
-                # hours is a reminder; every five minutes is something you mute,
-                # and a muted channel is worse than no channel.
+                # Deliberately long: a channel that nags gets muted.
                 repeat_interval = "12h";
               };
               receivers = [
@@ -267,8 +242,6 @@
           };
         };
 
-        # Alertmanager speaks its own webhook schema; ntfy speaks its own. This
-        # translates, and is packaged for exactly this job.
         services.prometheus.alertmanager-ntfy = {
           enable = true;
           settings = {
@@ -281,8 +254,6 @@
               };
             };
           };
-          # Credentials arrive as a systemd credential, so the password never
-          # reaches the store or the unit file.
           extraConfigFiles = [config.sops.templates."alertmanager-ntfy-auth.yml".path];
         };
 

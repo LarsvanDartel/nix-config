@@ -1,8 +1,5 @@
-# core.journald — bound the journal. The nixpkgs default (10% of the
-# filesystem, capped 4G) evicts silently and was costing gaia a tenth of its
-# disk and pioneer a third of its remaining SD-card space. Bounded by *time*
-# as well as size: size answers "how much disk", time answers "how far back
-# can I look"; whichever limit is hit first wins.
+# core.journald — bound the journal by size and time; the nixpkgs default
+# (10% of the filesystem, capped 4G) was costing pioneer a third of its SD card.
 {...}: {
   den.aspects.core.journald.nixos = {
     config,
@@ -57,8 +54,7 @@
       MaxFileSec = cfg.maxFileSec;
     };
 
-    # Rate limiting deliberately left at the default: nothing here is chatty
-    # enough (loudest is ipmi-fancontrol at 6 lines/min), and a limit that
-    # ever engages drops exactly the burst a crash produces.
+    # Rate limiting deliberately left at the default: a limit that ever engages
+    # drops exactly the burst a crash produces.
   };
 }

@@ -10,9 +10,7 @@
     services.typstnique = {
       enable = true;
       port = 3030;
-      # 0.0.0.0, not loopback: endeavour is edgeTerminated, connections arrive
-      # from gaia's netbird-proxy over WireGuard. The firewall limits reach
-      # (netbird.client.exposedPorts in hosts/endeavour.nix).
+      # 0.0.0.0: edgeTerminated, traffic arrives from gaia's netbird-proxy.
       address = "0.0.0.0";
     };
   };

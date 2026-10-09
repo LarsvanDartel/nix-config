@@ -1,7 +1,6 @@
 # minuet — LLM completion against the fleet's own ollama (endeavour only).
-# Opt-in per host: needs services.ollama on the mesh; elsewhere completions
-# silently time out. fill-in-middle, not chat — only /v1/completions takes a
-# suffix (text after the cursor), which is what makes suggestions fit.
+# Opt-in per host: elsewhere completions silently time out. FIM, not chat:
+# only /v1/completions takes a suffix.
 {
   lib,
   config,
@@ -70,11 +69,9 @@ in {
       settings = {
         provider = "openai_fim_compatible";
 
-        # One suggestion — more is wasted tokens on this shared GPU.
         n_completions = 1;
 
-        # Modest on purpose: prompt processing (no tensor cores) is this
-        # GPU's bottleneck, so context size decides latency more than model speed.
+        # Prompt processing is this GPU's bottleneck; context size decides latency.
         context_window = 512;
 
         provider_options.openai_fim_compatible = {
@@ -82,13 +79,10 @@ in {
           end_point = cfg.endpoint;
           inherit (cfg) model;
 
-          # minuet reads an env-var *name* here; ollama needs no key, so
-          # point it at a variable that is always set and never used (TERM,
-          # the conventional filler per minuet's docs).
+          # An env-var *name*; ollama needs no key, so any always-set var.
           api_key = "TERM";
 
           optional = {
-            # Short enough to read and accept at a glance.
             max_tokens = 128;
             top_p = 0.9;
           };
@@ -108,8 +102,6 @@ in {
       };
     };
 
-    # Manual ask-at-cursor; still bound with autoTrigger on for re-asking
-    # after editing the line.
     programs.nixvim.keymaps = [
       {
         mode = "i";

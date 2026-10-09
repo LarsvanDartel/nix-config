@@ -7,7 +7,6 @@
   flake-file = {
     description = "lvdar's NixOS config";
 
-    # flake-parts + import-tree over ./modules.
     outputs = "dendritic";
 
     inputs.flake-file.url = "github:denful/flake-file";

@@ -11,12 +11,9 @@
     inherit (lib.modules) mkIf mkForce;
 
     cfg = config.cosmos.services.kanidm;
-    # The gated services published by netbird-proxy (netbird.services in
-    # hosts/gaia.nix). Literals: den cannot read another host's config — the
-    # same reason the ports over there are literals. A name missing here is a
-    # service nobody can reach; a name no service uses is a harmless empty
-    # group. Each becomes a kanidm group AND a `groups` claim value, which
-    # NetBird matches against the service's distribution list.
+    # Gated services from netbird.services in hosts/gaia.nix, hand-synced (den
+    # cannot read another host's config). Each becomes a kanidm group AND a
+    # `groups` claim value NetBird matches against distribution lists.
     gatedServices = [
       "suwayomi"
       "sabnzbd"
@@ -27,26 +24,20 @@
       "bazarr"
       "lingarr"
 
-      # The only entry shared with people who administer nothing else — the
-      # point of it being a group of its own rather than folded into another.
+      # Shared with people who administer nothing else; keep it separate.
       "minecraft-control"
     ];
 
-    # Groups that gate something *inside* a service, not access to it: not
-    # published domains, they exist only to reach the `groups` claim the app
-    # reads out of the X-NetBird-Groups header netbird-proxy stamps on the
-    # request. One per Minecraft server, consumed by
-    # cosmos.services.minecraft.control.access on endeavour — someone who
-    # plays on one server has no business restarting the other.
+    # In-app permission groups (read via X-NetBird-Groups), not published
+    # domains; consumed by cosmos.services.minecraft.control.access on
+    # endeavour, one per server.
     inAppGroups = [
       "netbird-minecraft-smp"
       "netbird-minecraft-hardcore"
     ];
 
-    # Baseline mesh access. Kept in the claim because NetBird replaces a
-    # user's auto-groups wholesale with whatever the token says — anything
-    # omitted is taken away on next login, including the group the setup key
-    # enrols peers into.
+    # NetBird replaces auto-groups wholesale with the token's claim, so
+    # omitting netbird-users would strip mesh access on next login.
     netbirdGroups =
       ["netbird-users"]
       ++ map (s: "netbird-${s}") gatedServices
@@ -85,40 +76,24 @@
             tls_chain = "/var/lib/acme/lvdar.nl/fullchain.pem";
             tls_key = "/var/lib/acme/lvdar.nl/key.pem";
 
-            # nixpkgs defaults this to loopback, right only while a local
-            # nginx vhost fronts it. Under edge termination netbird-proxy
-            # dials `peer:8443` over the mesh and a loopback socket refuses.
-            # Reach stays governed by the firewall (8443 on wt0 alone).
+            # Under edge termination netbird-proxy dials peer:8443 over the
+            # mesh; firewall limits 8443 to wt0.
             bindaddress =
               if config.cosmos.networking.edgeTerminated
               then "0.0.0.0:8443"
               else "127.0.0.1:8443";
 
-            # Who may set the client address: trusting the wrong hop lets a
-            # client forge its IP, and kanidm rate-limits per source. Tracks
-            # whatever actually sits in front — nginx on loopback, or
-            # netbird-proxy from the mesh (100.64.0.0/10 is the CGNAT range
-            # NetBird assigns peers from).
+            # Trusting the wrong hop lets clients forge their IP (kanidm
+            # rate-limits per source). 100.64.0.0/10 = NetBird peer range.
             http_client_address_info.x-forward-for =
               if config.cosmos.networking.edgeTerminated
               then ["100.64.0.0/10"]
               else ["127.0.0.1"];
 
-            # Upstream defaults this to a *derivation* (entryManagementDir,
-            # an empty linkFarm — we never set entryManagement.migrations)
-            # rather than a path string. kanidm.nix's filterConfig
-            # (filterAttrsRecursive stripping nulls) walks into any attrset
-            # nested under server.settings, and derivations built via
-            # mkDerivation carry a `.stdenv` attribute — so it recurses
-            # straight into stdenv's own deprecated isDarwin/is32bit/…
-            # compat shims and forces every lib.warn in them.
-            # abort-on-warn turns that into a hard eval failure (broke
-            # flake-bump against nixpkgs rev 494ce7f, 2026-10-06). mkForce
-            # the same path as a plain string — what the TOML generator
-            # would coerce it to anyway — to keep the recursive filter off
-            # derivation internals. Revisit (track
-            # server.entryManagement.migrations here too) if that option is
-            # ever used.
+            # Upstream defaults this to a derivation; kanidm.nix's null filter
+            # recurses into its .stdenv and trips deprecated-attr warnings,
+            # fatal under abort-on-warn (broke at nixpkgs 494ce7f). Revisit if
+            # server.entryManagement.migrations is ever used.
             migration_path = mkForce (toString (pkgs.linkFarm "kanidm-entry-management" []));
           };
         };
@@ -148,9 +123,7 @@
               opencloud-admin.members = ["lvdar"];
               netbird-admin.members = ["lvdar"];
 
-              # Grafana authenticates against kanidm directly, not behind
-              # the netbird gate — its access lives here, not in the
-              # netbird-* family above.
+              # Grafana authenticates against kanidm directly, not via netbird.
               grafana-users = {
                 overwriteMembers = false;
                 members = ["lvdar"];
@@ -163,64 +136,38 @@
               };
               tino-admin.members = ["lvdar"];
             }
-            # One group per gated service, plus the baseline. overwriteMembers is
-            # off so members added by hand in kanidm survive a redeploy — these
-            # exist precisely to be handed out to other people.
+            # overwriteMembers off so hand-added members survive a redeploy.
             // lib.genAttrs netbirdGroups (_: {
               overwriteMembers = false;
               members = ["lvdar"];
             });
           systems.oauth2 = {
-            # The NetBird dashboard is a browser app, so it authenticates with
-            # PKCE and holds no client secret — hence `public`. The client name
-            # doubles as the audience NetBird's management server expects.
+            # Browser app using PKCE; the client name is the audience NetBird
+            # management expects.
             netbird = {
               displayName = "NetBird";
               public = true;
-              # Must match the dashboard's AUTH_REDIRECT_URI /
-              # AUTH_SILENT_REDIRECT_URI, which services/netbird.nix overrides
-              # to fragment-free paths precisely so these can exist: kanidm
-              # strips the fragment from configured origins on load (RFC 6749
-              # §3.1.2) while the incoming redirect_uri keeps it, so the
-              # default hash-routed `/#callback` can never match under strict
-              # validation (kanidm#3217, hit with NetBird specifically). The
-              # fix is on NetBird's side, so strict matching stays on; the
-              # paths are deliberately ones the dashboard has no page at —
-              # see AUTH_REDIRECT_URI in services/netbird.nix.
-              #
+              # kanidm strips fragments from configured origins (kanidm#3217),
+              # so services/netbird.nix moves the dashboard callbacks to
+              # fragment-free paths; keep these in sync with AUTH_REDIRECT_URI.
               originUrl = [
                 "https://netbird.lvdar.nl/callback"
                 "https://netbird.lvdar.nl/silent-callback"
-                # Not the dashboard's — netbird-proxy's bearer auth, which
-                # management handles centrally for every published domain
-                # (HttpConfig.AuthCallbackURL in services/netbird.nix).
+                # netbird-proxy bearer auth (HttpConfig.AuthCallbackURL).
                 "https://netbird.lvdar.nl/api/reverse-proxy/callback"
-                # Where the CLI's PKCE flow listens — `netbird up` and
-                # `netbird ssh`, which asks for a user token before it dials.
-                # It takes the first of these two ports it can open
-                # (PKCEAuthorizationFlow in services/netbird.nix), so both
-                # must be allowed here.
+                # CLI PKCE flow uses the first free of these ports
+                # (PKCEAuthorizationFlow in services/netbird.nix).
                 "http://localhost:53000/"
                 "http://localhost:54000/"
               ];
               originLanding = "https://netbird.lvdar.nl";
-              # Who may obtain a token at all, as opposed to what they reach
-              # once they have one. Every netbird-* group, not just the mesh
-              # baseline, because the two were once conflated and the failure
-              # was unreadable: a person in netbird-minecraft-control and
-              # nothing else got "Identity does not have access to the
-              # requested scopes" — kanidm refusing to issue a token before
-              # the service gate on gaia was ever consulted, pointing at the
-              # wrong layer. Being in one of these grants a token and nothing
-              # more; each service's distribution list still decides what it
-              # opens. netbird-users remains the group that means mesh access
-              # — see the claim map below for why it must also appear there.
+              # Every netbird-* group, not just netbird-users: otherwise a
+              # member of only one service group is refused a token with a
+              # misleading scopes error. Services' distribution lists still
+              # decide access.
               scopeMaps = lib.genAttrs netbirdGroups (_: ["openid" "profile" "email"]);
 
-              # Each group contributes its own name. NetBird sets the user's
-              # auto-groups to exactly this set, so the mapping is one-to-one
-              # on purpose: no translation layer to get wrong, and the group
-              # named in a service's bearerAuth is the group granted here.
+              # One-to-one on purpose: NetBird sets auto-groups to exactly this.
               claimMaps.groups = {
                 joinType = "array";
                 valuesByGroup =
@@ -229,19 +176,12 @@
               };
             };
 
-            # Confidential, not public: grafana runs on a server and can keep
-            # a secret, and its OIDC flow is server-to-server for the token
-            # exchange. `public` here would force PKCE-without-secret, which
-            # is for browser apps like the netbird dashboard.
             grafana = {
               displayName = "Grafana";
-              # Exactly what grafana derives from its root_url. kanidm matches
-              # redirect URIs strictly — the netbird dashboard needed its
-              # callbacks moved off hash routes for this same reason.
+              # kanidm matches redirect URIs strictly.
               originUrl = ["https://grafana.lvdar.nl/login/generic_oauth"];
               originLanding = "https://grafana.lvdar.nl";
               basicSecretFile = config.sops.secrets."keys/grafana/oauth-client-secret".path;
-              # Grafana looks up the account by preferred_username.
               preferShortUsername = true;
               scopeMaps.grafana-users = ["openid" "profile" "email"];
               claimMaps.grafana_role = {
@@ -286,39 +226,21 @@
               };
             };
 
-            # Confidential like grafana (server-side code exchange). TINO's
-            # admin check reads whatever claim TINO_OIDC_GROUPS_CLAIM names —
-            # tino_groups below, not kanidm's own "groups": granting that
-            # makes kanidm return the identity's *entire* raw group membership
-            # as the claim. TINO stores the whole userinfo response in its
-            # session cookie, and the raw list alone pushed Set-Cookie past
-            # 9KB — browsers silently drop cookies over ~4KB, so the session
-            # never persisted and every login bounced back to /login with no
-            # error. tino_groups mirrors opencloud_groups/immich_groups.
+            # Use tino_groups, not kanidm's raw "groups" claim as
+            # TINO_OIDC_GROUPS_CLAIM: TINO stores userinfo in its cookie and
+            # the raw list pushed it past 9KB, silently dropped by browsers.
             tino = {
               displayName = "TINO";
               originUrl = ["https://tino.lvdar.nl/oidc/callback"];
               originLanding = "https://tino.lvdar.nl";
               basicSecretFile = config.sops.secrets."keys/tino/oidc-client-secret".path;
-              # TINO's authlib flow sends no PKCE code_challenge; kanidm
-              # enforces PKCE on every client regardless of confidentiality
-              # and rejects the bare authorize request with "No PKCE code
-              # challenge was provided with client in enforced PKCE mode".
+              # TINO sends no PKCE challenge; kanidm enforces it otherwise.
               allowInsecureClientDisablePkce = true;
-              # TINO hardcodes "groups" as a *requested scope*, not just a
-              # claim name, and kanidm refuses a token for any scope the
-              # identity's scopeMaps does not grant. Unavoidable (TINO's own
-              # code, not configurable), and granting it makes kanidm add its
-              # raw "groups" claim regardless — tino_groups below coexists
-              # with that; TINO simply never reads the raw one.
+              # TINO hardcodes the "groups" scope; kanidm refuses ungranted
+              # scopes. The resulting raw claim is simply unused.
               scopeMaps.tino-users = ["openid" "profile" "email" "groups"];
-              # Each entry a kanidm group mapped to itself, not just the
-              # admin flag: TINO's bucket ACLs match `entry.group in
-              # user.groups` against exactly these values, so a kanidm group
-              # must be listed here before any bucket ACL can reference it.
-              # tino-users here is what makes a "tino-users" ACL usable in
-              # TINO's bucket-settings UI; a one-off single-member group
-              # needs the same treatment.
+              # TINO bucket ACLs match against these values, so a kanidm group
+              # must be listed here before an ACL can reference it.
               claimMaps.tino_groups = {
                 joinType = "array";
                 valuesByGroup = {
@@ -331,9 +253,7 @@
         };
       };
 
-      # Dropped when the edge terminates TLS. kanidm keeps its own certificate
-      # either way — it serves HTTPS on 8443 itself, which is what the edge
-      # target points at.
+      # kanidm still serves HTTPS on 8443 itself with its own certificate.
       services.nginx.virtualHosts = mkIf (cfg.expose && !config.cosmos.networking.edgeTerminated) {
         "auth.lvdar.nl" = {
           forceSSL = true;

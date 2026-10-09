@@ -1,5 +1,4 @@
 # core.ssh — openssh server + authorized keys for the primary user and root.
-# Keys live in ./_ssh-keys (import-tree-ignored).
 {cosmosLib, ...}: let
   inherit (cosmosLib) get-files get-flake-path;
 
@@ -21,12 +20,8 @@ in {
     services.openssh = {
       enable = true;
 
-      # 2222 exists because NetBird's SSH server claims the mesh's :22: the
-      # agent redirects <netbird-ip>:22 to its own embedded server (different
-      # host key, NetBird-only auth — presents as "Permission denied
-      # (password)"). deploy-rs connects as root by key via mesh names, so
-      # OpenSSH must answer elsewhere; the redirect is :22-specific, so both
-      # servers coexist.
+      # 2222 because NetBird's SSH server hijacks <netbird-ip>:22 (presents as
+      # "Permission denied (password)"); deploy-rs needs OpenSSH via the mesh.
       ports = [22 2222];
       hostKeys = [
         {

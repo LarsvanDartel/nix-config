@@ -1,8 +1,6 @@
-# core.nixpkgs — overlays + allowUnfree for den-produced hosts (and their
-# home-manager, which shares the OS pkgs via useGlobalPkgs). Overlays come
+# core.nixpkgs — overlays + allowUnfree for den-produced hosts. Overlays come
 # from inputs only — reading the flake-parts `config` here would create a
-# flake→host→flake recursion. Local packages (modules/pkgs/*) arrive via
-# self.overlays.default once a host needs them (voyager).
+# flake→host→flake recursion.
 {inputs, ...}: let
   stable = final: _prev: {
     stable = import inputs.nixpkgs-stable {

@@ -1,11 +1,7 @@
 # web-bluetooth-firefox-host — native messaging host giving Firefox forks a
-# `navigator.bluetooth`: an extension implements the API in the page and
-# forwards over stdio to a Python host driving BlueZ through bleak. Packaged
-# rather than upstream's install.sh (curls a script, venv + pip under
-# ~/.local/share), which would put an unmanaged Python env outside the store.
-# NOTE: upstream is candid that the code was written with generative AI —
-# worth knowing for anything standing between a web page and the Bluetooth
-# stack.
+# `navigator.bluetooth` (extension -> stdio -> Python/bleak -> BlueZ).
+# NOTE: upstream says the code was written with generative AI — relevant for
+# anything between a web page and the Bluetooth stack.
 {...}: {
   nixpkgs.overlays = [
     (final: _prev: {
@@ -34,19 +30,13 @@
 
             dontBuild = true;
 
-            # BlueZ refuses a connect while a discovery scan runs
-            # (org.bluez.Error.InProgress), and the host lets the two
-            # overlap; pages are entitled to that (Chrome allows it), so the
-            # patch pauses discovery around the connect. Restarting is the
-            # load-bearing half: the extension tracks scanning with one
-            # boolean, sending watch_advertisements only on its false->true
-            # edge, so a scanner quietly left stopped is never re-asked for —
-            # every later picker comes up empty.
+            # BlueZ refuses a connect during a discovery scan; the patch pauses
+            # discovery around it. Restarting matters: the extension only sends
+            # watch_advertisements on a false->true edge, so a scanner left
+            # stopped leaves every later picker empty.
             patches = [./_web-bluetooth/pause-scan-on-connect.patch];
 
-            # `name` must match the manifest file's basename (what the
-            # extension asks for over stdio); allowed_extensions gates who
-            # may talk to it.
+            # `name` must match the manifest file's basename.
             installPhase = ''
               runHook preInstall
 
@@ -92,13 +82,9 @@
           })
       ) {};
 
-      # The extension, rebuilt from source with one fix: upstream nests the
-      # advertisement event's fields under CustomEvent's `detail`, but the
-      # spec puts manufacturerData/rssi/uuids on the event itself —
-      # cstimer.net reads event.manufacturerData for a GAN cube's MAC, gets
-      # undefined, and fails. Shipped unsigned: Zen defaults
-      # xpinstall.signatures.required to false; stock Firefox would need the
-      # AMO build, bug and all.
+      # Rebuilt with one fix: upstream nests advertisement fields under
+      # `detail`, but the spec (and cstimer.net) expects them on the event.
+      # Unsigned: Zen defaults xpinstall.signatures.required to false.
       web-bluetooth-firefox-extension = final.callPackage (
         {
           lib,
@@ -119,12 +105,9 @@
             # whose exact text matters.
             patches = [./_web-bluetooth/advertisement-event-shape.patch];
 
-            # Laid out like home-manager's firefox addon packages (xpi named
-            # for the extension id, passthru.addonId alongside) so
-            # extensions.packages can install it — that mechanism replaces
-            # what is already in the profile, unlike ExtensionSettings. The
-            # manifest id must survive the rebuild: the host's
-            # allowed_extensions names it.
+            # Laid out like home-manager's firefox addon packages so
+            # extensions.packages can install it; the manifest id must match
+            # the host's allowed_extensions.
             installPhase = ''
               runHook preInstall
               dir="$out/share/mozilla/extensions/{ec8030f7-c20a-464f-9b0e-13a3a9e97384}"

@@ -1,15 +1,6 @@
-# desktop.keyd — tap/hold on the Mod key.
-#
-# niri cannot bind a modifier on its own: `find_configured_bind` compares a
-# bind's modifiers against the xkb state *after* the current key is folded in,
-# so a bare `Super_L` bind never matches, and `Mod+Super_L` matches on
-# key-DOWN — before every Super shortcut you type. Hyprland's `bindr` has the
-# same limitation in reverse. keyd sits below xkb at evdev level and resolves
-# tap-vs-hold before the compositor sees the key: hold = Meta as always, tap =
-# a key nothing else uses.
-#
-# keyd grabs every keyboard, so a broken config can leave you unable to type;
-# escape hatch is chording backspace+escape+enter, which terminates keyd.
+# desktop.keyd — tap/hold on the Mod key. niri (and Hyprland) cannot bind a
+# bare modifier tap; keyd resolves tap-vs-hold at evdev level below xkb.
+# keyd grabs every keyboard; escape hatch is backspace+escape+enter.
 {...}: {
   den.aspects.desktop.keyd.nixos = {
     config,
@@ -55,9 +46,7 @@
     config.services.keyd = {
       enable = true;
       keyboards.default.settings.main = {
-        # `overload` activates the meta layer while held and emits the tap key
-        # on release, but only if no other key was pressed meanwhile — so
-        # Mod+L, Mod+Tab and the workspace binds are untouched.
+        # `overload` emits the tap key only if no other key was pressed meanwhile.
         leftmeta = "overload(meta, ${cfg.key})";
       };
     };

@@ -10,16 +10,12 @@ export _JAVA_AWT_WM_NONREPARENTING=1
 
 share='@share@'
 
-# ProM keeps its downloaded packages, its workspace and its UI config next to
-# ProM.ini, so run it from a writable directory. $PROM_HOME lets the dev shell
-# put that somewhere that survives a reboot.
+# ProM keeps its packages/workspace/config next to ProM.ini, so it must run
+# from a writable directory.
 data="${PROM_HOME:-${XDG_DATA_HOME:-$HOME/.local/share}/prom-lite}"
 log="$data/prom-lite.log"
 mkdir -p "$data"
 
-# ProM logs every package it resolves and then sits there for the session, so
-# by default give it its own session and a log file and hand the terminal back.
-# --foreground keeps it attached, which is what you want when debugging.
 if [ "${1:-}" = "--foreground" ]; then
   shift
 else

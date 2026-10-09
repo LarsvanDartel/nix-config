@@ -1,34 +1,10 @@
 # services.minecraft — Minecraft servers for friends, declared here rather than
 # clicked into a panel.
 #
-# The deliberate choice this file encodes: no control panel. Pelican,
-# Pterodactyl and Crafty are what most people reach for, and all three move the
-# servers' state out of Nix and into a database that then has to be backed up,
-# upgraded and secured on its own terms — plus none of them are packaged for
-# NixOS. Here a server is an attribute in hosts/endeavour.nix, and adding,
-# upgrading or retiring one is an edit and a deploy. Friends get an address and
-# a whitelist entry; nobody else needs an account.
-#
-# Built on github:Infinidoge/nix-minecraft rather than nixpkgs'
-# `services.minecraft-server`, which is singular and vanilla-only. The upstream
-# module is plural, ships Paper/Fabric/Quilt/NeoForge/Purpur/Velocity through
-# its overlay, and renders whitelist, ops, bans and server.properties from Nix.
-# It also provides `fetchPackwizModpack`, which is what makes the mod set here
-# a reviewable directory in this repo rather than a pile of pinned URLs.
-# It also already carries a thorough systemd hardening block — unlike
-# services/traccar.nix, the fleet's other hand-run JVM, this file adds none of
-# its own, because duplicating it would only create a second owner of the same
-# settings.
-#
-# Two things upstream does that matter to how this is wired:
-#
-#   * it creates the `minecraft` user with `home = dataDir; createHome = true`,
-#     so the pool directory needs no tmpfiles rule of its own — but see the
-#     mount guard below for what that hands us if the dataset is missing.
-#   * per-server console is a local socket under /run/minecraft, not RCON.
-#     RCON stays off; it is a plaintext remote-admin protocol and there is
-#     nothing here it would buy. Which kind of socket is a decision this file
-#     makes rather than inherits — see managementSystem below.
+# Deliberately no control panel (Pelican/Pterodactyl/Crafty move state into a
+# database outside Nix). Built on nix-minecraft rather than nixpkgs'
+# singular, vanilla-only services.minecraft-server; its systemd hardening is
+# not duplicated here. RCON stays off; console is a local socket.
 {
   den,
   inputs,
@@ -36,35 +12,14 @@
 }: {
   flake-file.inputs.nix-minecraft.url = "github:Infinidoge/nix-minecraft";
 
-  # The server packages live in the flake's overlay, not in nixpkgs. Registered
-  # into the same aggregator modules/pkgs/*.nix uses (modules/meta/nixpkgs.nix),
-  # which modules/den/overlays.nix composes into flake.overlays.default.
   nixpkgs.overlays = [
     inputs.nix-minecraft.overlays.default
 
-    # Fixes an upstream bug: Fabric servers are launched with the wrong Java.
-    #
-    # Minecraft 26.2 is compiled for Java 25 (class file version 69). Upstream
-    # gets this right for vanilla and Paper, which pick a JDK from the version
-    # manifest and from Paper's documented requirements respectively — but
-    # `mkTextileServer`, which builds the Fabric and Quilt launchers, takes
-    # plain `jre_headless` out of the package set, and that is still Java 21.
-    # The result starts, then dies immediately with
-    #
-    #   UnsupportedClassVersionError: net/minecraft/bundler/Main has been
-    #   compiled by a more recent version of the Java Runtime (class file
-    #   version 69.0) ... only recognizes class file versions up to 65.0
-    #
-    # which cost a rolled-back deploy to find. mkTextileServer is not exported
-    # from the overlay, so it cannot simply be re-called with a different
-    # `jre_headless`; instead this rebuilds the same one-line launcher with the
-    # right JDK, reusing the loader derivation upstream already produced.
-    #
-    # Scoped to the one version this fleet runs, not mapped over the whole
-    # attrset: older Minecraft versions genuinely want Java 17 or 21, and
-    # forcing 25 on all of them would trade a loud failure for a quiet one.
-    # Bumping the server version means bumping this too — the mismatch is a
-    # crash loop at activation, not a silent misbehaviour, so it will say so.
+    # Upstream bug: mkTextileServer (Fabric/Quilt) uses jre_headless (Java 21),
+    # but Minecraft 26.2 needs Java 25 — crash loop with
+    # UnsupportedClassVersionError (class file version 69.0). mkTextileServer
+    # isn't exported, so the launcher is rebuilt with the right JDK. Scoped
+    # to this one version (older ones want 17/21); bump alongside the server.
     (_: prev: {
       fabricServers =
         prev.fabricServers
@@ -104,44 +59,17 @@
 
       cfg = config.cosmos.services.minecraft;
 
-      # The server-side performance set, resolved by packwiz against Minecraft
-      # 26.2. Every entry earns its place on a server; nothing here is a client
-      # rendering mod:
-      #
-      #   fabric-api        the dependency the rest are written against
-      #   lithium           game-logic rewrites, all vanilla-behaviour-preserving
-      #   ferritecore       cuts blockstate memory, the single biggest heap win
-      #   krypton           network stack, cheaper packet handling
-      #   c2me              parallel chunk I/O and generation
-      #   scalablelux       the lighting engine off the main thread
-      #   vmp               chunk and player tracking that scales past a handful
-      #   alternate-current a redstone implementation that is orders faster
-      #   servercore        tick and chunk-gen throttles under load
-      #   spark             the profiler, so "it feels laggy" becomes a flamegraph
-      #
-      # Two of these are alpha upstream — c2me and scalablelux — and both touch
-      # chunk storage and lighting, the parts of a world you least want a bug
-      # in. They are here because the pool takes hourly snapshots, so the cost
-      # of a bad chunk is a rollback rather than a lost world. Drop them from
-      # the pack first if anything odd shows up.
-      #
-      # Deliberately absent: ModernFix and Noisium, which have no 26.2 build —
-      # only third-party forks, which is not a dependency to take on a server
-      # holding the only copy of something.
+      # Server-side performance mods only. c2me and scalablelux are alpha and
+      # touch chunk storage/lighting — tolerable only because of hourly pool
+      # snapshots; drop them first if anything odd shows up. ModernFix and
+      # Noisium have no 26.2 build (only third-party forks).
       defaultModpack = pkgs.fetchPackwizModpack {
         src = ./_minecraft/pack;
         packHash = "sha256-x6VFhJvf9vAOh2dSow4cJ5GOwpu2IGdtSTTpSmEFrmE=";
       };
 
-      # The mods/ directory a given server gets: the shared packwiz pack, its
-      # own extraMods, or both merged.
-      #
-      # The loose jars are wrapped in a directory first because symlinkJoin
-      # joins *directories* — handed a bare file it would produce a store path
-      # that is not a mods/ folder at all. The basename is stripped of its store
-      # hash on the way in, so the server sees `voicechat-fabric-2.6.22.jar`
-      # rather than `ps28hlg…-voicechat-fabric-2.6.22.jar`; Fabric does not care
-      # about the filename, but anyone reading `ls mods/` on the host does.
+      # Loose jars are wrapped in a directory because symlinkJoin joins
+      # directories, not files; the store hash is stripped from basenames.
       modsDir = s: let
         extraDir = pkgs.runCommand "minecraft-extra-mods" {} ''
           mkdir -p "$out"
@@ -169,15 +97,7 @@
             paths = lib.optional (s.modpack != null) "${s.modpack}/mods" ++ [extraDir];
           };
 
-      # Aikar's flags — the G1GC tuning the Minecraft server community settled
-      # on years ago and still the sane default. The point of them is pause
-      # time, not throughput: a default-configured JVM will happily stop the
-      # world for long enough that players see a rubber-band, and no amount of
-      # CPU on this host fixes that. Heap is pinned (-Xms == -Xmx) on purpose;
-      # a growing heap just means the collector re-learns its sizing mid-game.
-      #
-      # The >= 12 GiB branch is Aikar's own, not an invention here: larger
-      # heaps want bigger regions and a larger young generation.
+      # Aikar's flags: G1GC tuned for pause time. Heap pinned (-Xms == -Xmx).
       aikarFlags = heapGiB: let
         large = heapGiB >= 12;
       in
@@ -216,8 +136,7 @@
           ]
         );
 
-      # Refuses to start rather than write a world to the wrong disk. See
-      # requireMountedDataDir for why this exists at all.
+      # Refuses to start rather than write a world to the wrong disk.
       mountGuard = pkgs.writeShellApplication {
         name = "minecraft-datadir-guard";
         runtimeInputs = [pkgs.util-linux];
@@ -470,32 +389,12 @@
           eula = true;
           inherit (cfg) dataDir;
 
-          # The mesh exposure below is what makes these reachable, and it is
-          # the only path that should exist. Letting upstream open the port
-          # would put a game server on endeavour's LAN interface as well, for
-          # no one's benefit.
+          # Mesh exposure only; no game server on endeavour's LAN interface.
           openFirewall = false;
 
-          # Console over a systemd socket rather than upstream's default tmux
-          # session, and the reason is logging, not taste.
-          #
-          # Under tmux the unit is Type=forking and the server's stdout goes to
-          # the tmux pane. Measured on the first deploy: the journal held
-          # exactly two lines for this unit — "Starting" and "Started" — while
-          # the entire server log sat in the world directory where nothing
-          # reads it. services/alloy.nix ships the journal to loki, so that
-          # arrangement means a Minecraft server is the one thing on this fleet
-          # you cannot grep in Grafana, and the OnFailure notification tells
-          # you a unit died with no way to see why.
-          #
-          # systemd-socket puts stdout in the journal and takes commands on a
-          # group-writable FIFO instead:
-          #
-          #   journalctl -fu minecraft-server-smp
-          #   echo 'whitelist add SomeName' > /run/minecraft/smp.stdin
-          #
-          # The loss is an interactive session; with the log in the journal
-          # there is not much of one to miss.
+          # systemd-socket, not tmux: under tmux stdout never reaches the
+          # journal, so the server log is invisible to loki and failure
+          # notifications. Console: echo 'cmd' > /run/minecraft/<name>.stdin
           managementSystem = {
             tmux.enable = false;
             systemd-socket.enable = true;
@@ -510,9 +409,8 @@
 
               operators = mapAttrs (_: uuid: {inherit uuid;}) s.operators;
 
-              # One mods/ directory, whatever it is made of. symlinkJoin rather
-              # than two entries because upstream's `symlinks` is keyed by path
-              # — there is exactly one mods/ and it can only point at one place.
+              # One symlinkJoin: upstream's `symlinks` is keyed by path, so
+              # mods/ can only point at one place.
               symlinks = lib.optionalAttrs (s.modpack != null || s.extraMods != []) {
                 mods = modsDir s;
               };
@@ -522,26 +420,15 @@
                   server-port = s.port;
                   motd = s.motd;
 
-                  # The three that matter on a public port, and the reason
-                  # they are here rather than left to the host:
-                  #
-                  #   online-mode      — verifies logins against Mojang. False
-                  #                      means anyone may join as any username,
-                  #                      including as an operator.
-                  #   white-list       — the allow-list itself.
-                  #   enforce-whitelist— kicks players who are already on when
-                  #                      they fall off the list. Without it the
-                  #                      whitelist only gates new joins.
+                  # enforce-whitelist kicks online players removed from the
+                  # list; without it the whitelist only gates new joins.
                   white-list = true;
                   enforce-whitelist = true;
                   online-mode = true;
 
-                  # Plaintext remote admin, and the console is already
-                  # available as a group-gated socket on the host.
                   enable-rcon = false;
 
-                  # The legacy UDP query protocol. Off: it is a reflection
-                  # amplification source and nothing here reads it.
+                  # Legacy UDP query: a reflection amplification source.
                   enable-query = false;
                 }
                 // s.serverProperties;
@@ -555,29 +442,15 @@
               lib.mkIf cfg.requireMountedDataDir
               [(lib.getExe mountGuard)];
 
-            # mkForce because upstream already defines this as
-            # `!conf.enableReload`, and two plain definitions of the same
-            # option conflict. Nested inside an attribute rather than at the
-            # top of the aspect body, which is where a mkForce recurses under
-            # facter — see the comment in hosts/pioneer.nix.
+            # mkForce: upstream defines this as `!conf.enableReload`. Nested,
+            # not at aspect top level, where mkForce recurses under facter
+            # (see hosts/pioneer.nix).
             restartIfChanged = lib.mkForce (!s.deferRestart);
           })
         cfg.servers;
 
-        # Reachable from gaia over WireGuard, and from nowhere else — gaia is
-        # the only host with a public address, so this is the whole of the
-        # ingress path on this side. A port missing here is a published service
-        # that times out rather than one that fails loudly.
         cosmos.services.netbird.client.exposedPorts =
           map (s: s.port) (attrValues cfg.servers);
-
-        # Nothing is wired for monitoring on purpose. Unit failures already
-        # notify through the type-wide OnFailure drop-in in
-        # core/notify-failure.nix, and the server's stdout reaches loki through
-        # services/alloy.nix by virtue of being in the journal — which is true
-        # only because of the managementSystem choice above, not by default. A
-        # per-service exporter would be the first in the fleet and would earn
-        # nothing.
       };
     };
   };

@@ -16,9 +16,7 @@ in {
   options.cosmos.desktops.common.styling.wallpaper = {
     themed = mkEnableOption "themed background";
     inverted = mkEnableOption "invert background";
-    # The image `stylix.image` derives the whole colour scheme from — so this
-    # one is not interchangeable with the backgrounds in the picker, and it
-    # lives in the repo's `defaults/` under a name that says as much.
+    # The scheme source image, not interchangeable with the picker's backgrounds.
     src = mkOption {
       default = "${inputs.wallpapers}/defaults/stylix-source-logo.png";
     };

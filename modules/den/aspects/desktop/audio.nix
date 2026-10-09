@@ -1,4 +1,4 @@
-# desktop.audio — pipewire stack (was the audio contribution to nixos desktop).
+# desktop.audio — pipewire stack.
 {...}: {
   den.aspects.desktop.audio.nixos = {pkgs, ...}: {
     services.pulseaudio.enable = false;

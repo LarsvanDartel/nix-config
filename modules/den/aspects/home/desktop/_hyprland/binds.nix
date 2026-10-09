@@ -45,36 +45,30 @@ in {
     wayland.windowManager.hyprland.extraConfig =
       lib.concatStringsSep "\n" (
         [
-          # Compositor
           (bind "${mod} + SHIFT + Q" (exec "pkill Hyprland"))
           (bind "${mod} + SHIFT + C" "hl.dsp.window.close()")
           (bind "${mod} + F" "hl.dsp.window.fullscreen()")
           (bind "${mod} + T" "hl.dsp.window.float({action = 'toggle'})")
           (bind "${mod} + D" "hl.dsp.window.toggle_swallow()")
 
-          # Move focus
           (bind "${mod} + L" "hl.dsp.focus({direction = 'right'})")
           (bind "${mod} + H" "hl.dsp.focus({direction = 'left'})")
           (bind "${mod} + K" "hl.dsp.focus({direction = 'up'})")
           (bind "${mod} + J" "hl.dsp.focus({direction = 'down'})")
 
-          # Move window
           (bind "${mod} + SHIFT + L" "hl.dsp.window.move({direction = 'right'})")
           (bind "${mod} + SHIFT + H" "hl.dsp.window.move({direction = 'left'})")
           (bind "${mod} + SHIFT + K" "hl.dsp.window.move({direction = 'up'})")
           (bind "${mod} + SHIFT + J" "hl.dsp.window.move({direction = 'down'})")
 
-          # Resize window
           (bind "${mod} + CTRL + L" "hl.dsp.window.resize({x = 10, y = 0})")
           (bind "${mod} + CTRL + H" "hl.dsp.window.resize({x = -10, y = 0})")
           (bind "${mod} + CTRL + K" "hl.dsp.window.resize({x = 0, y = -10})")
           (bind "${mod} + CTRL + J" "hl.dsp.window.resize({x = 0, y = 10})")
 
-          # Power menu
           (bind "${mod} + Escape" (exec "uwsm app -- ${toggle powerMenu}"))
           (bind "${mod} + SHIFT + Escape" (exec "hyprlock"))
 
-          # Utilities
           (bind "${mod} + SHIFT + Return" (exec "uwsm app -- ${terminal}"))
           (bind "${mod} + Tab" (exec "uwsm app -- ${toggle launcher}"))
           (bind "ALT + Tab" (exec "uwsm app -- ${toggle windowSwitch}"))
@@ -85,23 +79,19 @@ in {
           (bind "${mod} + S" (exec "${getExe config.programs.hyprshot.package} -m region"))
           (bind "${mod} + SHIFT + S" (exec "${getExe config.programs.hyprshot.package} -m window"))
 
-          # Brightness
           (bindOpts "XF86MonBrightnessUp" (exec "${pkgs.brightnessctl}/bin/brightnessctl set +5%") "{locked = true, repeating = true}")
           (bindOpts "XF86MonBrightnessDown" (exec "${pkgs.brightnessctl}/bin/brightnessctl set 5%-") "{locked = true, repeating = true}")
 
-          # Audio
           (bindOpts "XF86AudioRaiseVolume" (exec "${pkgs.pamixer}/bin/pamixer -i 5") "{locked = true, repeating = true}")
           (bindOpts "XF86AudioLowerVolume" (exec "${pkgs.pamixer}/bin/pamixer -d 5") "{locked = true, repeating = true}")
           (bindOpts "XF86AudioMute" (exec "${pkgs.pamixer}/bin/pamixer --toggle-mute") "{locked = true}")
           (bindOpts "XF86AudioMicMute" (exec "${pkgs.pamixer}/bin/pamixer --default-source --toggle-mute") "{locked = true}")
 
-          # Media
           (bindOpts "XF86AudioNext" (exec "playerctl next") "{locked = true}")
           (bindOpts "XF86AudioPrev" (exec "playerctl previous") "{locked = true}")
           (bindOpts "XF86AudioPlay" (exec "playerctl play-pause") "{locked = true}")
           (bindOpts "XF86AudioStop" (exec "playerctl stop") "{locked = true}")
 
-          # Mouse
           (bindOpts "${mod} + mouse:272" "hl.dsp.window.drag()" "{mouse = true}")
           (bindOpts "${mod} + mouse:273" "hl.dsp.window.resize()" "{mouse = true}")
           (bindOpts "${mod} + SHIFT + mouse:272" "hl.dsp.window.resize()" "{mouse = true}")

@@ -8,17 +8,12 @@
   regularFiles = path: filterAttrs (_: kind: kind == "regular") (builtins.readDir path);
 in {
   _module.args.cosmosLib = {
-    # Path to a subpath of the flake root (a genuine path, usable as a
-    # `source`/`fileContents` argument).
     get-flake-path = lib.path.append ../../.;
 
-    # List of regular-file paths directly inside `path`.
     get-files = path: mapAttrsToList (name: _: "${path}/${name}") (regularFiles path);
 
-    # List of regular-file names directly inside `path`.
     get-file-names = path: attrNames (regularFiles path);
 
-    # Basename of `path` with its final extension removed.
     get-file-name-without-extension = path: let
       base = baseNameOf path;
       parts = splitString "." base;

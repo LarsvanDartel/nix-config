@@ -1,8 +1,6 @@
 # thunderbird-addons — extensions and themes from addons.thunderbird.net,
-# repackaged for programs.thunderbird.profiles.<p>.extensions: each drops its
-# xpi under share/mozilla/extensions/{ec8030f7-…}/<addon-id>.xpi, the same
-# layout web-bluetooth-firefox.nix uses. None are on rycee.firefox-addons
-# (AMO-only catalog). Pinned to exact attachment URLs, never "latest".
+# repackaged for programs.thunderbird.profiles.<p>.extensions. Pinned to
+# exact attachment URLs, never "latest".
 {...}: {
   nixpkgs.overlays = [
     (final: _prev: let
@@ -29,14 +27,9 @@
         };
     in {
       thunderbird-addons = {
-        # Uploads a message's PDF attachments to paperless-ngx from a
-        # context menu — the alternative to giving paperless its own IMAP
-        # account. From GitHub, not ATN: ATN is stuck on 0.9.1, whose
-        # options.js loses the click's user activation awaiting
-        # permissions.contains() before permissions.request(), so the
-        # settings form can never save; 1.1.0 also fixes match patterns
-        # containing a port. Unsigned as a result — see
-        # xpinstall.signatures.required in thunderbird.nix.
+        # From GitHub, not ATN: ATN's 0.9.1 settings form can never save
+        # (loses user activation before permissions.request()). Unsigned as a
+        # result — see xpinstall.signatures.required in thunderbird.nix.
         paperless-ngx-uploader = mkThunderbirdXpi {
           pname = "thunderbird-paperless-ngx-uploader";
           version = "1.1.0";

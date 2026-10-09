@@ -13,8 +13,6 @@
 
     options.cosmos = {
       user = {
-        # den's define-user sets home.username/homeDirectory; mirror them for
-        # the home features that read cosmos.user.
         name = mkOption {
           type = nullOr str;
           default = config.home.username;

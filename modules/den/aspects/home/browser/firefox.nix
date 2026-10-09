@@ -1,6 +1,4 @@
-# home.firefox — kept but included by no role: roles.desktop-home switched to
-# home.zen. Still the reference for the policies/profile block zen.nix
-# inherited; defining an aspect costs nothing until something includes it.
+# home.firefox — included by no role (roles.desktop-home uses home.zen).
 {...}: {
   den.aspects.home.firefox.homeManager = {
     config,

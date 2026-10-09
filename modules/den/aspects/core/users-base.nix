@@ -1,6 +1,5 @@
 # core.users-base — system-wide user policy + the cosmos.user.extraGroups
-# collector (features append groups; they merge with the primary-user
-# battery's wheel/networkmanager). Per-user records: define-user battery.
+# collector.
 {...}: {
   den.aspects.core.users-base.nixos = {
     config,

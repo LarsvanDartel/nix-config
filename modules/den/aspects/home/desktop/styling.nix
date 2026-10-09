@@ -9,8 +9,7 @@
       fonts = let
         fontpkgs = config.cosmos.desktops.common.styling.fonts.pkgs;
       in {
-        # Without enable, stylix silently falls back to DejaVu Sans Mono
-        # everywhere and Cozette is never installed (long-standing latent bug).
+        # Without enable, stylix silently falls back to DejaVu Sans Mono.
         enable = true;
 
         serif = fontpkgs."DejaVu Serif";
@@ -26,11 +25,8 @@
         darkMode = true;
       };
 
-      # Same file the picker gets as its default, from the same `wallpapers`
-      # input, so scheme and picture cannot drift apart; takes the ranking's
-      # top image, overriding the module's own (different) default. `themed`
-      # (gowall onto base16) is off: this is a photograph shown by hyprpaper,
-      # hyprlock and the greeter, and recolouring it is very visible.
+      # Same top-ranked file as the picker's default, so scheme and picture
+      # can't drift apart.
       wallpaper = {
         src = config.cosmos.desktops.wallpapers.favourite;
         themed = false;

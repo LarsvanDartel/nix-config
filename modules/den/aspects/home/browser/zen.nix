@@ -1,14 +1,11 @@
-# home.zen — the Zen browser, replacing the firefox aspect this was written
-# from. A Firefox fork on home-manager's own mkFirefoxModule, so the policies
-# and profile schema below carried over unchanged.
+# home.zen — the Zen browser (Firefox fork on home-manager's mkFirefoxModule)
 {...}: {
   flake-file.inputs.zen-browser = {
     url = "github:0xc000022070/zen-browser-flake";
     inputs = {
       nixpkgs.follows = "nixpkgs";
-      # Load-bearing: homeModules.beta imports mkFirefoxModule from whichever
-      # home-manager this input resolves to — unpinned, one home-manager's
-      # module schema would evaluate inside a config built by another.
+      # Load-bearing: homeModules imports mkFirefoxModule from this input's
+      # home-manager; unpinned, two module schemas would mix.
       home-manager.follows = "home-manager";
     };
   };
@@ -18,63 +15,32 @@
     pkgs,
     ...
   }: {
-    # Twilight (Zen's nightly) via the flake's own input, not
-    # twilight-official: upstream's rolling tag is overwritten in place, so a
-    # pinned hash dies on mismatch at every new nightly. The flake mirrors to
-    # immutable timestamped tags; `nix flake update` moves the version. Same
-    # failure mode as the discord pin in roles/desktop-home.nix.
+    # Not twilight-official: upstream's rolling tag is overwritten in place, so
+    # a pinned hash breaks at every nightly. The flake mirrors to immutable tags.
     imports = [inputs.zen-browser.homeModules.twilight];
 
-    # ~/.config/zen (the module sets both vendorPath and configPath to it),
-    # not firefox's ~/.config/mozilla — nothing migrates the old profile
-    # across; history and logins start empty.
     cosmos.system.impermanence.persist.directories = [".config/zen"];
 
-    # Firefox resolves native messaging hosts via ~/.mozilla/native-messaging-hosts
-    # regardless of where the profile lives — Zen keeps its profile in
-    # ~/.config/zen but looks here.
-    #
-    # Linked by hand, not `mozilla.firefoxNativeMessagingHosts`: that option
-    # links the whole directory with ignorelinks = true, putting each manifest
-    # symlink straight into the host package's store path. checkLinkTargets
-    # then reads the previous generation's symlink as unmanaged and activation
-    # aborts with "would be clobbered" on every rebuild touching the host.
-    # Linking the manifest ourselves keeps it inside home-manager-files, where
-    # home-manager can replace it.
-    #
-    # force: that migration left survivors — a mid-session switch finds files
-    # the running generation put in unpersisted ~/.mozilla, and anything not
-    # resolving under home-manager-files aborts all of activation. The
-    # manifest is generated and holds nothing user-written; not worth failing
-    # a rebuild over.
+    # Zen looks up native messaging hosts in ~/.mozilla. Linked by hand, not via
+    # `mozilla.firefoxNativeMessagingHosts`: its ignorelinks symlinks make
+    # activation abort with "would be clobbered" on every host rebuild.
+    # force: leftover unmanaged files there would otherwise abort activation.
     home.file.".mozilla/native-messaging-hosts/webbluetooth_host.json" = {
       source = "${pkgs.web-bluetooth-firefox-host}/lib/mozilla/native-messaging-hosts/webbluetooth_host.json";
       force = true;
     };
 
-    # setAsDefaultBrowser writes defaultApplications but does not enable the
-    # module itself; without this it works only by accident, via whichever
-    # other aspect switched it on.
+    # setAsDefaultBrowser does not enable the module itself.
     xdg.mimeApps.enable = true;
 
     programs.zen-browser = {
       enable = true;
 
-      # Web Bluetooth: Firefox never implemented it, so BLE from a page (the
-      # smart cube on cstimer.net) works in Chrome and nowhere else. This host
-      # provides navigator.bluetooth over stdio via BlueZ/bleak; the extension
-      # below is the other half, useless without it. The manifest's
-      # allowed_extensions names only that extension, so nothing else can reach
-      # the Bluetooth stack.
-      #
-      # Not sufficient alone — hence the manifest link above: this option only
-      # feeds the host into the package wrapper, and Zen looks it up at runtime
-      # in ~/.mozilla, where nothing had put it.
+      # Web Bluetooth (Firefox lacks it) host; pairs with the extension below.
+      # Not sufficient alone — Zen looks it up in ~/.mozilla (see link above).
       nativeMessagingHosts = [pkgs.web-bluetooth-firefox-host];
 
-      # Claims http/https, html/xhtml, and BROWSER. Everything it writes is
-      # mkDefault, so an aspect wanting a type back just states it — how
-      # thunderbird keeps mailto below.
+      # Everything it writes is mkDefault — thunderbird reclaims mailto.
       setAsDefaultBrowser = true;
 
       policies = {
@@ -93,11 +59,8 @@
         DisplayMenuBar = "never";
         DNSOverHTTPS.Enabled = false;
         DontCheckDefaultBrowser = true;
-        # Any policies.json (this whole block) switches on Firefox's
-        # Enterprise Policy Engine, which defaults the Web Serial API to
-        # blocked from 151 on — same gate esptool-web-installer-style sites
-        # (ESP Web Tools, crosspoint) need to flash over /dev/ttyACM*. 3 =
-        # allow, 2 = block; there's no "ask" value.
+        # Any policies.json enables the Enterprise Policy Engine, which blocks
+        # Web Serial from 151 on (needed to flash ESP boards). 3 = allow.
         DefaultSerialGuardSetting = 3;
         PasswordManagerEnabled = false;
         TranslateEnabled = true;
@@ -119,12 +82,8 @@
             privacy-pass
           ])
           ++ [
-            # Page half of Web Bluetooth, paired with the native host above.
-            # Installed here, not via ExtensionSettings policy: install_url is
-            # only consulted when the id is absent, so with a copy already in
-            # the profile the policy did nothing. This symlinks the xpi in and
-            # replaces what is there. Own build, not AMO's —
-            # pkgs/web-bluetooth-firefox.nix has the fix it carries.
+            # Not via ExtensionSettings policy: install_url is ignored once the id
+            # is in the profile. Own build — see pkgs/web-bluetooth-firefox.nix.
             pkgs.web-bluetooth-firefox-extension
           ];
 
@@ -132,12 +91,8 @@
           "browser.tabs.inTitlebar" = 0;
           "extensions.autoDisableScopes" = 0;
 
-          # The web bluetooth extension is an unsigned own build (fix upstream
-          # hasn't shipped), so Zen disables it as unverifiable; the build
-          # permits this pref off but something sets it back, so state it.
-          # Costs little: every other add-on here is a signed AMO build via
-          # the nix store — this check guards browse-to-install, which is not
-          # how anything enters this profile.
+          # The web bluetooth extension is an unsigned own build; something
+          # resets this pref, so state it. All other add-ons arrive via nix.
           "xpinstall.signatures.required" = false;
           "devtools.chrome.enabled" = true;
           "devtools.debugger.remote-enabled" = true;
@@ -150,8 +105,7 @@
       };
     };
 
-    # Required under abort-on-warn: stylix warns when profileNames is empty
-    # with zen-browser on, and a warning is a hard eval failure.
+    # Required under abort-on-warn: stylix warns when profileNames is empty.
     stylix.targets.zen-browser.profileNames = ["default"];
   };
 }

@@ -1,25 +1,12 @@
 # services.flaresolverr — solve Cloudflare challenges for other services.
 #
-# The upstream module cannot run headless: Selenium removed `options.headless`,
-# so FlareSolverr's request for a headless browser is a silent no-op and
-# chromium wants a real display — the renderer dies with "Unable to receive
-# message from renderer", which reads like a browser bug. That is also why it
-# works on voyager and in the nixpkgs VM test but failed here: the display,
-# nothing else (versions, hardening, cores and GPUs were all eliminated).
-#
-# Two overrides on top of the module:
-#
-#   * ExecStart wrapped in xvfb-run. FlareSolverr's own internal Xvfb only
-#     starts on a path this configuration never reaches.
-#   * SystemCallFilter dropped: Xvfb needs several denied groups (@setuid
-#     trips it first, more behind it). Acceptable for a DynamicUser with no
-#     state and no network exposure; the module's other hardening is kept.
+# Selenium removed `options.headless`, so chromium needs a real display —
+# without one the renderer dies with "Unable to receive message from renderer".
+# Hence ExecStart wrapped in xvfb-run (FlareSolverr's internal Xvfb path is
+# never reached) and SystemCallFilter dropped (Xvfb needs @setuid and more).
 #
 # Loopback only, deliberately absent from netbird exposedPorts: an
 # unauthenticated endpoint that fetches arbitrary URLs is an SSRF primitive.
-#
-# Stateless; the DynamicUser is safe because it pairs with RuntimeDirectory,
-# not StateDirectory — the pairing that broke crowdsec (services/crowdsec.nix).
 {...}: {
   den.aspects.services.flaresolverr.nixos = {
     config,
