@@ -10,7 +10,7 @@
       ...
     }: let
       inherit (lib.options) mkOption mkPackageOption;
-      inherit (lib.types) port path bool str listOf submodule;
+      inherit (lib.types) port path bool str listOf submodule ints;
       inherit (lib.modules) mkIf;
 
       cfg-arr = config.cosmos.services.arr;
@@ -54,6 +54,11 @@
           description = "OpenRouter model id. Any chat model works; pricing is per token.";
           default = "anthropic/claude-haiku-5.5";
         };
+        maxConcurrentJobs = mkOption {
+          type = ints.positive;
+          # Hangfire workers across all queues, so media syncs share these slots.
+          default = 4;
+        };
         sourceLanguages = mkOption {
           type = listOf language;
           default = [
@@ -96,6 +101,7 @@
             DB_HANGFIRE_SQLITE_PATH = "${cfg.stateDir}/Hangfire.db";
             ENCRYPTION_KEYS = "${cfg.stateDir}/keys";
             TELEMETRY_ENABLED = "false";
+            MAX_CONCURRENT_JOBS = toString cfg.maxConcurrentJobs;
 
             # "localai" = upstream's generic OpenAI-compatible client.
             SERVICE_TYPE = builtins.toJSON ["localai"];
