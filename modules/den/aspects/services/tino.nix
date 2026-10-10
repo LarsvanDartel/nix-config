@@ -1,8 +1,45 @@
 # services.tino — TINO (github:confirm/tino), a git+Typst-backed
 # collaborative document editor. Published ungated: TINO does its own OIDC.
-{den, ...}: {
+{
+  den,
+  inputs,
+  ...
+}: {
   den.aspects.services.tino = {
     includes = [den.aspects.services.netbird.client];
+
+    kanidm-provision = {
+      groups = {
+        tino-users = {
+          overwriteMembers = false;
+          members = ["lvdar"];
+        };
+        tino-admin.members = ["lvdar"];
+      };
+      # Use tino_groups, not kanidm's raw "groups" claim as
+      # TINO_OIDC_GROUPS_CLAIM: TINO stores userinfo in its cookie and
+      # the raw list pushed it past 9KB, silently dropped by browsers.
+      oauth2.tino = {
+        displayName = "TINO";
+        originUrl = ["https://tino.lvdar.nl/oidc/callback"];
+        originLanding = "https://tino.lvdar.nl";
+        basicSecret = "keys/tino/oidc-client-secret";
+        # TINO sends no PKCE challenge; kanidm enforces it otherwise.
+        allowInsecureClientDisablePkce = true;
+        # TINO hardcodes the "groups" scope; kanidm refuses ungranted
+        # scopes. The resulting raw claim is simply unused.
+        scopeMaps.tino-users = ["openid" "profile" "email" "groups"];
+        # TINO bucket ACLs match against these values, so a kanidm group
+        # must be listed here before an ACL can reference it.
+        claimMaps.tino_groups = {
+          joinType = "array";
+          valuesByGroup = {
+            tino-admin = ["admins"];
+            tino-users = ["tino-users"];
+          };
+        };
+      };
+    };
 
     nixos = {
       config,
@@ -115,9 +152,10 @@
           }
         ];
 
-        # Owned by kanidm: its provisioning reads the same file as
-        # `basicSecretFile`. tino gets it via LoadCredential.
-        sops.secrets."keys/tino/oidc-client-secret".owner = "kanidm";
+        # Shared with kanidm's host (services/kanidm.nix), hence hosts/common.
+        # Root-owned: tino gets it via LoadCredential.
+        sops.secrets."keys/tino/oidc-client-secret".sopsFile =
+          builtins.toString inputs.nix-secrets + "/hosts/common/secrets.yaml";
 
         # Unset, TINO picks a random key per process, so every gunicorn worker
         # respawn silently invalidates all sessions (login loops).

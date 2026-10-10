@@ -4,6 +4,33 @@
   den.aspects.services.stalwart = {
     includes = [den.aspects.services.netbird.client];
 
+    # Thunderbird's custom OAuth for IMAP/SMTP (home/apps/thunderbird.nix).
+    # Stalwart validates tokens at this client's userinfo endpoint
+    # (userinfoUrl below); kanidm signs them per client, so every OAuth mail
+    # client must use this one.
+    kanidm-provision = {config, ...}: let
+      cfg = config.cosmos.services.stalwart;
+    in {
+      groups.mail-users = {
+        overwriteMembers = false;
+        members = ["lvdar"];
+      };
+      oauth2.stalwart = {
+        displayName = "Mail";
+        public = true;
+        # Thunderbird's loopback listener takes a random port.
+        enableLocalhostRedirects = true;
+        # Required by the module; no flow redirects here.
+        originUrl = ["https://${cfg.hostname}/"];
+        originLanding = "https://${cfg.hostname}";
+        # preferred_username becomes the Stalwart account name: `lvdar`,
+        # not the SPN `lvdar@lvdar.nl`.
+        preferShortUsername = true;
+        # Stalwart requires the email claim: it is the account's address.
+        scopeMaps.mail-users = ["openid" "profile" "email"];
+      };
+    };
+
     nixos = {
       config,
       lib,
@@ -60,7 +87,7 @@
 
         userinfoUrl = mkOption {
           type = str;
-          # Hand-synced with systems.oauth2.stalwart in services/kanidm.nix.
+          # The client is oauth2.stalwart above.
           default = "https://auth.lvdar.nl/oauth2/openid/stalwart/userinfo";
           description = ''
             Where bearer tokens are validated. kanidm signs access tokens per
@@ -167,14 +194,22 @@
             };
 
             # Only `rcpt` (the full address) is in scope here, not rcpt_domain.
-            # The target is the account's kanidm mail address.
+            # The target is the account's kanidm mail address. A blocked
+            # address drops out of the catch-all and gets 550 at RCPT.
             session.rcpt.catch-all = [
               {
-                "if" = "ends_with(rcpt, '@${cfg.domain}')";
+                "if" = "ends_with(rcpt, '@${cfg.domain}') && !key_exists('blocked', rcpt)";
                 "then" = "'lars@${cfg.domain}'";
               }
               {"else" = false;}
             ];
+
+            # Blocked addresses are `lookup.blocked.<address>` keys in Stalwart's
+            # DB (admin API, then /api/reload/lookup), not here: blocking needs
+            # no deploy and the list stays out of this public repo. The
+            # placeholder only defines the store, so lookups never fall back to
+            # the default one.
+            lookup.blocked."placeholder@blocked.invalid" = true;
 
             session.auth = {
               require = [

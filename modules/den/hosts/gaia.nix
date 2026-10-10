@@ -176,6 +176,7 @@
         "kavita"
         "paperless"
         "bin"
+        "vault"
       ];
 
       # Ad-blocking DNS follows roaming devices; gaia is the fallback.
@@ -311,6 +312,10 @@
 
         # Own OIDC.
         kavita = shared 5000;
+
+        # Bitwarden clients authenticate to the API themselves and can't
+        # follow the gate's redirect; kanidm SSO is the login (vaultwarden.nix).
+        vault = shared 8222;
 
         # Git clients can't do an IdP redirect; writes are authenticated by
         # the knot against ATProto identity.

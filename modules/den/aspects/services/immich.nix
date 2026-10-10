@@ -1,81 +1,108 @@
 # services.immich
 {...}: {
-  den.aspects.services.immich.nixos = {
-    config,
-    lib,
-    ...
-  }: let
-    inherit (lib.options) mkOption;
-    inherit (lib.types) listOf path str;
-
-    cfg = config.cosmos.services.immich;
-  in {
-    options.cosmos.services.immich = {
-      mediaDir = mkOption {
-        type = str;
-        default = "/var/lib/immich";
+  den.aspects.services.immich = {
+    kanidm-provision = {
+      groups = {
+        immich-users = {
+          overwriteMembers = false;
+          members = ["lvdar"];
+        };
+        immich-admin.members = ["lvdar"];
       };
-
-      accelerationDevices = mkOption {
-        type = listOf path;
-        default = ["/dev/dri/renderD128"];
-        description = ''
-          Render nodes to hand immich's transcoder.
-
-          Which card this is, is a fact about the host, so a host with more
-          than one GPU should name its by-path symlink here — renderD12x
-          numbering follows probe order and moves between cards when one fails
-          to bind. See the same option on services.transcode.
-        '';
+      oauth2.immich = {
+        displayName = "Immich";
+        originUrl = [
+          "app.immich:///oauth-callback"
+          "https://immich.lvdar.nl/auth/login"
+          "https://immich.lvdar.nl/user-settings"
+        ];
+        originLanding = "https://immich.lvdar.nl";
+        scopeMaps.immich-users = ["openid" "profile" "email"];
+        claimMaps.immich_groups = {
+          joinType = "array";
+          valuesByGroup.immich-admin = ["admin"];
+        };
       };
     };
 
-    config = {
-      systemd.tmpfiles.rules = ["d '${cfg.mediaDir}' 0775 immich media - -"];
-      cosmos.system.impermanence.persist.directories = [
-        {
-          directory = "/var/lib/immich";
+    nixos = {
+      config,
+      lib,
+      ...
+    }: let
+      inherit (lib.options) mkOption;
+      inherit (lib.types) listOf path str;
+
+      cfg = config.cosmos.services.immich;
+    in {
+      options.cosmos.services.immich = {
+        mediaDir = mkOption {
+          type = str;
+          default = "/var/lib/immich";
+        };
+
+        accelerationDevices = mkOption {
+          type = listOf path;
+          default = ["/dev/dri/renderD128"];
+          description = ''
+            Render nodes to hand immich's transcoder.
+
+            Which card this is, is a fact about the host, so a host with more
+            than one GPU should name its by-path symlink here — renderD12x
+            numbering follows probe order and moves between cards when one fails
+            to bind. See the same option on services.transcode.
+          '';
+        };
+      };
+
+      config = {
+        systemd.tmpfiles.rules = ["d '${cfg.mediaDir}' 0775 immich media - -"];
+        cosmos.system.impermanence.persist.directories = [
+          {
+            directory = "/var/lib/immich";
+            user = "immich";
+            group = "media";
+            mode = "0750";
+          }
+          {
+            # Here, not a postgres aspect: immich is this host's only postgres user.
+            directory = "/var/lib/postgresql";
+            user = "postgres";
+            group = "postgres";
+            mode = "0750";
+          }
+          {
+            directory = "/var/lib/redis-immich";
+            user = "redis-immich";
+            group = "redis-immich";
+            mode = "0750";
+          }
+        ];
+
+        # Root-owned: the immich module reads it via LoadCredential.
+        sops.secrets."keys/immich/oauth-client-secret" = {};
+        services.immich = {
+          enable = true;
+          host = "0.0.0.0";
+          mediaLocation = cfg.mediaDir;
+          settings = {
+            server.externalDomain = "https://immich.lvdar.nl";
+            oauth = {
+              enabled = true;
+              autoLaunch = true;
+              buttonText = "Login with Kanidm";
+              clientId = "immich";
+              clientSecret._secret = config.sops.secrets."keys/immich/oauth-client-secret".path;
+              issuerUrl = "https://auth.lvdar.nl/oauth2/openid/immich";
+              roleClaim = "immich_groups";
+              signingAlgorithm = "ES256";
+            };
+            passwordLogin.enabled = false;
+          };
+          inherit (cfg) accelerationDevices;
           user = "immich";
           group = "media";
-          mode = "0750";
-        }
-        {
-          # Here, not a postgres aspect: immich is this host's only postgres user.
-          directory = "/var/lib/postgresql";
-          user = "postgres";
-          group = "postgres";
-          mode = "0750";
-        }
-        {
-          directory = "/var/lib/redis-immich";
-          user = "redis-immich";
-          group = "redis-immich";
-          mode = "0750";
-        }
-      ];
-
-      sops.secrets."keys/immich/oauth-client-secret".owner = "kanidm";
-      services.immich = {
-        enable = true;
-        host = "0.0.0.0";
-        mediaLocation = cfg.mediaDir;
-        settings = {
-          server.externalDomain = "https://immich.lvdar.nl";
-          oauth = {
-            enabled = true;
-            autoLaunch = true;
-            buttonText = "Login with Kanidm";
-            clientId = "immich";
-            clientSecret._secret = config.sops.secrets."keys/immich/oauth-client-secret".path;
-            issuerUrl = "https://auth.lvdar.nl/oauth2/openid/immich";
-            roleClaim = "immich_groups";
-            signingAlgorithm = "ES256";
-          };
-          passwordLogin.enabled = false;
         };
-        inherit (cfg) accelerationDevices;
-        user = "immich";
-        group = "media";
       };
     };
   };

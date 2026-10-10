@@ -4,9 +4,42 @@
 # the gate's 302 on a lapsed session kills SPA XHR with a bare NetworkError
 # (what took traccar down). Local admin login kept: kanidm sits behind the
 # same edge, so OIDC-only would lock you out exactly when you need to look.
-{den, ...}: {
+{
+  den,
+  inputs,
+  ...
+}: {
   den.aspects.services.grafana = {
     includes = with den.aspects.services; [netbird.client prometheus loki];
+
+    kanidm-provision = {config, ...}: let
+      cfg = config.cosmos.services.grafana;
+    in {
+      # Grafana authenticates against kanidm directly, not via netbird.
+      groups = {
+        grafana-users = {
+          overwriteMembers = false;
+          members = ["lvdar"];
+        };
+        grafana-admin.members = ["lvdar"];
+      };
+      oauth2.grafana = {
+        displayName = "Grafana";
+        # kanidm matches redirect URIs strictly.
+        originUrl = ["https://${cfg.domain}/login/generic_oauth"];
+        originLanding = "https://${cfg.domain}";
+        basicSecret = "keys/grafana/oauth-client-secret";
+        preferShortUsername = true;
+        scopeMaps.grafana-users = ["openid" "profile" "email"];
+        claimMaps.grafana_role = {
+          joinType = "array";
+          valuesByGroup = {
+            grafana-users = ["Viewer"];
+            grafana-admin = ["Admin"];
+          };
+        };
+      };
+    };
 
     nixos = {
       config,
@@ -123,12 +156,9 @@
 
       config = {
         sops.secrets = {
-          # Read by kanidm to provision the client...
-          "keys/grafana/oauth-client-secret".owner = "kanidm";
-          # ...and by grafana. Two entries over one key rather than a shared
-          # group, so neither service can read the other's secrets.
-          "grafana/oauth-client-secret" = {
-            key = "keys/grafana/oauth-client-secret";
+          # Shared with kanidm's host (services/kanidm.nix), hence hosts/common.
+          "keys/grafana/oauth-client-secret" = {
+            sopsFile = builtins.toString inputs.nix-secrets + "/hosts/common/secrets.yaml";
             owner = "grafana";
           };
           # Encrypts datasource credentials in grafana's DB; losing it loses
@@ -176,7 +206,7 @@
               name = "kanidm";
               icon = "signin";
               client_id = "grafana";
-              client_secret = "$__file{${config.sops.secrets."grafana/oauth-client-secret".path}}";
+              client_secret = "$__file{${config.sops.secrets."keys/grafana/oauth-client-secret".path}}";
               scopes = "openid profile email";
               auth_url = "https://${cfg.authDomain}/ui/oauth2";
               token_url = "https://${cfg.authDomain}/oauth2/token";

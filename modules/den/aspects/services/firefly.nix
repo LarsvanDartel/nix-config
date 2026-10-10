@@ -8,9 +8,31 @@
 #
 # The data importer is mesh-only, not in gaia.nix, but still needs real TLS:
 # Enable Banking's pre-registered callback redirect may not tolerate HTTP.
-{den, ...}: {
+{
+  den,
+  inputs,
+  ...
+}: {
   den.aspects.services.firefly = {
     includes = with den.aspects.services; [nginx netbird.client];
+
+    kanidm-provision = {config, ...}: let
+      cfg = config.cosmos.services.firefly;
+    in {
+      groups.firefly-users = {
+        overwriteMembers = false;
+        members = ["lvdar"];
+      };
+
+      oauth2.firefly = {
+        displayName = "Firefly III";
+        basicSecret = "keys/firefly/oauth-client-secret";
+        originUrl = "https://${cfg.domain}/oauth2/callback";
+        originLanding = "https://${cfg.domain}";
+        scopeMaps.firefly-users = ["openid" "profile" "email"];
+        preferShortUsername = true;
+      };
+    };
 
     nixos = {
       config,
@@ -354,7 +376,9 @@
 
         sops.secrets = {
           "keys/firefly/app-key" = {owner = "firefly-iii";};
-          "keys/firefly/oauth-client-secret".owner = "kanidm";
+          # Shared with kanidm's host (services/kanidm.nix), hence hosts/common.
+          "keys/firefly/oauth-client-secret".sopsFile =
+            builtins.toString inputs.nix-secrets + "/hosts/common/secrets.yaml";
           "keys/firefly/cookie-secret" = {};
           # Personal Access Token created in Firefly's UI after first SSO login.
           "keys/firefly/importer-access-token" = {owner = "firefly-iii-data-importer";};
@@ -502,22 +526,6 @@
             };
 
             "~ \\.php$" = phpLocation {socket = config.services.phpfpm.pools.firefly-iii-data-importer.socket;};
-          };
-        };
-
-        services.kanidm.provision = {
-          groups.firefly-users = {
-            overwriteMembers = false;
-            members = ["lvdar"];
-          };
-
-          systems.oauth2.firefly = {
-            displayName = "Firefly III";
-            basicSecretFile = config.sops.secrets."keys/firefly/oauth-client-secret".path;
-            originUrl = "https://${cfg.domain}/oauth2/callback";
-            originLanding = "https://${cfg.domain}";
-            scopeMaps.firefly-users = ["openid" "profile" "email"];
-            preferShortUsername = true;
           };
         };
 

@@ -20,6 +20,36 @@
     })
   ];
 
+  den.aspects.services.jellyfin.kanidm-provision = {
+    groups = {
+      jellyfin-users = {
+        overwriteMembers = false;
+        members = ["lvdar"];
+      };
+      jellyfin-movies = {
+        overwriteMembers = false;
+        members = ["lvdar"];
+      };
+      jellyfin-admin.members = ["lvdar"];
+    };
+    oauth2.jellyfin = {
+      displayName = "Jellyfin";
+      basicSecret = "keys/jellyfin/oauth-client-secret";
+      originUrl = "https://jellyfin.lvdar.nl/sso/OID/redirect/kanidm";
+      originLanding = "https://jellyfin.lvdar.nl";
+      scopeMaps.jellyfin-users = ["openid" "profile" "email"];
+      supplementaryScopeMaps.jellyfin-users = ["jellyfin_groups"];
+      claimMaps.jellyfin_groups = {
+        joinType = "array";
+        valuesByGroup = {
+          jellyfin-users = ["jellyfin"];
+          jellyfin-admin = ["jellyfin_admin"];
+          jellyfin-movies = ["jellyfin_movies"];
+        };
+      };
+    };
+  };
+
   den.aspects.services.jellyfin.nixos = {
     config,
     lib,
@@ -82,10 +112,6 @@
 
     config = {
       sops.secrets = {
-        "keys/jellyfin/oauth-client-secret" = {
-          owner = "kanidm";
-          mode = "0640";
-        };
         "keys/jellyfin/api-key" = {};
         "keys/jellyfin/lvdar-password".owner = "jellyfin";
       };
@@ -228,36 +254,6 @@
           sslCertificate = "/var/lib/acme/lvdar.nl/fullchain.pem";
           sslCertificateKey = "/var/lib/acme/lvdar.nl/key.pem";
           locations."/".proxyPass = "http://127.0.0.1:${toString cfg.port}";
-        };
-      };
-
-      services.kanidm.provision = {
-        groups = {
-          jellyfin-users = {
-            overwriteMembers = false;
-            members = ["lvdar"];
-          };
-          jellyfin-movies = {
-            overwriteMembers = false;
-            members = ["lvdar"];
-          };
-          jellyfin-admin.members = ["lvdar"];
-        };
-        systems.oauth2.jellyfin = {
-          displayName = "Jellyfin";
-          basicSecretFile = config.sops.secrets."keys/jellyfin/oauth-client-secret".path;
-          originUrl = "https://jellyfin.lvdar.nl/sso/OID/redirect/kanidm";
-          originLanding = "https://jellyfin.lvdar.nl";
-          scopeMaps.jellyfin-users = ["openid" "profile" "email"];
-          supplementaryScopeMaps.jellyfin-users = ["jellyfin_groups"];
-          claimMaps.jellyfin_groups = {
-            joinType = "array";
-            valuesByGroup = {
-              jellyfin-users = ["jellyfin"];
-              jellyfin-admin = ["jellyfin_admin"];
-              jellyfin-movies = ["jellyfin_movies"];
-            };
-          };
         };
       };
     };

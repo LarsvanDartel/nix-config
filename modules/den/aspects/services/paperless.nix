@@ -1,7 +1,31 @@
 # services.paperless — document archive with OCR, behind kanidm.
-{den, ...}: {
+{
+  den,
+  inputs,
+  ...
+}: {
   den.aspects.services.paperless = {
     includes = [den.aspects.services.arr];
+
+    kanidm-provision = {config, ...}: let
+      cfg = config.cosmos.services.paperless;
+    in {
+      groups.paperless-users = {
+        overwriteMembers = false;
+        members = ["lvdar"];
+      };
+
+      oauth2.paperless = {
+        displayName = "Paperless";
+        basicSecret = "keys/paperless/oauth-client-secret";
+        # Must match the nixos module's providerId ("kanidm").
+        originUrl = "https://${cfg.domain}/accounts/oidc/kanidm/login/callback/";
+        originLanding = "https://${cfg.domain}";
+        scopeMaps.paperless-users = ["openid" "profile" "email"];
+
+        preferShortUsername = true;
+      };
+    };
 
     nixos = {
       config,
@@ -16,7 +40,6 @@
 
       # Wrong redirect URI is rejected *after* a successful login.
       providerId = "kanidm";
-      callback = "https://${cfg.domain}/accounts/oidc/${providerId}/login/callback/";
     in {
       options.cosmos.services.paperless = {
         expose = mkOption {
@@ -161,7 +184,10 @@
         sops.secrets =
           {
             "keys/paperless/admin-password".owner = "paperless";
-            "keys/paperless/oauth-client-secret".owner = "kanidm";
+            # Shared with kanidm's host (services/kanidm.nix), hence hosts/common.
+            # Root-owned; only read into the sops template.
+            "keys/paperless/oauth-client-secret".sopsFile =
+              builtins.toString inputs.nix-secrets + "/hosts/common/secrets.yaml";
           }
           // lib.optionalAttrs (cfg.ai.enable && cfg.ai.provider == "openrouter") {
             "keys/openrouter/api-key" = {};
@@ -220,23 +246,6 @@
             mode = "0750";
           }
         ];
-
-        services.kanidm.provision = {
-          groups.paperless-users = {
-            overwriteMembers = false;
-            members = ["lvdar"];
-          };
-
-          systems.oauth2.paperless = {
-            displayName = "Paperless";
-            basicSecretFile = config.sops.secrets."keys/paperless/oauth-client-secret".path;
-            originUrl = callback;
-            originLanding = "https://${cfg.domain}";
-            scopeMaps.paperless-users = ["openid" "profile" "email"];
-
-            preferShortUsername = true;
-          };
-        };
 
         services.nginx.virtualHosts = lib.mkIf (cfg.expose && !config.cosmos.networking.edgeTerminated) {
           ${cfg.domain} = {

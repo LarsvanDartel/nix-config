@@ -1,7 +1,43 @@
 # NetBird — self-hosted WireGuard mesh + reverse proxy. Replaces Pangolin.
 # :443 on gaia is shared by the control-plane vhost and netbird-proxy (own
 # ACME); nginx ssl_preread splits them by SNI. Upstream docs mandate Traefik.
-{den, ...}: {
+{
+  den,
+  lib,
+  ...
+}: let
+  # Gated services from netbird.services in hosts/gaia.nix, hand-synced (den
+  # cannot read another host's config). Each becomes a kanidm group AND a
+  # `groups` claim value NetBird matches against distribution lists.
+  gatedServices = [
+    "suwayomi"
+    "sabnzbd"
+    "prowlarr"
+    "radarr"
+    "sonarr"
+    "lidarr"
+    "bazarr"
+    "lingarr"
+
+    # Shared with people who administer nothing else; keep it separate.
+    "minecraft-control"
+  ];
+
+  # In-app permission groups (read via X-NetBird-Groups), not published
+  # domains; consumed by cosmos.services.minecraft.control.access on
+  # endeavour, one per server.
+  inAppGroups = [
+    "netbird-minecraft-smp"
+    "netbird-minecraft-hardcore"
+  ];
+
+  # NetBird replaces auto-groups wholesale with the token's claim, so
+  # omitting netbird-users would strip mesh access on next login.
+  netbirdGroups =
+    ["netbird-users"]
+    ++ map (s: "netbird-${s}") gatedServices
+    ++ inAppGroups;
+in {
   den.aspects.services.netbird.client.nixos = {
     config,
     lib,
@@ -288,6 +324,50 @@
 
   den.aspects.services.netbird = {
     includes = with den.aspects.services; [nginx netbird.client];
+
+    kanidm-provision = {
+      groups =
+        {netbird-admin.members = ["lvdar"];}
+        # overwriteMembers off so hand-added members survive a redeploy.
+        // lib.genAttrs netbirdGroups (_: {
+          overwriteMembers = false;
+          members = ["lvdar"];
+        });
+
+      # Browser app using PKCE; the client name is the audience NetBird
+      # management expects.
+      oauth2.netbird = {
+        displayName = "NetBird";
+        public = true;
+        # kanidm strips fragments from configured origins (kanidm#3217),
+        # so services/netbird.nix moves the dashboard callbacks to
+        # fragment-free paths; keep these in sync with AUTH_REDIRECT_URI.
+        originUrl = [
+          "https://netbird.lvdar.nl/callback"
+          "https://netbird.lvdar.nl/silent-callback"
+          # netbird-proxy bearer auth (HttpConfig.AuthCallbackURL).
+          "https://netbird.lvdar.nl/api/reverse-proxy/callback"
+          # CLI PKCE flow uses the first free of these ports
+          # (PKCEAuthorizationFlow in services/netbird.nix).
+          "http://localhost:53000/"
+          "http://localhost:54000/"
+        ];
+        originLanding = "https://netbird.lvdar.nl";
+        # Every netbird-* group, not just netbird-users: otherwise a
+        # member of only one service group is refused a token with a
+        # misleading scopes error. Services' distribution lists still
+        # decide access.
+        scopeMaps = lib.genAttrs netbirdGroups (_: ["openid" "profile" "email"]);
+
+        # One-to-one on purpose: NetBird sets auto-groups to exactly this.
+        claimMaps.groups = {
+          joinType = "array";
+          valuesByGroup =
+            {netbird-admin = ["netbird-admin"];}
+            // lib.genAttrs netbirdGroups (g: [g]);
+        };
+      };
+    };
 
     nixos = {
       config,

@@ -1,5 +1,9 @@
 # services.ollama — local LLM inference on endeavour's Tesla P100.
-{den, ...}: {
+{
+  den,
+  inputs,
+  ...
+}: {
   den.aspects.services.ollama.nixos = {
     config,
     lib,
@@ -135,6 +139,25 @@
   den.aspects.services.ollama.librechat = {
     includes = [den.aspects.services.ollama den.aspects.core.sops];
 
+    kanidm-provision = {config, ...}: let
+      cfg = config.cosmos.services.ollama.librechat;
+    in {
+      groups.librechat-users = {
+        overwriteMembers = false;
+        members = ["lvdar"];
+      };
+
+      oauth2.librechat = {
+        displayName = "LibreChat";
+        basicSecret = "keys/librechat/oauth-client-secret";
+        originUrl = "https://${cfg.domain}/oauth/openid/callback";
+        originLanding = "https://${cfg.domain}";
+        scopeMaps.librechat-users = ["openid" "email" "profile"];
+
+        preferShortUsername = true;
+      };
+    };
+
     nixos = {
       config,
       lib,
@@ -216,7 +239,7 @@
             JWT_REFRESH_SECRET = config.sops.secrets."keys/librechat/jwt-refresh-secret".path;
             OPENID_SESSION_SECRET = config.sops.secrets."keys/librechat/session-secret".path;
 
-            # Shared with the kanidm provisioner, which owns the sops file.
+            # Shared with kanidm's host, hence hosts/common.
             OPENID_CLIENT_SECRET = config.sops.secrets."keys/librechat/oauth-client-secret".path;
             OPENROUTER_KEY = config.sops.secrets."keys/openrouter/api-key".path;
           };
@@ -266,7 +289,10 @@
           "keys/librechat/jwt-refresh-secret" = {};
           "keys/librechat/session-secret" = {};
           "keys/openrouter/api-key" = {};
-          "keys/librechat/oauth-client-secret".owner = "kanidm";
+          # Shared with kanidm's host (services/kanidm.nix), hence hosts/common.
+          # Root-owned; handed over as a systemd credential.
+          "keys/librechat/oauth-client-secret".sopsFile =
+            builtins.toString inputs.nix-secrets + "/hosts/common/secrets.yaml";
         };
 
         cosmos.system.impermanence.persist.directories = [
@@ -284,23 +310,6 @@
             mode = "0750";
           }
         ];
-
-        services.kanidm.provision = {
-          groups.librechat-users = {
-            overwriteMembers = false;
-            members = ["lvdar"];
-          };
-
-          systems.oauth2.librechat = {
-            displayName = "LibreChat";
-            basicSecretFile = config.sops.secrets."keys/librechat/oauth-client-secret".path;
-            originUrl = "https://${cfg.domain}/oauth/openid/callback";
-            originLanding = "https://${cfg.domain}";
-            scopeMaps.librechat-users = ["openid" "email" "profile"];
-
-            preferShortUsername = true;
-          };
-        };
       };
     };
   };

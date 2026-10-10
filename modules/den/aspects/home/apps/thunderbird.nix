@@ -58,7 +58,7 @@
           thunderbird = {
             enable = true;
             # Thunderbird's custom OAuth (155+) against kanidm's `stalwart`
-            # client (services/kanidm.nix). Same issuer for IMAP and SMTP, so
+            # client (services/stalwart.nix). Same issuer for IMAP and SMTP, so
             # both share one refresh token. No issuerIdentifier: kanidm sends
             # no RFC 9207 `iss`, and setting it rejects every response.
             settings = id: let
