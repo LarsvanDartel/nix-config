@@ -243,12 +243,12 @@
             AUTHENTICATION_GUARD_EMAIL = "REMOTE_USER_EMAIL";
 
             MAIL_MAILER = "smtp";
-            MAIL_HOST = "smtp.protonmail.ch";
-            MAIL_PORT = 587;
-            MAIL_ENCRYPTION = "tls";
-            MAIL_USERNAME = "firefly@lvdar.nl";
+            # gaia's Stalwart mesh relay (services/stalwart.nix): no auth or
+            # STARTTLS offered, so none configured; hand-synced with gaia.nix
+            # relayClients.
+            MAIL_HOST = "gaia.nb.lvdar.nl";
+            MAIL_PORT = 2525;
             MAIL_FROM = "firefly@lvdar.nl";
-            MAIL_PASSWORD_FILE = config.sops.secrets."keys/firefly/smtp-token".path;
           };
         };
 
@@ -353,7 +353,6 @@
           "keys/firefly/app-key" = {owner = "firefly-iii";};
           "keys/firefly/oauth-client-secret".owner = "kanidm";
           "keys/firefly/cookie-secret" = {};
-          "keys/firefly/smtp-token".owner = "firefly-iii";
           # Personal Access Token created in Firefly's UI after first SSO login.
           "keys/firefly/importer-access-token" = {owner = "firefly-iii-data-importer";};
           "keys/firefly/enable-banking-app-id".owner = "firefly-iii-data-importer";

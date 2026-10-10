@@ -61,15 +61,6 @@
 
       collabora.enable = mkEnableOption "Collabora Online" // {default = true;};
 
-      radicale = {
-        enable = mkEnableOption "CalDAV and CardDAV via Radicale" // {default = true;};
-        port = mkOption {
-          type = port;
-          # Not 5232: traccar owns 5001-5263. Not the 9000s: OpenCloud's own.
-          default = 8231;
-        };
-      };
-
       tika.enable =
         mkEnableOption "full-text search inside documents, via Apache Tika"
         // {default = true;};
@@ -106,22 +97,15 @@
         # JWT key, machine-auth key, service credentials: lose this and
         # everything under dataDir is orphaned.
         files = ["/etc/opencloud/opencloud.yaml"];
-        directories =
-          [
-            {
-              directory = "/var/lib/cool";
-              user = "cool";
-              group = "cool";
-              mode = "0750";
-            }
-          ]
-          # Tika's state is deliberately not persisted: DynamicUser fights the mount.
-          ++ lib.optional cfg.radicale.enable {
-            directory = "/var/lib/radicale";
-            user = config.services.radicale.user;
-            group = config.services.radicale.group;
+        # Tika's state is deliberately not persisted: DynamicUser fights the mount.
+        directories = [
+          {
+            directory = "/var/lib/cool";
+            user = "cool";
+            group = "cool";
             mode = "0750";
-          };
+          }
+        ];
       };
 
       services.opencloud = {
@@ -196,32 +180,6 @@
               };
             };
             csp_config_file_location = "/etc/opencloud/csp.yaml";
-
-            # Radicale trusts X-Remote-User unconditionally, so it must stay
-            # loopback-only and out of exposedPorts.
-            additional_policies = lib.mkIf cfg.radicale.enable [
-              {
-                # Must be "default": appended policies under any other name
-                # load fine and are silently never consulted.
-                name = "default";
-                routes = let
-                  # Without X-Script-Name, Radicale's .well-known redirect lacks
-                  # /caldav and the web UI reports the calendar as not configured.
-                  route = prefix: endpoint: {
-                    inherit endpoint;
-                    backend = "http://127.0.0.1:${toString cfg.radicale.port}";
-                    remote_user_header = "X-Remote-User";
-                    skip_x_access_token = true;
-                    additional_headers."X-Script-Name" = prefix;
-                  };
-                in [
-                  (route "/caldav" "/caldav/")
-                  (route "/carddav" "/carddav/")
-                  (route "/caldav" "/.well-known/caldav")
-                  (route "/carddav" "/.well-known/carddav")
-                ];
-              }
-            ];
           };
 
           # docs must frame and be framed by cloud, or the editor is blank.
@@ -371,34 +329,6 @@
 
       sops.secrets = lib.mkIf cfg.smtp.enable {
         "keys/opencloud/smtp".owner = config.services.opencloud.user;
-      };
-
-      services.radicale = mkIf cfg.radicale.enable {
-        enable = true;
-        settings = {
-          server.hosts = "127.0.0.1:${toString cfg.radicale.port}";
-
-          # No auth of its own: safe only while the port is loopback and unexposed.
-          auth.type = "http_x_remote_user";
-
-          storage = {
-            filesystem_folder = "/var/lib/radicale/collections";
-
-            # Without these a new principal is empty, which looks like a config
-            # error. Created once; new entries do not reach existing users.
-            predefined_collections = builtins.toJSON {
-              def-calendar = {
-                "D:displayname" = "Personal Calendar";
-                "C:supported-calendar-component-set" = "VEVENT,VJOURNAL,VTODO";
-                tag = "VCALENDAR";
-              };
-              def-addressbook = {
-                "D:displayname" = "Personal Address Book";
-                tag = "VADDRESSBOOK";
-              };
-            };
-          };
-        };
       };
 
       # Loopback-only: a JVM that will parse anything it is handed.

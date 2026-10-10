@@ -52,7 +52,6 @@
         # home.freecad
         home.orca-slicer
         home.simplelogin
-        home.proton.mail-bridge
         home.proton.pass-cli
         home.proton.vpn-cli
         home.eduvpn

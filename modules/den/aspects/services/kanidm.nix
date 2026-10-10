@@ -1,4 +1,4 @@
-# services.kanidm — identity provider (OIDC for netbird/immich/opencloud/traccar).
+# services.kanidm — identity provider (OIDC for netbird/immich/opencloud/traccar/mail).
 {...}: {
   den.aspects.services.kanidm.nixos = {
     config,
@@ -135,6 +135,11 @@
                 members = ["lvdar"];
               };
               tino-admin.members = ["lvdar"];
+
+              mail-users = {
+                overwriteMembers = false;
+                members = ["lvdar"];
+              };
             }
             # overwriteMembers off so hand-added members survive a redeploy.
             // lib.genAttrs netbirdGroups (_: {
@@ -248,6 +253,25 @@
                   tino-users = ["tino-users"];
                 };
               };
+            };
+
+            # Thunderbird's custom OAuth for IMAP/SMTP (home/apps/thunderbird.nix).
+            # Stalwart validates tokens at this client's userinfo endpoint
+            # (cosmos.services.stalwart.userinfoUrl on gaia); kanidm signs
+            # them per client, so every OAuth mail client must use this one.
+            stalwart = {
+              displayName = "Mail";
+              public = true;
+              # Thunderbird's loopback listener takes a random port.
+              enableLocalhostRedirects = true;
+              # Required by the module; no flow redirects here.
+              originUrl = ["https://mail.lvdar.nl/"];
+              originLanding = "https://mail.lvdar.nl";
+              # preferred_username becomes the Stalwart account name: `lvdar`,
+              # not the SPN `lvdar@lvdar.nl`.
+              preferShortUsername = true;
+              # Stalwart requires the email claim: it is the account's address.
+              scopeMaps.mail-users = ["openid" "profile" "email"];
             };
           };
         };
