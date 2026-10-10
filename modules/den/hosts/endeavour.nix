@@ -454,10 +454,7 @@
           vaapiDevice = arcRenderNode;
         };
 
-        paperless.ai = {
-          enable = true;
-          model = "qwen3:14b";
-        };
+        paperless.ai.enable = true;
         immich = {
           mediaDir = "/tank/media/library/images";
           accelerationDevices = [arcRenderNode];

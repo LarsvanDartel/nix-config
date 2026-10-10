@@ -9,7 +9,7 @@
       ...
     }: let
       inherit (lib.options) mkOption;
-      inherit (lib.types) bool port str;
+      inherit (lib.types) bool enum port str;
 
       cfg = config.cosmos.services.paperless;
       arr = config.cosmos.services.arr;
@@ -44,36 +44,49 @@
           enable = mkOption {
             type = bool;
             default = false;
-            description = ''
-              Offer LLM-generated suggestions when a document is opened.
+            description = "Offer LLM-generated suggestions when a document is opened.";
+          };
 
-              Off by default because it needs a model to talk to, which is a
-              fact about the host rather than about paperless.
+          provider = mkOption {
+            type = enum ["openrouter" "ollama"];
+            default = "openrouter";
+            description = ''
+              `openrouter` sends document text off-host, restricted to
+              zero-data-retention endpoints. `ollama` keeps it on the host but
+              needs a local model.
             '';
           };
 
           endpoint = mkOption {
             type = str;
-            default = "http://127.0.0.1:11434";
+            default =
+              if cfg.ai.provider == "openrouter"
+              then "https://openrouter.ai/api/v1"
+              else "http://127.0.0.1:11434";
+            defaultText = lib.literalMD "OpenRouter's API, or local ollama";
             description = ''
-              Where the model lives. Loopback works because paperless-web —
-              the only unit that makes this call — runs with
-              PrivateNetwork=no. The consumer and scheduler are in their own
-              network namespace, where this address would mean something else
-              entirely and reach nothing.
+              Loopback works for ollama because paperless-web — the only unit
+              that makes this call — runs with PrivateNetwork=no. The consumer
+              and scheduler are in their own network namespace, where this
+              address would mean something else entirely and reach nothing.
             '';
           };
 
           model = mkOption {
             type = str;
-            default = "qwen3:14b";
+            default =
+              if cfg.ai.provider == "openrouter"
+              then "anthropic/claude-haiku-5.5"
+              else "qwen3:14b";
+            defaultText = lib.literalMD "`anthropic/claude-haiku-5.5` on OpenRouter, `qwen3:14b` on ollama";
             description = ''
-              A starting point, not a recommendation for every host — what is
-              actually available is a property of that host's ollama.
+              On OpenRouter the model must support forced tool calls
+              (`tool_choice`): paperless gets its answer as a tool call. With
+              zero-data-retention routing a model with no ZDR endpoint fails
+              every request.
 
-              If suggestions come back malformed, this model's thinking mode
-              leaking into the structured output is the first thing to
-              suspect; a plainer instruct model is a one-word change.
+              On ollama, if suggestions come back malformed, thinking mode
+              leaking into the structured output is the first thing to suspect.
             '';
           };
         };
@@ -120,50 +133,67 @@
               # OIDC login got a bare 403 (2026-08-30).
               PAPERLESS_SOCIAL_ACCOUNT_DEFAULT_GROUPS = "Users";
             }
-            // lib.optionalAttrs cfg.ai.enable {
-              # Suggestions on document view only, not applied during consumption.
-              PAPERLESS_AI_ENABLED = true;
-              PAPERLESS_AI_LLM_BACKEND = "ollama";
-              PAPERLESS_AI_LLM_ENDPOINT = cfg.ai.endpoint;
-              PAPERLESS_AI_LLM_MODEL = cfg.ai.model;
+            // lib.optionalAttrs cfg.ai.enable ({
+                # Suggestions on document view only, not applied during consumption.
+                PAPERLESS_AI_ENABLED = true;
+                PAPERLESS_AI_LLM_ENDPOINT = cfg.ai.endpoint;
+                PAPERLESS_AI_LLM_MODEL = cfg.ai.model;
 
-              # OUTPUT_LANGUAGE unset: translation breaks name-matching of tags.
-              # SOCIALACCOUNT_PROVIDERS carries a secret: via environmentFile.
-            };
+                # OUTPUT_LANGUAGE unset: translation breaks name-matching of tags.
+                # SOCIALACCOUNT_PROVIDERS and the API key carry secrets: via environmentFile.
+              }
+              // (
+                if cfg.ai.provider == "openrouter"
+                then {
+                  PAPERLESS_AI_LLM_BACKEND = "openai-like";
+                  # Passed through llama-index into openai-python's create();
+                  # only `extra_body` reaches OpenRouter's request body.
+                  PAPERLESS_AI_LLM_EXTRA_PARAMS = builtins.toJSON {extra_body.provider.zdr = true;};
+                }
+                else {PAPERLESS_AI_LLM_BACKEND = "ollama";}
+              ));
 
           environmentFile = config.sops.templates."paperless.env".path;
         };
 
         # Password login stays enabled as break-glass for when kanidm is down.
 
-        sops.secrets = {
-          "keys/paperless/admin-password".owner = "paperless";
-          "keys/paperless/oauth-client-secret".owner = "kanidm";
-        };
+        sops.secrets =
+          {
+            "keys/paperless/admin-password".owner = "paperless";
+            "keys/paperless/oauth-client-secret".owner = "kanidm";
+          }
+          // lib.optionalAttrs (cfg.ai.enable && cfg.ai.provider == "openrouter") {
+            "keys/openrouter/api-key" = {};
+          };
 
         # Single-quoted: `paperless-manage` sources this file and unquoted JSON
         # breaks in the shell.
         sops.templates."paperless.env" = {
-          content = ''
-            PAPERLESS_SOCIALACCOUNT_PROVIDERS='${builtins.toJSON {
-              openid_connect = {
-                OAUTH_PKCE_ENABLED = true;
-                APPS = [
-                  {
-                    provider_id = providerId;
-                    name = "Kanidm";
-                    client_id = "paperless";
-                    # The placeholder goes through builtins.toJSON intact —
-                    # it carries no quotes or backslashes to escape — and
-                    # sops-nix substitutes the real value when it renders the
-                    # file at activation.
-                    secret = config.sops.placeholder."keys/paperless/oauth-client-secret";
-                    settings.server_url = "https://auth.lvdar.nl/oauth2/openid/paperless/.well-known/openid-configuration";
-                  }
-                ];
-              };
-            }}'
-          '';
+          content =
+            ''
+              PAPERLESS_SOCIALACCOUNT_PROVIDERS='${builtins.toJSON {
+                openid_connect = {
+                  OAUTH_PKCE_ENABLED = true;
+                  APPS = [
+                    {
+                      provider_id = providerId;
+                      name = "Kanidm";
+                      client_id = "paperless";
+                      # The placeholder goes through builtins.toJSON intact —
+                      # it carries no quotes or backslashes to escape — and
+                      # sops-nix substitutes the real value when it renders the
+                      # file at activation.
+                      secret = config.sops.placeholder."keys/paperless/oauth-client-secret";
+                      settings.server_url = "https://auth.lvdar.nl/oauth2/openid/paperless/.well-known/openid-configuration";
+                    }
+                  ];
+                };
+              }}'
+            ''
+            + lib.optionalString (cfg.ai.enable && cfg.ai.provider == "openrouter") ''
+              PAPERLESS_AI_LLM_API_KEY='${config.sops.placeholder."keys/openrouter/api-key"}'
+            '';
           owner = "paperless";
         };
 
