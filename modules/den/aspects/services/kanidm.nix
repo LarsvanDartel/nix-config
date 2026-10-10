@@ -72,6 +72,8 @@ in {
             key = client.basicSecret;
             sopsFile = commonSecrets;
             owner = "kanidm";
+            # Provisioning runs in kanidm's ExecStartPost.
+            restartUnits = ["kanidm.service"];
           })
         (confidential entry);
     in {
