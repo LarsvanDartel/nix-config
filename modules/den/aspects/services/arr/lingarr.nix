@@ -52,7 +52,7 @@
         model = mkOption {
           type = str;
           description = "OpenRouter model id. Any chat model works; pricing is per token.";
-          default = "google/gemini-3.8-flash";
+          default = "anthropic/claude-haiku-5.5";
         };
         sourceLanguages = mkOption {
           type = listOf language;
