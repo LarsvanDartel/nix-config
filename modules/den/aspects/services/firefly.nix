@@ -249,6 +249,9 @@
             MAIL_HOST = "gaia.nb.lvdar.nl";
             MAIL_PORT = 2525;
             MAIL_FROM = "firefly@lvdar.nl";
+            # Recipient of admin notifications, including Settings ->
+            # Notifications' test button; unset, those are silently dropped.
+            SITE_OWNER = "lars@lvdar.nl";
           };
         };
 

@@ -206,6 +206,16 @@
               must-match-sender = false;
             };
 
+            # The relay's clients are our own services; unsigned and unaligned,
+            # their notifications to the local mailbox otherwise land in Junk.
+            session.data.spam-filter = [
+              {
+                "if" = "listener == 'mesh-relay'";
+                "then" = false;
+              }
+              {"else" = true;}
+            ];
+
             session.rcpt.relay =
               [
                 {
