@@ -52,7 +52,7 @@
         # home.freecad
         home.orca-slicer
         home.simplelogin
-        home.proton.pass-cli
+        home.rbw
         home.proton.vpn-cli
         home.eduvpn
       ];

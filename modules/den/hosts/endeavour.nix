@@ -80,6 +80,7 @@
       services.minecraft.control
       services.ollama.librechat
       services.taskchampion
+      services.vaultwarden
     ];
 
     nixos = {
@@ -277,6 +278,8 @@
         "/persist/var/lib/typstnique"
         # Convenience only: every replica holds the full list; encrypted.
         "/persist/var/lib/taskchampion-sync-server"
+        # vaultwarden's nightly sqlite .backup; the live DB is not copied.
+        "/persist/var/backup/vaultwarden"
         "/persist/home"
         # The ssh host key decrypts sops, incl. keys/zfs/tank: without it
         # nothing else (including /tank) is restorable.

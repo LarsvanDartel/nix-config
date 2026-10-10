@@ -8,9 +8,55 @@
 #     once locked the only account out; recovery was a sqlite UPDATE on row
 #     40 with the service stopped.
 #   * the module substitutes only TokenKey; hence the replace-secret pass below.
-{den, ...}: {
+{
+  den,
+  inputs,
+  ...
+}: {
   den.aspects.services.kavita = {
     includes = [den.aspects.services.arr];
+
+    kanidm-provision = {config, ...}: let
+      cfg = config.cosmos.services.kavita;
+    in {
+      groups.kavita-users = {
+        overwriteMembers = false;
+        members = ["lvdar"];
+      };
+
+      groups.kavita-admins = {
+        overwriteMembers = false;
+        members = ["lvdar"];
+      };
+
+      oauth2.kavita = {
+        displayName = "Kavita";
+        basicSecret = "keys/kavita/oauth-client-secret";
+
+        # Kavita's exact role names; single-word only.
+        supplementaryScopeMaps.kavita-users = ["kavita_roles"];
+        claimMaps.kavita_roles = {
+          joinType = "array";
+          valuesByGroup = {
+            kavita-users = ["Login" "Download" "Bookmark"];
+            kavita-admins = ["Admin"];
+          };
+        };
+
+        # Without the sign-out callback, logout lands on a kanidm error.
+        originUrl = [
+          "https://${cfg.domain}/signin-oidc"
+          "https://${cfg.domain}/signout-callback-oidc"
+        ];
+        originLanding = "https://${cfg.domain}";
+        scopeMaps.kavita-users = ["openid" "profile" "email"];
+
+        # Deliberately NOT allowInsecureClientDisablePkce (unlike jellyfin
+        # and traccar): ASP.NET Core sends PKCE. If token exchange fails with
+        # invalid_request, confirm the challenge is absent before using it.
+        preferShortUsername = true;
+      };
+    };
 
     nixos = {
       config,
@@ -116,8 +162,10 @@
           #   head -c 64 /dev/urandom | base64 --wrap=0
           "keys/kavita/token" = {};
 
-          # kanidm reads it directly; systemd hands Kavita a LoadCredential copy.
-          "keys/kavita/oauth-client-secret".owner = "kanidm";
+          # Shared with kanidm's host (services/kanidm.nix), hence hosts/common.
+          # Root-owned; systemd hands Kavita a LoadCredential copy.
+          "keys/kavita/oauth-client-secret".sopsFile =
+            builtins.toString inputs.nix-secrets + "/hosts/common/secrets.yaml";
         };
 
         cosmos.system.impermanence.persist.directories = [
@@ -128,46 +176,6 @@
             mode = "0750";
           }
         ];
-
-        services.kanidm.provision = {
-          groups.kavita-users = {
-            overwriteMembers = false;
-            members = ["lvdar"];
-          };
-
-          groups.kavita-admins = {
-            overwriteMembers = false;
-            members = ["lvdar"];
-          };
-
-          systems.oauth2.kavita = {
-            displayName = "Kavita";
-            basicSecretFile = config.sops.secrets."keys/kavita/oauth-client-secret".path;
-
-            # Kavita's exact role names; single-word only.
-            supplementaryScopeMaps.kavita-users = ["kavita_roles"];
-            claimMaps.kavita_roles = {
-              joinType = "array";
-              valuesByGroup = {
-                kavita-users = ["Login" "Download" "Bookmark"];
-                kavita-admins = ["Admin"];
-              };
-            };
-
-            # Without the sign-out callback, logout lands on a kanidm error.
-            originUrl = [
-              "https://${cfg.domain}/signin-oidc"
-              "https://${cfg.domain}/signout-callback-oidc"
-            ];
-            originLanding = "https://${cfg.domain}";
-            scopeMaps.kavita-users = ["openid" "profile" "email"];
-
-            # Deliberately NOT allowInsecureClientDisablePkce (unlike jellyfin
-            # and traccar): ASP.NET Core sends PKCE. If token exchange fails with
-            # invalid_request, confirm the challenge is absent before using it.
-            preferShortUsername = true;
-          };
-        };
 
         services.nginx.virtualHosts = mkIf (cfg.expose && !config.cosmos.networking.edgeTerminated) {
           ${cfg.domain} = {

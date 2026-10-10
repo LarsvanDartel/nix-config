@@ -8,7 +8,25 @@
 # probing: `POST /upload/` also creates a pasta (hence `limit_except GET HEAD`
 # on public locations), and MicroBin redirects new pastas to `/upload/{id}`,
 # so `/upload/` must be readable.
-{...}: {
+{inputs, ...}: {
+  den.aspects.services.microbin.kanidm-provision = {config, ...}: let
+    cfg = config.cosmos.services.microbin;
+  in {
+    groups.microbin-users = {
+      overwriteMembers = false;
+      members = ["lvdar"];
+    };
+
+    oauth2.microbin = {
+      displayName = "MicroBin";
+      basicSecret = "keys/microbin/oauth-client-secret";
+      originUrl = "https://${cfg.domain}/oauth2/callback";
+      originLanding = "https://${cfg.domain}";
+      scopeMaps.microbin-users = ["openid" "profile" "email"];
+      preferShortUsername = true;
+    };
+  };
+
   den.aspects.services.microbin.nixos = {
     config,
     lib,
@@ -138,7 +156,11 @@
       # Deliberately no uploader password; kanidm gates creation.
       sops.secrets = {
         "keys/microbin/admin-password" = {};
-        "keys/microbin/oauth-client-secret".owner = "kanidm";
+        # Shared with kanidm's host (services/kanidm.nix), hence hosts/common.
+        "keys/microbin/oauth-client-secret" = {
+          sopsFile = builtins.toString inputs.nix-secrets + "/hosts/common/secrets.yaml";
+          owner = "oauth2-proxy";
+        };
         "keys/microbin/cookie-secret" = {};
       };
 
@@ -236,22 +258,6 @@
           # against the public URL.
           absolute_redirect off;
         '';
-      };
-
-      services.kanidm.provision = {
-        groups.microbin-users = {
-          overwriteMembers = false;
-          members = ["lvdar"];
-        };
-
-        systems.oauth2.microbin = {
-          displayName = "MicroBin";
-          basicSecretFile = config.sops.secrets."keys/microbin/oauth-client-secret".path;
-          originUrl = "https://${cfg.domain}/oauth2/callback";
-          originLanding = "https://${cfg.domain}";
-          scopeMaps.microbin-users = ["openid" "profile" "email"];
-          preferShortUsername = true;
-        };
       };
 
       cosmos.system.impermanence.persist.directories = [

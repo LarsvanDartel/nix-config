@@ -41,7 +41,7 @@
 
         extensions.packages = with pkgs.nur.repos.rycee.firefox-addons; [
           ublock-origin
-          proton-pass
+          bitwarden
           zotero-connector
         ];
 

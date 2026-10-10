@@ -1,230 +1,231 @@
 # services.traccar — GPS tracking server (H2 db, OIDC via kanidm).
-{...}: {
-  den.aspects.services.traccar.nixos = {
-    config,
-    lib,
-    pkgs,
-    ...
-  }: let
-    inherit (lib.options) mkOption;
-    inherit (lib.types) attrsOf bool port listOf enum;
-    inherit (lib.modules) mkIf;
-    inherit (lib.strings) concatMapStringsSep concatStringsSep toUpper;
-    inherit (lib.attrsets) mapAttrsToListRecursive mapAttrsRecursive recursiveUpdate;
-    inherit (lib.meta) getExe;
-
-    cfg = config.cosmos.services.traccar;
-    stateDirectory = "/var/lib/traccar";
-    configFilePath = "${stateDirectory}/config.xml";
-
-    mapLeafs = mapAttrsRecursive (
-      path: value: "<entry key='${lib.concatStringsSep "." path}'>${value}</entry>"
-    );
-
-    mkConfigEntry = config: lib.collect builtins.isString (mapLeafs config);
-
-    mkConfig = configurationOptions:
-      pkgs.writeText "traccar.xml" ''
-        <?xml version='1.0' encoding='UTF-8'?>
-        <!DOCTYPE properties SYSTEM 'http://java.sun.com/dtd/properties.dtd'>
-        <properties>
-            ${builtins.concatStringsSep "\n" (mkConfigEntry configurationOptions)}
-        </properties>
-      '';
-
-    toPlaceHolder = path: "@${concatMapStringsSep "_" (x: toUpper x) path}@";
-
-    addSecretPlaceholders = settings: secrets:
-      recursiveUpdate settings (mapAttrsRecursive (path: _: toPlaceHolder path) secrets);
-
-    generateConfig = settings: secrets:
-      pkgs.writeShellScriptBin "traccar-generate-config" ''
-        set -euo pipefail
-        umask 077
-
-        install -d -m 750 -o traccar -g traccar "${stateDirectory}"
-        install -m 600 -o traccar -g traccar "${mkConfig (addSecretPlaceholders settings secrets)}" "${configFilePath}"
-
-        ${concatStringsSep "\n" (mapAttrsToListRecursive (path: value: ''
-            ${pkgs.replace-secret}/bin/replace-secret \
-              "${toPlaceHolder path}" \
-              "${value}" \
-              ${configFilePath}
-          '')
-          secrets)}
-      '';
-
-    protocolPorts.osmand = 5055;
-
-    selectedPorts = map (p: protocolPorts.${p}) cfg.protocols;
-
-    settings = {
-      protocol = lib.genAttrs cfg.protocols (name: {port = toString protocolPorts.${name};});
-      database = {
-        driver = "org.h2.Driver";
-        password = "";
-        url = "jdbc:h2:${stateDirectory}/traccar";
-        user = "sa";
-      };
-      logger = {
-        console = "true";
-        level = "info";
-      };
-      web = {
-        port = toString cfg.port;
-        url = "https://traccar.lvdar.nl";
-        override = "${stateDirectory}/override";
-        showUnknownDevices = "true";
-      };
-      notificator.types = "traccar,web,mail,command";
-      # gaia's Stalwart mesh relay (services/stalwart.nix): no auth or
-      # STARTTLS offered, so none configured; hand-synced with gaia.nix
-      # relayClients.
-      mail.smtp = {
-        host = "gaia.nb.lvdar.nl";
-        port = "2525";
-        from = "traccar@lvdar.nl";
-      };
-      openid = {
-        force = "true";
-        clientId = "traccar";
-        issuerUrl = "https://auth.lvdar.nl/oauth2/openid/traccar";
-        groupsClaimName = "traccar_groups";
-        allowGroup = "traccar";
-        adminGroup = "traccar_admin";
-      };
-    };
-
-    secrets = {
-      openid.clientSecret = config.sops.secrets."keys/traccar/oauth-client-secret".path;
-      notificator.traccar.key = config.sops.secrets."keys/traccar/notifications-key".path;
-    };
-  in {
-    options.cosmos.services.traccar = {
-      port = mkOption {
-        type = port;
-        default = 8082;
-      };
-      openFirewall = mkOption {
-        type = bool;
-        default = !cfg.expose;
-      };
-      expose = mkOption {
-        type = bool;
-        default = false;
-      };
-      protocols = mkOption {
-        type = listOf (enum (builtins.attrNames protocolPorts));
-        default = [];
-      };
-      # Read-only, so that something feeding positions in from the same host
-      # can look the decoder port up rather than repeat the number and drift.
-      protocolPorts = mkOption {
-        type = attrsOf port;
-        readOnly = true;
-        internal = true;
-        default = protocolPorts;
-      };
-    };
-
-    config = {
-      cosmos.system.impermanence.persist.directories = [
-        {
-          directory = stateDirectory;
-          user = "traccar";
-          group = "traccar";
-          mode = "0750";
-        }
-      ];
-
-      users.users.traccar = {
-        isSystemUser = true;
-        group = "traccar";
-      };
-      users.groups.traccar = {};
-      users.users.kanidm.extraGroups = ["traccar"];
-
-      sops.secrets = {
-        "keys/traccar/oauth-client-secret" = {
-          owner = "traccar";
-          group = "traccar";
-          mode = "0640";
+{inputs, ...}: {
+  den.aspects.services.traccar = {
+    kanidm-provision = {
+      groups = {
+        traccar-users = {
+          overwriteMembers = false;
+          members = ["lvdar"];
         };
-        "keys/traccar/notifications-key".owner = "traccar";
+        traccar-admin.members = ["lvdar"];
       };
-
-      networking.firewall = mkIf cfg.openFirewall {
-        allowedTCPPorts = [cfg.port] ++ selectedPorts;
-        allowedUDPPorts = selectedPorts;
+      oauth2.traccar = {
+        displayName = "Traccar";
+        basicSecret = "keys/traccar/oauth-client-secret";
+        allowInsecureClientDisablePkce = true;
+        originUrl = ["https://traccar.lvdar.nl/api/session/openid/callback" "org.traccar.manager://api/session/openid/callback"];
+        originLanding = "https://traccar.lvdar.nl";
+        scopeMaps.traccar-users = ["openid" "profile" "email" "traccar_groups"];
+        claimMaps.traccar_groups = {
+          joinType = "array";
+          valuesByGroup = {
+            traccar-users = ["traccar"];
+            traccar-admin = ["traccar_admin"];
+          };
+        };
       };
+    };
 
-      systemd.services.traccar = {
-        enable = true;
-        description = "Traccar";
-        after = ["network-online.target"];
-        wantedBy = ["multi-user.target"];
-        wants = ["network-online.target"];
-        serviceConfig = {
-          User = "traccar";
-          Group = "traccar";
-          WorkingDirectory = "${pkgs.traccar}";
-          ExecStartPre = ["${generateConfig settings secrets}/bin/traccar-generate-config"];
-          ExecStart = "${getExe pkgs.traccar} ${configFilePath}";
-          LockPersonality = true;
-          NoNewPrivileges = true;
-          PrivateDevices = true;
-          PrivateTmp = true;
-          PrivateUsers = true;
-          ProtectClock = true;
-          ProtectControlGroups = true;
-          ProtectHome = true;
-          ProtectHostname = true;
-          ProtectKernelLogs = true;
-          ProtectKernelModules = true;
-          ProtectKernelTunables = true;
-          ProtectSystem = "strict";
-          Restart = "on-failure";
-          RestartSec = 10;
-          RestrictRealtime = true;
-          RestrictSUIDSGID = true;
-          StateDirectory = "traccar";
-          SuccessExitStatus = 143;
-          Type = "simple";
+    nixos = {
+      config,
+      lib,
+      pkgs,
+      ...
+    }: let
+      inherit (lib.options) mkOption;
+      inherit (lib.types) attrsOf bool port listOf enum;
+      inherit (lib.modules) mkIf;
+      inherit (lib.strings) concatMapStringsSep concatStringsSep toUpper;
+      inherit (lib.attrsets) mapAttrsToListRecursive mapAttrsRecursive recursiveUpdate;
+      inherit (lib.meta) getExe;
+
+      cfg = config.cosmos.services.traccar;
+      stateDirectory = "/var/lib/traccar";
+      configFilePath = "${stateDirectory}/config.xml";
+
+      mapLeafs = mapAttrsRecursive (
+        path: value: "<entry key='${lib.concatStringsSep "." path}'>${value}</entry>"
+      );
+
+      mkConfigEntry = config: lib.collect builtins.isString (mapLeafs config);
+
+      mkConfig = configurationOptions:
+        pkgs.writeText "traccar.xml" ''
+          <?xml version='1.0' encoding='UTF-8'?>
+          <!DOCTYPE properties SYSTEM 'http://java.sun.com/dtd/properties.dtd'>
+          <properties>
+              ${builtins.concatStringsSep "\n" (mkConfigEntry configurationOptions)}
+          </properties>
+        '';
+
+      toPlaceHolder = path: "@${concatMapStringsSep "_" (x: toUpper x) path}@";
+
+      addSecretPlaceholders = settings: secrets:
+        recursiveUpdate settings (mapAttrsRecursive (path: _: toPlaceHolder path) secrets);
+
+      generateConfig = settings: secrets:
+        pkgs.writeShellScriptBin "traccar-generate-config" ''
+          set -euo pipefail
+          umask 077
+
+          install -d -m 750 -o traccar -g traccar "${stateDirectory}"
+          install -m 600 -o traccar -g traccar "${mkConfig (addSecretPlaceholders settings secrets)}" "${configFilePath}"
+
+          ${concatStringsSep "\n" (mapAttrsToListRecursive (path: value: ''
+              ${pkgs.replace-secret}/bin/replace-secret \
+                "${toPlaceHolder path}" \
+                "${value}" \
+                ${configFilePath}
+            '')
+            secrets)}
+        '';
+
+      protocolPorts.osmand = 5055;
+
+      selectedPorts = map (p: protocolPorts.${p}) cfg.protocols;
+
+      settings = {
+        protocol = lib.genAttrs cfg.protocols (name: {port = toString protocolPorts.${name};});
+        database = {
+          driver = "org.h2.Driver";
+          password = "";
+          url = "jdbc:h2:${stateDirectory}/traccar";
+          user = "sa";
+        };
+        logger = {
+          console = "true";
+          level = "info";
+        };
+        web = {
+          port = toString cfg.port;
+          url = "https://traccar.lvdar.nl";
+          override = "${stateDirectory}/override";
+          showUnknownDevices = "true";
+        };
+        notificator.types = "traccar,web,mail,command";
+        # gaia's Stalwart mesh relay (services/stalwart.nix): no auth or
+        # STARTTLS offered, so none configured; hand-synced with gaia.nix
+        # relayClients.
+        mail.smtp = {
+          host = "gaia.nb.lvdar.nl";
+          port = "2525";
+          from = "traccar@lvdar.nl";
+        };
+        openid = {
+          force = "true";
+          clientId = "traccar";
+          issuerUrl = "https://auth.lvdar.nl/oauth2/openid/traccar";
+          groupsClaimName = "traccar_groups";
+          allowGroup = "traccar";
+          adminGroup = "traccar_admin";
         };
       };
 
-      services = {
-        nginx.virtualHosts = mkIf (cfg.expose && !config.cosmos.networking.edgeTerminated) {
-          "traccar.lvdar.nl" = {
-            forceSSL = true;
-            enableACME = false;
-            sslCertificate = "/var/lib/acme/lvdar.nl/fullchain.pem";
-            sslCertificateKey = "/var/lib/acme/lvdar.nl/key.pem";
-            locations."/".proxyPass = "http://127.0.0.1:${toString cfg.port}";
+      secrets = {
+        openid.clientSecret = config.sops.secrets."keys/traccar/oauth-client-secret".path;
+        notificator.traccar.key = config.sops.secrets."keys/traccar/notifications-key".path;
+      };
+    in {
+      options.cosmos.services.traccar = {
+        port = mkOption {
+          type = port;
+          default = 8082;
+        };
+        openFirewall = mkOption {
+          type = bool;
+          default = !cfg.expose;
+        };
+        expose = mkOption {
+          type = bool;
+          default = false;
+        };
+        protocols = mkOption {
+          type = listOf (enum (builtins.attrNames protocolPorts));
+          default = [];
+        };
+        # Read-only, so that something feeding positions in from the same host
+        # can look the decoder port up rather than repeat the number and drift.
+        protocolPorts = mkOption {
+          type = attrsOf port;
+          readOnly = true;
+          internal = true;
+          default = protocolPorts;
+        };
+      };
+
+      config = {
+        cosmos.system.impermanence.persist.directories = [
+          {
+            directory = stateDirectory;
+            user = "traccar";
+            group = "traccar";
+            mode = "0750";
+          }
+        ];
+
+        users.users.traccar = {
+          isSystemUser = true;
+          group = "traccar";
+        };
+        users.groups.traccar = {};
+
+        sops.secrets = {
+          # Shared with kanidm's host (services/kanidm.nix), hence hosts/common.
+          "keys/traccar/oauth-client-secret" = {
+            owner = "traccar";
+            sopsFile = builtins.toString inputs.nix-secrets + "/hosts/common/secrets.yaml";
+          };
+          "keys/traccar/notifications-key".owner = "traccar";
+        };
+
+        networking.firewall = mkIf cfg.openFirewall {
+          allowedTCPPorts = [cfg.port] ++ selectedPorts;
+          allowedUDPPorts = selectedPorts;
+        };
+
+        systemd.services.traccar = {
+          enable = true;
+          description = "Traccar";
+          after = ["network-online.target"];
+          wantedBy = ["multi-user.target"];
+          wants = ["network-online.target"];
+          serviceConfig = {
+            User = "traccar";
+            Group = "traccar";
+            WorkingDirectory = "${pkgs.traccar}";
+            ExecStartPre = ["${generateConfig settings secrets}/bin/traccar-generate-config"];
+            ExecStart = "${getExe pkgs.traccar} ${configFilePath}";
+            LockPersonality = true;
+            NoNewPrivileges = true;
+            PrivateDevices = true;
+            PrivateTmp = true;
+            PrivateUsers = true;
+            ProtectClock = true;
+            ProtectControlGroups = true;
+            ProtectHome = true;
+            ProtectHostname = true;
+            ProtectKernelLogs = true;
+            ProtectKernelModules = true;
+            ProtectKernelTunables = true;
+            ProtectSystem = "strict";
+            Restart = "on-failure";
+            RestartSec = 10;
+            RestrictRealtime = true;
+            RestrictSUIDSGID = true;
+            StateDirectory = "traccar";
+            SuccessExitStatus = 143;
+            Type = "simple";
           };
         };
 
-        kanidm.provision = {
-          groups = {
-            traccar-users = {
-              overwriteMembers = false;
-              members = ["lvdar"];
-            };
-            traccar-admin.members = ["lvdar"];
-          };
-          systems.oauth2.traccar = {
-            displayName = "Traccar";
-            basicSecretFile = config.sops.secrets."keys/traccar/oauth-client-secret".path;
-            allowInsecureClientDisablePkce = true;
-            originUrl = ["https://traccar.lvdar.nl/api/session/openid/callback" "org.traccar.manager://api/session/openid/callback"];
-            originLanding = "https://traccar.lvdar.nl";
-            scopeMaps.traccar-users = ["openid" "profile" "email" "traccar_groups"];
-            claimMaps.traccar_groups = {
-              joinType = "array";
-              valuesByGroup = {
-                traccar-users = ["traccar"];
-                traccar-admin = ["traccar_admin"];
-              };
+        services = {
+          nginx.virtualHosts = mkIf (cfg.expose && !config.cosmos.networking.edgeTerminated) {
+            "traccar.lvdar.nl" = {
+              forceSSL = true;
+              enableACME = false;
+              sslCertificate = "/var/lib/acme/lvdar.nl/fullchain.pem";
+              sslCertificateKey = "/var/lib/acme/lvdar.nl/key.pem";
+              locations."/".proxyPass = "http://127.0.0.1:${toString cfg.port}";
             };
           };
         };
