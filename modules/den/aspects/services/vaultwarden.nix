@@ -63,11 +63,16 @@
 
       config = {
         # Shared with kanidm's host (services/kanidm.nix), hence hosts/common.
+        # Hex only: vaultwarden URL-encodes the secret for HTTP Basic auth and
+        # kanidm compares it undecoded, so `+` or `/` fail the token exchange.
         sops.secrets."keys/vaultwarden/oauth-client-secret".sopsFile =
           builtins.toString inputs.nix-secrets + "/hosts/common/secrets.yaml";
-        sops.templates."vaultwarden.env".content = ''
-          SSO_CLIENT_SECRET=${config.sops.placeholder."keys/vaultwarden/oauth-client-secret"}
-        '';
+        sops.templates."vaultwarden.env" = {
+          content = ''
+            SSO_CLIENT_SECRET=${config.sops.placeholder."keys/vaultwarden/oauth-client-secret"}
+          '';
+          restartUnits = ["vaultwarden.service"];
+        };
 
         cosmos.system.impermanence.persist.directories = [
           {
