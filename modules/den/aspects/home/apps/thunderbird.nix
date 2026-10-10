@@ -39,31 +39,42 @@
       # Keyed by attribute name, not Thunderbird's order-of-creation id1, id2,
       # so accounts survive a profile rebuild.
       accounts.email.accounts = {
-        proton = recursiveUpdate {
+        lvdar = recursiveUpdate {
           primary = true;
-          address = "larsvandartel@proton.me";
-          userName = "larsvandartel@proton.me";
+          address = "lars@lvdar.nl";
+          # Stalwart's account name (kanidm's short username), not the address.
+          userName = "lvdar";
           realName = "Lars van Dartel";
-          # Bridge sends as any address of the account; no separate config.
-          aliases = [
-            {
-              address = "lars@lvdar.nl";
-              realName = "Lars van Dartel";
-            }
-          ];
-          # Via Proton Bridge (home.proton.mail-bridge).
           imap = {
-            host = "127.0.0.1";
-            port = 1143;
-            tls.useStartTls = true;
+            host = "mail.lvdar.nl";
+            port = 993;
+            authentication = "xoauth2";
           };
           smtp = {
-            host = "127.0.0.1";
-            port = 1025;
-            tls.useStartTls = true;
+            host = "mail.lvdar.nl";
+            port = 465;
+            authentication = "xoauth2";
           };
-          thunderbird.enable = true;
-        } (mkSignature "proton");
+          thunderbird = {
+            enable = true;
+            # Thunderbird's custom OAuth (155+) against kanidm's `stalwart`
+            # client (services/kanidm.nix). Same issuer for IMAP and SMTP, so
+            # both share one refresh token. No issuerIdentifier: kanidm sends
+            # no RFC 9207 `iss`, and setting it rejects every response.
+            settings = id: let
+              oauth = prefix: {
+                "${prefix}.oauth2.useCustomDetails" = true;
+                "${prefix}.oauth2.issuer" = "auth.lvdar.nl";
+                "${prefix}.oauth2.clientId" = "stalwart";
+                "${prefix}.oauth2.authorizationEndpoint" = "https://auth.lvdar.nl/ui/oauth2";
+                "${prefix}.oauth2.tokenEndpoint" = "https://auth.lvdar.nl/oauth2/token";
+                "${prefix}.oauth2.scopes" = "openid profile email";
+                "${prefix}.oauth2.usePKCE" = true;
+              };
+            in
+              oauth "mail.server.server_${id}" // oauth "mail.smtpserver.smtp_${id}";
+          };
+        } (mkSignature "lvdar");
 
         gewis = recursiveUpdate {
           address = "m10243@gewis.nl";
@@ -104,6 +115,27 @@
         };
       };
 
+      # Thunderbird's calendar has no custom OAuth: DAV takes a Stalwart app
+      # password.
+      accounts.calendar.accounts.lvdar = {
+        primary = true;
+        remote = {
+          type = "caldav";
+          url = "https://mail.lvdar.nl/dav/cal/lvdar/default/";
+          userName = "lvdar";
+        };
+        thunderbird.enable = true;
+      };
+
+      accounts.contact.accounts.lvdar = {
+        remote = {
+          type = "carddav";
+          url = "https://mail.lvdar.nl/dav/card/lvdar/default/";
+          userName = "lvdar";
+        };
+        thunderbird.enable = true;
+      };
+
       programs.thunderbird = {
         enable = true;
 
@@ -111,7 +143,7 @@
           isDefault = true;
 
           # Otherwise the undeclarable local-folders account lands arbitrarily.
-          accountsOrder = ["proton" "gewis" "tue" "wsvw"];
+          accountsOrder = ["lvdar" "gewis" "tue" "wsvw"];
 
           extensions = with pkgs.thunderbird-addons; [
             theme-ancient-time

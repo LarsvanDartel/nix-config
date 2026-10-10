@@ -77,13 +77,13 @@
         showUnknownDevices = "true";
       };
       notificator.types = "traccar,web,mail,command";
+      # gaia's Stalwart mesh relay (services/stalwart.nix): no auth or
+      # STARTTLS offered, so none configured; hand-synced with gaia.nix
+      # relayClients.
       mail.smtp = {
-        host = "smtp.protonmail.ch";
-        port = "587";
-        starttls.enable = "true";
+        host = "gaia.nb.lvdar.nl";
+        port = "2525";
         from = "traccar@lvdar.nl";
-        auth = "true";
-        username = "traccar@lvdar.nl";
       };
       openid = {
         force = "true";
@@ -98,7 +98,6 @@
     secrets = {
       openid.clientSecret = config.sops.secrets."keys/traccar/oauth-client-secret".path;
       notificator.traccar.key = config.sops.secrets."keys/traccar/notifications-key".path;
-      mail.smtp.password = config.sops.secrets."keys/traccar/smtp-token".path;
     };
   in {
     options.cosmos.services.traccar = {
@@ -152,7 +151,6 @@
           mode = "0640";
         };
         "keys/traccar/notifications-key".owner = "traccar";
-        "keys/traccar/smtp-token".owner = "traccar";
       };
 
       networking.firewall = mkIf cfg.openFirewall {

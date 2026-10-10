@@ -21,6 +21,7 @@
       services.netbird
       services.crowdsec
       services.ntfy
+      services.stalwart
       services.unbound
       services.gatus
       services.alloy
@@ -60,6 +61,11 @@
       # Dynamic; keep until home.lvdar.nl (services/ddns.nix) resolves.
       cosmos.services.crowdsec.whitelistIps = ["86.86.217.11"];
 
+      # endeavour's mesh address, where firefly/traccar relay through
+      # gaia.nb.lvdar.nl:2525; hand-synced with services/firefly.nix and
+      # services/traccar.nix.
+      cosmos.services.stalwart.relayClients = ["100.68.151.172"];
+
       # No LAN behind this host. endeavour keeps :53 global for its LAN.
       cosmos.services.unbound.firewallInterfaces = [
         config.services.netbird.clients.default.interface
@@ -90,6 +96,7 @@
           "/persist/var/lib/crowdsec"
           "/persist/var/lib/acme"
           "/persist/var/lib/unbound"
+          "/persist/var/lib/stalwart"
           # uid/gid map, so restored files keep their owners.
           "/persist/var/lib/nixos"
           # SSH host keys: sops-nix decrypts with them.
@@ -103,8 +110,9 @@
           "**/geonames_*.db"
         ];
 
-        # Live SQLite store — see quiesceServices in services/restic.nix.
-        quiesceServices = ["netbird-management.service"];
+        # Live SQLite store and live RocksDB — see quiesceServices in
+        # services/restic.nix. Inbound senders retry during the stop.
+        quiesceServices = ["netbird-management.service" "stalwart.service"];
       };
 
       # Kernel NAT, not an L4 service: the L4 service for this target never
@@ -245,6 +253,18 @@
           targets = [
             {
               port = 8095;
+              peer = "gaia";
+            }
+          ];
+        };
+
+        # Ungated: CalDAV/CardDAV clients carry their own credentials and can't
+        # follow a redirect. Stalwart 404s everything but /dav and /.well-known here.
+        mail = {
+          bearerAuth.enable = false;
+          targets = [
+            {
+              port = 8089;
               peer = "gaia";
             }
           ];

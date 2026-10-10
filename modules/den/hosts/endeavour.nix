@@ -283,8 +283,6 @@
         "/persist/etc"
         # uid/gid map, so restored files keep their owners.
         "/persist/var/lib/nixos"
-        # On btrfs root SSD, so sanoid doesn't cover it: only copy.
-        "/persist/var/lib/radicale"
         # database.mv.db matters; the 1.4 GB around it is excluded.
         # suwayomi-downloads is re-fetched by the download-retry timer.
         "/persist/var/lib/suwayomi-server"
