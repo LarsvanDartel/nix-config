@@ -3,7 +3,6 @@
 # these root-owned knobs are opened up declaratively.
 {...}: {
   den.aspects.hardware.thinkpad.nixos = {
-    config,
     lib,
     pkgs,
     ...
@@ -16,7 +15,7 @@
     # udev re-applies this on every battery hotplug/resume; a one-off chmod
     # does not stick.
     users.groups.battery_ctl = {};
-    users.users.${config.cosmos.user.name}.extraGroups = ["battery_ctl"];
+    cosmos.user.extraGroups = ["battery_ctl"];
 
     # procfs has no group ownership to hand out, so 0666 is the only option
     # (as upstream's setup script does).

@@ -9,10 +9,12 @@
     den.aspects.services.node-exporter
   ];
 
-  den.aspects.roles.server.nixos = {lib, ...}: {
-    cosmos.user.name = "nixos";
-
-    services.getty.autologinUser = "nixos";
+  den.aspects.roles.server.nixos = {
+    config,
+    lib,
+    ...
+  }: {
+    services.getty.autologinUser = config.cosmos.user.name;
 
     security.sudo = {
       wheelNeedsPassword = false;

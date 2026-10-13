@@ -1,5 +1,5 @@
-# roles.home-base — the home baseline every user gets. Included by the user
-# aspects (lvdar, nixos).
+# roles.home-base — the home baseline every user gets, via
+# den.schema.user.includes (defaults.nix).
 {den, ...}: {
   den.aspects.roles.home-base.includes =
     (with den.aspects.home; [
