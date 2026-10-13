@@ -12,7 +12,9 @@
       enable = true;
       plugins = [pkgs.networkmanager-openvpn];
       dns =
-        if cfg.nameservers == []
+        if config.services.resolved.enable
+        then "systemd-resolved"
+        else if cfg.nameservers == []
         then "default"
         else "none";
     };
