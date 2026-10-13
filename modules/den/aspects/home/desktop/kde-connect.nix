@@ -2,7 +2,7 @@
 # service, but the peer answers discovery by initiating a TCP connection back
 # to this machine, which needs a hole in the host firewall (NixOS level).
 {...}: {
-  den.aspects.home.kde-connect.nixos = {...}: {
+  den.aspects.home.kde-connect.provides.to-hosts.nixos = {...}: {
     # Full range, TCP and UDP: devices claim the first free port and discovery
     # needs both protocols. Open on every interface; pairing is the boundary.
     networking.firewall = {
