@@ -36,6 +36,7 @@
 
     nixos = {
       config,
+      host,
       lib,
       pkgs,
       ...
@@ -504,7 +505,7 @@
         cosmos.services.netbird.client.exposedPorts = [cfg.importerPort];
 
         # Mesh-only name pointing at this host's NetBird address.
-        cosmos.services.unbound.localRecords.${cfg.importerDomain} = "100.68.151.172";
+        cosmos.services.unbound.localRecords.${cfg.importerDomain} = host.meshAddress;
 
         services.nginx.virtualHosts.${cfg.importerDomain} = {
           onlySSL = true;

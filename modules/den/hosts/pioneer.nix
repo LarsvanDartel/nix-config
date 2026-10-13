@@ -39,7 +39,7 @@
           systemd.settings.Manager.RuntimeWatchdogSec = lib.mkForce "60s";
 
           # Served to mesh peers by the unbound hosts; their localRecords
-          # must point at this host's mesh address.
+          # point at this host's meshAddress.
           cosmos.services.idrac = {
             address = "192.168.2.111";
             domain = "idrac.lvdar.nl";

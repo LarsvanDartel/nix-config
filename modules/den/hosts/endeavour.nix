@@ -159,7 +159,7 @@
         enable = true;
 
         # netbird-proxy's embedded client peer, not gaia's agent. Literal:
-        # den can't read another host's config.
+        # it is not a den host, so there is no entity to read it from.
         proxyAddress = "100.68.242.26";
 
         access = {
@@ -226,7 +226,7 @@
       cosmos.networking.edgeTerminated = true;
 
       # Mesh-only (not in public DNS). Must match the other resolver's copy.
-      cosmos.services.unbound.localRecords."idrac.lvdar.nl" = "100.68.78.148";
+      cosmos.services.unbound.localRecords."idrac.lvdar.nl" = den.hosts.aarch64-linux.pioneer.meshAddress;
 
       cosmos.services = {
         attic.dataDir = "/tank/atticd";
@@ -362,7 +362,7 @@
       # SSH arrives from one address and OpenSSH's srclimit penalised it,
       # resetting legitimate git traffic ("kex_exchange_identification:
       # Connection reset", build-gate 2026-08-15). crowdsec sheds scanners.
-      services.openssh.settings.PerSourcePenaltyExemptList = "100.68.38.155";
+      services.openssh.settings.PerSourcePenaltyExemptList = den.hosts.x86_64-linux.gaia.meshAddress;
 
       hardware = {
         nvidia = {
