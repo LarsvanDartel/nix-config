@@ -7,7 +7,10 @@
   inputs,
   ...
 }: {
-  den.hosts.x86_64-linux.voyager.users.lvdar = {};
+  den.hosts.x86_64-linux.voyager = {
+    users.lvdar = {};
+    meshAddress = "100.68.60.163";
+  };
 
   den.aspects.voyager = {
     includes = with den.aspects; [

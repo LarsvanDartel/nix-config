@@ -7,11 +7,17 @@
   inputs,
   ...
 }: {
-  den.hosts.x86_64-linux.gaia.users.nixos = {};
+  den.hosts.x86_64-linux.gaia = {
+    users.nixos = {};
+    meshAddress = "100.68.38.155";
+    server = true;
+    # Its public name, deliberately: gaia runs the mesh control plane, so it
+    # must be reachable for deploys when the mesh is broken.
+    deployAddress = "lvdar.nl";
+  };
 
   den.aspects.gaia = {
     includes = with den.aspects; [
-      roles.server
       core.boot
       core.impermanence
       services.netbird
