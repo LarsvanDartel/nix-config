@@ -23,7 +23,6 @@
       # flake.nix is formatted by flake-file (write-flake); treefmt off it so
       # the two don't fight.
       "flake.nix"
-      "*hardware-configuration.nix"
       "*.facter.json"
       "*.png"
       "*.jpg"
