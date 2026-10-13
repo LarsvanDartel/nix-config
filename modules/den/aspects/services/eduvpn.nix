@@ -6,25 +6,27 @@
 
     nixos = {
       config,
+      lib,
       pkgs,
       utils,
       ...
     }: let
-      netbird = config.services.netbird.clients.default;
-
       # eduvpn's ip rules (v4 priorities 2/3) beat NetBird's (105/110), and
       # TU/e claims all of 100.64.0.0/10, swallowing the mesh even on the split
-      # profile. Carve the mesh and NetBird's own transport back out at
-      # priority 1; inert when eduvpn is down. Pool and fwmark are read off the
+      # profile. Carve each mesh's prefixes (one unit per NetBird client) back
+      # out at priority 1; inert when eduvpn is down. The pool is read off the
       # interface, never hardcoded, so a change cannot silently break the mesh.
-      deviceUnit = "sys-subsystem-net-devices-${utils.escapeSystemdPath netbird.interface}.device";
-
+      #
+      # NetBird's own transport (fwmark 0x1bd00) is deliberately *not* carved
+      # out: under the full profile it falls through to eduvpn's table and runs
+      # nested in the campus tunnel. The split profile's peer only accepts TU/e
+      # prefixes, so there it keeps leaving via the uplink.
       meshPriority = pkgs.writeShellApplication {
         name = "eduvpn-mesh-priority";
-        runtimeInputs = with pkgs; [iproute2 gawk wireguard-tools];
+        runtimeInputs = with pkgs; [iproute2 gawk];
         text = ''
-          iface=${netbird.interface}
-          state=/run/eduvpn-mesh-priority.rules
+          iface="''${2:?usage: eduvpn-mesh-priority start|stop <interface>}"
+          state="/run/eduvpn-mesh-priority-$iface.rules"
 
           # One "family selector value" per line; every one of them ends up as
           # `ip <family> rule add priority 1 <selector> <value> lookup main`.
@@ -37,17 +39,6 @@
             # the mesh and must not be pulled out of eduvpn's table.
             ip -6 -o route show dev "$iface" proto kernel 2>/dev/null |
               awk '$1 != "fe80::/64" {print "-6 to " $1}'
-
-            # `off` when the agent is running wireguard in userspace, where
-            # there is no mark to match on. The prefix rules above still do
-            # their half of the job, so that is a warning, not a failure.
-            mark="$(wg show "$iface" fwmark 2>/dev/null || true)"
-            if [ -n "$mark" ] && [ "$mark" != "off" ]; then
-              echo "-4 fwmark $mark"
-              echo "-6 fwmark $mark"
-            else
-              echo "no fwmark on $iface; mesh transport will nest inside a full tunnel" >&2
-            fi
           }
 
           case "''${1-}" in
@@ -96,26 +87,31 @@
       # never matches the ingress interface.
       networking.firewall.checkReversePath = "loose";
 
-      systemd.services.eduvpn-mesh-priority = {
-        description = "Keep the NetBird mesh reachable while eduvpn is connected";
-        documentation = ["man:ip-rule(8)"];
+      systemd.services = lib.mapAttrs' (_: netbird: let
+        deviceUnit = "sys-subsystem-net-devices-${utils.escapeSystemdPath netbird.interface}.device";
+      in
+        lib.nameValuePair "eduvpn-mesh-priority-${netbird.interface}" {
+          description = "Keep the NetBird mesh on ${netbird.interface} reachable while eduvpn is connected";
+          documentation = ["man:ip-rule(8)"];
 
-        # Tied to wt0's device unit, not netbird.service: `netbird up`/`down`
-        # toggle inside a daemon that keeps running, and this shipped dead the
-        # first time. multi-user.target starts it on a `switch` with the mesh up.
-        after = [deviceUnit "${netbird.suffixedName}.service"];
-        bindsTo = [deviceUnit];
-        wantedBy = [deviceUnit "multi-user.target"];
+          # Tied to the interface's device unit, not the agent's service:
+          # `netbird up`/`down` toggle inside a daemon that keeps running, and
+          # this shipped dead the first time. multi-user.target starts it on a
+          # `switch` with the mesh up.
+          after = [deviceUnit "${netbird.service.name}.service"];
+          bindsTo = [deviceUnit];
+          wantedBy = [deviceUnit "multi-user.target"];
 
-        serviceConfig = {
-          Type = "oneshot";
-          RemainAfterExit = true;
-          ExecStart = "${meshPriority}/bin/eduvpn-mesh-priority start";
-          ExecStop = "${meshPriority}/bin/eduvpn-mesh-priority stop";
-          Restart = "on-failure";
-          RestartSec = 30;
-        };
-      };
+          serviceConfig = {
+            Type = "oneshot";
+            RemainAfterExit = true;
+            ExecStart = "${meshPriority}/bin/eduvpn-mesh-priority start ${netbird.interface}";
+            ExecStop = "${meshPriority}/bin/eduvpn-mesh-priority stop ${netbird.interface}";
+            Restart = "on-failure";
+            RestartSec = 30;
+          };
+        })
+      config.services.netbird.clients;
     };
   };
 }

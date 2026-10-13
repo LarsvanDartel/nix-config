@@ -22,6 +22,7 @@
       desktop.keyd
       services.containers
       services.netbird.client
+      services.netbird-gewis
       services.eduvpn
       # Not node-exporter: a sleeping laptop would sit permanently "target down".
       services.alloy
