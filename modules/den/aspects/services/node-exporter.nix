@@ -1,9 +1,19 @@
 # services.node-exporter — host metrics, scraped over the mesh.
 #
 # Not on voyager: a sleeping laptop would sit permanently "target down".
-{den, ...}: {
+{den, ...}: let
+  # Shared by the option default and the scrape-target entry, which must be
+  # static (see services/prometheus.nix).
+  defaultPort = 9500;
+in {
   den.aspects.services.node-exporter = {
     includes = [den.aspects.services.netbird.client];
+
+    scrape-target = {host, ...}: {
+      job = "node";
+      instance = host.name;
+      port = defaultPort;
+    };
 
     nixos = {
       config,
@@ -18,7 +28,7 @@
       options.cosmos.services.node-exporter = {
         port = mkOption {
           type = port;
-          default = 9500;
+          default = defaultPort;
           description = ''
             Not 9100, which is node_exporter's conventional port and would be
             the obvious choice.
