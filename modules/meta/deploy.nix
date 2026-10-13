@@ -1,35 +1,21 @@
 # deploy-rs: remote deployment of the hosts with magic rollback. Nodes are
-# derived from den's `flake.nixosConfigurations`. Deploy a host with:
+# derived from den's host entities (address and system are entity data, so
+# listing nodes does not evaluate any host). Deploy a host with:
 #   nix run github:serokell/deploy-rs .#<host>
 {
   inputs,
   config,
   lib,
   ...
-}: let
-  # gaia uses its public name deliberately: it runs the mesh control plane,
-  # so it must be reachable when the mesh is broken.
-  addresses = {
-    gaia = "lvdar.nl";
-    endeavour = "endeavour.${dnsDomain}";
-    voyager = "voyager.${dnsDomain}";
-    pioneer = "pioneer.${dnsDomain}";
-  };
-
-  # Matches cosmos.services.netbird.dnsDomain — hand-synced: reading it from
-  # a nixosConfiguration here would evaluate a host on every deploy.
-  dnsDomain = "nb.lvdar.nl";
-in {
+}: {
   flake-file.inputs.deploy-rs = {
     url = "github:serokell/deploy-rs";
     inputs.nixpkgs.follows = "nixpkgs";
   };
 
   flake.deploy.nodes =
-    lib.mapAttrs (name: nixos: let
-      system = nixos.config.nixpkgs.hostPlatform.system;
-    in {
-      hostname = addresses.${name} or name;
+    lib.mapAttrs (name: host: {
+      hostname = host.deployAddress;
 
       # Not :22 — NetBird redirects the mesh address's :22 to its own
       # key-less SSH server; OpenSSH listens on :2222 (core.ssh).
@@ -42,10 +28,10 @@ in {
         magicRollback = true;
         # Building the uncached rpi kernel on the Pi takes ~a day and OOMs.
         remoteBuild = false;
-        path = inputs.deploy-rs.lib.${system}.activate.nixos nixos;
+        path = inputs.deploy-rs.lib.${host.system}.activate.nixos config.flake.nixosConfigurations.${name};
       };
     })
-    config.flake.nixosConfigurations;
+    (lib.mergeAttrsList (lib.attrValues config.den.hosts));
 
   flake.checks =
     lib.mapAttrs
