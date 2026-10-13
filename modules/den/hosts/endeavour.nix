@@ -225,9 +225,6 @@
       # TLS terminates at gaia's netbird-proxy; no local vhosts.
       cosmos.networking.edgeTerminated = true;
 
-      # Mesh-only (not in public DNS). Must match the other resolver's copy.
-      cosmos.services.unbound.localRecords."idrac.lvdar.nl" = den.hosts.aarch64-linux.pioneer.meshAddress;
-
       cosmos.services = {
         attic.dataDir = "/tank/atticd";
         loki.dataDir = "/tank/monitoring/loki";

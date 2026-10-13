@@ -12,9 +12,19 @@
   den,
   inputs,
   ...
-}: {
+}: let
+  # A constant, not an option: the mesh-dns-record entry below must be
+  # static or `{host, ...}:` (see services/unbound.nix).
+  importerDomain = "firefly-import.lvdar.nl";
+in {
   den.aspects.services.firefly = {
     includes = with den.aspects.services; [nginx netbird.client];
+
+    # Resolves only inside the mesh, to this host's NetBird address — never
+    # published, but still a real name under the *.lvdar.nl wildcard so nginx
+    # can present a browser-trusted cert for Enable Banking's callback
+    # redirect.
+    mesh-dns-record = {host, ...}: {${importerDomain} = host.meshAddress;};
 
     kanidm-provision = {config, ...}: let
       cfg = config.cosmos.services.firefly;
@@ -36,7 +46,6 @@
 
     nixos = {
       config,
-      host,
       lib,
       pkgs,
       ...
@@ -209,17 +218,6 @@
           default = "firefly.lvdar.nl";
         };
 
-        importerDomain = mkOption {
-          type = str;
-          default = "firefly-import.lvdar.nl";
-          description = ''
-            Resolves only inside the mesh (see localRecords in endeavour.nix)
-            to endeavour's own NetBird address — never published, but still a
-            real name under the *.lvdar.nl wildcard so nginx can present a
-            browser-trusted cert for Enable Banking's callback redirect.
-          '';
-        };
-
         importerPort = mkOption {
           type = port;
           # Not 8096: jellyfin's port — binding both broke both.
@@ -280,7 +278,7 @@
 
         services.firefly-iii-data-importer = {
           enable = true;
-          virtualHost = cfg.importerDomain;
+          virtualHost = importerDomain;
           enableNginx = false;
 
           settings = {
@@ -291,7 +289,7 @@
             FIREFLY_III_ACCESS_TOKEN_FILE = config.sops.secrets."keys/firefly/importer-access-token".path;
 
             # The app's callback URL in Enable Banking's portal must be
-            # https://${cfg.importerDomain}/eb-callback.
+            # https://${importerDomain}/eb-callback.
             ENABLE_BANKING_APP_ID_FILE = config.sops.secrets."keys/firefly/enable-banking-app-id".path;
             ENABLE_BANKING_PRIVATE_KEY_FILE = config.sops.secrets."keys/firefly/enable-banking-private-key".path;
 
@@ -504,10 +502,7 @@
 
         cosmos.services.netbird.client.exposedPorts = [cfg.importerPort];
 
-        # Mesh-only name pointing at this host's NetBird address.
-        cosmos.services.unbound.localRecords.${cfg.importerDomain} = host.meshAddress;
-
-        services.nginx.virtualHosts.${cfg.importerDomain} = {
+        services.nginx.virtualHosts.${importerDomain} = {
           onlySSL = true;
           useACMEHost = "lvdar.nl";
           listen = [
