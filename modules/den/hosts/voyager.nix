@@ -31,7 +31,7 @@
       hardware.v4l2loopback
     ];
 
-    lvdar = {
+    provides.lvdar = {
       includes = with den.aspects; [
         roles.desktop-home
         home.steam
