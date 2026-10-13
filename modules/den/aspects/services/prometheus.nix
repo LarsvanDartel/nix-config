@@ -5,24 +5,48 @@
 #
 # Complements core.notify-failure: that reports unit transitions and survives
 # this host dying; this reports states and thresholds no per-host hook sees.
+#
+# Scrape targets arrive on the `scrape-target` quirk: each exporter's aspect
+# emits { job; instance; port; } and this groups them by job. Payloads must be
+# static or `{host, ...}:`; a `{config, ...}:` payload would make this host
+# evaluate every other host's configuration.
 {
   den,
   inputs,
   ...
-}: {
+}: let
+  inherit (den.lib.policy) pipe;
+in {
+  den.quirks.scrape-target.description = "Prometheus scrape targets ({job, instance, port}), collected by services.prometheus";
+
+  # collectAll, not collect: pioneer is aarch64 and exports node metrics.
+  # den reads these argument names (host scope, host-entity filter), so
+  # deadnix must not strip them as unused.
+  # deadnix: skip
+  den.policies.scrape-target = {host, ...}: [
+    (pipe.from "scrape-target" [
+      (pipe.collectAll (
+        # deadnix: skip
+        {host, ...}: true
+      ))
+    ])
+  ];
+
   den.aspects.services.prometheus = {
-    includes = with den.aspects.services; [netbird.client node-exporter];
+    includes = with den.aspects.services; [netbird.client node-exporter den.policies.scrape-target];
 
     nixos = {
       config,
       lib,
+      scrape-target,
       ...
     }: let
       inherit (lib.options) mkOption;
-      inherit (lib.types) port str listOf;
+      inherit (lib.types) port str;
+      inherit (lib.lists) groupBy sortOn;
+      inherit (lib.attrsets) mapAttrsToList;
 
       cfg = config.cosmos.services.prometheus;
-      nodePort = config.cosmos.services.node-exporter.port;
       dnsDomain = config.cosmos.services.netbird.dnsDomain;
     in {
       options.cosmos.services.prometheus = {
@@ -51,23 +75,6 @@
           type = str;
           default = "90d";
           description = "Passed through as retentionTime.";
-        };
-
-        targets = mkOption {
-          type = listOf str;
-          default = ["endeavour" "gaia" "pioneer"];
-          description = ''
-            Peer names, dialled as `<name>.${dnsDomain}` over the mesh.
-
-            Names work here only because services/unbound.nix forwards the mesh
-            domain to the NetBird agent's resolver. Before that, unbound
-            answered *.lvdar.nl from public DNS and every one of these
-            resolved to the edge's public address — the scrapes left the mesh
-            and timed out. If these ever start timing out again, check mesh DNS
-            on this host before suspecting the exporters.
-
-            Not voyager: a laptop that sleeps would sit permanently "down".
-          '';
         };
       };
 
@@ -103,31 +110,31 @@
             evaluation_interval = "30s";
           };
 
-          scrapeConfigs = [
-            {
-              job_name = "node";
-              # One static_config per peer so `instance` is the bare peer name.
+          # One static_config per instance so `instance` is the bare peer name.
+          #
+          # Names work here only because services/unbound.nix forwards the mesh
+          # domain to the NetBird agent's resolver. Before that, unbound
+          # answered *.lvdar.nl from public DNS and every one of these resolved
+          # to the edge's public address — the scrapes left the mesh and timed
+          # out. If these ever start timing out again, check mesh DNS on this
+          # host before suspecting the exporters.
+          scrapeConfigs =
+            mapAttrsToList (job: entries: {
+              job_name = job;
               static_configs =
-                map (h: {
-                  targets = ["${h}.${dnsDomain}:${toString nodePort}"];
-                  labels.instance = h;
+                map (e: {
+                  targets = ["${e.instance}.${dnsDomain}:${toString e.port}"];
+                  labels.instance = e.instance;
                 })
-                cfg.targets;
-            }
-            {
-              job_name = "netbird";
-              static_configs = [
-                {
-                  targets = ["gaia.${dnsDomain}:9090"];
-                  labels.instance = "gaia";
-                }
-              ];
-            }
-            {
-              job_name = "prometheus";
-              static_configs = [{targets = ["127.0.0.1:${toString cfg.port}"];}];
-            }
-          ];
+                (sortOn (e: e.instance) entries);
+            })
+            (groupBy (e: e.job) scrape-target)
+            ++ [
+              {
+                job_name = "prometheus";
+                static_configs = [{targets = ["127.0.0.1:${toString cfg.port}"];}];
+              }
+            ];
 
           alertmanagers = [
             {

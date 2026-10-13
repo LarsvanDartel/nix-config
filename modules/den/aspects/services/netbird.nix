@@ -325,6 +325,13 @@ in {
   den.aspects.services.netbird = {
     includes = with den.aspects.services; [nginx netbird.client];
 
+    # Management serves its own metrics on 9090.
+    scrape-target = {host, ...}: {
+      job = "netbird";
+      instance = host.name;
+      port = 9090;
+    };
+
     kanidm-provision = {
       groups =
         {netbird-admin.members = ["lvdar"];}

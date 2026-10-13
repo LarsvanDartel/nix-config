@@ -9,13 +9,23 @@
   den,
   inputs,
   ...
-}: {
+}: let
+  # Shared by the option default and the scrape-target entry, which must be
+  # static (see services/prometheus.nix).
+  defaultExporterPort = 4243;
+in {
   flake-file.inputs.comin = {
     url = "github:nlewo/comin";
     inputs.nixpkgs.follows = "nixpkgs";
   };
 
   den.aspects.services.comin = {
+    scrape-target = {host, ...}: {
+      job = "comin";
+      instance = host.name;
+      port = defaultExporterPort;
+    };
+
     includes = [
       den.aspects.services.netbird.client
       den.aspects.core.sops
@@ -107,7 +117,7 @@
 
         exporterPort = mkOption {
           type = ints.positive;
-          default = 4243;
+          default = defaultExporterPort;
           description = ''
             Prometheus exporter. Worth having: this is the first thing in the
             fleet that can answer "did that host actually take the new config,
