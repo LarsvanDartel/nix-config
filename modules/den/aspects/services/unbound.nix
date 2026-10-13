@@ -3,11 +3,37 @@
 # Blocklists are vendored in ./_unbound: as `flake = false` inputs, oisd's
 # constant regeneration broke the locked narHash within a day. Update with
 # `nix run .#update-blocklists`.
-{...}: {
+#
+# Mesh-only names come from the `mesh-dns-record` quirk: an aspect emits
+# { "<name>" = host.meshAddress; } and every mesh resolver answers it, so the
+# resolvers cannot drift apart. Payloads must be static or `{host, ...}:`; a
+# `{config, ...}:` payload would make each resolver evaluate the producer's
+# host.
+{den, ...}: let
+  inherit (den.lib.policy) pipe;
+in {
+  den.quirks.mesh-dns-record.description = "Mesh-only DNS records (name -> mesh IPv4), answered by every mesh unbound resolver";
+
+  # collectAll, not collect: pioneer (aarch64) produces the idrac record.
+  # den reads these argument names (host scope, host-entity filter), so
+  # deadnix must not strip them as unused.
+  # deadnix: skip
+  den.policies.mesh-dns-record = {host, ...}: [
+    (pipe.from "mesh-dns-record" [
+      (pipe.collectAll (
+        # deadnix: skip
+        {host, ...}: true
+      ))
+    ])
+  ];
+
+  den.aspects.services.unbound.includes = [den.policies.mesh-dns-record];
+
   den.aspects.services.unbound.nixos = {
     config,
     lib,
     pkgs,
+    mesh-dns-record,
     ...
   }: let
     inherit (lib.options) mkEnableOption mkOption;
@@ -127,6 +153,8 @@
           mode = "0750";
         }
       ];
+      cosmos.services.unbound.localRecords = mkIf cfg.mesh.enable (mkMerge mesh-dns-record);
+
       cosmos.services.unbound.blocklist = mkIf cfg.oisd.enable (
         let
           lines = str: filter (x: x != "") (splitString "\n" str);

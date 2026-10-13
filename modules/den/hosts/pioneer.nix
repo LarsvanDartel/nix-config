@@ -6,7 +6,9 @@
   den,
   inputs,
   ...
-}: {
+}: let
+  idracDomain = "idrac.lvdar.nl";
+in {
   den.hosts.aarch64-linux.pioneer = {
     users.nixos = {};
     meshAddress = "100.68.78.148";
@@ -20,6 +22,10 @@
       # not out-of-band (2026-08-28: seven-hour outage).
       services.idrac
     ];
+
+    # Mesh-only (not in public DNS): the unbound resolvers answer it with
+    # this host's mesh address.
+    mesh-dns-record = {host, ...}: {${idracDomain} = host.meshAddress;};
 
     nixos = {...}: {
       imports = [
@@ -38,11 +44,10 @@
           # can stall long enough under IO for the watchdog to reset the board.
           systemd.settings.Manager.RuntimeWatchdogSec = lib.mkForce "60s";
 
-          # Served to mesh peers by the unbound hosts; their localRecords
-          # point at this host's meshAddress.
+          # Served to mesh peers; see mesh-dns-record above.
           cosmos.services.idrac = {
             address = "192.168.2.111";
-            domain = "idrac.lvdar.nl";
+            domain = idracDomain;
             certificate = "lvdar.nl";
           };
 
