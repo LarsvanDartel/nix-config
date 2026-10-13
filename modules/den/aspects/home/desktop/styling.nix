@@ -1,6 +1,6 @@
-# home.styling — stylix theming (the _styling tree) + profile font/theme/
-# wallpaper values. The stylix HM module is auto-imported by the nixos
-# desktop styling (homeManagerIntegration).
+# home.styling — stylix theming (the _styling tree) + profile font/wallpaper
+# values. Delivered by desktop.styling (to-users), which also sets the theme
+# and auto-imports the stylix HM module (homeManagerIntegration).
 {...}: {
   den.aspects.home.styling.homeManager = {config, ...}: {
     imports = [./_styling];
@@ -18,11 +18,6 @@
         emoji = fontpkgs."Noto Color Emoji";
         interface = fontpkgs."Cozette";
         extraFonts = [];
-      };
-
-      theme.nord = {
-        enable = true;
-        darkMode = true;
       };
 
       # Same top-ranked file as the picker's default, so scheme and picture

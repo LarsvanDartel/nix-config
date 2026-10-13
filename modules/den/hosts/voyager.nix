@@ -34,7 +34,6 @@
     provides.lvdar = {
       includes = with den.aspects; [
         roles.desktop-home
-        home.steam
         home.minecraft
         home.tino
         home.kanidm
@@ -55,7 +54,6 @@
         home.simplelogin
         home.rbw
         home.proton.vpn-cli
-        home.eduvpn
       ];
 
       homeManager = {pkgs, ...}: {
@@ -210,10 +208,9 @@
         bgscan=""
       '';
 
-      # 25565: Minecraft. 5353: catt mDNS replies (dropped = empty scan).
-      # 45114: catt local-file cast server (without it the video never starts).
-      networking.firewall.allowedUDPPorts = [25565 5353];
-      networking.firewall.allowedTCPPorts = [25565 45114];
+      # Minecraft.
+      networking.firewall.allowedUDPPorts = [25565];
+      networking.firewall.allowedTCPPorts = [25565];
 
       cosmos.system.impermanence.device = "/dev/mapper/crypted";
 
