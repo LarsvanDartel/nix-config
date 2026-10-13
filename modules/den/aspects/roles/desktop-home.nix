@@ -3,9 +3,7 @@
 {den, ...}: {
   den.aspects.roles.desktop-home = {
     includes = with den.aspects.home; [
-      styling
       wallpapers
-      hyprland
       foot
       # Not in home-base: the 101 MB index doesn't fit on pioneer.
       comma

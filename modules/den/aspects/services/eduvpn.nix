@@ -123,5 +123,11 @@
         })
       config.services.netbird.clients;
     };
+
+    # state.json holds OAuth tokens; unpersisted, every boot re-runs the
+    # browser login.
+    provides.to-users.homeManager = {...}: {
+      cosmos.system.impermanence.persist.directories = [".config/eduvpn"];
+    };
   };
 }

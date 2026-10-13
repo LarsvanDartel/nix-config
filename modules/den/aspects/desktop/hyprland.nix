@@ -1,6 +1,9 @@
-# desktop.hyprland (nixos side) — the compositor + its portal/greeter deps.
+# desktop.hyprland — the compositor + its portal/greeter deps; its home half
+# (home.hyprland) goes to every user via to-users.
 {den, ...}: {
   den.aspects.desktop.hyprland = {
+    provides.to-users.includes = [den.aspects.home.hyprland];
+
     includes = with den.aspects.desktop; [
       greetd
       xdg-portal
