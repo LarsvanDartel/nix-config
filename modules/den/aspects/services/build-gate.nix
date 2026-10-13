@@ -127,11 +127,13 @@
 
         hosts = mkOption {
           type = listOf str;
-          default = ["gaia" "endeavour" "voyager"];
+          # Sorted, not hand-ordered: the loop builds every host regardless
+          # of failures, so order only affects the log.
+          default = lib.attrNames den.hosts.x86_64-linux;
           description = ''
-            Must all build before deploy moves. The three x86_64 ones; pioneer
-            is aarch64 and this host cannot emulate it, which is the same
-            reason it was left out of the workflows this replaces.
+            Must all build before deploy moves. Every x86_64 host; pioneer is
+            aarch64 and this host cannot emulate it, which is the same reason
+            it was left out of the workflows this replaces.
 
             voyager is included even though comin does not deploy it: it is
             still a host whose closure this repo has to keep evaluable, and

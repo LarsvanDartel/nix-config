@@ -1,9 +1,22 @@
 # home.ssh
-{cosmosLib, ...}: let
+{
+  cosmosLib,
+  den,
+  lib,
+  ...
+}: let
   inherit (cosmosLib) get-file-names get-flake-path get-file-name-without-extension;
 
   keys-path = get-flake-path "modules/den/aspects/core/_ssh-keys";
   available-identities = map (name: builtins.replaceStrings ["id_" ".pub"] ["" ""] name) (get-file-names keys-path);
+
+  servers = lib.filter (h: h.server) (lib.attrValues (lib.mergeAttrsList (lib.attrValues den.hosts)));
+  # One Host block below serves every server, so they must share an account.
+  serverUsers = lib.unique (map (h: (lib.head (lib.attrValues h.users)).userName) servers);
+  serverUser =
+    lib.throwIfNot (lib.length serverUsers == 1)
+    "home.ssh: servers have different accounts (${toString serverUsers}); split the Host block"
+    (lib.head serverUsers);
 in {
   den.aspects.home.ssh.homeManager = {
     config,
@@ -37,19 +50,18 @@ in {
         enable = true;
         enableDefaultConfig = false;
 
-        # Servers' account is `nixos` (else a misleading "Permission denied
-        # (publickey)"); a literal because den can't read another host's
-        # cosmos.user.name. Must precede the catch-all (ssh keeps the first value).
+        # Servers' account (else a misleading "Permission denied
+        # (publickey)"). Must precede the catch-all (ssh keeps the first value).
         # Port 2222: NetBird hijacks :22 on mesh addresses. See core/ssh.nix.
         settings."*.nb.lvdar.nl" = entryBefore ["*"] {
-          User = "nixos";
+          User = serverUser;
           Port = 2222;
         };
 
         # Only the qualified name resolves.
-        settings."endeavour gaia pioneer" = entryBefore ["*"] {
+        settings.${lib.concatMapStringsSep " " (h: h.name) servers} = entryBefore ["*"] {
           HostName = "%h.nb.lvdar.nl";
-          User = "nixos";
+          User = serverUser;
           Port = 2222;
         };
 
