@@ -1,6 +1,7 @@
 # nixpkgs instance + the `nixpkgs.overlays` aggregation option. The pkgs set
-# is built once per system here and shared to hosts via withSystem
-# (configurations.nix); local packages self-register from modules/pkgs/*.nix.
+# here is perSystem's (packages, checks, devshells) only; hosts build their
+# own in core.nixpkgs, receiving local packages via flake.overlays.default
+# (den/overlays.nix). Local packages self-register from modules/pkgs/*.nix.
 {
   inputs,
   lib,
