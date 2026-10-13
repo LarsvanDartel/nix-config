@@ -33,7 +33,9 @@
       services.comin
     ];
 
-    nixos = {config, ...}: {
+    nixos = {config, ...}: let
+      endeavourMesh = den.hosts.x86_64-linux.endeavour.meshAddress;
+    in {
       imports = [
         inputs.nixos-facter-modules.nixosModules.facter
         {
@@ -63,10 +65,9 @@
       # Dynamic; keep until home.lvdar.nl (services/ddns.nix) resolves.
       cosmos.services.crowdsec.whitelistIps = ["86.86.217.11"];
 
-      # endeavour's mesh address, where firefly/traccar relay through
-      # gaia.nb.lvdar.nl:2525; hand-synced with services/firefly.nix and
-      # services/traccar.nix.
-      cosmos.services.stalwart.relayClients = ["100.68.151.172"];
+      # endeavour, where firefly/traccar relay through gaia.nb.lvdar.nl:2525;
+      # hand-synced with services/firefly.nix and services/traccar.nix.
+      cosmos.services.stalwart.relayClients = [endeavourMesh];
 
       # No LAN behind this host. endeavour keeps :53 global for its LAN.
       cosmos.services.unbound.firewallInterfaces = [
@@ -127,17 +128,17 @@
         forwardPorts = [
           {
             sourcePort = 22;
-            destination = "100.68.151.172:2222";
+            destination = "${endeavourMesh}:2222";
             proto = "tcp";
           }
         ];
         extraCommands = ''
-          iptables -t nat -A POSTROUTING -d 100.68.151.172 -p tcp --dport 2222 -j MASQUERADE
-          iptables -A FORWARD -d 100.68.151.172 -p tcp --dport 2222 -j ACCEPT
+          iptables -t nat -A POSTROUTING -d ${endeavourMesh} -p tcp --dport 2222 -j MASQUERADE
+          iptables -A FORWARD -d ${endeavourMesh} -p tcp --dport 2222 -j ACCEPT
         '';
         extraStopCommands = ''
-          iptables -t nat -D POSTROUTING -d 100.68.151.172 -p tcp --dport 2222 -j MASQUERADE || true
-          iptables -D FORWARD -d 100.68.151.172 -p tcp --dport 2222 -j ACCEPT || true
+          iptables -t nat -D POSTROUTING -d ${endeavourMesh} -p tcp --dport 2222 -j MASQUERADE || true
+          iptables -D FORWARD -d ${endeavourMesh} -p tcp --dport 2222 -j ACCEPT || true
         '';
       };
 
@@ -147,19 +148,18 @@
       cosmos.system.journald.maxUse = "512M";
 
       # Via nginx, not netbird-proxy: management needs kanidm to start and
-      # the proxy needs management. Mesh literal: den can't read endeavour's
-      # config; stable unless endeavour re-enrolls.
+      # the proxy needs management.
       cosmos.services.netbird.oidc.idp = {
         domain = "auth.lvdar.nl";
-        upstream = "https://100.68.151.172:8443";
+        upstream = "https://${endeavourMesh}:8443";
       };
 
       # netbird-proxy can't serve the apex (see www below). Ungated: a
       # public blog.
-      cosmos.services.netbird.localVhosts."lvdar.nl".upstream = "http://100.68.151.172:3031";
+      cosmos.services.netbird.localVhosts."lvdar.nl".upstream = "http://${endeavourMesh}:3031";
 
       # Mesh-only (not in public DNS). Must match the other resolver's copy.
-      cosmos.services.unbound.localRecords."idrac.lvdar.nl" = "100.68.78.148";
+      cosmos.services.unbound.localRecords."idrac.lvdar.nl" = den.hosts.aarch64-linux.pioneer.meshAddress;
 
       # comin pulls, so no credential here grants anything on the fleet.
       cosmos.services.comin.repository = "https://knot.lvdar.nl/did:plc:a3erncqfgkcxu3yl6fpjfmwf";
