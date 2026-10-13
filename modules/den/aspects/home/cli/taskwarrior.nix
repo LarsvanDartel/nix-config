@@ -1,16 +1,11 @@
 # home.taskwarrior (+ taskwarrior-tui, and the sync block for services.taskchampion)
 #
 # Split across nixos and homeManager: taskrc can't read a secret from a file,
-# only `include` one, so the nixos half renders the sync stanza into a sops template.
-{
-  den,
-  inputs,
-  ...
-}: {
+# only `include` one, so the nixos half (to-hosts) renders the sync stanza into
+# a sops template.
+{inputs, ...}: {
   den.aspects.home.taskwarrior = {
-    includes = [den.aspects.core.sops];
-
-    nixos = {
+    provides.to-hosts.nixos = {
       config,
       lib,
       ...
