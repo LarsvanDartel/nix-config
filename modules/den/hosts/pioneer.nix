@@ -7,11 +7,14 @@
   inputs,
   ...
 }: {
-  den.hosts.aarch64-linux.pioneer.users.nixos = {};
+  den.hosts.aarch64-linux.pioneer = {
+    users.nixos = {};
+    meshAddress = "100.68.78.148";
+    server = true;
+  };
 
   den.aspects.pioneer = {
     includes = with den.aspects; [
-      roles.server
       services.netbird.client
       # Not on endeavour: management proxied by the machine it recovers is
       # not out-of-band (2026-08-28: seven-hour outage).

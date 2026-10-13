@@ -10,7 +10,11 @@
   inputs,
   ...
 }: {
-  den.hosts.x86_64-linux.endeavour.users.nixos = {};
+  den.hosts.x86_64-linux.endeavour = {
+    users.nixos = {};
+    meshAddress = "100.68.151.172";
+    server = true;
+  };
 
   den.aspects.endeavour = {
     provides.to-users.homeManager = {...}: {
@@ -18,7 +22,6 @@
     };
 
     includes = with den.aspects; [
-      roles.server
       core.boot
       core.impermanence
       services.nginx
