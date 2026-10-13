@@ -1,14 +1,7 @@
-# The primary user `lvdar`, built from den batteries (define-user,
-# primary-user, user-shell).
-{den, ...}: {
+# The primary user `lvdar`. Account, shell and home baseline come from
+# den.default / den.schema.user (defaults.nix); this is lvdar's own config.
+{...}: {
   den.aspects.lvdar = {
-    includes = [
-      den.batteries.define-user
-      den.batteries.primary-user
-      (den.batteries.user-shell "zsh")
-      den.aspects.roles.home-base
-    ];
-
     homeManager = {
       osConfig,
       lib,

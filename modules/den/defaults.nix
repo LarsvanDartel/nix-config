@@ -12,6 +12,11 @@
 
   den.schema.host.includes = [den.aspects.roles.default];
 
+  den.schema.user.includes = [
+    (den.batteries.user-shell "zsh")
+    den.aspects.roles.home-base
+  ];
+
   den.default.includes = [
     den.batteries.define-user
     den.batteries.hostname

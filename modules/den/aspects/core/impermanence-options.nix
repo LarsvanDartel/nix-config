@@ -1,5 +1,6 @@
 # core.impermanence-options — persist option schema, declared on every host so
-# any aspect can contribute persist paths. Also declares cosmos.user.name.
+# any aspect can contribute persist paths. Also declares cosmos.user.name (set
+# by core.users-base from the host's den user).
 {...}: {
   den.aspects.core.impermanence-options.nixos = {lib, ...}: let
     inherit (lib.types) listOf str coercedTo attrsOf bool;
@@ -7,8 +8,7 @@
   in {
     options.cosmos.user.name = mkOption {
       type = str;
-      default = "lvdar";
-      description = "Username of the main user (host-level; matches the den user entity).";
+      description = "Username of the main user (the host's single den user entity).";
     };
 
     options.cosmos.system.impermanence = {
