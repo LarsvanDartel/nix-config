@@ -33,8 +33,13 @@
       services.comin
     ];
 
-    nixos = {config, ...}: let
+    nixos = {
+      config,
+      lib,
+      ...
+    }: let
       endeavourMesh = den.hosts.x86_64-linux.endeavour.meshAddress;
+      denHosts = lib.attrNames (lib.mergeAttrsList (lib.attrValues den.hosts));
     in {
       imports = [
         inputs.nixos-facter-modules.nixosModules.facter
@@ -188,12 +193,7 @@
       # uses published names. `enforce` retires All -> All; getting it wrong
       # takes out SSH to everything at once.
       cosmos.services.netbird.mesh = {
-        fleet = [
-          "endeavour"
-          "gaia"
-          "pioneer"
-          "voyager"
-        ];
+        fleet = denHosts;
         resolvers = [
           "endeavour"
           "gaia"
@@ -202,12 +202,7 @@
       };
 
       # panther is a phone with no shell.
-      cosmos.services.netbird.sshPeers = [
-        "endeavour"
-        "gaia"
-        "pioneer"
-        "voyager"
-      ];
+      cosmos.services.netbird.sshPeers = denHosts;
 
       # The only internet-reachable surface. Peer/port literals must track
       # the owning aspects (den can't read another host's config).
