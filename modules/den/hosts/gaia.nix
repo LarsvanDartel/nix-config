@@ -10,10 +10,6 @@
   den.hosts.x86_64-linux.gaia.users.nixos = {};
 
   den.aspects.gaia = {
-    # Via provides.to-users: the user `nixos` collides with the aspect's
-    # `nixos` key. On gaia because pioneer has no room for the 100 MiB index.
-    provides.to-users.includes = [den.aspects.home.comma];
-
     includes = with den.aspects; [
       roles.server
       core.boot

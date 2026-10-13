@@ -13,10 +13,6 @@
   den.hosts.x86_64-linux.endeavour.users.nixos = {};
 
   den.aspects.endeavour = {
-    # Via the host, not roles.home-base: pioneer has no room for the
-    # 100 MiB index.
-    provides.to-users.includes = [den.aspects.home.comma];
-
     provides.to-users.homeManager = {...}: {
       cosmos.system.impermanence.persist.directories = ["dev"];
     };

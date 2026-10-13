@@ -5,8 +5,6 @@
     includes = with den.aspects.home; [
       wallpapers
       foot
-      # Not in home-base: the 101 MB index doesn't fit on pioneer.
-      comma
       zen
       mpv
       spotify
