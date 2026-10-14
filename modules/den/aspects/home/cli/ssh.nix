@@ -70,12 +70,18 @@ in {
         };
       };
 
-      home.file = mergeAttrsList (
-        map (key: {
-          "${ssh-file key}.pub".source = key;
-        })
-        keys
-      );
+      home.file =
+        mergeAttrsList (
+          map (key: {
+            "${ssh-file key}.pub".source = key;
+          })
+          keys
+        )
+        // {
+          # Default paths for tools that don't read IdentityFile; every host key is ed25519.
+          ".ssh/id_ed25519.pub".source = keys-path + "/id_${osConfig.networking.hostName}.pub";
+          ".ssh/id_ed25519".source = config.lib.file.mkOutOfStoreSymlink config.sops.secrets."keys/ssh/${osConfig.networking.hostName}".path;
+        };
 
       sops.secrets = mergeAttrsList (
         map (name: {
