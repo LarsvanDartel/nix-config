@@ -382,6 +382,10 @@ in {
       fleetGroup = "${managedPrefix}fleet";
       resolverGroup = "${managedPrefix}resolvers";
 
+      # Same-host read: the fleet resolvers serve these names (gaia runs one).
+      # attrByPath, as this module must not require the unbound aspect.
+      meshOnlyNames = lib.attrNames (lib.attrByPath ["cosmos" "services" "unbound" "localRecords"] {} config);
+
       target = submodule {
         options = {
           peer = mkOption {
@@ -979,6 +983,12 @@ in {
           # nothing else. Ad-blocking comes back the moment there is a relay to
           # fall back to and this can go primary again.
           #
+          # The mesh-only names under lvdar.nl (unbound localRecords, fed by
+          # the mesh-dns-record quirk: idrac, firefly-import) ride along. Left
+          # out, peers resolve them through their uplink to the public wildcard,
+          # i.e. netbird-proxy, which has no such service and aborts the TLS
+          # handshake (SSL_ERROR_INTERNAL_ERROR_ALERT, 2026-09-02 → 2026-10-14).
+          #
           # The address is looked up rather than configured: NetBird assigns it
           # at enrollment, so a re-enrolled peer would otherwise leave the whole
           # mesh pointing at an address nothing answers on.
@@ -997,6 +1007,7 @@ in {
                 --argjson ips "$dns_ips" \
                 --arg group "$all_group" \
                 --arg peers "${lib.concatStringsSep ", " cfg.dnsPeers}" \
+                --argjson meshOnly ${lib.escapeShellArg (builtins.toJSON meshOnlyNames)} \
                 --arg domain ${lib.escapeShellArg cfg.dnsDomain} '{
                   name: $name,
                   description: ("unbound on " + $peers),
@@ -1004,7 +1015,7 @@ in {
                   enabled: true,
                   groups: [$group],
                   primary: false,
-                  domains: [$domain],
+                  domains: ([$domain] + $meshOnly),
                   search_domains_enabled: false,
                 }')"
 
