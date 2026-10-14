@@ -38,10 +38,10 @@ There are no tests beyond `nix flake check`; correctness is eval + build.
 
 ## Layout
 
-- `modules/meta/` — flake-level infrastructure: nixpkgs instance + overlay aggregation, treefmt, pre-commit, devshell, deploy-rs nodes, flake-file, `cosmosLib` helpers, hm-wrapper program catalog.
+- `modules/meta/` — flake-level infrastructure: perSystem nixpkgs (packages/devshell only; hosts build their own in `core.nixpkgs`), treefmt, pre-commit, devshell, deploy-rs nodes (from `den.hosts`), flake-file, `cosmosLib` helpers, hm-wrapper program catalog.
 - `modules/pkgs/` — local packages. Each file self-registers into the `nixpkgs.overlays` aggregator option; `modules/den/overlays.nix` composes them into `flake.overlays.default`, which hosts consume via `inputs.self.overlays.default`.
 - `modules/den/aspects/` — the actual configuration, ~200 files, grouped `core/ desktop/ hardware/ home/ roles/ services/`.
-- `modules/den/hosts/` — one file per host; `modules/den/users/` — one per user.
+- `modules/den/hosts/` — one file per host; `modules/den/users/` — user aspects (only `lvdar.nix`; shell + `roles.home-base` come from `den.schema.user.includes`); `modules/den/schema.nix` — host entity facts (`meshAddress`, `server`, `deployAddress`).
 - `modules/den/deployment.nix` — facts about *this* deployment, applied to every
   host via `den.default.nixos`. Values that would otherwise sit as option
   defaults inside an aspect, making it unusable by anyone else and hiding real
@@ -50,7 +50,7 @@ There are no tests beyond `nix flake check`; correctness is eval + build.
 
 ## den model
 
-An aspect is a named, composable unit declaring any of `includes` (other aspects), `nixos` (a NixOS module), `homeManager` (an HM module), `provides.to-users.*`:
+An aspect is a named, composable unit declaring any of `includes` (other aspects), `nixos` (a NixOS module), `homeManager` (an HM module), `provides.*` edges, and quirk keys:
 
 ```nix
 {den, ...}: {
@@ -61,14 +61,19 @@ An aspect is a named, composable unit declaring any of `includes` (other aspects
 }
 ```
 
-`roles/*` are the aggregates (`roles.server`, `roles.desktop`, `roles.desktop-home`, `roles.home-base`, `roles.gaming`); hosts include roles plus individual aspects. `modules/den/defaults.nix` sets what every host/user gets by default (batteries, `core.nixpkgs`, `core.home-manager`, HM class for all users, `roles.default`).
+`roles/*` are the aggregates (`roles.server`, `roles.desktop`, `roles.desktop-home`, `roles.home-base`, `roles.gaming`); hosts include roles plus individual aspects. `roles.server` arrives through the `server-role` policy for hosts declared with `server = true`. `modules/den/defaults.nix` sets what every host/user gets by default (batteries, `core.nixpkgs`, `core.home-manager`, HM class for all users, `roles.default` per host, user-shell + `roles.home-base` per user). `cosmos.user.name` is derived from the host's single den user (asserted).
+
+**Where config lands.** Host scope delivers only `nixos`; a `homeManager` key on a host-included aspect is silently dropped. Host → users: `provides.to-users` (`services.eduvpn`, `roles.gaming`, `desktop.hyprland`, `desktop.styling`, `services.netbird-gewis`). User → hosts: `provides.to-hosts` (`home.kde-connect`, `home.catt`, `home.taskwarrior`). A plain `nixos` key on a user-scope aspect only reaches the host through den bug #694; don't. Host-specific user config: `den.aspects.<host>.provides.<user>`.
 
 Custom options live under the **`cosmos.*`** namespace (`cosmos.system.impermanence`, `cosmos.services.netbird`, `cosmos.cli.programs.nvim.languages`, `cosmos.desktops.*`, …), declared in whichever aspect owns them.
 
 ### den quirks
 
 - A `mkForce`/`mkDefault` at the top level of an aspect body **infinitely recurses when combined with facter** — den classifies aspect content by unwrapping priority wrappers, forcing the definition too early. Put such a module inside `imports` instead, where it stays opaque to den until the NixOS module system evaluates it. See the comment in `modules/den/hosts/pioneer.nix`.
-- den cannot read another host's config. Cross-host references (ports, addresses) are literals that must be kept in sync by hand — e.g. `cosmos.services.netbird.services` in `gaia.nix` hardcodes endeavour's service ports.
+- **Cross-host data**:
+  - Static per-host facts live on the den host entity (`den.hosts.<sys>.<name>.meshAddress` etc.) and are readable anywhere without evaluating that host.
+  - Config that one host owns and another consumes goes through a **quirk**: `netbird-service` (apps publish themselves; gaia's netbird-proxy collects), `kanidm-provision`, `scrape-target`, `mesh-dns-record`. Payloads stay static or `{host, ...}:`: a `{config, ...}:` payload instantiates the producer's whole config on the consumer, and comin evaluates on gaia.
+  - What remains literal is what neither holds (netbird-proxy's embedded-client address, ordered resolver lists).
 - `mkForce` inside an `attrsOf` submodule doesn't do what you want for Hyprland Lua-ish config; suppress bad output with `stylix.targets.<t>.disable` instead.
 
 ## Hosts
@@ -136,14 +141,14 @@ URL, so a partial push can leave the two out of sync.
 
 - Hosts meet on a **NetBird mesh** (`<host>.nb.lvdar.nl`). The control plane is
   self-hosted on gaia.
-- `cosmos.services.netbird.services` on `gaia.nix` is where a service becomes
-  public. Entries are either gated behind a NetBird identity check or `shared`
-  (open, because the app runs its own login). Gated: `suwayomi`, `sabnzbd`,
-  `prowlarr`, `radarr`, `sonarr`, `lidarr`, `bazarr`, `minecraft-control`.
-  Everything else — jellyfin, immich, cloud/docs/wopi, chat, grafana, traccar,
-  status, ntfy, pds, knot, spindle, seerr, typstnique, www, the minecraft
-  entries — is open by design; the reasoning for each is in the comments there
-  and is worth reading before changing one.
+- A service becomes public when its own aspect emits a `netbird-service` quirk
+  entry; gaia's netbird server collects them into
+  `cosmos.services.netbird.services`. Entries are gated behind a NetBird
+  identity check unless `bearerAuth.enable = false` (open, because the app runs
+  its own login). Gated: `suwayomi`, `sabnzbd`, `prowlarr`, `radarr`, `sonarr`,
+  `lidarr`, `bazarr`, `lingarr`, `minecraft-control`. The reasoning for each
+  entry sits next to it in the app's aspect and is worth reading before
+  changing one.
 - `cosmos.services.netbird.localVhosts` on `gaia.nix` is the escape hatch for
   domains netbird-proxy *cannot* carry. The proxy's cluster domain is
   `baseDomain`, and management rejects any service whose domain is not a label

@@ -4,13 +4,14 @@ NixOS fleet config for four hosts (`voyager`, `endeavour`, `gaia`, `pioneer`), b
 
 ## Architecture & Data Flow
 
-**Evaluation flow**: generated `flake.nix` → `mkFlake` + `import-tree ./modules` → every module auto-loads → den assembles `nixosConfigurations` from aspects → `modules/meta/nixpkgs.nix` injects one shared per-system `pkgs` (stable + unstable + NUR overlays) via `_module.args.pkgs`.
+**Evaluation flow**: generated `flake.nix` → `mkFlake` + `import-tree ./modules` → every module auto-loads → den assembles `nixosConfigurations` from aspects → each host builds its own `pkgs` in `core.nixpkgs` (stable + unstable + NUR + `inputs.self.overlays.default`). `modules/meta/nixpkgs.nix` is perSystem's pkgs only (packages, devshell, hm-wrappers).
 
 **Composition model** (`modules/den/`):
 
-- **Aspect** = the unit of configuration: `den.aspects.<group>.<name>` with any of `includes` (other aspects), `nixos` (NixOS module), `homeManager` (HM module), `provides.to-users.*`.
-- **Roles** (`modules/den/aspects/roles/`) are the only aggregates hosts include: `default` (every host, via `modules/den/defaults.nix`), `server`, `desktop`, `desktop-home`, `gaming`, `home-base` (every user).
-- **Hosts** (`modules/den/hosts/<host>.nix`) register `den.hosts.<arch>.<host>.users.<user>` and define a per-host aspect stacking roles + individual aspects + hardware imports.
+- **Aspect** = the unit of configuration: `den.aspects.<group>.<name>` with any of `includes` (other aspects), `nixos` (NixOS module), `homeManager` (HM module), `provides.*` (cross-entity edges, below), and quirk keys (`kanidm-provision`, `netbird-service`, `scrape-target`, `mesh-dns-record`).
+- **Where config lands**: host scope delivers only `nixos`; a `homeManager` key on a host-included aspect is **silently dropped**. Host → its users: `provides.to-users` (e.g. `services.eduvpn`, `roles.gaming`, `desktop.hyprland`). User → its hosts: `provides.to-hosts` (e.g. `home.kde-connect`, `home.catt`). Never a plain `nixos` key on a user-scope aspect: that only works through den bug #694. Host-specific user config goes in `den.aspects.<host>.provides.<user>`, not a host child named after the user.
+- **Roles** (`modules/den/aspects/roles/`): `default` (every host, `den.schema.host.includes`), `server` (via the `server-role` policy when the host entity has `server = true`), `desktop`, `desktop-home`, `gaming`, `home-base` (every user, `den.schema.user.includes`).
+- **Hosts** (`modules/den/hosts/<host>.nix`) register `den.hosts.<arch>.<host> = { users.<user> = {}; meshAddress; server; deployAddress; }` (facts declared in `modules/den/schema.nix`) and define a per-host aspect stacking roles + individual aspects + hardware imports.
 - Custom options live under **`cosmos.*`**, declared by whichever aspect owns the feature. Frequently used: `cosmos.system.impermanence.persist.*`, `cosmos.networking.edgeTerminated`, `cosmos.services.*`, `cosmos.user.*`.
 - **Local packages**: each `modules/pkgs/*.nix` self-registers into the `nixpkgs.overlays` aggregator option; `modules/den/overlays.nix` composes `flake.overlays.default`, consumed by hosts via `inputs.self.overlays.default`.
 
@@ -25,7 +26,7 @@ push to main → knot (services.tangled on endeavour)
 
 `testing` branch → `nixos-rebuild test` (activated, gone on reboot). flake-bump pushes to `main` autonomously daily — **always pull before pushing**. deploy-rs stays for manual/out-of-band deploys and hosts without comin (voyager: `nh os switch`; pioneer).
 
-**Publishing model**: `cosmos.services.netbird.services` in `gaia.nix` is where a service becomes public (gated behind NetBird identity vs `shared` = open; per-entry comments explain why). `localVhosts` is the escape hatch for domains netbird-proxy cannot carry (the apex `lvdar.nl` 422s). `cosmos.networking.edgeTerminated`: endeavour = `true` (apps must bind `0.0.0.0`, local nginx vhosts dropped), gaia = `false` (is the edge). A new service answering locally but not publicly is almost always a missing bind/`edgeTerminated` issue. netbird-proxy **fails closed** when crowdsec's LAPI is unreachable — check `curl -I` against a published service before blaming the knot.
+**Publishing model**: an app aspect becomes public by emitting a `netbird-service = {host, ...}: { <name> = {...}; }` entry (same shape as `cosmos.services.netbird.services.<name>`; gated behind NetBird identity unless `bearerAuth.enable = false`; the entry's comment explains why). gaia's netbird server collects them (`pipe.collect`, x86_64 only) into `cosmos.services.netbird.services`; the producer also appends its port to `cosmos.services.netbird.client.exposedPorts`. `localVhosts` is the escape hatch for domains netbird-proxy cannot carry (the apex `lvdar.nl` 422s). `cosmos.networking.edgeTerminated`: endeavour = `true` (apps must bind `0.0.0.0`, local nginx vhosts dropped), gaia = `false` (is the edge). A new service answering locally but not publicly is almost always a missing bind/`edgeTerminated` issue. netbird-proxy **fails closed** when crowdsec's LAPI is unreachable — check `curl -I` against a published service before blaming the knot.
 
 ## Key Directories
 
@@ -35,7 +36,8 @@ push to main → knot (services.tangled on endeavour)
 | `modules/pkgs/` | Local packages (14 files), each self-registering into the overlays aggregator |
 | `modules/den/aspects/` | The configuration itself (~200 files): `core/ desktop/ hardware/ home/ roles/ services/` |
 | `modules/den/hosts/` | One aspect-bearing file per host + `_hw/` (disko) + `_facter/` (hardware reports) |
-| `modules/den/users/` | User aspects: `lvdar.nix`, `nixos.nix` (batteries + `roles.home-base`) |
+| `modules/den/users/` | User aspects: `lvdar.nix` (the `nixos` server user needs none: shell + `roles.home-base` come from `den.schema.user.includes`) |
+| `modules/den/schema.nix` | Host entity facts (`meshAddress`, `server`, `deployAddress`) + the `server-role` policy |
 | `modules/den/{defaults,deployment}.nix` | Every-host/user baseline; per-deployment facts (only options valid on *every* host) |
 | `docs/RESTORE.md` | Host-restore runbook — read its first section before you need it |
 | `.tangled/` | Spindle CI workflow (`lint.yml`) + `nix-secrets-stub` used by build-gate/flake-bump/CI |
@@ -80,7 +82,10 @@ There are no tests beyond `nix flake check`; correctness is eval + build.
 - **Impermanence**: aspects contribute paths declaratively via `cosmos.system.impermanence.persist.directories` (bare path string or `{directory, user, group}` attrset); activation is opt-in via the `core.impermanence` aspect (voyager/endeavour/gaia, not pioneer).
 - **Priority discipline**: `mkDefault` for overridable defaults; `mkForce` only for real overrides — and **never at the top level of an aspect body combined with facter** (den unwraps priority wrappers to classify content → infinite recursion). Wrap such modules in an inner `imports = [({...}: {...})]`; see the comment in `modules/den/hosts/pioneer.nix`. Same trap family: avoid config reads in host aspect top level (see `gaia.nix`'s `facter.detected.graphics.enable` comment).
 - **homeManager modules** are plain HM modules that freely read `osConfig`; `lib.hm.dag` for ordering.
-- **Cross-host values are hand-synced literals** — den cannot read another host's config (e.g. gaia's `netbird.services` hardcodes endeavour's ports; the BMC address in pioneer). When you change a port on one host, grep the others.
+- **Cross-host data**, three tools, cheapest first:
+  1. **Host entity facts** (`den.hosts.<sys>.<name>.meshAddress`, `.server`, `.users`, names): plain data, readable from any host or flake module without evaluating that host. Used for mesh IPs, host lists, deploy-rs nodes, ssh config.
+  2. **Quirks** (`den.quirks.<q>` + a `pipe.collect`/`collectAll` policy included only by the consumer): producer aspects emit entries, the consumer gets the list as a module arg. `netbird-service` (apps publish themselves to gaia's netbird-proxy), `kanidm-provision`, `scrape-target` (prometheus), `mesh-dns-record` (unbound). Keep payloads static or `{host, ...}:`; a `{config, ...}:` payload makes the consumer instantiate the producer host's whole config (comin evaluates on gaia), and config-dependent quirks cannot be chained.
+  3. **Literals**, only for what no config or entity holds (e.g. netbird-proxy's embedded-client address, preference-ordered resolver lists). Comment them as hand-synced.
 - Names: kebab-case aspect names matching their file; nested subdirs extend the namespace (`services/arr/*.nix` → `den.aspects.services.arr.radarr`).
 
 ## Important Files
@@ -88,7 +93,7 @@ There are no tests beyond `nix flake check`; correctness is eval + build.
 - `flake.nix` — **generated, never edit**; header says so. `nixConfig.abort-on-warn = true`.
 - `modules/den/defaults.nix` — what every host/user gets by default.
 - `modules/den/deployment.nix` — fleet-wide option values; only options that exist on *every* host belong here, anything narrower goes in the host's own file.
-- `modules/den/hosts/gaia.nix` — the publish-or-gate registry (`cosmos.services.netbird.services`); read the per-entry reasoning before changing one.
+- `modules/den/hosts/gaia.nix` — the edge: NetBird control plane, `localVhosts`, oidc.idp. Published services are declared by their own aspects (`netbird-service` key); read an entry's reasoning there before changing gating.
 - `modules/den/hosts/voyager.nix` — boot-time compositor specialisations (base/hyprland + niri as separate GRUB entries).
 - `modules/den/aspects/core/{sops,impermanence,impermanence-options,networking}.nix` — secrets, persistence, `edgeTerminated`.
 - `modules/meta/{nixpkgs,formatter,pre-commit,devshell,deploy,hm-wrappers}.nix` — flake machinery.
@@ -99,7 +104,7 @@ There are no tests beyond `nix flake check`; correctness is eval + build.
 
 - Nix flake workflow only; no justfile, no scripts dir, no GitHub Actions. `.envrc` at root is `use flake`.
 - `nixConfig.abort-on-warn = true`: **any nixpkgs/HM eval warning (deprecation etc.) is a hard build failure**, not a warning. Upgrades introducing deprecation warnings break the build.
-- Formatter set is fixed: alejandra (Nix) + deadnix + shfmt via treefmt (`modules/meta/formatter.nix`); `flake.nix`, `*.facter.json`, `*hardware-configuration.nix`, `*.lua` are excluded. `.pre-commit-config.yaml` is gitignored — hooks are flake-managed in `modules/meta/pre-commit.nix`.
+- Formatter set is fixed: alejandra (Nix) + deadnix + shfmt via treefmt (`modules/meta/formatter.nix`); `flake.nix`, `*.facter.json`, `*.lua` are excluded. deadnix strips lambda args that look unused, but den dispatches on arg *names* (`{host, ...}:` in policies/quirks): keep them with `# deadnix: skip` on the line directly above. `.pre-commit-config.yaml` is gitignored — hooks are flake-managed in `modules/meta/pre-commit.nix`.
 - **`git add` new files before building** — the flake is a `git+file://` source, so unstaged files are invisible and produce confusing "option does not exist" errors.
 - Secrets: sops-nix sourced from the private `nix-secrets` flake input over SSH (`git+ssh`). **The flake cannot be evaluated without access to that repo.** Machines without a key (build-gate, flake-bump, CI) build with `--override-input nix-secrets ./.tangled/nix-secrets-stub` (sound because `validateSopsFiles = false`).
 - Git remotes: `origin` = the knot (`knot.lvdar.nl`, what comin watches), sole fetch URL, dual push URLs (knot + GitHub) — a partial push can desync the mirror. Pull before pushing; flake-bump commits on its own.
