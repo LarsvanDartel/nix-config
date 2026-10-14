@@ -98,7 +98,17 @@
           # `netbird up`/`down` toggle inside a daemon that keeps running, and
           # this shipped dead the first time. multi-user.target starts it on a
           # `switch` with the mesh up.
-          after = [deviceUnit "${netbird.service.name}.service"];
+          #
+          # DefaultDependencies=no stops multi-user.target from ordering itself
+          # after this unit: with the mesh down the device job sits out its 90 s
+          # timeout, and power-profiles-daemon (After=multi-user.target) with it
+          # — which froze noctalia's startup on its synchronous D-Bus activation.
+          # The defaults that still matter are restated below.
+          unitConfig.DefaultDependencies = false;
+          after = [deviceUnit "${netbird.service.name}.service" "basic.target"];
+          requires = ["sysinit.target"];
+          before = ["shutdown.target"];
+          conflicts = ["shutdown.target"];
           bindsTo = [deviceUnit];
           wantedBy = [deviceUnit "multi-user.target"];
 
