@@ -1,6 +1,21 @@
 # services.immich
-{...}: {
+{...}: let
+  # services.immich.port and the netbird-service target.
+  port = 2283;
+in {
   den.aspects.services.immich = {
+    netbird-service = {host, ...}: {
+      immich = {
+        bearerAuth.enable = false;
+        targets = [
+          {
+            peer = host.name;
+            inherit port;
+          }
+        ];
+      };
+    };
+
     kanidm-provision = {
       groups = {
         immich-users = {
@@ -81,9 +96,11 @@
 
         # Root-owned: the immich module reads it via LoadCredential.
         sops.secrets."keys/immich/oauth-client-secret" = {};
+        cosmos.services.netbird.client.exposedPorts = [port];
         services.immich = {
           enable = true;
           host = "0.0.0.0";
+          inherit port;
           mediaLocation = cfg.mediaDir;
           settings = {
             server.externalDomain = "https://immich.lvdar.nl";

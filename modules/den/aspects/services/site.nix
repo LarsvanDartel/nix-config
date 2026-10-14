@@ -2,15 +2,36 @@
 #
 # Nothing persisted on purpose: an impermanence entry under /var/lib/private
 # (DynamicUser) is the EBUSY that broke ntfy; the working copy is a cache.
-{inputs, ...}: {
+{inputs, ...}: let
+  # services.site.port and the netbird-service target. hosts/gaia.nix's
+  # lvdar.nl localVhost also points here, as an address it must spell out.
+  port = 3031;
+in {
   flake-file.inputs.site.url = "git+https://tangled.org/lvdar.nl/site";
+
+  # www only: the apex can't be a proxy service (management 422s
+  # non-subdomains, masked by the reconciler as "already taken"); gaia
+  # serves it via netbird.localVhosts. The app 301s www to the apex.
+  den.aspects.services.site.netbird-service = {host, ...}: {
+    www = {
+      bearerAuth.enable = false;
+      targets = [
+        {
+          peer = host.name;
+          inherit port;
+        }
+      ];
+    };
+  };
 
   den.aspects.services.site.nixos = {...}: {
     imports = [inputs.site.nixosModules.default];
 
+    cosmos.services.netbird.client.exposedPorts = [port];
+
     services.site = {
       enable = true;
-      port = 3031;
+      inherit port;
 
       # 0.0.0.0: edgeTerminated, traffic arrives from gaia's netbird-proxy.
       address = "0.0.0.0";

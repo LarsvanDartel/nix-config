@@ -1,8 +1,25 @@
 # services.stalwart — Stalwart mail/CalDAV/CardDAV server; logins via kanidm
 # OIDC, outbound via the JetEmail relay.
-{den, ...}: {
+{den, ...}: let
+  # Option default and netbird-service target (see services/netbird.nix).
+  defaultDavPort = 8089;
+in {
   den.aspects.services.stalwart = {
     includes = [den.aspects.services.netbird.client];
+
+    # Ungated: CalDAV/CardDAV clients carry their own credentials and can't
+    # follow a redirect. Stalwart 404s everything but /dav and /.well-known here.
+    netbird-service = {host, ...}: {
+      mail = {
+        bearerAuth.enable = false;
+        targets = [
+          {
+            peer = host.name;
+            port = defaultDavPort;
+          }
+        ];
+      };
+    };
 
     # Thunderbird's custom OAuth for IMAP/SMTP (home/apps/thunderbird.nix).
     # Stalwart validates tokens at this client's userinfo endpoint
@@ -60,7 +77,7 @@
 
         davPort = mkOption {
           type = port;
-          default = 8089;
+          default = defaultDavPort;
           description = "Mesh-only HTTP listener netbird-proxy targets for CalDAV/CardDAV.";
         };
 

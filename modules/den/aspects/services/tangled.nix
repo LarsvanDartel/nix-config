@@ -9,11 +9,29 @@
   den,
   inputs,
   ...
-}: {
+}: let
+  # Option defaults and netbird-service targets (see services/netbird.nix).
+  defaultPort = 5555;
+  defaultSpindlePort = 6555;
+in {
   flake-file.inputs.tangled.url = "git+https://tangled.org/tangled.org/core";
 
   den.aspects.services.tangled = {
     includes = [den.aspects.services.netbird.client];
+
+    # Git clients can't do an IdP redirect; writes are authenticated by
+    # the knot against ATProto identity.
+    netbird-service = {host, ...}: {
+      knot = {
+        bearerAuth.enable = false;
+        targets = [
+          {
+            peer = host.name;
+            port = defaultPort;
+          }
+        ];
+      };
+    };
 
     nixos = {
       config,
@@ -53,7 +71,7 @@
 
         port = mkOption {
           type = port;
-          default = 5555;
+          default = defaultPort;
           description = "HTTP listener, reached over the mesh by netbird-proxy.";
         };
 
@@ -110,6 +128,19 @@
       den.aspects.services.tangled
       den.aspects.services.attic.client
     ];
+
+    # The appview calls it service-to-service; can't follow a redirect.
+    netbird-service = {host, ...}: {
+      spindle = {
+        bearerAuth.enable = false;
+        targets = [
+          {
+            peer = host.name;
+            port = defaultSpindlePort;
+          }
+        ];
+      };
+    };
 
     nixos = {
       config,
@@ -226,7 +257,7 @@
 
         port = mkOption {
           type = port;
-          default = 6555;
+          default = defaultSpindlePort;
           description = "Free on this host; reached over the mesh by netbird-proxy.";
         };
 

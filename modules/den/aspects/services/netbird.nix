@@ -6,9 +6,11 @@
   lib,
   ...
 }: let
-  # Gated services from netbird.services in hosts/gaia.nix, hand-synced (den
-  # cannot read another host's config). Each becomes a kanidm group AND a
-  # `groups` claim value NetBird matches against distribution lists.
+  inherit (den.lib.policy) pipe;
+
+  # The gated netbird-service entries, hand-synced. Each becomes a kanidm
+  # group AND a `groups` claim value NetBird matches against distribution
+  # lists.
   gatedServices = [
     "suwayomi"
     "sabnzbd"
@@ -38,6 +40,26 @@
     ++ map (s: "netbird-${s}") gatedServices
     ++ inAppGroups;
 in {
+  den.quirks.netbird-service.description = "Public reverse-proxy services (cosmos.services.netbird.services entries), published by the NetBird server";
+
+  # Payloads are `{host, ...}` functions, never `{config, ...}`: reading the
+  # producer's config would make gaia evaluate that host's whole system. So
+  # a producer keeps its port in a file-level `defaultPort`, shared with the
+  # option default, and an override of that option does not reach here.
+  #
+  # collect, not collectAll: every published app runs on an x86_64 host.
+  # den reads these argument names (host scope, host-entity filter), so
+  # deadnix must not strip them as unused.
+  # deadnix: skip
+  den.policies.netbird-service = {host, ...}: [
+    (pipe.from "netbird-service" [
+      (pipe.collect (
+        # deadnix: skip
+        {host, ...}: true
+      ))
+    ])
+  ];
+
   den.aspects.services.netbird.client.nixos = {
     config,
     lib,
@@ -323,7 +345,9 @@ in {
   };
 
   den.aspects.services.netbird = {
-    includes = with den.aspects.services; [nginx netbird.client];
+    # Only the server collects: a fleet-wide collect would make each host's
+    # evaluation pull in every other host's config.
+    includes = with den.aspects.services; [nginx netbird.client den.policies.netbird-service];
 
     # Management serves its own metrics on 9090.
     scrape-target = {host, ...}: {
@@ -380,6 +404,7 @@ in {
       config,
       lib,
       pkgs,
+      netbird-service,
       ...
     }: let
       inherit (lib.options) mkOption mkEnableOption;
@@ -1390,7 +1415,9 @@ in {
           default = {};
           description = ''
             Reverse-proxy services, reconciled against the management API on
-            activation. Peers and groups are given by name, not id.
+            activation. Peers and groups are given by name, not id. This is
+            the only internet-reachable surface. Apps publish their entries
+            on the `netbird-service` quirk from their own aspect.
           '';
         };
 
@@ -1519,6 +1546,8 @@ in {
       };
 
       config = {
+        cosmos.services.netbird.services = lib.mkMerge netbird-service;
+
         sops.secrets = {
           # coturn's preStart reads this as the service user; root-only gives EACCES.
           "keys/netbird/coturn-password".owner = "turnserver";

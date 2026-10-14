@@ -7,9 +7,26 @@
   den,
   inputs,
   ...
-}: {
+}: let
+  # Option default and netbird-service target (see services/netbird.nix).
+  defaultPort = 8222;
+in {
   den.aspects.services.vaultwarden = {
     includes = [den.aspects.services.netbird.client];
+
+    # Bitwarden clients authenticate to the API themselves and can't
+    # follow the gate's redirect; kanidm SSO is the login.
+    netbird-service = {host, ...}: {
+      vault = {
+        bearerAuth.enable = false;
+        targets = [
+          {
+            peer = host.name;
+            port = defaultPort;
+          }
+        ];
+      };
+    };
 
     kanidm-provision = {config, ...}: let
       cfg = config.cosmos.services.vaultwarden;
@@ -45,13 +62,13 @@
       options.cosmos.services.vaultwarden = {
         port = mkOption {
           type = port;
-          default = 8222;
+          default = defaultPort;
         };
 
         domain = mkOption {
           type = str;
           default = "vault.lvdar.nl";
-          description = "Public name. Must match the published service on gaia.";
+          description = "Public name: the `vault` netbird-service published above.";
         };
 
         authDomain = mkOption {

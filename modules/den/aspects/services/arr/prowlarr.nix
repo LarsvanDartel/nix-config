@@ -2,10 +2,13 @@
 # Longhand, not mkSimpleArr: nixpkgs runs prowlarr under DynamicUser with no
 # option for its data dir, so User/ExecStart are overridden by hand.
 {den, ...}: let
-  inherit (import ./_lib.nix) vpnVhost;
+  inherit (import ./_lib.nix) vpnVhost gatedService;
+  # Option default and netbird-service target (see services/netbird.nix).
+  defaultPort = 9696;
 in {
   den.aspects.services.arr.prowlarr = {
     includes = [den.aspects.services.arr];
+    netbird-service = gatedService "prowlarr" defaultPort;
     nixos = {
       config,
       lib,
@@ -24,7 +27,7 @@ in {
         package = mkPackageOption pkgs "prowlarr" {};
         port = mkOption {
           type = port;
-          default = 9696;
+          default = defaultPort;
         };
         stateDir = mkOption {
           type = path;
@@ -42,6 +45,7 @@ in {
       };
 
       config = {
+        cosmos.services.netbird.client.exposedPorts = [cfg.port];
         systemd.tmpfiles.rules = ["d '${cfg.stateDir}' 0700 ${cfg.user} root - -"];
         services.prowlarr = {
           enable = true;

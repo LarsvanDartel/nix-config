@@ -1,5 +1,18 @@
 # services.suwayomi — manga server.
-{...}: {
+{...}: let
+  # Option default and netbird-service target (see services/netbird.nix).
+  defaultPort = 8080;
+in {
+  # Gated: no login of its own.
+  den.aspects.services.suwayomi.netbird-service = {host, ...}: {
+    suwayomi.targets = [
+      {
+        peer = host.name;
+        port = defaultPort;
+      }
+    ];
+  };
+
   den.aspects.services.suwayomi.nixos = {
     config,
     lib,
@@ -35,7 +48,7 @@
       };
       port = mkOption {
         type = port;
-        default = 8080;
+        default = defaultPort;
       };
       dataDir = mkOption {
         type = path;
@@ -114,6 +127,8 @@
     };
 
     config = {
+      cosmos.services.netbird.client.exposedPorts = [cfg.port];
+
       assertions = [
         {
           assertion = cfg.homeLink != null -> cfg.downloadsDir != null;

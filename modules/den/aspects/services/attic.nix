@@ -39,8 +39,8 @@
             The attic server, without a cache name.
 
             A literal rather than a reference to the server aspect's options:
-            den cannot read another host's config, which is the same reason
-            gaia.nix hardcodes endeavour's service ports.
+            reading another host's config would make this host evaluate that
+            host's whole system.
           '';
         };
 

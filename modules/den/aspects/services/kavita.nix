@@ -12,9 +12,25 @@
   den,
   inputs,
   ...
-}: {
+}: let
+  # Option default and netbird-service target (see services/netbird.nix).
+  defaultPort = 5000;
+in {
   den.aspects.services.kavita = {
     includes = [den.aspects.services.arr];
+
+    # Own OIDC.
+    netbird-service = {host, ...}: {
+      kavita = {
+        bearerAuth.enable = false;
+        targets = [
+          {
+            peer = host.name;
+            port = defaultPort;
+          }
+        ];
+      };
+    };
 
     kanidm-provision = {config, ...}: let
       cfg = config.cosmos.services.kavita;
@@ -81,7 +97,7 @@
 
         port = mkOption {
           type = port;
-          default = 5000;
+          default = defaultPort;
         };
 
         domain = mkOption {
@@ -111,6 +127,8 @@
       };
 
       config = {
+        cosmos.services.netbird.client.exposedPorts = [cfg.port];
+
         services.kavita = {
           enable = true;
           settings = {

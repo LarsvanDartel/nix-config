@@ -2,9 +2,23 @@
 # actually use. Its own unit, because nixpkgs' runs it under DynamicUser.
 {den, ...}: let
   inherit (import ./_lib.nix) vpnVhost;
+  # Option default and netbird-service target (see services/netbird.nix).
+  # Not upstream's 5055: traccar's osmand protocol holds that.
+  defaultPort = 4055;
 in {
   den.aspects.services.arr.jellyseerr = {
     includes = [den.aspects.services.arr];
+    netbird-service = {host, ...}: {
+      seerr = {
+        bearerAuth.enable = false;
+        targets = [
+          {
+            peer = host.name;
+            port = defaultPort;
+          }
+        ];
+      };
+    };
     nixos = {
       config,
       lib,
@@ -29,7 +43,7 @@ in {
         };
         port = mkOption {
           type = port;
-          default = 5055;
+          default = defaultPort;
         };
         openFirewall = mkOption {
           type = bool;
@@ -50,6 +64,8 @@ in {
       };
 
       config = {
+        cosmos.services.netbird.client.exposedPorts = [cfg.port];
+
         assertions = [
           {
             assertion = !(cfg.vpn.enable && cfg.expose);

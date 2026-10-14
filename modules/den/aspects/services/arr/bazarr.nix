@@ -2,10 +2,13 @@
 # Hand-rolled unit: the nixpkgs module cannot place the config directory,
 # and bazarr keeps its database there.
 {den, ...}: let
-  inherit (import ./_lib.nix) vpnVhost;
+  inherit (import ./_lib.nix) vpnVhost gatedService;
+  # Option default and netbird-service target (see services/netbird.nix).
+  defaultPort = 6767;
 in {
   den.aspects.services.arr.bazarr = {
     includes = [den.aspects.services.arr];
+    netbird-service = gatedService "bazarr" defaultPort;
     nixos = {
       config,
       lib,
@@ -23,7 +26,7 @@ in {
         package = mkPackageOption pkgs "bazarr" {};
         port = mkOption {
           type = port;
-          default = 6767;
+          default = defaultPort;
         };
         stateDir = mkOption {
           type = path;
@@ -41,6 +44,7 @@ in {
       };
 
       config = {
+        cosmos.services.netbird.client.exposedPorts = [cfg.port];
         systemd.tmpfiles.rules = ["d '${cfg.stateDir}' 0700 ${cfg.user} root - -"];
         users.users.${cfg.user} = {
           isSystemUser = true;

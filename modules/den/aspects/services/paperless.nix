@@ -3,9 +3,25 @@
   den,
   inputs,
   ...
-}: {
+}: let
+  # Option default and netbird-service target (see services/netbird.nix).
+  defaultPort = 28981;
+in {
   den.aspects.services.paperless = {
     includes = [den.aspects.services.arr];
+
+    # Own OIDC.
+    netbird-service = {host, ...}: {
+      paperless = {
+        bearerAuth.enable = false;
+        targets = [
+          {
+            peer = host.name;
+            port = defaultPort;
+          }
+        ];
+      };
+    };
 
     kanidm-provision = {config, ...}: let
       cfg = config.cosmos.services.paperless;
@@ -49,7 +65,7 @@
 
         port = mkOption {
           type = port;
-          default = 28981;
+          default = defaultPort;
         };
 
         domain = mkOption {
@@ -126,6 +142,8 @@
       };
 
       config = {
+        cosmos.services.netbird.client.exposedPorts = [cfg.port];
+
         # `paperless-manage` is broken (wrapper passes sudo two -g flags);
         # run it as the paperless user so it takes the `sudo=exec` branch.
         services.paperless = {

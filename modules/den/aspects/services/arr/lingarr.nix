@@ -1,8 +1,13 @@
 # services.arr.lingarr — machine-translates subtitles via OpenRouter.
 # Settings below are written into lingarr's database on every start; UI edits revert on restart.
-{den, ...}: {
+{den, ...}: let
+  inherit (import ./_lib.nix) gatedService;
+  # Option default and netbird-service target (see services/netbird.nix).
+  defaultPort = 9876;
+in {
   den.aspects.services.arr.lingarr = {
     includes = [den.aspects.services.arr];
+    netbird-service = gatedService "lingarr" defaultPort;
     nixos = {
       config,
       lib,
@@ -35,7 +40,7 @@
         package = mkPackageOption pkgs "lingarr" {};
         port = mkOption {
           type = port;
-          default = 9876;
+          default = defaultPort;
         };
         stateDir = mkOption {
           type = path;
@@ -80,6 +85,7 @@
       };
 
       config = {
+        cosmos.services.netbird.client.exposedPorts = [cfg.port];
         systemd.tmpfiles.rules = ["d '${cfg.stateDir}' 0700 ${cfg.user} root - -"];
         users.users.${cfg.user} = {
           isSystemUser = true;

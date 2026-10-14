@@ -8,9 +8,26 @@
   den,
   inputs,
   ...
-}: {
+}: let
+  # Option default and netbird-service target (see services/netbird.nix).
+  defaultPort = 3000;
+in {
   den.aspects.services.grafana = {
     includes = with den.aspects.services; [netbird.client prometheus loki];
+
+    # Ungated: own OIDC, and its XHR can't follow the gate's 302
+    # (the NetworkError that took traccar down).
+    netbird-service = {host, ...}: {
+      grafana = {
+        bearerAuth.enable = false;
+        targets = [
+          {
+            peer = host.name;
+            port = defaultPort;
+          }
+        ];
+      };
+    };
 
     kanidm-provision = {config, ...}: let
       cfg = config.cosmos.services.grafana;
@@ -133,7 +150,7 @@
       options.cosmos.services.grafana = {
         port = mkOption {
           type = port;
-          default = 3000;
+          default = defaultPort;
           description = ''
             Free here — but note 3003 and 3030 are not, and opencloud holds
             most of 9091-9304, so this host is worth checking before claiming

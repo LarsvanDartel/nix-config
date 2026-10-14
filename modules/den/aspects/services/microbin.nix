@@ -1,14 +1,30 @@
 # services.microbin — pastebin and small-file drop, public to read and OIDC to write.
 #
 # MicroBin has no auth hooks, so oauth2-proxy (kanidm) + nginx gate writes.
-# MicroBin binds loopback; gaia's netbird-proxy must target nginx's
+# MicroBin binds loopback; its netbird-service must target nginx's
 # `proxyPort`, never MicroBin's own port, or mesh peers bypass the gate.
 #
 # Routes below are an allow-list (unlisted = authenticated). Traps found by
 # probing: `POST /upload/` also creates a pasta (hence `limit_except GET HEAD`
 # on public locations), and MicroBin redirects new pastas to `/upload/{id}`,
 # so `/upload/` must be readable.
-{inputs, ...}: {
+{inputs, ...}: let
+  # Option default and netbird-service target (see services/netbird.nix).
+  defaultProxyPort = 8087;
+in {
+  # Creating a pasta needs MICROBIN_UPLOADER_PASSWORD.
+  den.aspects.services.microbin.netbird-service = {host, ...}: {
+    bin = {
+      bearerAuth.enable = false;
+      targets = [
+        {
+          peer = host.name;
+          port = defaultProxyPort;
+        }
+      ];
+    };
+  };
+
   den.aspects.services.microbin.kanidm-provision = {config, ...}: let
     cfg = config.cosmos.services.microbin;
   in {
@@ -73,11 +89,11 @@
 
       proxyPort = mkOption {
         type = port;
-        default = 8087;
+        default = defaultProxyPort;
         description = ''
-          The mesh-facing port nginx serves this vhost on, and the one gaia's
-          netbird-proxy must target. Publishing `port` instead would bypass
-          the authentication in front of the write routes.
+          The mesh-facing port nginx serves this vhost on, and the one the
+          netbird-service above targets. Publishing `port` instead would
+          bypass the authentication in front of the write routes.
         '';
       };
 
@@ -110,6 +126,8 @@
     };
 
     config = {
+      cosmos.services.netbird.client.exposedPorts = [cfg.proxyPort];
+
       services.microbin = {
         enable = true;
         passwordFile = config.sops.templates."microbin.env".path;
