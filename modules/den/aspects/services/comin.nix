@@ -68,8 +68,9 @@ in {
 
             Must match cosmos.services.build-gate.deployBranch. They are
             separate literals because the gate runs on one host and comin runs
-            on several, and den cannot read another host's config — the same
-            constraint that makes gaia.nix hardcode endeavour's ports.
+            on several. A `{config, ...}` quirk payload could carry it across,
+            but at eval cost: comin evaluates on gaia, which would then
+            evaluate the gate host's whole config on every check.
 
             Set this back to "main" on a host that should track HEAD directly,
             accepting that nothing checks it first.

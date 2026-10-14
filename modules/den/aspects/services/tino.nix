@@ -4,9 +4,24 @@
   den,
   inputs,
   ...
-}: {
+}: let
+  # Option default and netbird-service target (see services/netbird.nix).
+  defaultPort = 3040;
+in {
   den.aspects.services.tino = {
     includes = [den.aspects.services.netbird.client];
+
+    netbird-service = {host, ...}: {
+      tino = {
+        bearerAuth.enable = false;
+        targets = [
+          {
+            peer = host.name;
+            port = defaultPort;
+          }
+        ];
+      };
+    };
 
     kanidm-provision = {
       groups = {
@@ -87,10 +102,9 @@
       options.cosmos.services.tino = {
         port = mkOption {
           type = port;
-          default = 3040;
+          default = defaultPort;
           description = ''
-            Loopback/mesh port. Not 3030 (typstnique) or 3031 (site) — see
-            hosts/endeavour.nix's port list for what else is taken nearby.
+            Loopback/mesh port. Not 3030 (typstnique) or 3031 (site).
           '';
         };
 

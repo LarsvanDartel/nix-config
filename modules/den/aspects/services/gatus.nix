@@ -6,9 +6,26 @@
   den,
   inputs,
   ...
-}: {
+}: let
+  # Option default and netbird-service target (see services/netbird.nix).
+  defaultPort = 8085;
+in {
   den.aspects.services.gatus = {
     includes = [den.aspects.services.ntfy];
+
+    # Ungated: gating would put kanidm (on endeavour) in front of the
+    # page that reports endeavour down.
+    netbird-service = {host, ...}: {
+      status = {
+        bearerAuth.enable = false;
+        targets = [
+          {
+            peer = host.name;
+            port = defaultPort;
+          }
+        ];
+      };
+    };
 
     nixos = {
       config,
@@ -47,7 +64,7 @@
       options.cosmos.services.gatus = {
         port = mkOption {
           type = port;
-          default = 8085;
+          default = defaultPort;
           description = ''
             Free on this host. 443, 4443, 8080, 8444, 9090, 9444, 8076 and
             8095 are not — gaia is crowded, and 8080/8444 in particular belong

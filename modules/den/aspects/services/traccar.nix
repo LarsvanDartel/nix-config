@@ -1,6 +1,37 @@
 # services.traccar — GPS tracking server (H2 db, OIDC via kanidm).
-{inputs, ...}: {
+{inputs, ...}: let
+  # Option default and netbird-service targets (see services/netbird.nix).
+  defaultPort = 8082;
+  protocolPorts.osmand = 5055;
+in {
   den.aspects.services.traccar = {
+    netbird-service = {host, ...}: {
+      # XHR and the Manager app can't follow a gate redirect.
+      traccar = {
+        bearerAuth.enable = false;
+        targets = [
+          {
+            peer = host.name;
+            port = defaultPort;
+          }
+        ];
+      };
+
+      # Reaches the decoder only with "osmand" in cosmos.services.traccar.protocols.
+      traccar-osmand = {
+        domain = "traccar-osmand.lvdar.nl";
+        mode = "tcp";
+        listenPort = protocolPorts.osmand;
+        bearerAuth.enable = false;
+        targets = [
+          {
+            peer = host.name;
+            port = protocolPorts.osmand;
+          }
+        ];
+      };
+    };
+
     kanidm-provision = {
       groups = {
         traccar-users = {
@@ -80,8 +111,6 @@
             secrets)}
         '';
 
-      protocolPorts.osmand = 5055;
-
       selectedPorts = map (p: protocolPorts.${p}) cfg.protocols;
 
       settings = {
@@ -129,7 +158,7 @@
       options.cosmos.services.traccar = {
         port = mkOption {
           type = port;
-          default = 8082;
+          default = defaultPort;
         };
         openFirewall = mkOption {
           type = bool;
@@ -154,6 +183,8 @@
       };
 
       config = {
+        cosmos.services.netbird.client.exposedPorts = [cfg.port] ++ selectedPorts;
+
         cosmos.system.impermanence.persist.directories = [
           {
             directory = stateDirectory;

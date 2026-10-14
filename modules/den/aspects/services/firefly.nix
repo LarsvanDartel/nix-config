@@ -6,7 +6,7 @@
 # No native OIDC: oauth2-proxy + nginx auth_request + remote_user_guard.
 # Published through gaia *ungated* — kanidm SSO is already a full login.
 #
-# The data importer is mesh-only, not in gaia.nix, but still needs real TLS:
+# The data importer is mesh-only, not published, but still needs real TLS:
 # Enable Banking's pre-registered callback redirect may not tolerate HTTP.
 {
   den,
@@ -16,9 +16,25 @@
   # A constant, not an option: the mesh-dns-record entry below must be
   # static or `{host, ...}:` (see services/unbound.nix).
   importerDomain = "firefly-import.lvdar.nl";
+
+  # Option default and netbird-service target (see services/netbird.nix).
+  defaultProxyPort = 8097;
 in {
   den.aspects.services.firefly = {
     includes = with den.aspects.services; [nginx netbird.client];
+
+    # Authenticates via oauth2-proxy + kanidm.
+    netbird-service = {host, ...}: {
+      firefly = {
+        bearerAuth.enable = false;
+        targets = [
+          {
+            peer = host.name;
+            port = defaultProxyPort;
+          }
+        ];
+      };
+    };
 
     # Resolves only inside the mesh, to this host's NetBird address — never
     # published, but still a real name under the *.lvdar.nl wildcard so nginx
@@ -230,10 +246,10 @@ in {
 
         proxyPort = mkOption {
           type = port;
-          default = 8097;
+          default = defaultProxyPort;
           description = ''
-            Mesh-facing port nginx serves the main vhost on, and what gaia's
-            netbird-proxy targets.
+            Mesh-facing port nginx serves the main vhost on, and what the
+            netbird-service above targets.
           '';
         };
       };

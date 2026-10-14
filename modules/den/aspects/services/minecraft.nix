@@ -244,8 +244,8 @@
                 default = 25565;
                 description = ''
                   TCP listener. Also the port gaia publishes, so a second
-                  server needs a second one here and a matching entry in
-                  hosts/gaia.nix.
+                  server needs a second one here and a matching
+                  netbird-service entry from the host.
                 '';
               };
 

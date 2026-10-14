@@ -2,9 +2,25 @@
 #
 # Single-user: hosting others' handles needs *.pds.lvdar.nl — a non-goal.
 # Ungated at the edge: ATProto clients cannot follow a NetBird 302 to kanidm.
-{den, ...}: {
+{den, ...}: let
+  # Option default and netbird-service target (see services/netbird.nix).
+  defaultPort = 3001;
+in {
   den.aspects.services.pds = {
     includes = [den.aspects.services.netbird.client];
+
+    # XRPC clients carry their own tokens.
+    netbird-service = {host, ...}: {
+      pds = {
+        bearerAuth.enable = false;
+        targets = [
+          {
+            peer = host.name;
+            port = defaultPort;
+          }
+        ];
+      };
+    };
 
     nixos = {
       config,
@@ -31,7 +47,7 @@
 
         port = mkOption {
           type = port;
-          default = 3001;
+          default = defaultPort;
           description = ''
             Not the module's default of 3000: grafana already has that on this
             host (services/grafana.nix). Reached over the mesh by gaia's

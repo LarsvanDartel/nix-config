@@ -159,14 +159,17 @@
         upstream = "https://${endeavourMesh}:8443";
       };
 
-      # netbird-proxy can't serve the apex (see www below). Ungated: a
-      # public blog.
+      # netbird-proxy can't serve the apex (see services/site.nix, which
+      # publishes www). Ungated: a public blog.
       cosmos.services.netbird.localVhosts."lvdar.nl".upstream = "http://${endeavourMesh}:3031";
 
       # comin pulls, so no credential here grants anything on the fleet.
       cosmos.services.comin.repository = "https://knot.lvdar.nl/did:plc:a3erncqfgkcxu3yl6fpjfmwf";
 
-      # Dotted names probe as written, bare labels as subdomains.
+      # Dotted names probe as written, bare labels as subdomains. Explicit,
+      # not derived from cosmos.services.netbird.services: the order is the
+      # status page's, lvdar.nl and auth are not proxy services, and not
+      # every published service is worth probing.
       cosmos.services.gatus.endpoints = [
         "lvdar.nl"
         "jellyfin"
@@ -200,196 +203,6 @@
 
       # panther is a phone with no shell.
       cosmos.services.netbird.sshPeers = denHosts;
-
-      # The only internet-reachable surface. Peer/port literals must track
-      # the owning aspects (den can't read another host's config).
-      cosmos.services.netbird.services = let
-        endeavour = port: [
-          {
-            inherit port;
-            peer = "endeavour";
-          }
-        ];
-
-        shared = port: {
-          bearerAuth.enable = false;
-          targets = endeavour port;
-        };
-      in {
-        # Own OIDC; docs/wopi can't be gated (editor iframe and Collabora
-        # server-to-server fetch).
-        cloud = shared 9200;
-        docs = shared 9980;
-        wopi = shared 9300;
-
-        # Authenticates via oauth2-proxy + kanidm (firefly.nix).
-        firefly = shared 8097;
-
-        # Ungated: gating would put kanidm (on endeavour) in front of the
-        # page that reports endeavour down.
-        status = {
-          bearerAuth.enable = false;
-          targets = [
-            {
-              port = 8085;
-              peer = "gaia";
-            }
-          ];
-        };
-
-        # Ungated: TaskChampion clients can't follow a redirect. The client
-        # id (sops) is the allow-list; replicas encrypt client-side.
-        task = shared 10222;
-
-        # Ungated: the app uses username/password, and the outage notifier
-        # must not depend on kanidm.
-        ntfy = {
-          bearerAuth.enable = false;
-          targets = [
-            {
-              port = 8095;
-              peer = "gaia";
-            }
-          ];
-        };
-
-        # Ungated: CalDAV/CardDAV clients carry their own credentials and can't
-        # follow a redirect. Stalwart 404s everything but /dav and /.well-known here.
-        mail = {
-          bearerAuth.enable = false;
-          targets = [
-            {
-              port = 8089;
-              peer = "gaia";
-            }
-          ];
-        };
-
-        # Ungated: own OIDC, and its XHR can't follow the gate's 302
-        # (the NetworkError that took traccar down).
-        grafana = {
-          bearerAuth.enable = false;
-          targets = endeavour 3000;
-        };
-
-        typstnique = {
-          bearerAuth.enable = false;
-          targets = endeavour 3030;
-        };
-
-        # Own OIDC.
-        tino = {
-          bearerAuth.enable = false;
-          targets = endeavour 3040;
-        };
-
-        # The apex can't be a proxy service (management 422s non-subdomains,
-        # masked by the reconciler as "already taken"); served via
-        # netbird.localVhosts. The app 301s www to the apex.
-        www = {
-          bearerAuth.enable = false;
-          targets = endeavour 3031;
-        };
-
-        # SSE streams can't follow a lapsed gate's 302; own OIDC.
-        chat = shared 8084;
-
-        jellyfin = shared 8096;
-        immich = shared 2283;
-        seerr = shared 4055;
-
-        # Creating a pasta needs MICROBIN_UPLOADER_PASSWORD.
-        bin = shared 8087;
-
-        # Own OIDC.
-        paperless = shared 28981;
-
-        # Own OIDC.
-        kavita = shared 5000;
-
-        # Bitwarden clients authenticate to the API themselves and can't
-        # follow the gate's redirect; kanidm SSO is the login (vaultwarden.nix).
-        vault = shared 8222;
-
-        # Git clients can't do an IdP redirect; writes are authenticated by
-        # the knot against ATProto identity.
-        knot = shared 5555;
-
-        # The appview calls it service-to-service; can't follow a redirect.
-        spindle = shared 6555;
-
-        # XRPC clients carry their own tokens.
-        pds = shared 3001;
-
-        # XHR and the Manager app can't follow a gate redirect.
-        traccar = shared 8082;
-
-        # Must agree with cosmos.services.traccar.protocols on endeavour.
-        traccar-osmand = {
-          domain = "traccar-osmand.lvdar.nl";
-          mode = "tcp";
-          listenPort = 5055;
-          bearerAuth.enable = false;
-          targets = endeavour 5055;
-        };
-
-        # GATED: hands out a console. Gate is wider than the default because
-        # the service authorises per server from the stamped groups. Groups
-        # hand-synced with `inAppGroups` in services/kanidm.nix.
-        minecraft-control = {
-          domain = "minecraft.lvdar.nl";
-          targets = endeavour 8086;
-          bearerAuth.groups = [
-            "netbird-minecraft-control"
-            "netbird-minecraft-smp"
-            "netbird-minecraft-hardcore"
-          ];
-        };
-
-        # A game client can't follow an IdP redirect; endeavour's whitelist
-        # is the access control. If it connects but never handshakes, try
-        # target protocol = "tcp", or a DNAT like the knot's :22.
-        minecraft-smp = {
-          domain = "smp.lvdar.nl";
-          mode = "tcp";
-          listenPort = 25565;
-          bearerAuth.enable = false;
-          targets = endeavour 25565;
-        };
-
-        # L4 routes by listen port only, so a second port. The SRV record is
-        # manual (the wildcard doesn't answer SRV):
-        #   _minecraft._tcp.hardcore.lvdar.nl  SRV  0 0 25566 hardcore.lvdar.nl
-        # Not Velocity: needs online-mode off + a forwarding secret.
-        minecraft-hardcore = {
-          domain = "hardcore.lvdar.nl";
-          mode = "tcp";
-          listenPort = 25566;
-          bearerAuth.enable = false;
-          targets = endeavour 25566;
-        };
-
-        # Simple Voice Chat. A broken voice port is silent ("voice chat
-        # unavailable") while the game still works.
-        minecraft-hardcore-voice = {
-          domain = "hardcore-voice.lvdar.nl";
-          mode = "udp";
-          listenPort = 24454;
-          bearerAuth.enable = false;
-          targets = endeavour 24454;
-        };
-
-        suwayomi.targets = endeavour 8080;
-        sabnzbd.targets = endeavour 6336;
-
-        # API keys only, no login: the identity check is the only gate.
-        prowlarr.targets = endeavour 9696;
-        radarr.targets = endeavour 7878;
-        sonarr.targets = endeavour 8989;
-        lidarr.targets = endeavour 8686;
-        bazarr.targets = endeavour 6767;
-        lingarr.targets = endeavour 9876;
-      };
 
       system.stateVersion = "24.11";
     };

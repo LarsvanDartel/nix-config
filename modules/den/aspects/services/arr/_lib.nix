@@ -19,6 +19,18 @@ rec {
     };
   };
 
+  # A gated netbird-service entry. The *arrs have API keys only, no login:
+  # the identity check is the only gate. Takes the default port, not
+  # config (see services/netbird.nix).
+  gatedService = name: port: {host, ...}: {
+    ${name}.targets = [
+      {
+        peer = host.name;
+        inherit port;
+      }
+    ];
+  };
+
   # radarr/sonarr/lidarr: only name, port and library dir differ.
   mkSimpleArr = {
     name,
@@ -26,6 +38,7 @@ rec {
     libraryDir,
   }: arr: {
     includes = [arr];
+    netbird-service = gatedService name defaultPort;
     nixos = {
       config,
       lib,
@@ -61,6 +74,8 @@ rec {
       };
 
       config = {
+        cosmos.services.netbird.client.exposedPorts = [cfg.port];
+
         systemd.tmpfiles.rules = [
           "d '${cfg-arr.mediaDir}/library' 0775 root media - -"
           "d '${cfg-arr.mediaDir}/library/${libraryDir}' 0775 root media - -"

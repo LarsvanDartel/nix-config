@@ -8,8 +8,20 @@
 {
   den,
   inputs,
+  lib,
   ...
-}: {
+}: let
+  # Shared by the server config below and the netbird-service entries.
+  smpPort = 25565;
+  hardcorePort = 25566;
+  voicePort = 24454;
+
+  # Per-server kanidm groups, checked against X-NetBird-Groups.
+  minecraftAccess = {
+    smp = ["netbird-minecraft-smp" "netbird-minecraft-control"];
+    hardcore = ["netbird-minecraft-hardcore" "netbird-minecraft-control"];
+  };
+in {
   den.hosts.x86_64-linux.endeavour = {
     users.nixos = {};
     meshAddress = "100.68.151.172";
@@ -19,6 +31,52 @@
   den.aspects.endeavour = {
     provides.to-users.homeManager = {...}: {
       cosmos.system.impermanence.persist.directories = ["dev"];
+    };
+
+    netbird-service = {host, ...}: let
+      targets = port: [
+        {
+          peer = host.name;
+          inherit port;
+        }
+      ];
+    in {
+      # Gate is wider than the default because the service authorises per
+      # server from the stamped groups.
+      minecraft-control.bearerAuth.groups = lib.unique (lib.concatLists (lib.attrValues minecraftAccess));
+
+      # A game client can't follow an IdP redirect; the whitelist is the
+      # access control. If it connects but never handshakes, try target
+      # protocol = "tcp", or a DNAT like the knot's :22.
+      minecraft-smp = {
+        domain = "smp.lvdar.nl";
+        mode = "tcp";
+        listenPort = smpPort;
+        bearerAuth.enable = false;
+        targets = targets smpPort;
+      };
+
+      # L4 routes by listen port only, so a second port. The SRV record is
+      # manual (the wildcard doesn't answer SRV):
+      #   _minecraft._tcp.hardcore.lvdar.nl  SRV  0 0 25566 hardcore.lvdar.nl
+      # Not Velocity: needs online-mode off + a forwarding secret.
+      minecraft-hardcore = {
+        domain = "hardcore.lvdar.nl";
+        mode = "tcp";
+        listenPort = hardcorePort;
+        bearerAuth.enable = false;
+        targets = targets hardcorePort;
+      };
+
+      # Simple Voice Chat. A broken voice port is silent ("voice chat
+      # unavailable") while the game still works.
+      minecraft-hardcore-voice = {
+        domain = "hardcore-voice.lvdar.nl";
+        mode = "udp";
+        listenPort = voicePort;
+        bearerAuth.enable = false;
+        targets = targets voicePort;
+      };
     };
 
     includes = with den.aspects; [
@@ -142,6 +200,7 @@
       # 25566 + SRV). Whitelist UUIDs from world/players/data; the UUID is
       # the identity, the name a mutable label.
       cosmos.services.minecraft.servers.smp = {
+        port = smpPort;
         motd = "lvdar.nl";
         whitelist = {
           Svenie23 = "1fd240dc-faa7-4a34-a12b-5465dec604d1";
@@ -153,8 +212,8 @@
       };
 
       # `netbird-minecraft-control` is the gate on gaia; the per-server
-      # groups below (checked against X-NetBird-Groups) decide which servers
-      # a user gets. Gate group alone shows an empty page.
+      # groups in minecraftAccess decide which servers a user gets. Gate
+      # group alone shows an empty page.
       cosmos.services.minecraft.control = {
         enable = true;
 
@@ -162,17 +221,14 @@
         # it is not a den host, so there is no entity to read it from.
         proxyAddress = "100.68.242.26";
 
-        access = {
-          smp = ["netbird-minecraft-smp" "netbird-minecraft-control"];
-          hardcore = ["netbird-minecraft-hardcore" "netbird-minecraft-control"];
-        };
+        access = minecraftAccess;
       };
 
       # Upstream's duplicate-port assertion only checks servers with
       # openFirewall, which this aspect disables — a clash would fail to bind
-      # and roll back the deploy. SRV record is manual (see gaia.nix).
+      # and roll back the deploy. SRV record is manual (see netbird-service above).
       cosmos.services.minecraft.servers.hardcore = {
-        port = 25566;
+        port = hardcorePort;
         motd = "lvdar.nl — hardcore";
         whitelist = {
           DutchRD = "7239bc30-af4e-482c-9434-7ce3005cb917";
@@ -182,9 +238,9 @@
         };
         operators = {};
 
-        # Here, not the shared packwiz pack: this world only. UDP 24454 needs
-        # its own firewall hole and gaia L4 service; unreachable = silent
-        # "voice chat unavailable".
+        # Here, not the shared packwiz pack: this world only. UDP voicePort
+        # needs its own firewall hole and gaia L4 service; unreachable =
+        # silent "voice chat unavailable".
         extraMods = [pkgs.simple-voice-chat];
 
         serverProperties = {
@@ -312,47 +368,8 @@
         # Advertises 192.168.2.0/24 to roaming peers; enables IP forwarding.
         routingFeatures = "server";
 
-        # Must track gaia.nix's services: a missing port times out silently.
-        exposedPorts = [
-          8443 # kanidm      auth.lvdar.nl
-          8096 # jellyfin    jellyfin.lvdar.nl
-          2283 # immich      immich.lvdar.nl
-          8082 # traccar     traccar.lvdar.nl
-          5055 # traccar     osmand tracker protocol, published L4 on :5055
-          8080 # suwayomi    suwayomi.lvdar.nl
-          5000 # kavita      kavita.lvdar.nl
-          8087 # microbin    bin.lvdar.nl  (nginx + oauth2-proxy, NOT microbin's own 8081)
-          28981 # paperless   paperless.lvdar.nl
-          4055 # jellyseerr  seerr.lvdar.nl     (via the netns bridge)
-          6336 # sabnzbd     sabnzbd.lvdar.nl   (via the netns bridge)
-
-          # *arr suite runs on the host, not in the VPN namespace.
-          9696 # prowlarr    prowlarr.lvdar.nl
-          7878 # radarr      radarr.lvdar.nl
-          8989 # sonarr      sonarr.lvdar.nl
-          8686 # lidarr      lidarr.lvdar.nl
-          6767 # bazarr      bazarr.lvdar.nl
-          9876 # lingarr     lingarr.lvdar.nl
-
-          9200 # opencloud   cloud.lvdar.nl
-          9300 # wopi host   wopi.lvdar.nl   (server-to-server, from Collabora)
-          9980 # collabora   docs.lvdar.nl
-
-          3030 # typstnique  typstnique.lvdar.nl
-          3031 # site        lvdar.nl + www.lvdar.nl
-          3040 # tino        tino.lvdar.nl
-          8084 # librechat  chat.lvdar.nl
-          8086 # mc control  minecraft.lvdar.nl
-
-          # Mesh-only, absent from gaia.nix: unauthenticated inference API.
-          11434 # ollama     (no public service)
-
-          # Mesh-only, absent from gaia.nix: the NetBird ACL guards it.
-          10222 # taskchampion (no public service)
-        ];
-
-        # Simple Voice Chat (hardcore); separate L4 service on gaia.
-        exposedUdpPorts = [24454];
+        # Simple Voice Chat (hardcore); TCP ports come from each service's aspect.
+        exposedUdpPorts = [voicePort];
       };
 
       # gaia's agent address. gaia DNATs+masquerades public :22 here, so all
@@ -511,8 +528,6 @@
               };
             };
           };
-
-          seerr.port = 4055;
 
           vpn = let
             name = "arr";

@@ -4,7 +4,24 @@
 # nothing. Published ungated: native clients cannot do a browser login. The
 # client ids are the only auth and arrive as a systemd credential, since
 # `--allow-client-id` on the command line is world-readable.
-{...}: {
+{...}: let
+  # Option default and netbird-service target (see services/netbird.nix).
+  defaultPort = 10222;
+in {
+  # Ungated: TaskChampion clients can't follow a redirect. The client id
+  # (sops) is the allow-list; replicas encrypt client-side.
+  den.aspects.services.taskchampion.netbird-service = {host, ...}: {
+    task = {
+      bearerAuth.enable = false;
+      targets = [
+        {
+          peer = host.name;
+          port = defaultPort;
+        }
+      ];
+    };
+  };
+
   den.aspects.services.taskchampion.nixos = {
     config,
     lib,
@@ -55,11 +72,11 @@
     options.cosmos.services.taskchampion = {
       port = mkOption {
         type = port;
-        default = 10222;
+        default = defaultPort;
         description = ''
-          Upstream's own default. Opened on the netbird interface in
-          hosts/endeavour.nix for replicas already on the mesh, and published
-          publicly by gaia's netbird-proxy for those that are not.
+          Upstream's own default. Opened on the netbird interface for
+          replicas already on the mesh, and published as `task` for those
+          that are not.
         '';
       };
 
@@ -79,6 +96,8 @@
     };
 
     config = {
+      cosmos.services.netbird.client.exposedPorts = [cfg.port];
+
       services.taskchampion-sync-server = {
         enable = true;
         inherit (cfg) port;

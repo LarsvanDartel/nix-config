@@ -2,8 +2,29 @@
 # browser. WOPI needs three domains: cloud (OpenCloud), docs (Collabora, framed
 # by the browser), wopi (collaboration service, fetched server to server).
 # Diff the CSP against opencloud-compose's csp.yaml on upgrade.
-{...}: {
+{lib, ...}: let
+  # Option defaults and netbird-service targets (see services/netbird.nix).
+  defaultPorts = {
+    cloud = 9200;
+    wopi = 9300;
+    docs = 9980;
+  };
+in {
   den.aspects.services.opencloud = {
+    # Own OIDC; docs/wopi can't be gated (editor iframe and Collabora
+    # server-to-server fetch).
+    netbird-service = {host, ...}:
+      lib.mapAttrs (_: port: {
+        bearerAuth.enable = false;
+        targets = [
+          {
+            peer = host.name;
+            inherit port;
+          }
+        ];
+      })
+      defaultPorts;
+
     kanidm-provision = {
       groups = {
         opencloud-users = {
@@ -77,15 +98,15 @@
 
         port = mkOption {
           type = port;
-          default = 9200;
+          default = defaultPorts.cloud;
         };
         wopiPort = mkOption {
           type = port;
-          default = 9300;
+          default = defaultPorts.wopi;
         };
         docsPort = mkOption {
           type = port;
-          default = 9980;
+          default = defaultPorts.docs;
         };
 
         collabora.enable = mkEnableOption "Collabora Online" // {default = true;};
@@ -122,6 +143,8 @@
       };
 
       config = {
+        cosmos.services.netbird.client.exposedPorts = [cfg.port cfg.wopiPort cfg.docsPort];
+
         cosmos.system.impermanence.persist = {
           # JWT key, machine-auth key, service credentials: lose this and
           # everything under dataDir is orphaned.

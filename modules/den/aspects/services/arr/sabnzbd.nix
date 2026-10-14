@@ -1,9 +1,12 @@
 # services.arr.sabnzbd — the usenet client, confined to the VPN namespace.
 {den, ...}: let
-  inherit (import ./_lib.nix) vpnVhost;
+  inherit (import ./_lib.nix) vpnVhost gatedService;
+  # Option default and netbird-service target (see services/netbird.nix).
+  defaultUiPort = 6336;
 in {
   den.aspects.services.arr.sabnzbd = {
     includes = [den.aspects.services.arr];
+    netbird-service = gatedService "sabnzbd" defaultUiPort;
     nixos = {
       config,
       lib,
@@ -39,7 +42,7 @@ in {
         package = mkPackageOption pkgs "sabnzbd" {};
         uiPort = mkOption {
           type = port;
-          default = 6336;
+          default = defaultUiPort;
         };
         openFirewall = mkOption {
           type = bool;
@@ -99,6 +102,7 @@ in {
       };
 
       config = {
+        cosmos.services.netbird.client.exposedPorts = [cfg.uiPort];
         systemd.tmpfiles.rules = [
           "d '${cfg.stateDir}' 0700 ${cfg.user} root - -"
           "d '${cfg-arr.mediaDir}/usenet'             0755 ${cfg.user} media - -"

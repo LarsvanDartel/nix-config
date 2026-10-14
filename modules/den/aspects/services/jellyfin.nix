@@ -1,5 +1,8 @@
 # services.jellyfin (jellarr).
-{inputs, ...}: {
+{inputs, ...}: let
+  # Option default and netbird-service target (see services/netbird.nix).
+  defaultPort = 8096;
+in {
   flake-file.inputs.jellarr.url = "github:venkyr77/jellarr";
 
   # jellarr's pinned pnpmDeps.hash was computed with an older pnpm; pnpm's
@@ -19,6 +22,18 @@
         );
     })
   ];
+
+  den.aspects.services.jellyfin.netbird-service = {host, ...}: {
+    jellyfin = {
+      bearerAuth.enable = false;
+      targets = [
+        {
+          peer = host.name;
+          port = defaultPort;
+        }
+      ];
+    };
+  };
 
   den.aspects.services.jellyfin.kanidm-provision = {
     groups = {
@@ -88,7 +103,7 @@
       };
       port = mkOption {
         type = port;
-        default = 8096;
+        default = defaultPort;
       };
       openFirewall = mkOption {
         type = bool;
@@ -111,6 +126,8 @@
     };
 
     config = {
+      cosmos.services.netbird.client.exposedPorts = [cfg.port];
+
       sops.secrets = {
         "keys/jellyfin/api-key" = {};
         "keys/jellyfin/lvdar-password".owner = "jellyfin";

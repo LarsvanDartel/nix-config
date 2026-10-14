@@ -10,10 +10,27 @@
 # Not sudo: roles/server.nix sets execWheelOnly, so non-wheel users are
 # refused at exec; polkit is disabled on headless hosts.
 #
-# Authentication lives in gaia's gated netbird-proxy + kanidm `gatedServices`.
-{den, ...}: {
+# Authentication lives in gaia's gated netbird-proxy + kanidm. The gate's
+# groups come from the host, which owns the per-server access lists.
+{den, ...}: let
+  # Option default and netbird-service target (see services/netbird.nix).
+  defaultPort = 8086;
+in {
   den.aspects.services.minecraft.control = {
     includes = [den.aspects.services.minecraft den.aspects.services.nginx];
+
+    # GATED: hands out a console.
+    netbird-service = {host, ...}: {
+      minecraft-control = {
+        domain = "minecraft.lvdar.nl";
+        targets = [
+          {
+            peer = host.name;
+            port = defaultPort;
+          }
+        ];
+      };
+    };
 
     nixos = {
       config,
@@ -291,10 +308,10 @@
 
         port = mkOption {
           type = port;
-          default = 8086;
+          default = defaultPort;
           description = ''
             The published port: nginx serves the page and proxies the API. Not
-            8080 (suwayomi) or 8084 (librechat); gaia must forward this one.
+            8080 (suwayomi) or 8084 (librechat).
           '';
         };
 
@@ -310,6 +327,8 @@
       };
 
       config = mkIf cfg.enable {
+        cosmos.services.netbird.client.exposedPorts = [cfg.port];
+
         users.users.${user} = {
           isSystemUser = true;
           group = user;

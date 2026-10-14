@@ -3,7 +3,10 @@
   den,
   inputs,
   ...
-}: {
+}: let
+  # Option default and netbird-service target (see services/netbird.nix).
+  defaultChatPort = 8084;
+in {
   den.aspects.services.ollama.nixos = {
     config,
     lib,
@@ -78,14 +81,15 @@
           this hands every peer unmetered use of the GPU and of any model
           loaded. LibreChat reaches it over loopback and does not need this.
 
-          Binding is only half of it — the port also has to appear in
-          `cosmos.services.netbird.client.exposedPorts` on the host, which is
-          what actually opens the mesh interface. Same split as suwayomi.
+          Also opens the port on the mesh interface (and only there), via
+          `cosmos.services.netbird.client.exposedPorts`.
         '';
       };
     };
 
     config = {
+      cosmos.services.netbird.client.exposedPorts = lib.mkIf cfg.meshExposed [cfg.port];
+
       services.ollama = {
         enable = true;
 
@@ -139,6 +143,19 @@
   den.aspects.services.ollama.librechat = {
     includes = [den.aspects.services.ollama den.aspects.core.sops];
 
+    # SSE streams can't follow a lapsed gate's 302; own OIDC.
+    netbird-service = {host, ...}: {
+      chat = {
+        bearerAuth.enable = false;
+        targets = [
+          {
+            peer = host.name;
+            port = defaultChatPort;
+          }
+        ];
+      };
+    };
+
     kanidm-provision = {config, ...}: let
       cfg = config.cosmos.services.ollama.librechat;
     in {
@@ -172,14 +189,12 @@
       options.cosmos.services.ollama.librechat = {
         port = mkOption {
           type = port;
-          default = 8084;
+          default = defaultChatPort;
           description = ''
-            Open WebUI's port, kept on purpose: gaia forwards chat.lvdar.nl
-            to endeavour:8084 and the netbird exposedPorts list names it, so
-            keeping it means the publish path survives the switch untouched.
-            Not upstream's 3080, and not 8080 — suwayomi holds that on this
-            host, and two services binding one port is an activation failure
-            that rolls the whole deploy back.
+            Open WebUI's port, kept on purpose so the publish path survived
+            the switch untouched. Not upstream's 3080, and not 8080 — suwayomi
+            holds that on this host, and two services binding one port is an
+            activation failure that rolls the whole deploy back.
           '';
         };
 
@@ -197,6 +212,8 @@
       };
 
       config = {
+        cosmos.services.netbird.client.exposedPorts = [cfg.port];
+
         services.librechat = {
           enable = true;
 

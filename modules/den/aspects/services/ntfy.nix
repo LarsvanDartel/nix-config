@@ -7,9 +7,26 @@
   den,
   inputs,
   ...
-}: {
+}: let
+  # Option default and netbird-service target (see services/netbird.nix).
+  defaultPort = 8095;
+in {
   den.aspects.services.ntfy = {
     includes = [den.aspects.services.netbird.client];
+
+    # Ungated: the app uses username/password, and the outage notifier
+    # must not depend on kanidm.
+    netbird-service = {host, ...}: {
+      ntfy = {
+        bearerAuth.enable = false;
+        targets = [
+          {
+            peer = host.name;
+            port = defaultPort;
+          }
+        ];
+      };
+    };
 
     nixos = {
       config,
@@ -72,7 +89,7 @@
       options.cosmos.services.ntfy = {
         port = mkOption {
           type = port;
-          default = 8095;
+          default = defaultPort;
           description = ''
             Loopback/mesh port. Not 8080 or 8444 (netbird-proxy's health and
             debug endpoints), not 9090 (netbird management's metrics), not 4443

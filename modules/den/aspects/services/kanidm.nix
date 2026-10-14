@@ -15,6 +15,10 @@
   ...
 }: let
   inherit (den.lib.policy) pipe;
+
+  # Not a netbird-service: gaia's nginx proxies auth.lvdar.nl here
+  # (cosmos.services.netbird.oidc.idp).
+  port = 8443;
 in {
   den.quirks.kanidm-provision.description = "kanidm groups and OAuth2 clients, provisioned wherever kanidm runs";
 
@@ -83,6 +87,8 @@ in {
       };
 
       config = {
+        cosmos.services.netbird.client.exposedPorts = [port];
+
         cosmos.system.impermanence.persist.directories = [
           {
             directory = "/var/lib/kanidm";
@@ -116,8 +122,8 @@ in {
               # mesh; firewall limits 8443 to wt0.
               bindaddress =
                 if config.cosmos.networking.edgeTerminated
-                then "0.0.0.0:8443"
-                else "127.0.0.1:8443";
+                then "0.0.0.0:${toString port}"
+                else "127.0.0.1:${toString port}";
 
               # Trusting the wrong hop lets clients forge their IP (kanidm
               # rate-limits per source). 100.64.0.0/10 = NetBird peer range.
@@ -158,7 +164,7 @@ in {
             enableACME = false;
             sslCertificate = "/var/lib/acme/lvdar.nl/fullchain.pem";
             sslCertificateKey = "/var/lib/acme/lvdar.nl/key.pem";
-            locations."/".proxyPass = "https://127.0.0.1:8443";
+            locations."/".proxyPass = "https://127.0.0.1:${toString port}";
           };
         };
       };
