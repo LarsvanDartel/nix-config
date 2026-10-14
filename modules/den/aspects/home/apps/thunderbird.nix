@@ -161,6 +161,12 @@
             # paperless-ngx-uploader is unsigned (ships from GitHub, see
             # thunderbird-addons.nix); all other add-ons arrive via nix.
             "xpinstall.signatures.required" = false;
+
+            # Identity-pref fallbacks, so they cover every account. With the
+            # reply on top, sig_bottom = false puts the signature between the
+            # reply and the quote instead of under the quote.
+            "mail.identity.default.reply_on_top" = 1;
+            "mail.identity.default.sig_bottom" = false;
           };
         };
       };
