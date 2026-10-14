@@ -8,17 +8,9 @@
     programs.omp = {
       enable = true;
 
-      # The full config, verbatim from ~/.omp/agent/config.yml. Declaring it
-      # matters: home-manager-<user>.service re-runs on every boot and the
-      # upstream module's activation `install`s this yaml over
-      # ~/.omp/agent/config.yml — a partial declaration would revert
-      # everything undeclared (that is how theme etc. got wiped by a reboot
-      # while the persisted `.omp` kept login/sessions intact). Consequence:
-      # `/settings` or `omp config set` changes only live until the next
-      # boot; make them HERE instead.
       settings = {
         startup.quiet = true;
-        modelRoles.default = "anthropic/claude-sonnet-5:high";
+        modelRoles.default = "anthropic/claude-opus-5-5:high";
         symbolPreset = "nerd";
         composer.shape = "field";
         theme = {
