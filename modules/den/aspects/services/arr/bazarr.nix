@@ -8,7 +8,7 @@
 in {
   den.aspects.services.arr.bazarr = {
     includes = [den.aspects.services.arr];
-    netbird-service = gatedService "bazarr" defaultPort;
+    inherit (gatedService "bazarr" defaultPort) netbird-service kanidm-provision;
     nixos = {
       config,
       lib,

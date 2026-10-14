@@ -13,6 +13,8 @@ in {
     ];
   };
 
+  den.aspects.services.suwayomi.kanidm-provision = import ./_netbird-groups.nix "netbird-suwayomi";
+
   den.aspects.services.suwayomi.nixos = {
     config,
     lib,
