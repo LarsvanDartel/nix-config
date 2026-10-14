@@ -21,6 +21,8 @@
     smp = ["netbird-minecraft-smp" "netbird-minecraft-control"];
     hardcore = ["netbird-minecraft-hardcore" "netbird-minecraft-control"];
   };
+  # The gate group (netbird-minecraft-control) and one per server.
+  minecraftGroups = lib.unique (lib.concatLists (lib.attrValues minecraftAccess));
 in {
   den.hosts.x86_64-linux.endeavour = {
     users.nixos = {};
@@ -33,6 +35,12 @@ in {
       cosmos.system.impermanence.persist.directories = ["dev"];
     };
 
+    # minecraft-control's gate and its in-app per-server groups. Its own
+    # gate, not an *arr one: shared with people who administer nothing else.
+    kanidm-provision =
+      lib.foldl' lib.recursiveUpdate {}
+      (map (import ../aspects/services/_netbird-groups.nix) minecraftGroups);
+
     netbird-service = {host, ...}: let
       targets = port: [
         {
@@ -43,7 +51,7 @@ in {
     in {
       # Gate is wider than the default because the service authorises per
       # server from the stamped groups.
-      minecraft-control.bearerAuth.groups = lib.unique (lib.concatLists (lib.attrValues minecraftAccess));
+      minecraft-control.bearerAuth.groups = minecraftGroups;
 
       # A game client can't follow an IdP redirect; the whitelist is the
       # access control. If it connects but never handshakes, try target

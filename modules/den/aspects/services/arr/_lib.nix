@@ -19,16 +19,19 @@ rec {
     };
   };
 
-  # A gated netbird-service entry. The *arrs have API keys only, no login:
-  # the identity check is the only gate. Takes the default port, not
-  # config (see services/netbird.nix).
-  gatedService = name: port: {host, ...}: {
-    ${name}.targets = [
-      {
-        peer = host.name;
-        inherit port;
-      }
-    ];
+  # A gated netbird-service entry plus the kanidm group that opens its gate.
+  # The *arrs have API keys only, no login: the identity check is the only
+  # gate. Takes the default port, not config (see services/netbird.nix).
+  gatedService = name: port: {
+    netbird-service = {host, ...}: {
+      ${name}.targets = [
+        {
+          peer = host.name;
+          inherit port;
+        }
+      ];
+    };
+    kanidm-provision = import ../_netbird-groups.nix "netbird-${name}";
   };
 
   # radarr/sonarr/lidarr: only name, port and library dir differ.
@@ -38,7 +41,7 @@ rec {
     libraryDir,
   }: arr: {
     includes = [arr];
-    netbird-service = gatedService name defaultPort;
+    inherit (gatedService name defaultPort) netbird-service kanidm-provision;
     nixos = {
       config,
       lib,

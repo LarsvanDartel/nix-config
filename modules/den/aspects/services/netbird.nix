@@ -7,38 +7,6 @@
   ...
 }: let
   inherit (den.lib.policy) pipe;
-
-  # The gated netbird-service entries, hand-synced. Each becomes a kanidm
-  # group AND a `groups` claim value NetBird matches against distribution
-  # lists.
-  gatedServices = [
-    "suwayomi"
-    "sabnzbd"
-    "prowlarr"
-    "radarr"
-    "sonarr"
-    "lidarr"
-    "bazarr"
-    "lingarr"
-
-    # Shared with people who administer nothing else; keep it separate.
-    "minecraft-control"
-  ];
-
-  # In-app permission groups (read via X-NetBird-Groups), not published
-  # domains; consumed by cosmos.services.minecraft.control.access on
-  # endeavour, one per server.
-  inAppGroups = [
-    "netbird-minecraft-smp"
-    "netbird-minecraft-hardcore"
-  ];
-
-  # NetBird replaces auto-groups wholesale with the token's claim, so
-  # omitting netbird-users would strip mesh access on next login.
-  netbirdGroups =
-    ["netbird-users"]
-    ++ map (s: "netbird-${s}") gatedServices
-    ++ inAppGroups;
 in {
   den.quirks.netbird-service.description = "Public reverse-proxy services (cosmos.services.netbird.services entries), published by the NetBird server";
 
@@ -356,14 +324,11 @@ in {
       port = 9090;
     };
 
-    kanidm-provision = {
-      groups =
-        {netbird-admin.members = ["lvdar"];}
-        # overwriteMembers off so hand-added members survive a redeploy.
-        // lib.genAttrs netbirdGroups (_: {
-          overwriteMembers = false;
-          members = ["lvdar"];
-        });
+    # NetBird replaces auto-groups wholesale with the token's claim, so
+    # omitting netbird-users would strip mesh access on next login. Gated
+    # apps add their own groups the same way (services/_netbird-groups.nix).
+    kanidm-provision = lib.recursiveUpdate (import ./_netbird-groups.nix "netbird-users") {
+      groups.netbird-admin.members = ["lvdar"];
 
       # Browser app using PKCE; the client name is the audience NetBird
       # management expects.
@@ -384,18 +349,10 @@ in {
           "http://localhost:54000/"
         ];
         originLanding = "https://netbird.lvdar.nl";
-        # Every netbird-* group, not just netbird-users: otherwise a
-        # member of only one service group is refused a token with a
-        # misleading scopes error. Services' distribution lists still
-        # decide access.
-        scopeMaps = lib.genAttrs netbirdGroups (_: ["openid" "profile" "email"]);
 
-        # One-to-one on purpose: NetBird sets auto-groups to exactly this.
         claimMaps.groups = {
           joinType = "array";
-          valuesByGroup =
-            {netbird-admin = ["netbird-admin"];}
-            // lib.genAttrs netbirdGroups (g: [g]);
+          valuesByGroup.netbird-admin = ["netbird-admin"];
         };
       };
     };
