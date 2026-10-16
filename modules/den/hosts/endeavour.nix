@@ -143,6 +143,7 @@ in {
       services.pds
       services.minecraft
       services.minecraft.control
+      services.minecraft.packs
       services.ollama.librechat
       services.taskchampion
       services.vaultwarden

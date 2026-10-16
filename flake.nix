@@ -41,6 +41,10 @@
     import-tree.url = "github:vic/import-tree";
     jellarr.url = "github:venkyr77/jellarr";
     make-shell.url = "github:nicknovitski/make-shell";
+    modpacks = {
+      url = "git+https://knot.lvdar.nl/did:plc:lz6wnhglzbatsbxadexhf3bx?shallow=1";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
     nix-index-database = {
       url = "github:nix-community/nix-index-database";
       inputs.nixpkgs.follows = "nixpkgs";

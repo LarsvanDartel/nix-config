@@ -12,8 +12,17 @@
 }: {
   flake-file.inputs.nix-minecraft.url = "github:Infinidoge/nix-minecraft";
 
+  # The packwiz packs (pkgs.modpacks.<pack>), in their own repository so they
+  # are released and edited apart from the fleet. Public HTTPS, not git@knot:
+  # build-gate has no SSH credential. Run `nix run .#write-flake` after editing.
+  flake-file.inputs.modpacks = {
+    url = "git+https://knot.lvdar.nl/did:plc:lz6wnhglzbatsbxadexhf3bx?shallow=1";
+    inputs.nixpkgs.follows = "nixpkgs";
+  };
+
   nixpkgs.overlays = [
     inputs.nix-minecraft.overlays.default
+    inputs.modpacks.overlays.default
 
     # Upstream bug: mkTextileServer (Fabric/Quilt) uses jre_headless (Java 21),
     # but Minecraft 26.2 needs Java 25 — crash loop with
@@ -59,14 +68,12 @@
 
       cfg = config.cosmos.services.minecraft;
 
-      # Server-side performance mods only. c2me and scalablelux are alpha and
-      # touch chunk storage/lighting — tolerable only because of hourly pool
-      # snapshots; drop them first if anything odd shows up. ModernFix and
-      # Noisium have no 26.2 build (only third-party forks).
-      defaultModpack = pkgs.fetchPackwizModpack {
-        src = ./_minecraft/pack;
-        packHash = "sha256-x6VFhJvf9vAOh2dSow4cJ5GOwpu2IGdtSTTpSmEFrmE=";
-      };
+      # Server-side performance mods only (modpacks: packs/lvdar-smp). c2me
+      # and scalablelux are alpha and touch chunk storage/lighting — tolerable
+      # only because of hourly pool snapshots; drop them first if anything odd
+      # shows up. ModernFix and Noisium have no 26.2 build (only third-party
+      # forks).
+      defaultModpack = pkgs.modpacks.lvdar-smp.server;
 
       # Loose jars are wrapped in a directory because symlinkJoin joins
       # directories, not files; the store hash is stripped from basenames.
@@ -291,25 +298,29 @@
               modpack = mkOption {
                 type = nullOr package;
                 default = defaultModpack;
-                defaultText = "the packwiz pack in ./_minecraft/pack";
+                defaultText = "pkgs.modpacks.lvdar-smp.server";
+                example = "pkgs.modpacks.create.server";
                 description = ''
-                  A fetchPackwizModpack derivation whose mods/ directory is
-                  symlinked into the server. Null for no mods.
+                  A pack's server tree from the modpacks input
+                  (`pkgs.modpacks.<pack>.server`). Null for no mods. Its
+                  Minecraft and loader versions must match `package`; nothing
+                  checks that for you, and a mismatch is a crash at startup.
 
-                  packwiz rather than a hand-rolled list of fetchurl calls
-                  because it is the format the Minecraft world already uses:
-                  `packwiz modrinth add <slug>` resolves the right build for
-                  the pack's Minecraft version and writes the URL and hash into
-                  a .pw.toml, and `packwiz update` re-resolves them. The pack
-                  is a directory in this repo rather than a URL, so the mod set
-                  is reviewable in a diff and pinned by packHash — nothing is
-                  fetched at deploy time that was not fetched at build time.
+                  packwiz because it is the format the Minecraft world already
+                  uses: `packwiz modrinth add <slug>` resolves the right build
+                  for the pack's Minecraft version and writes the URL and hash
+                  into a .pw.toml, and every file is fetched against that
+                  hash — nothing is fetched at deploy time that was not
+                  fetched at build time. packs.lvdar.nl (minecraft-packs.nix)
+                  serves players the same revision.
 
-                  Symlinked, not copied: upstream's `files` are writable and
-                  deleted when the server stops, `symlinks` are read-only store
-                  paths. Mods are the store's business, so a mod cannot be
-                  changed on the running host and quietly diverge from what
-                  this repo says is deployed.
+                  mods/ is symlinked, not copied: upstream's `files` are
+                  writable and deleted when the server stops, `symlinks` are
+                  read-only store paths. Mods are the store's business, so a
+                  mod cannot be changed on the running host and quietly
+                  diverge from what is deployed. Every other top-level entry
+                  (config/, ...) goes through `files`, because mods rewrite
+                  their configs at startup and crash on a read-only one.
                 '';
               };
 
@@ -414,6 +425,10 @@
               symlinks = lib.optionalAttrs (s.modpack != null || s.extraMods != []) {
                 mods = modsDir s;
               };
+
+              files = lib.optionalAttrs (s.modpack != null) (lib.genAttrs
+                (lib.remove "mods" (s.modpack.topLevel or []))
+                (entry: "${s.modpack}/${entry}"));
 
               serverProperties =
                 {
