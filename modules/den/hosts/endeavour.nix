@@ -12,14 +12,13 @@
   ...
 }: let
   # Shared by the server config below and the netbird-service entries.
-  smpPort = 25565;
-  hardcorePort = 25566;
+  createPort = 25565;
+  # Simple Voice Chat (in the create pack).
   voicePort = 24454;
 
   # Per-server kanidm groups, checked against X-NetBird-Groups.
   minecraftAccess = {
-    smp = ["netbird-minecraft-smp" "netbird-minecraft-control"];
-    hardcore = ["netbird-minecraft-hardcore" "netbird-minecraft-control"];
+    create = ["netbird-minecraft-create" "netbird-minecraft-control"];
   };
   # The gate group (netbird-minecraft-control) and one per server.
   minecraftGroups = lib.unique (lib.concatLists (lib.attrValues minecraftAccess));
@@ -56,30 +55,19 @@ in {
       # A game client can't follow an IdP redirect; the whitelist is the
       # access control. If it connects but never handshakes, try target
       # protocol = "tcp", or a DNAT like the knot's :22.
-      minecraft-smp = {
-        domain = "smp.lvdar.nl";
+      minecraft-create = {
+        domain = "create.lvdar.nl";
         mode = "tcp";
-        listenPort = smpPort;
+        listenPort = createPort;
         bearerAuth.enable = false;
-        targets = targets smpPort;
-      };
-
-      # L4 routes by listen port only, so a second port. The SRV record is
-      # manual (the wildcard doesn't answer SRV):
-      #   _minecraft._tcp.hardcore.lvdar.nl  SRV  0 0 25566 hardcore.lvdar.nl
-      # Not Velocity: needs online-mode off + a forwarding secret.
-      minecraft-hardcore = {
-        domain = "hardcore.lvdar.nl";
-        mode = "tcp";
-        listenPort = hardcorePort;
-        bearerAuth.enable = false;
-        targets = targets hardcorePort;
+        targets = targets createPort;
       };
 
       # Simple Voice Chat. A broken voice port is silent ("voice chat
-      # unavailable") while the game still works.
-      minecraft-hardcore-voice = {
-        domain = "hardcore-voice.lvdar.nl";
+      # unavailable") while the game still works. L4 routes by listen port,
+      # so the client's default (game address, this port) lands here too.
+      minecraft-create-voice = {
+        domain = "create-voice.lvdar.nl";
         mode = "udp";
         listenPort = voicePort;
         bearerAuth.enable = false;
@@ -205,12 +193,20 @@ in {
         meshExposed = true;
       };
 
-      # Holds 25565: gaia's L4 has only one 25565 to give (hardcore uses
-      # 25566 + SRV). Whitelist UUIDs from world/players/data; the UUID is
-      # the identity, the name a mutable label.
-      cosmos.services.minecraft.servers.smp = {
-        port = smpPort;
-        motd = "lvdar.nl";
+      # Whitelist UUIDs from world/players/data; the UUID is the identity,
+      # the name a mutable label.
+      cosmos.services.minecraft.servers.create = {
+        port = createPort;
+        motd = "lvdar.nl — Create";
+
+        # Hand-synced with packs/create/pack.toml [versions] in the modpacks
+        # repo; bump both together.
+        package = pkgs.neoforgeServers.neoforge-1_21_1-21_1_259;
+        modpack = pkgs.modpacks.create.server;
+
+        # ~150 mods; the 6 GiB default is a vanilla-sized heap.
+        heapGiB = 10;
+
         whitelist = {
           Svenie23 = "1fd240dc-faa7-4a34-a12b-5465dec604d1";
           DeProGamer2015 = "584d73d3-c9e5-4d75-9fba-9c35d41531e7";
@@ -231,45 +227,6 @@ in {
         proxyAddress = "100.68.242.26";
 
         access = minecraftAccess;
-      };
-
-      # Upstream's duplicate-port assertion only checks servers with
-      # openFirewall, which this aspect disables — a clash would fail to bind
-      # and roll back the deploy. SRV record is manual (see netbird-service above).
-      cosmos.services.minecraft.servers.hardcore = {
-        port = hardcorePort;
-        motd = "lvdar.nl — hardcore";
-        whitelist = {
-          DutchRD = "7239bc30-af4e-482c-9434-7ce3005cb917";
-          PittyPfert = "f2bfe527-e914-4d2b-b72b-3f1708452082";
-          # Same UUID as on smp.
-          Svenie23 = "1fd240dc-faa7-4a34-a12b-5465dec604d1";
-        };
-        operators = {};
-
-        # Here, not the shared packwiz pack: this world only. UDP voicePort
-        # needs its own firewall hole and gaia L4 service; unreachable =
-        # silent "voice chat unavailable".
-        extraMods = [pkgs.simple-voice-chat];
-
-        serverProperties = {
-          hardcore = true;
-
-          # Redundant under hardcore; pinned in case hardcore is turned off.
-          difficulty = "hard";
-
-          # Vanilla defaults, pinned so changing them is deliberate.
-          pvp = true;
-          spawn-monsters = true;
-
-          # Spawn protection is pointless with a whitelist of two.
-          spawn-protection = 0;
-
-          # Server-side render ceiling; ~2.5x load per player vs 10.
-          # Affordable: 36 cores, two players, C2ME + VMP in the pack.
-          # simulation-distance stays 10: raising it changes gameplay.
-          view-distance = 16;
-        };
       };
 
       networking.hostId = "b8433556";
@@ -377,7 +334,7 @@ in {
         # Advertises 192.168.2.0/24 to roaming peers; enables IP forwarding.
         routingFeatures = "server";
 
-        # Simple Voice Chat (hardcore); TCP ports come from each service's aspect.
+        # Simple Voice Chat; TCP ports come from each service's aspect.
         exposedUdpPorts = [voicePort];
       };
 
