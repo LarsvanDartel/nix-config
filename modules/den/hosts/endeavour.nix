@@ -224,7 +224,7 @@ in {
 
         # netbird-proxy's embedded client peer, not gaia's agent. Literal:
         # it is not a den host, so there is no entity to read it from.
-        proxyAddress = "100.68.242.26";
+        proxyAddress = "100.68.186.229";
 
         access = minecraftAccess;
       };

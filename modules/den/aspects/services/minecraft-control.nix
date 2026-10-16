@@ -282,15 +282,13 @@ in {
             the address in PerSourcePenaltyExemptList on this host — is the
             wrong answer, which cost a round of 403s to discover.
 
-            Two ways to find the right one, easiest first:
+            Find it from the denial itself, in this host's nginx error log:
+            `access forbidden by rule, client: <address>`. (gaia's
+            /var/lib/netbird-proxy/state.json no longer carries it; it went
+            stale without a trace there when the proxy moved to
+            100.68.186.229 by 2026-10-10.)
 
-              * the denial itself, in this host's nginx error log:
-                `access forbidden by rule, client: <address>`
-              * on gaia, nftables_state.interface_state.wg_address.IP in
-                /var/lib/netbird-proxy/state.json
-
-            Stable across reboots, that path being persisted — but it would
-            change if the proxy ever re-enrolled, and the symptom of that is
+            It changes if the proxy re-enrols, and the symptom of that is
             every request to this page answering 403.
           '';
         };
