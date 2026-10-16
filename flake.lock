@@ -1027,6 +1027,27 @@
         "type": "github"
       }
     },
+    "modpacks": {
+      "inputs": {
+        "nixpkgs": [
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "lastModified": 1792154610,
+        "narHash": "sha256-dvDsh5ohsahlrpa4hlihNAXxl8p5QGvM/1pSjeHDUtA=",
+        "ref": "refs/heads/main",
+        "rev": "7038d04ded2b63a2df5f4b7a8e03696bc9fb3ceb",
+        "shallow": true,
+        "type": "git",
+        "url": "https://knot.lvdar.nl/did:plc:lz6wnhglzbatsbxadexhf3bx"
+      },
+      "original": {
+        "shallow": true,
+        "type": "git",
+        "url": "https://knot.lvdar.nl/did:plc:lz6wnhglzbatsbxadexhf3bx"
+      }
+    },
     "nix-bun": {
       "inputs": {
         "nixpkgs": [
@@ -1554,6 +1575,7 @@
         "import-tree": "import-tree",
         "jellarr": "jellarr",
         "make-shell": "make-shell",
+        "modpacks": "modpacks",
         "nix-index-database": "nix-index-database",
         "nix-minecraft": "nix-minecraft",
         "nix-secrets": "nix-secrets",
