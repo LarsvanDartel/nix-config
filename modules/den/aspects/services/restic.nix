@@ -78,8 +78,7 @@
           default = [
             "traccar.service"
             "knot.service"
-            "minecraft-server-smp.service"
-            "minecraft-server-hardcore.service"
+            "minecraft-server-create.service"
           ];
           description = ''
             Units stopped for the duration of the run and started again after.

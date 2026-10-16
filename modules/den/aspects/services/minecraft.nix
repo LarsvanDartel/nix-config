@@ -23,34 +23,6 @@
   nixpkgs.overlays = [
     inputs.nix-minecraft.overlays.default
     inputs.modpacks.overlays.default
-
-    # Upstream bug: mkTextileServer (Fabric/Quilt) uses jre_headless (Java 21),
-    # but Minecraft 26.2 needs Java 25 — crash loop with
-    # UnsupportedClassVersionError (class file version 69.0). mkTextileServer
-    # isn't exported, so the launcher is rebuilt with the right JDK. Scoped
-    # to this one version (older ones want 17/21); bump alongside the server.
-    (_: prev: {
-      fabricServers =
-        prev.fabricServers
-        // {
-          fabric-26_2 = let
-            vanilla = prev.vanillaServers.vanilla-26_2;
-            inherit (prev.fabricServers.fabric-26_2.passthru) loader;
-          in
-            (prev.writeShellScriptBin "minecraft-server" ''
-              exec ${prev.lib.getExe prev.jdk25_headless} \
-                -D${loader.propertyPrefix}.gameJarPath=${vanilla}/lib/minecraft/server.jar \
-                -Dlog4j.configurationFile=${inputs.nix-minecraft}/pkgs/fabric-servers/log4j.xml \
-                "$@" -jar ${loader}/lib/minecraft/launch.jar nogui
-            '')
-            // rec {
-              pname = "minecraft-server";
-              version = "${vanilla.version}-${loader.loaderName}-${loader.loaderVersion}";
-              name = "${pname}-${version}";
-              passthru = {inherit loader;};
-            };
-        };
-    })
   ];
 
   den.aspects.services.minecraft = {
@@ -67,13 +39,6 @@
       inherit (lib.types) attrsOf bool ints listOf nullOr oneOf package port str submodule;
 
       cfg = config.cosmos.services.minecraft;
-
-      # Server-side performance mods only (modpacks: packs/lvdar-smp). c2me
-      # and scalablelux are alpha and touch chunk storage/lighting — tolerable
-      # only because of hourly pool snapshots; drop them first if anything odd
-      # shows up. ModernFix and Noisium have no 26.2 build (only third-party
-      # forks).
-      defaultModpack = pkgs.modpacks.lvdar-smp.server;
 
       # Loose jars are wrapped in a directory because symlinkJoin joins
       # directories, not files; the store hash is stripped from basenames.
@@ -270,41 +235,29 @@
 
               package = mkOption {
                 type = package;
-                default = pkgs.fabricServers.fabric-26_2;
-                defaultText = "pkgs.fabricServers.fabric-26_2";
+                example = "pkgs.neoforgeServers.neoforge-1_21_1-21_1_259";
                 description = ''
-                  Server jar. Fabric rather than Paper, and the trade is worth
-                  stating because Paper is the more usual answer.
+                  Server jar. Its Minecraft and loader versions must match the
+                  modpack's pack.toml `[versions]`; nothing checks that for
+                  you, and a mismatch is a crash at startup.
 
-                  Paper optimises by *changing the game* — its patches alter
-                  redstone, entity and chunk behaviour, and it silently
-                  rewrites the world into its own split-dimension layout, which
-                  is a one-way door. Fabric leaves vanilla semantics alone and
-                  moves the optimisation into mods that can be added and
-                  removed one at a time. For a server whose whole point is
-                  playing vanilla with friends, keeping vanilla behaviour and
-                  choosing the optimisations explicitly is the better shape —
-                  and the modpack option below is what makes it competitive.
-
-                  Pinned to a version alias, NOT a bare `fabric` alias. Version
-                  aliases here resolve to prereleases: `pkgs.paperServers.paper`
-                  pointed at 26.2-rc-2-build.9 when this was written, and
-                  fabricServers carries a full set of `-pre-N` and `-snapshot-N`
-                  entries alongside the release. Other people have to update
-                  their clients to match this line, so it moves deliberately.
+                  Pin a fully versioned alias, NOT a bare `neoforge`/`fabric`
+                  alias. Bare aliases here resolve to prereleases:
+                  `pkgs.paperServers.paper` pointed at 26.2-rc-2-build.9 once,
+                  and the loader sets carry `-pre-N` and `-snapshot-N` entries
+                  alongside releases. Other people have to update their
+                  clients to match this line, so it moves deliberately.
                 '';
               };
 
               modpack = mkOption {
                 type = nullOr package;
-                default = defaultModpack;
-                defaultText = "pkgs.modpacks.lvdar-smp.server";
+                default = null;
                 example = "pkgs.modpacks.create.server";
                 description = ''
                   A pack's server tree from the modpacks input
-                  (`pkgs.modpacks.<pack>.server`). Null for no mods. Its
-                  Minecraft and loader versions must match `package`; nothing
-                  checks that for you, and a mismatch is a crash at startup.
+                  (`pkgs.modpacks.<pack>.server`). Null for no mods. Must
+                  match `package` (see there).
 
                   packwiz because it is the format the Minecraft world already
                   uses: `packwiz modrinth add <slug>` resolves the right build
@@ -327,15 +280,11 @@
               extraMods = mkOption {
                 type = listOf package;
                 default = [];
-                example = "[pkgs.simple-voice-chat]";
+                example = "[(pkgs.fetchurl {name = \"mod.jar\"; ...})]";
                 description = ''
-                  Jars to add to this server on top of `modpack`.
-
-                  The pack above is deliberately shared by every server, since
-                  it exists to carry the performance mods all of them want. This
-                  is the escape hatch for a mod that belongs to *one* world —
-                  voice chat on the hardcore server and not on the survival one.
-                  Adding it to the pack instead would install it everywhere.
+                  Jars to add to this server on top of `modpack`: the escape
+                  hatch for a mod that belongs to this world but not the pack
+                  players install.
 
                   Each entry is a derivation producing a single .jar. They are
                   merged with the pack's mods/ into one directory that is
@@ -345,7 +294,7 @@
                   Note this bypasses packwiz, so `packwiz update` will not see
                   these and the Minecraft version compatibility is on you —
                   which is why the pack remains the right home for anything
-                  every server should have.
+                  players need too.
                 '';
               };
 
