@@ -1034,10 +1034,10 @@
         ]
       },
       "locked": {
-        "lastModified": 1792156313,
-        "narHash": "sha256-oZmQrDYSJg0b8U8Bnut/jNaYG/mANBbgQNM2dzFPwyg=",
+        "lastModified": 1792158007,
+        "narHash": "sha256-+AFkOYlS4SsG6Pyf1xAY/1GUd8Q4fDxVmG6/BDZUZP8=",
         "ref": "refs/heads/main",
-        "rev": "860ada632c5bbe3f93d3b21bd257d1cb5c865e7c",
+        "rev": "4b3889e318c8dbcc677df06835a926f3f79ae1de",
         "shallow": true,
         "type": "git",
         "url": "https://knot.lvdar.nl/did:plc:lz6wnhglzbatsbxadexhf3bx"
