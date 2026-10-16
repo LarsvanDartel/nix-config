@@ -212,6 +212,7 @@ in {
           DeProGamer2015 = "584d73d3-c9e5-4d75-9fba-9c35d41531e7";
           DutchRD = "7239bc30-af4e-482c-9434-7ce3005cb917";
           Netwerk2009 = "88392a55-9cbc-4311-9fe1-9945a16abf72";
+          PittyPfert = "f2bfe527-e914-4d2b-b72b-3f1708452082";
         };
         operators = {};
       };
