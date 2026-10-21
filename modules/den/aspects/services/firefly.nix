@@ -464,6 +464,7 @@ in {
 
           # Server-level so the PHP location (tryFiles target) is gated too.
           extraConfig = ''
+            ${config.cosmos.services.netbird.client.proxyRealIp}
             auth_request /oauth2/auth;
             error_page 401 = @redirectToAuth2ProxyLogin;
             auth_request_set $auth_user $upstream_http_x_auth_request_user;
