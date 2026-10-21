@@ -11,7 +11,16 @@
   defaultPort = 8085;
 in {
   den.aspects.services.gatus = {
-    includes = [den.aspects.services.ntfy];
+    includes = with den.aspects.services; [ntfy netbird.client];
+
+    # Same port as the page: Gatus has no separate metrics listener, so
+    # /metrics is public through the proxy too. It carries what the public
+    # page already shows (endpoints, results), plus timings.
+    scrape-target = {host, ...}: {
+      job = "gatus";
+      instance = host.name;
+      port = defaultPort;
+    };
 
     # Ungated: gating would put kanidm (on endeavour) in front of the
     # page that reports endeavour down.
@@ -130,6 +139,7 @@ in {
           enable = true;
           settings = {
             web.port = cfg.port;
+            metrics = true;
 
             # Was `memory` because of the DynamicUser trap above.
             storage = {

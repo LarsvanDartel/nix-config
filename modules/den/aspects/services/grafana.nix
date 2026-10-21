@@ -71,81 +71,14 @@ in {
       prom = config.cosmos.services.prometheus;
       loki = config.cosmos.services.loki;
 
-      # Hand-written, not imported from grafana.com: id-pulled dashboards are
-      # unreviewable blobs that break silently when metric names change.
-      fleetJson = pkgs.writeText "fleet.json" (builtins.toJSON {
-        title = "Fleet";
-        uid = "fleet";
-        timezone = "browser";
-        refresh = "1m";
-        time = {
-          from = "now-24h";
-          to = "now";
-        };
-        panels = let
-          panel = id: title: expr: legend: unit: gridPos: {
-            inherit id title gridPos;
-            type = "timeseries";
-            datasource = {
-              type = "prometheus";
-              uid = "prometheus";
-            };
-            targets = [
-              {
-                inherit expr;
-                legendFormat = legend;
-                refId = "A";
-              }
-            ];
-            fieldConfig = {
-              defaults = {
-                inherit unit;
-                custom.fillOpacity = 8;
-              };
-              overrides = [];
-            };
-          };
-        in [
-          (panel 1 "CPU busy" ''
-              100 - (avg by (instance) (rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100)
-            '' "{{instance}}" "percent" {
-              h = 8;
-              w = 12;
-              x = 0;
-              y = 0;
-            })
-          (panel 2 "Memory used" ''
-              100 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes * 100)
-            '' "{{instance}}" "percent" {
-              h = 8;
-              w = 12;
-              x = 12;
-              y = 0;
-            })
-          (panel 3 "Filesystem used" ''
-              100 - (node_filesystem_avail_bytes{fstype!~"tmpfs|ramfs|overlay"}
-                / node_filesystem_size_bytes * 100)
-            '' "{{instance}} {{mountpoint}}" "percent" {
-              h = 8;
-              w = 12;
-              x = 0;
-              y = 8;
-            })
-          (panel 4 "Failed units" ''
-              sum by (instance) (node_systemd_unit_state{state="failed"})
-            '' "{{instance}}" "short" {
-              h = 8;
-              w = 12;
-              x = 12;
-              y = 8;
-            })
-        ];
-      });
-
-      dashboardDir = pkgs.runCommand "grafana-dashboards" {} ''
-        mkdir -p $out
-        cp ${fleetJson} $out/fleet.json
-      '';
+      # See _grafana/dashboards.nix: one JSON file per dashboard.
+      dashboardDir = pkgs.linkFarm "grafana-dashboards" (
+        lib.mapAttrsToList (name: d: {
+          inherit name;
+          path = pkgs.writeText name (builtins.toJSON d);
+        })
+        (import ./_grafana/dashboards.nix {inherit lib;})
+      );
     in {
       options.cosmos.services.grafana = {
         port = mkOption {
