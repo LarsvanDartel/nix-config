@@ -314,6 +314,17 @@ in {
           };
         };
 
+        # PHP2Shell (CVE-2026-109618/-109619): pre-auth RCE in PHP's multipart
+        # upload-progress handling, reached before Firefly runs. Neither app
+        # shows PHP upload-progress bars; strict sessions are PHP's own advice.
+        # Hardening only: a patched PHP is the fix.
+        services.phpfpm.pools = lib.genAttrs ["firefly-iii" "firefly-iii-data-importer"] (_: {
+          settings = {
+            "php_admin_flag[session.upload_progress.enabled]" = "off";
+            "php_admin_flag[session.use_strict_mode]" = "on";
+          };
+        });
+
         systemd.tmpfiles.rules = [
           "d ${importDir} 0750 firefly-iii-data-importer firefly-iii-data-importer -"
         ];
@@ -484,7 +495,15 @@ in {
             "/api/" = phpLocation {
               socket = config.services.phpfpm.pools.firefly-iii.socket;
               scriptFilename = "$document_root/index.php";
-              extraConfig = "auth_request off;";
+              # The one path anonymous requests reach PHP by, and PHP parses
+              # multipart bodies before Firefly sees them (PHP2Shell). The API
+              # never takes multipart: attachment upload reads the raw body.
+              extraConfig = ''
+                auth_request off;
+                if ($http_content_type ~* "multipart/form-data") {
+                  return 403;
+                }
+              '';
             };
 
             # Hand-written equivalent of oauth2-proxy-nginx.nix, for :4181.
