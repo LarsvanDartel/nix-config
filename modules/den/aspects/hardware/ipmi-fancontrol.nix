@@ -18,6 +18,17 @@
     curve = toString cfg.curve;
     gpuMaxTemp = toString cfg.nvidia-smi.maxTemp;
     nvidia_x11 = config.hardware.nvidia.package;
+
+    # nixpkgs#576412: patchelf 0.19.2 setting interpreter and rpath in one call
+    # yields overlapping LOAD segments, and the driver's nvidia-smi segfaults
+    # in ld.so. This loop set the fans to manual first, then died: fans stuck.
+    # Re-patch the pristine origBin copy in two calls, rpath first (the fix in
+    # nixpkgs#576397); drop once the locked nixpkgs carries that.
+    nvidiaSmi = pkgs.runCommand "nvidia-smi-repatched" {nativeBuildInputs = [pkgs.patchelf];} ''
+      install -Dm755 ${nvidia_x11.bin}/origBin/nvidia-smi $out/bin/nvidia-smi
+      patchelf --set-rpath "$(patchelf --print-rpath ${nvidia_x11.bin}/bin/nvidia-smi)" $out/bin/nvidia-smi
+      patchelf --interpreter "$(patchelf --print-interpreter ${nvidia_x11.bin}/bin/nvidia-smi)" $out/bin/nvidia-smi
+    '';
   in {
     options.cosmos.hardware.ipmi-fancontrol = {
       dynamic = mkOption {
@@ -97,7 +108,7 @@
                 done
 
                 ${optionalString cfg.nvidia-smi.enable ''
-                gpu_temp=$(${nvidia_x11.bin}/bin/nvidia-smi --query-gpu=temperature.gpu --format=csv,noheader,nounits | head -n1)
+                gpu_temp=$(${nvidiaSmi}/bin/nvidia-smi --query-gpu=temperature.gpu --format=csv,noheader,nounits | head -n1)
                 gpu_ratio=$(${pkgs.gawk}/bin/awk "BEGIN {print $gpu_temp / ${gpuMaxTemp}}")
                 [ "$(${pkgs.gawk}/bin/awk "BEGIN {print ($gpu_ratio > 1)}")" -eq 1 ] && gpu_ratio=1
                 [ "$(${pkgs.gawk}/bin/awk "BEGIN {print ($gpu_ratio > $max_ratio)}")" -eq 1 ] && max_ratio=$gpu_ratio
