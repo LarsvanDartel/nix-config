@@ -165,8 +165,9 @@
               '';
 
               # setuptools_scm derives the version from git metadata, which
-              # fetchFromGitHub does not provide.
-              SETUPTOOLS_SCM_PRETEND_VERSION = version;
+              # fetchFromGitHub does not provide. Under `env`: with structured
+              # attrs a top-level attribute is a shell variable, not exported.
+              env.SETUPTOOLS_SCM_PRETEND_VERSION = version;
 
               pythonImportsCheck = ["tino"];
 

@@ -52,7 +52,7 @@
               };
             };
           in
-            graalvmPackages.buildGraalvm {
+            (graalvmPackages.buildGraalvm {
               pname = "graalvm-oracle";
               version = "21.0.9";
 
@@ -61,6 +61,11 @@
               inherit useMusl;
 
               meta.platforms = lib.platforms.linux;
+            }).overrideAttrs {
+              # The installCheck's native-image HelloWorld segfaults on the
+              # 2026-10 nixpkgs toolchain (21.0.12 too; GraalVM 25 is fine). Only
+              # the JVM is used — prismlauncher's runtime — and its checks pass.
+              doInstallCheck = false;
             }
         ) {};
 
