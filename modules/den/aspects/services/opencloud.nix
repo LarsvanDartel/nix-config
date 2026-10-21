@@ -162,6 +162,9 @@ in {
 
         services.opencloud = {
           enable = true;
+          # Rolling, as deployed: opencloud-production trails it, and OpenCloud
+          # cannot downgrade an existing install.
+          package = pkgs.opencloud;
           url = "https://${domain}";
           inherit (cfg) port;
           stateDir = cfg.dataDir;
