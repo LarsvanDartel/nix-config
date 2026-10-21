@@ -40,7 +40,14 @@
 
     config = mkIf (cfg.devices != []) {
       boot.kernelModules = ["v4l2loopback"];
-      boot.extraModulePackages = [config.boot.kernelPackages.v4l2loopback];
+      # nixpkgs' kernel build stopped neutering depmod, so modules_install now
+      # writes a full modules.* index that collides with the kernel's in the
+      # modules buildEnv. DEPMOD=true is nixpkgs' own idiom (amneziawg).
+      boot.extraModulePackages = [
+        (config.boot.kernelPackages.v4l2loopback.overrideAttrs (old: {
+          makeFlags = old.makeFlags ++ ["DEPMOD=true"];
+        }))
+      ];
       boot.extraModprobeConfig = ''
         options v4l2loopback devices=${toString (length devices)} video_nr=${field (d: toString d.number)} card_label="${field (d: d.label)}" exclusive_caps=${field (d:
           if d.exclusiveCaps
