@@ -26,6 +26,10 @@
   # Not a per-host option: remote agents dial it.
   lapiPort = 8076;
 
+  # Scrape-target ports must be static (see services/prometheus.nix).
+  metricsPort = 6060;
+  bouncerMetricsPort = 60601;
+
   commonSecrets = builtins.toString inputs.nix-secrets + "/hosts/common/secrets.yaml";
   machineSecret = name: "keys/crowdsec/machines/${name}";
 in {
@@ -54,6 +58,14 @@ in {
       ))
     ])
   ];
+
+  den.aspects.services.crowdsec.agent.includes = [den.aspects.services.netbird.client];
+
+  den.aspects.services.crowdsec.agent.scrape-target = {host, ...}: {
+    job = "crowdsec";
+    instance = host.name;
+    port = metricsPort;
+  };
 
   den.aspects.services.crowdsec.agent.nixos = {
     config,
@@ -159,9 +171,20 @@ in {
             # and every bouncer registration, netbird-proxy's included.
             config_paths.data_dir = "/var/lib/crowdsec/state";
             db_config.use_wal = true;
+
+            # 0.0.0.0, not the mesh address (unknown at eval time); the
+            # firewall admits it on the mesh interface alone.
+            prometheus = {
+              enabled = true;
+              level = "full";
+              listen_addr = "0.0.0.0";
+              listen_port = metricsPort;
+            };
           };
         };
       };
+
+      cosmos.services.netbird.client.exposedPorts = [metricsPort];
 
       # `cscli hub update` needs DNS. netbird-proxy fails closed on a dead
       # LAPI, so every published service 403'd for six hours (2026-08-29)
@@ -217,6 +240,12 @@ in {
 
     crowdsec-lapi = {host, ...}: "http://${host.meshAddress}:${toString lapiPort}";
 
+    scrape-target = {host, ...}: {
+      job = "crowdsec-firewall-bouncer";
+      instance = host.name;
+      port = bouncerMetricsPort;
+    };
+
     nixos = {
       config,
       lib,
@@ -252,8 +281,11 @@ in {
           "f /var/lib/crowdsec/online_api_credentials.yaml 0750 ${config.services.crowdsec.user} ${config.services.crowdsec.group} - -"
         ];
 
-        # Remote agents, over the mesh only. Bouncers stay on loopback.
-        cosmos.services.netbird.client.exposedPorts = mkIf remote [lapiPort];
+        # Mesh only: the bouncer's metrics, and the LAPI when remote agents
+        # dial it. The bouncers themselves query the LAPI over loopback.
+        cosmos.services.netbird.client.exposedPorts =
+          [bouncerMetricsPort]
+          ++ lib.optional remote lapiPort;
 
         services.crowdsec = {
           hub.collections = ["crowdsecurity/sshd"];
@@ -300,7 +332,14 @@ in {
           };
         };
 
-        services.crowdsec-firewall-bouncer.enable = true;
+        services.crowdsec-firewall-bouncer = {
+          enable = true;
+          settings.prometheus = {
+            enabled = true;
+            listen_addr = "0.0.0.0";
+            listen_port = bouncerMetricsPort;
+          };
+        };
 
         # Upstream's ReadWritePaths covers data_dir only; under DynamicUser's
         # ProtectSystem=strict the credentials above could not be (re)written.

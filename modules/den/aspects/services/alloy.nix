@@ -16,69 +16,106 @@
       inherit (lib.types) port str;
 
       cfg = config.cosmos.services.alloy;
+      nginx = config.services.nginx.enable;
 
-      config-alloy = pkgs.writeTextDir "config.alloy" ''
-        loki.write "default" {
-          endpoint {
-            url = "http://${cfg.lokiHost}:${toString cfg.lokiPort}/loki/api/v1/push"
-          }
-        }
-
-        // kdeconnectd probes for peers over mDNS on every interface it can
-        // see, twice a second. One of those is wt0, NetBird's WireGuard
-        // interface, where no peer's AllowedIPs cover the mDNS multicast group
-        // 224.0.0.251 — so the kernel refuses the send with ENOKEY and
-        // kdeconnect logs "Failed to send mDNS query: Required key not
-        // available". Verified by hand: the same send succeeds on the LAN
-        // interface and returns ENOKEY on wt0.
-        //
-        // Nothing is broken. Discovery works over the LAN, which is the only
-        // place it could ever work, and a mesh peer is not a thing mDNS is
-        // meant to find. It is ~50k identical lines a day that bury everything
-        // else this host says.
-        //
-        // Dropped here because there is nowhere else to drop it: kdeconnect
-        // offers no way to restrict which interfaces it probes. If it ever
-        // gains one, this goes. The count survives as
-        // `loki_process_dropped_lines_total{reason=...}`, so the noise stays
-        // measurable even though the lines are gone.
-        loki.process "denoise" {
-          forward_to = [loki.write.default.receiver]
-
-          stage.drop {
-            expression          = "Failed to send mDNS query: Required key not available"
-            drop_counter_reason = "kdeconnect_mdns_on_wireguard"
-          }
-        }
-
-        // Kept to a small fixed set on purpose: labels are what loki indexes,
-        // and a high-cardinality one (a pid, a request id) is how a loki
-        // install becomes unusably slow. `unit` answers the first question
-        // anyone asks, which is which service said this.
-        loki.relabel "journal" {
-          forward_to = []
-
-          rule {
-            source_labels = ["__journal__systemd_unit"]
-            target_label  = "unit"
+      config-alloy = pkgs.writeTextDir "config.alloy" (''
+          loki.write "default" {
+            endpoint {
+              url = "http://${cfg.lokiHost}:${toString cfg.lokiPort}/loki/api/v1/push"
+            }
           }
 
-          rule {
-            source_labels = ["__journal_priority_keyword"]
-            target_label  = "level"
-          }
-        }
+          // kdeconnectd probes for peers over mDNS on every interface it can
+          // see, twice a second. One of those is wt0, NetBird's WireGuard
+          // interface, where no peer's AllowedIPs cover the mDNS multicast group
+          // 224.0.0.251 — so the kernel refuses the send with ENOKEY and
+          // kdeconnect logs "Failed to send mDNS query: Required key not
+          // available". Verified by hand: the same send succeeds on the LAN
+          // interface and returns ENOKEY on wt0.
+          //
+          // Nothing is broken. Discovery works over the LAN, which is the only
+          // place it could ever work, and a mesh peer is not a thing mDNS is
+          // meant to find. It is ~50k identical lines a day that bury everything
+          // else this host says.
+          //
+          // Dropped here because there is nowhere else to drop it: kdeconnect
+          // offers no way to restrict which interfaces it probes. If it ever
+          // gains one, this goes. The count survives as
+          // `loki_process_dropped_lines_total{reason=...}`, so the noise stays
+          // measurable even though the lines are gone.
+          loki.process "denoise" {
+            forward_to = [loki.write.default.receiver]
 
-        loki.source.journal "read" {
-          forward_to    = [loki.process.denoise.receiver]
-          relabel_rules = loki.relabel.journal.rules
-          labels        = {
-            job  = "systemd-journal",
-            host = "${config.networking.hostName}",
+            stage.drop {
+              expression          = "Failed to send mDNS query: Required key not available"
+              drop_counter_reason = "kdeconnect_mdns_on_wireguard"
+            }
           }
-          max_age = "12h"
-        }
-      '';
+
+          // Kept to a small fixed set on purpose: labels are what loki indexes,
+          // and a high-cardinality one (a pid, a request id) is how a loki
+          // install becomes unusably slow. `unit` answers the first question
+          // anyone asks, which is which service said this.
+          loki.relabel "journal" {
+            forward_to = []
+
+            rule {
+              source_labels = ["__journal__systemd_unit"]
+              target_label  = "unit"
+            }
+
+            rule {
+              source_labels = ["__journal_priority_keyword"]
+              target_label  = "level"
+            }
+          }
+
+          loki.source.journal "read" {
+            forward_to    = [loki.process.denoise.receiver]
+            relabel_rules = loki.relabel.journal.rules
+            labels        = {
+              job  = "systemd-journal",
+              host = "${config.networking.hostName}",
+            }
+            max_age = "12h"
+          }
+        ''
+        + lib.optionalString nginx ''
+
+          // nginx logs to files, not the journal. `log` tells access from error.
+          local.file_match "nginx" {
+            path_targets = [
+              {"__path__" = "/var/log/nginx/access.log", "log" = "access"},
+              {"__path__" = "/var/log/nginx/error.log", "log" = "error"},
+            ]
+          }
+
+          // From the end: positions do not survive an impermanent reboot, and
+          // re-reading a whole rotated log would replay it into loki.
+          loki.source.file "nginx" {
+            targets       = local.file_match.nginx.targets
+            forward_to    = [loki.process.nginx.receiver]
+            tail_from_end = true
+          }
+
+          // The *arr clients put their API keys in query strings; loki is not
+          // where those should live.
+          loki.process "nginx" {
+            forward_to = [loki.write.default.receiver]
+
+            stage.replace {
+              expression = "(?i)api_?key=([^&\\s\"]+)"
+              replace    = "<redacted>"
+            }
+
+            stage.static_labels {
+              values = {
+                job  = "nginx",
+                host = "${config.networking.hostName}",
+              }
+            }
+          }
+        '');
     in {
       options.cosmos.services.alloy = {
         lokiHost = mkOption {
@@ -104,7 +141,9 @@
           configPath = config-alloy;
         };
 
-        systemd.services.alloy.serviceConfig.SupplementaryGroups = ["systemd-journal"];
+        systemd.services.alloy.serviceConfig.SupplementaryGroups =
+          ["systemd-journal"]
+          ++ lib.optional nginx "nginx";
       };
     };
   };

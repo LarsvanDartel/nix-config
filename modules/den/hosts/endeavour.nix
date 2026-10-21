@@ -108,6 +108,7 @@ in {
       services.site
       services.cdrom
       hardware.ipmi-fancontrol
+      services.ipmi-exporter
       services.arr.vpn
       services.arr.transmission
       services.arr.sabnzbd
