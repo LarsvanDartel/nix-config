@@ -229,7 +229,7 @@ in {
 
       # netbird-proxy's embedded client peer, not gaia's agent. Literal:
       # it is not a den host, so there is no entity to read it from.
-      cosmos.services.netbird.client.proxyAddress = "100.68.186.229";
+      cosmos.services.netbird.client.proxyAddress = "100.68.223.154";
 
       networking.hostId = "b8433556";
 
