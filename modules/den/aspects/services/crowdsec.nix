@@ -172,12 +172,13 @@ in {
             config_paths.data_dir = "/var/lib/crowdsec/state";
             db_config.use_wal = true;
 
-            # 0.0.0.0, not the mesh address (unknown at eval time); the
-            # firewall admits it on the mesh interface alone.
+            # Every address, both families: mesh names resolve to IPv6 first,
+            # and the mesh address is unknown at eval time. The firewall
+            # admits it on the mesh interface alone.
             prometheus = {
               enabled = true;
               level = "full";
-              listen_addr = "0.0.0.0";
+              listen_addr = "::";
               listen_port = metricsPort;
             };
           };
@@ -185,6 +186,13 @@ in {
       };
 
       cosmos.services.netbird.client.exposedPorts = [metricsPort];
+
+      # Upstream hands crowdsec its configuration as tmpfiles symlinks, so a
+      # changed setting leaves the unit untouched and the running engine on the
+      # old config: metrics stayed on loopback after the 2026-10-21 deploy.
+      systemd.services.crowdsec.restartTriggers = [
+        (builtins.hashString "sha256" (builtins.unsafeDiscardStringContext (builtins.toJSON config.services.crowdsec.settings)))
+      ];
 
       # `cscli hub update` needs DNS. netbird-proxy fails closed on a dead
       # LAPI, so every published service 403'd for six hours (2026-08-29)
