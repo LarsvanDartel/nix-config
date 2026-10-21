@@ -576,7 +576,8 @@ in {
       (timeseries {
         title = "Temperatures (BMC)";
         unit = "celsius";
-        queries = [(q "ipmi_temperature_celsius" "{{name}}")];
+        # Both CPU sensors are named "Temp"; the id tells them apart.
+        queries = [(q "ipmi_temperature_celsius" "{{name}} {{id}}")];
       })
       (timeseries {
         title = "Fans";
