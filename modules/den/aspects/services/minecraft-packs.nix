@@ -60,6 +60,7 @@ in {
           # mtime-based ETag survive a pack update unchanged: a conditional
           # request would get a 304 and keep the old index. Always send it.
           extraConfig = ''
+            ${config.cosmos.services.netbird.client.proxyRealIp}
             etag off;
             if_modified_since off;
             add_header Cache-Control "no-cache";

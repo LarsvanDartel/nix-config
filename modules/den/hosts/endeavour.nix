@@ -99,6 +99,8 @@ in {
       # Lets gaia's crowdsec whitelist name home.lvdar.nl instead of a
       # drifting literal.
       services.ddns
+      # Reads the proxied vhosts' logs; bans land on gaia's edge.
+      services.crowdsec.remote
       services.opencloud
       services.typstnique
       services.tino
@@ -222,13 +224,12 @@ in {
       # group alone shows an empty page.
       cosmos.services.minecraft.control = {
         enable = true;
-
-        # netbird-proxy's embedded client peer, not gaia's agent. Literal:
-        # it is not a den host, so there is no entity to read it from.
-        proxyAddress = "100.68.186.229";
-
         access = minecraftAccess;
       };
+
+      # netbird-proxy's embedded client peer, not gaia's agent. Literal:
+      # it is not a den host, so there is no entity to read it from.
+      cosmos.services.netbird.client.proxyAddress = "100.68.186.229";
 
       networking.hostId = "b8433556";
 

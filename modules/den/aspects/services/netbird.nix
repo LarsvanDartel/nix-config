@@ -35,7 +35,7 @@ in {
     ...
   }: let
     inherit (lib.options) mkOption mkEnableOption;
-    inherit (lib.types) enum ints listOf port str;
+    inherit (lib.types) enum ints lines listOf nullOr port str;
 
     cfg = config.cosmos.services.netbird;
 
@@ -223,6 +223,53 @@ in {
             interval above would catch that window and restart the agent into
             its own startup — and since the remedy is a restart, that could
             loop rather than converge.
+          '';
+        };
+
+        proxyAddress = mkOption {
+          type = nullOr str;
+          default = null;
+          example = "100.68.0.1";
+          description = ''
+            netbird-proxy's own mesh address: the source of every request it
+            forwards to this host. Set on hosts it targets.
+
+            NOT gaia's address. netbird-proxy enrols as its own NetBird client,
+            with a WireGuard address separate from the host agent's, and dials
+            upstream targets from that one. It is also absent from /api/peers,
+            so the peer list does not show it and gaia's own 100.68.38.155 is
+            the wrong answer, which cost a round of 403s to discover.
+
+            Find it from the denial itself, in minecraft-control's nginx error
+            log: `access forbidden by rule, client: <address>`. (gaia's
+            /var/lib/netbird-proxy/state.json no longer carries it; it went
+            stale without a trace there when the proxy moved to
+            100.68.186.229 by 2026-10-10.)
+
+            It changes if the proxy re-enrols, and the symptom of that is
+            every minecraft-control request answering 403 and every proxied
+            nginx vhost logging the proxy instead of its visitors.
+          '';
+        };
+
+        proxyRealIp = mkOption {
+          type = lines;
+          readOnly = true;
+          default = lib.optionalString (cfg.client.proxyAddress != null) ''
+            set_real_ip_from ${cfg.client.proxyAddress};
+            real_ip_header X-Forwarded-For;
+            real_ip_recursive on;
+          '';
+          description = ''
+            nginx server-block directives restoring the visitor's address on
+            a vhost netbird-proxy targets, so logs (and crowdsec) see the
+            visitor rather than the proxy. X-Forwarded-For, not X-Real-IP:
+            the proxy passes a client-sent X-Real-IP through untouched but
+            appends to X-Forwarded-For, and recursion from the right with only
+            the proxy trusted lands on the address it actually saw.
+
+            Not for a vhost gated on `allow <proxy>`: access rules would then
+            see the visitor and refuse everyone.
           '';
         };
       };

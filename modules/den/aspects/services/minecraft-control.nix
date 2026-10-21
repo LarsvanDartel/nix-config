@@ -261,38 +261,6 @@ in {
           '';
         };
 
-        proxyAddress = mkOption {
-          type = str;
-          example = "100.68.0.1";
-          description = ''
-            netbird-proxy's own mesh address, and the only source this vhost
-            accepts.
-
-            Necessary rather than defensive. The fleet runs a single All -> All
-            NetBird policy, so binding to the mesh means every enrolled peer can
-            reach this port — and reaching it directly skips the kanidm gate,
-            which lives on gaia. It is also what makes the identity headers
-            trustworthy: they are believable exactly because the one peer that
-            can set them is the proxy that authenticated the user.
-
-            NOT gaia's address. netbird-proxy enrols as its own NetBird client,
-            with a WireGuard address separate from the host agent's, and dials
-            upstream targets from that one. It is also absent from /api/peers,
-            so the peer list does not show it and gaia's own 100.68.38.155 —
-            the address in PerSourcePenaltyExemptList on this host — is the
-            wrong answer, which cost a round of 403s to discover.
-
-            Find it from the denial itself, in this host's nginx error log:
-            `access forbidden by rule, client: <address>`. (gaia's
-            /var/lib/netbird-proxy/state.json no longer carries it; it went
-            stale without a trace there when the proxy moved to
-            100.68.186.229 by 2026-10-10.)
-
-            It changes if the proxy re-enrols, and the symptom of that is
-            every request to this page answering 403.
-          '';
-        };
-
         logLines = mkOption {
           type = ints.positive;
           default = 300;
@@ -325,6 +293,13 @@ in {
       };
 
       config = mkIf cfg.enable {
+        assertions = [
+          {
+            assertion = config.cosmos.services.netbird.client.proxyAddress != null;
+            message = "minecraft-control accepts only netbird-proxy: set cosmos.services.netbird.client.proxyAddress.";
+          }
+        ];
+
         cosmos.services.netbird.client.exposedPorts = [cfg.port];
 
         users.users.${user} = {
@@ -430,9 +405,9 @@ in {
 
           # NOT gated by the wt0 firewall: the NetBird policy is All -> All, so
           # any peer could bypass gaia's kanidm gate and spoof identity headers.
-          # Literal gaia mesh address; matches PerSourcePenaltyExemptList here.
+          # That is also why this vhost must never get proxyRealIp.
           extraConfig = ''
-            allow ${cfg.proxyAddress};
+            allow ${config.cosmos.services.netbird.client.proxyAddress};
             deny all;
           '';
 

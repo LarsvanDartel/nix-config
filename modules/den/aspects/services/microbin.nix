@@ -268,6 +268,7 @@ in {
         };
 
         extraConfig = ''
+          ${config.cosmos.services.netbird.client.proxyRealIp}
           proxy_set_header X-Forwarded-Proto https;
 
           # nginx builds absolute redirects from its own listen address — a
