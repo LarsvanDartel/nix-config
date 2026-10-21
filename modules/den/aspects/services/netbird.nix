@@ -241,14 +241,15 @@ in {
             the wrong answer, which cost a round of 403s to discover.
 
             Find it from the denial itself, in minecraft-control's nginx error
-            log: `access forbidden by rule, client: <address>`. (gaia's
-            /var/lib/netbird-proxy/state.json no longer carries it; it went
-            stale without a trace there when the proxy moved to
-            100.68.186.229 by 2026-10-10.)
+            log (`access forbidden by rule, client: <address>`), or as the
+            mesh address suddenly dominating the proxied vhosts' access log.
+            gaia's /var/lib/netbird-proxy/state.json does not carry it.
 
-            It changes if the proxy re-enrols, and the symptom of that is
-            every minecraft-control request answering 403 and every proxied
-            nginx vhost logging the proxy instead of its visitors.
+            It is not stable: it moved to 100.68.186.229 by 2026-10-10 and to
+            100.68.223.154 at the 2026-10-21 deploy that upgraded netbird,
+            with persisted state both times. The symptom is every
+            minecraft-control request answering 403 and every proxied nginx
+            vhost logging the proxy instead of its visitors.
           '';
         };
 
