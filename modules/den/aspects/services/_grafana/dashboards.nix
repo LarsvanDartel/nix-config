@@ -541,10 +541,10 @@ in {
         queries = [(q ''sum by (host, status) (count_over_time({job="nginx", log="access"} | regexp "\" (?P<status>[0-9])[0-9]{2} " [5m]))'' "{{host}} {{status}}xx")];
       })
       (table {
-        title = "Top clients, endeavour, 1h";
+        title = "Top external clients, endeavour nginx, 24h";
         ds = loki;
-        description = "Visitors' own addresses since the proxied vhosts restore X-Forwarded-For.";
-        expr = ''topk(10, sum by (ip) (count_over_time({job="nginx", log="access", host="endeavour"} | regexp "^(?P<ip>\\S+) " [1h])))'';
+        description = "Only firefly, bin and packs pass endeavour's nginx; every other published app is proxied straight to its port. Loopback (the *arr stack) and Gatus are filtered out.";
+        expr = ''topk(10, sum by (ip) (count_over_time({job="nginx", log="access", host="endeavour"} !~ "Gatus/" | regexp "^(?P<ip>\\S+) " | ip !~ "127\\.0\\.0\\.1|::1" [24h])))'';
       })
       (timeseries {
         title = "Refused by access rule";
