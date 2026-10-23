@@ -9,12 +9,39 @@
     nixos = {
       config,
       lib,
+      pkgs,
       ...
     }: let
       inherit (lib.options) mkOption;
       inherit (lib.types) port str path;
 
       cfg = config.cosmos.services.loki;
+      proxy = config.cosmos.services.netbird.client.proxyAddress;
+      alertmanager = config.services.prometheus.alertmanager;
+
+      # A store path, so a changed rule restarts loki with it. "fake" is the
+      # tenant loki assumes with auth_enabled = false.
+      rulesDir = pkgs.writeTextDir "fake/rules.yaml" (builtins.toJSON {
+        groups = lib.optional (proxy != null) {
+          name = "logs";
+          rules = [
+            {
+              # proxyAddress is hand-synced (hosts/endeavour.nix). When
+              # netbird-proxy moves, nginx stops restoring visitors and the
+              # mesh whitelist hides them all from crowdsec (until 2026-10-21).
+              # Gatus keeps a steady trickle through the proxy, so drift shows.
+              alert = "ProxyAddressDrift";
+              expr = ''sum(count_over_time({job="nginx", log="access", host="${config.networking.hostName}"} |~ `^100\.(6[4-9]|[7-9][0-9]|1[01][0-9]|12[0-7])\.` !~ `^${lib.escapeRegex proxy} ` [15m])) > 5'';
+              for = "15m";
+              labels.severity = "warning";
+              annotations = {
+                summary = "netbird-proxy is no longer at ${proxy}";
+                description = "{{ $value }} proxied requests in 15 minutes came from another mesh address: update cosmos.services.netbird.client.proxyAddress.";
+              };
+            }
+          ];
+        };
+      });
     in {
       options.cosmos.services.loki = {
         port = mkOption {
@@ -45,7 +72,6 @@
           "d /tank/monitoring 0750 loki loki - -"
           "d ${cfg.dataDir} 0750 loki loki - -"
           "d ${cfg.dataDir}/chunks 0750 loki loki - -"
-          "d ${cfg.dataDir}/rules 0750 loki loki - -"
           "d ${cfg.dataDir}/compactor 0750 loki loki - -"
         ];
 
@@ -65,12 +91,17 @@
 
             common = {
               path_prefix = cfg.dataDir;
-              storage.filesystem = {
-                chunks_directory = "${cfg.dataDir}/chunks";
-                rules_directory = "${cfg.dataDir}/rules";
-              };
+              storage.filesystem.chunks_directory = "${cfg.dataDir}/chunks";
               replication_factor = 1;
               ring.kvstore.store = "inmemory";
+            };
+
+            ruler = {
+              storage = {
+                type = "local";
+                local.directory = "${rulesDir}";
+              };
+              alertmanager_url = lib.mkIf alertmanager.enable "http://127.0.0.1:${toString alertmanager.port}";
             };
 
             schema_config.configs = [
