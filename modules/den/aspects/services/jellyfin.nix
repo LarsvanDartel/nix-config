@@ -7,18 +7,22 @@ in {
 
   # jellarr's pinned pnpmDeps.hash was computed with an older pnpm; pnpm's
   # store format changes the hash across versions (broke twice, surfacing as
-  # ERR_PNPM_NO_OFFLINE_TARBALL). Drop once upstream regenerates it. To
-  # regenerate: set the replacement hash to "", build jellarr, copy "got:".
+  # ERR_PNPM_NO_OFFLINE_TARBALL). Warns once upstream changes the hash; delete
+  # this then. To regenerate: set the replacement hash to "", build jellarr,
+  # copy "got:".
   nixpkgs.overlays = [
     (final: prev: {
       fetchPnpmDeps = args:
         prev.fetchPnpmDeps (
-          if
-            args.pname or null
-            == "jellarr"
-            && args.hash == "sha256-jo1BjRAjjfNKF0xb5cLCuELSveHeJ98iLPhMDKP1QbI="
+          if args.pname or null != "jellarr"
+          then args
+          else if args.hash == "sha256-jo1BjRAjjfNKF0xb5cLCuELSveHeJ98iLPhMDKP1QbI="
           then args // {hash = "sha256-7VXyltKa602y4vdmLYyLHFYbcwc8DKQ/dMzEKOYPHT0=";}
-          else args
+          else
+            prev.lib.warn ''
+              modules/den/aspects/services/jellyfin.nix: jellarr's pnpmDeps hash changed upstream; delete the fetchPnpmDeps override.
+            ''
+            args
         );
     })
   ];
@@ -75,6 +79,7 @@ in {
     inherit (lib.lists) optional;
     inherit (lib.types) bool path port;
     inherit (lib.modules) mkIf mkForce;
+    inherit (lib.strings) hasInfix;
 
     cfg = config.cosmos.services.jellyfin;
     proxy = config.cosmos.services.netbird.client.proxyAddress;
@@ -82,18 +87,23 @@ in {
     # jellarr sends only the legacy X-Emby-Token header, which our Jellyfin
     # ignores (EnableLegacyAuthorization=false); the silent 401 surfaces as
     # "Cannot set properties of undefined (setting '$root')". Add the modern
-    # Authorization header; drop once jellarr grows a non-legacy client.
+    # Authorization header; warns once jellarr's client sends one itself.
     jellarrPkg = pkgs.callPackage "${inputs.jellarr}/nix/package.nix" {};
-    jellarrPatched = jellarrPkg.overrideAttrs (old: {
-      postInstall =
-        (old.postInstall or "")
-        + ''
-          substituteInPlace $out/share/bundle.cjs --replace-fail \
-            "headers.set(\"X-Emby-Token\", apiKey);" \
-            "headers.set(\"X-Emby-Token\", apiKey);
-                headers.set(\"Authorization\", 'MediaBrowser Client=\"jellarr\", Device=\"cli\", DeviceId=\"jellarr\", Version=\"0.1.0\", Token=\"' + apiKey + '\"');"
-        '';
-    });
+    jellarrClient = "${inputs.jellarr}/src/api/client.ts";
+    jellarrPatched =
+      lib.warnIf (!builtins.pathExists jellarrClient || hasInfix ''"Authorization"'' (builtins.readFile jellarrClient)) ''
+        modules/den/aspects/services/jellyfin.nix: jellarr's API client moved or now sends an Authorization header.
+        Check whether it authenticates without EnableLegacyAuthorization; drop jellarrPatched.
+      '' (jellarrPkg.overrideAttrs (old: {
+        postInstall =
+          (old.postInstall or "")
+          + ''
+            substituteInPlace $out/share/bundle.cjs --replace-fail \
+              "headers.set(\"X-Emby-Token\", apiKey);" \
+              "headers.set(\"X-Emby-Token\", apiKey);
+                  headers.set(\"Authorization\", 'MediaBrowser Client=\"jellarr\", Device=\"cli\", DeviceId=\"jellarr\", Version=\"0.1.0\", Token=\"' + apiKey + '\"');"
+          '';
+      }));
   in {
     imports = [inputs.jellarr.nixosModules.default];
 

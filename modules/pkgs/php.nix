@@ -1,13 +1,17 @@
 # php — PHP 8.5.12 ahead of nixpkgs: the 2026-10-21 out-of-band release for
 # GHSA-w8hw-w9fx-j79w / GHSA-6wmf-4rv5-p3rp (PHP2Shell, pre-auth RCE, attacked
 # before release). Firefly III and its data importer run on php85.
-# Inert once nixpkgs reaches 8.5.12, so it cannot downgrade; delete it then.
+# Inert once nixpkgs reaches 8.5.12, so it cannot downgrade, and warns then.
 {...}: {
   nixpkgs.overlays = [
     (final: prev: {
       php85 =
         if prev.lib.versionAtLeast prev.php85.version "8.5.12"
-        then prev.php85
+        then
+          prev.lib.warn ''
+            modules/pkgs/php.nix: nixpkgs' php85 is now ${prev.php85.version} (>= 8.5.12); delete the override.
+          ''
+          prev.php85
         else
           prev.php85.override {
             version = "8.5.12";
