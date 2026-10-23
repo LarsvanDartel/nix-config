@@ -1,19 +1,32 @@
 {
   config,
   lib,
+  inputs,
   ...
 }: let
   inherit (lib.modules) mkIf;
+  inherit (lib.strings) hasInfix;
 
   colors = config.lib.stylix.colors;
   rgb = color: "rgb(${color})";
   rgba = color: alpha: "rgba(${color}${alpha})";
+
+  stylixTarget = "${inputs.stylix}/modules/hyprland/hm.nix";
+  stylixStillFlat =
+    builtins.pathExists stylixTarget
+    && (let src = builtins.readFile stylixTarget; in hasInfix ''"col.active_border"'' src && hasInfix "{ config = colorSettings; }" src);
 in {
   # Stylix's Hyprland target stays off in Lua mode: it emits flat hyprlang names
   # ("col.active_border") but hl.config({}) takes the nested HL.ConfigOpt shape
-  # (per hyprland-0.56.2's hl.meta.lua). Drop this file if stylix emits nested `col`.
+  # (per hyprland-0.56.2's hl.meta.lua). Warns once stylix's Lua branch changes;
+  # drop this file if it emits nested `col`.
   config = mkIf config.wayland.windowManager.hyprland.enable {
-    stylix.targets.hyprland.enable = false;
+    stylix.targets.hyprland.enable =
+      lib.warnIfNot stylixStillFlat ''
+        modules/den/aspects/home/desktop/_hyprland/stylix-lua-compat.nix: stylix's Hyprland target changed its Lua-mode output.
+        If it now emits nested `col`, delete this file; otherwise bump this guard.
+      ''
+      false;
 
     wayland.windowManager.hyprland.settings.config = {
       general.col = {

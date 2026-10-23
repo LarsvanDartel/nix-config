@@ -125,8 +125,13 @@ in {
           enable = true;
           # `stalwart` is a warnAlias (fatal under abort-on-warn). Module is
           # 0.15-only until nixpkgs ships its 0.16 module; that bump will need
-          # a config rewrite.
-          package = pkgs.stalwart_0_15;
+          # a config rewrite. Warns once the alias stops saying so.
+          package =
+            lib.warnIfNot (lib.strings.hasInfix "is not compatible with `services.stalwart`" (builtins.readFile (pkgs.path + "/pkgs/top-level/aliases.nix"))) ''
+              modules/den/aspects/services/stalwart.nix: nixpkgs' `stalwart` alias no longer calls 0.16 incompatible with services.stalwart.
+              Check whether the module supports 0.16; rewrite the config for it and drop the stalwart_0_15 pin.
+            ''
+            pkgs.stalwart_0_15;
           stateVersion = "26.11";
 
           # LoadCredential reads as root: no secret owners or acme group needed.
