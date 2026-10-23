@@ -77,6 +77,7 @@ in {
     inherit (lib.modules) mkIf mkForce;
 
     cfg = config.cosmos.services.jellyfin;
+    proxy = config.cosmos.services.netbird.client.proxyAddress;
 
     # jellarr sends only the legacy X-Emby-Token header, which our Jellyfin
     # ignores (EnableLegacyAuthorization=false); the silent 401 surfaces as
@@ -152,6 +153,30 @@ in {
       services.jellyfin.enable = true;
       users.users.jellyfin.extraGroups = ["video" "render"];
       networking.firewall.allowedTCPPorts = optional cfg.openFirewall cfg.port;
+
+      # jellarr has no network section. Without KnownProxies every visitor is
+      # netbird-proxy's mesh address: jellyfin counts them all as LAN, and the
+      # crowdsec mesh whitelist drops every failed login below.
+      systemd.services.jellyfin.preStart = mkIf (proxy != null) ''
+        f=${config.services.jellyfin.configDir}/network.xml
+        if [ -f "$f" ]; then
+          ${pkgs.xmlstarlet}/bin/xmlstarlet ed -L -d '//KnownProxies/*' \
+            -s '//KnownProxies' -t elem -n string -v ${proxy} "$f"
+        fi
+      '';
+
+      # Password logins (lvdar, sven) go from the proxy straight to jellyfin,
+      # past nginx; jellyfin-bf bans their brute force at the edge.
+      services.crowdsec = mkIf config.services.crowdsec.enable {
+        hub.collections = ["LePresidente/jellyfin"];
+        settings.acquisitions = [
+          {
+            source = "journalctl";
+            journalctl_filter = ["_SYSTEMD_UNIT=jellyfin.service"];
+            labels.type = "syslog";
+          }
+        ];
+      };
 
       services.jellarr = {
         enable = true;
