@@ -1,0 +1,71 @@
+diff --git a/src/api.rs b/src/api.rs
+--- a/src/api.rs
++++ b/src/api.rs
+@@ -760,6 +760,8 @@
+     identity: Option<CipherIdentity>,
+     #[serde(rename = "secureNote")]
+     secure_note: Option<CipherSecureNote>,
++    #[serde(rename = "encryptedFor")]
++    encrypted_for: Option<String>,
+ }
+
+ #[derive(serde::Serialize, Debug)]
+@@ -780,6 +782,8 @@
+     secure_note: Option<CipherSecureNote>,
+     #[serde(rename = "passwordHistory")]
+     password_history: Vec<CiphersPutReqHistory>,
++    #[serde(rename = "encryptedFor")]
++    encrypted_for: Option<String>,
+ }
+
+ #[derive(serde::Serialize, Debug)]
+@@ -1211,6 +1215,7 @@
+             card: None,
+             identity: None,
+             secure_note: None,
++            encrypted_for: Some(self.user_id(access_token)?),
+         };
+         match data {
+             crate::db::EntryData::Login {
+@@ -1361,6 +1366,7 @@
+                     password: entry.password.clone(),
+                 })
+                 .collect(),
++            encrypted_for: Some(self.user_id(access_token)?),
+         };
+         match data {
+             crate::db::EntryData::Login {
+@@ -1582,6 +1588,33 @@
+         Ok(connect_res.access_token)
+     }
+
++    // vaultwarden >= 2026.6 rejects cipher writes without `encryptedFor`.
++    fn user_id(&self, access_token: &str) -> Result<String> {
++        let res = reqwest::blocking::Client::new()
++            .get(self.api_url("/accounts/profile"))
++            .header("Authorization", format!("Bearer {access_token}"))
++            .send()
++            .map_err(|source| Error::Reqwest { source })?;
++        match res.status() {
++            reqwest::StatusCode::OK => {
++                let v: serde_json::Value = res
++                    .json()
++                    .map_err(|source| Error::Reqwest { source })?;
++                v.get("id")
++                    .or_else(|| v.get("Id"))
++                    .and_then(|i| i.as_str())
++                    .map(std::string::ToString::to_string)
++                    .ok_or(Error::RequestFailed { status: 200 })
++            }
++            reqwest::StatusCode::UNAUTHORIZED => {
++                Err(Error::RequestUnauthorized)
++            }
++            _ => Err(Error::RequestFailed {
++                status: res.status().as_u16(),
++            }),
++        }
++    }
++
+     fn api_url(&self, path: &str) -> String {
+         format!("{}{}", self.base_url, path)
+     }
