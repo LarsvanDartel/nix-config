@@ -305,11 +305,6 @@ in {
                 journalctl_filter = ["_SYSTEMD_UNIT=sshd.service"];
                 labels.type = "syslog";
               }
-              {
-                source = "journalctl";
-                journalctl_filter = ["_TRANSPORT=kernel"];
-                labels.type = "syslog";
-              }
             ];
 
             config.api = {
