@@ -229,11 +229,6 @@ in {
 
           users = [
             {
-              name = "Admin";
-              password = "123";
-              policy.isAdministrator = true;
-            }
-            {
               name = "lvdar@lvdar.nl";
               passwordFile = config.sops.secrets."keys/jellyfin/lvdar-password".path;
               policy.isAdministrator = true;
