@@ -221,6 +221,55 @@ in {
                     }
                   ];
                 }
+                {
+                  name = "crowdsec";
+                  rules = [
+                    {
+                      alert = "CrowdsecDown";
+                      expr = "up{job=\"crowdsec\"} == 0";
+                      for = "5m";
+                      labels.severity = "critical";
+                      annotations = {
+                        summary = "crowdsec on {{ $labels.instance }} is not answering";
+                        description = "On the LAPI host netbird-proxy fails closed: every published service, and comin, gets 403 (2026-08-29).";
+                      };
+                    }
+                    {
+                      # Covers a LAPI that runs but refuses a bouncer (a wiped
+                      # database invalidating netbird-proxy's key, say).
+                      alert = "CrowdsecBouncerSilent";
+                      expr = "sum by (instance, bouncer) (rate(cs_lapi_bouncer_requests_total[10m])) == 0";
+                      for = "5m";
+                      labels.severity = "critical";
+                      annotations = {
+                        summary = "{{ $labels.bouncer }} stopped polling the crowdsec LAPI";
+                        description = "No decision pulls for 15 minutes; netbird-proxy fails closed, the firewall bouncer stops enforcing.";
+                      };
+                    }
+                    {
+                      alert = "CrowdsecAgentSilent";
+                      expr = "time() - cs_machines_last_heartbeat_timestamp > 300";
+                      for = "5m";
+                      labels.severity = "warning";
+                      annotations = {
+                        summary = "crowdsec agent {{ $labels.machine }} lost the LAPI";
+                        description = "Last heartbeat {{ $value | humanizeDuration }} ago. A decommissioned agent keeps its registration: `cscli machines delete` it on the LAPI host.";
+                      };
+                    }
+                    {
+                      # File sources only: sshd and kernel journals legitimately
+                      # go quiet for hours.
+                      alert = "CrowdsecNotReading";
+                      expr = "sum by (instance, source) (rate(cs_filesource_hits_total[2h])) == 0";
+                      for = "1h";
+                      labels.severity = "warning";
+                      annotations = {
+                        summary = "crowdsec on {{ $labels.instance }} stopped reading {{ $labels.source }}";
+                        description = "No lines for 3 hours: rotated away, wrong path, or lost permission.";
+                      };
+                    }
+                  ];
+                }
               ];
             })
           ];
