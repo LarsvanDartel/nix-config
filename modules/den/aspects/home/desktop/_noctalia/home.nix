@@ -31,7 +31,7 @@ in {
         concave_edge_corners = false;
         margin_ends = 0;
         margin_edge = 0;
-        padding = 2;
+        padding = 10;
         # No capsules: the gap alone separates widgets.
         widget_spacing = 16;
         shadow = false;
