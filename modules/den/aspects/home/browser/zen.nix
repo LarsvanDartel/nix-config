@@ -12,6 +12,7 @@
 
   den.aspects.home.zen.homeManager = {
     inputs,
+    lib,
     pkgs,
     ...
   }: {
@@ -98,6 +99,10 @@
           "devtools.debugger.remote-enabled" = true;
           "toolkit.legacyUserProfileCustomizations.stylesheets" = true;
           "network.trr.mode" = 5;
+
+          # Not stylix's Cozette: pages size code text themselves (GitHub's 12px…),
+          # and Gecko ignores the fontconfig rule that keeps Cozette on its 13px grid.
+          "font.name.monospace.x-western" = lib.mkForce "DejaVu Sans Mono";
         };
 
         search.force = true;
