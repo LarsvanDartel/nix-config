@@ -7,9 +7,8 @@
   ...
 }: let
   fonts = config.cosmos.desktops.common.styling.fonts;
-  # Not stylix's sansSerif: mixing in DejaVu made the shell look off. The vector cut,
-  # which the fontconfig pixel-grid rule (_styling/fonts/fontconfig) snaps to 13px multiples.
-  font = fonts.pkgs."Cozette Vector";
+  # Not stylix's sansSerif: mixing in DejaVu made the shell look off.
+  font = fonts.interface;
   opacity = config.stylix.opacity;
   wallpapers = config.cosmos.desktops.wallpapers;
 in {
@@ -33,11 +32,9 @@ in {
         margin_ends = 0;
         margin_edge = 0;
         padding = 2;
-        widget_spacing = 6;
+        # No capsules: the gap alone separates widgets.
+        widget_spacing = 16;
         shadow = false;
-        capsule = true;
-        # surface_variant barely separates from the bar; outline is the next Nord shade up.
-        capsule_fill = "outline";
         start = ["workspaces" "active_window" "media" "privacy"];
         center = ["clock"];
         end = [

@@ -36,6 +36,11 @@
         default = null;
         description = "Pixel size a pixel font is drawn on; it is only crisp at multiples of it.";
       };
+      boldFamily = mkOption {
+        type = nullOr str;
+        default = null;
+        description = "Family holding the bold cut, when it is not a weight of this family; bold is redirected there instead of synthesized.";
+      };
       fallbackFonts = mkOption {
         type = listOf str;
         default = [];

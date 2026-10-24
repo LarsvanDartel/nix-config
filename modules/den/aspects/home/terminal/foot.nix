@@ -22,17 +22,26 @@
         settings.main = let
           monospace = config.cosmos.desktops.common.styling.fonts.monospace;
           font = monospace.name;
-          # A pixel font in points (9pt is 12px at 96 dpi) gets a rescaled, blurry strike.
+          # A pixel font in points (9pt is 12px at 96 dpi) is drawn off its grid.
           size =
             if monospace.pixelGrid != null
             then "pixelsize=${toString monospace.pixelGrid}"
             else "size=${toString monospace.recommendedSize}";
-        in {
-          font = mkForce "${font}:style=Regular:${size}";
-          font-bold = mkForce "${font}:style=Bold:${size}";
-          font-italic = mkForce "${font}:style=Italic:${size}";
-          font-bold-italic = mkForce "${font}:style=Bold Italic:${size}";
-        };
+          bold =
+            if monospace.boldFamily != null
+            then "${monospace.boldFamily}:${size}"
+            else "${font}:style=Bold:${size}";
+        in
+          {
+            font = mkForce "${font}:${size}";
+            font-bold = mkForce bold;
+            font-italic = mkForce "${font}:style=Italic:${size}";
+            font-bold-italic = mkForce "${font}:style=Bold Italic:${size}";
+          }
+          # Zoom (ctrl +/-) a whole grid step at a time instead of 0.5pt.
+          // lib.optionalAttrs (monospace.pixelGrid != null) {
+            font-size-adjustment = "${toString monospace.pixelGrid}px";
+          };
       };
     };
   };
