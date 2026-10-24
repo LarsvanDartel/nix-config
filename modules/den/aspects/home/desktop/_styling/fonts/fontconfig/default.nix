@@ -20,12 +20,30 @@
     </alias>
   '';
 
-  configContent = concatStrings (
-    map (
-      font: aliasConfig config.cosmos.desktops.common.styling.fonts.pkgs.${font}
-    )
-    config.cosmos.desktops.common.styling.fonts.installed
-  );
+  installedFonts = map (font: config.cosmos.desktops.common.styling.fonts.pkgs.${font}) config.cosmos.desktops.common.styling.fonts.installed;
+
+  configContent = concatStrings (map aliasConfig installedFonts);
+
+  # A pixel font is only crisp at multiples of its grid: round every requested pixel
+  # size down to one (at least one grid). Pango sizes the layout from the edited
+  # pattern, so measurement and rendering both see the snapped size.
+  pixelGridConfig = font: let
+    grid = "<double>${toString font.pixelGrid}</double>";
+  in ''
+    <match target="pattern">
+      <test name="family" qual="any"><string>${font.name}</string></test>
+      <test name="pixelsize" compare="less">${grid}</test>
+      <edit name="pixelsize" mode="assign">${grid}</edit>
+    </match>
+    <match target="pattern">
+      <test name="family" qual="any"><string>${font.name}</string></test>
+      <edit name="pixelsize" mode="assign">
+        <times><floor><divide><name>pixelsize</name>${grid}</divide></floor>${grid}</times>
+      </edit>
+    </match>
+  '';
+
+  pixelGridContent = concatStrings (map pixelGridConfig (builtins.filter (font: font.pixelGrid != null) installedFonts));
 in {
   options.cosmos.desktops.common.styling.fonts.fontconfig = {
     enable = mkEnableOption "fontconfig";
@@ -55,5 +73,13 @@ in {
         </fontconfig>
       '';
     };
+
+    home.file.".config/fontconfig/conf.d/30-pixel-grid.conf".text = ''
+      <?xml version='1.0'?>
+      <!DOCTYPE fontconfig SYSTEM 'urn:fontconfig:fonts.dtd'>
+      <fontconfig>
+      ${pixelGridContent}
+      </fontconfig>
+    '';
   };
 }

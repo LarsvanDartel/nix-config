@@ -31,6 +31,11 @@
         default = null;
         description = "Recommended size for displaying this font.";
       };
+      pixelGrid = mkOption {
+        type = nullOr int;
+        default = null;
+        description = "Pixel size a pixel font is drawn on; it is only crisp at multiples of it.";
+      };
       fallbackFonts = mkOption {
         type = listOf str;
         default = [];

@@ -6,9 +6,9 @@
     pkgs,
     ...
   }: let
-    # `runuser -l` resets the environment and udev has none to begin with;
-    # noctalia's IPC needs these three, so lift them from a user process with
-    # a Wayland display open.
+    # `runuser -l` resets the environment and udev has none to begin with; lift
+    # the session's display, runtime dir and bus from a user process with a
+    # Wayland display open (noctalia's IPC socket is named after WAYLAND_DISPLAY).
     lockScript = pkgs.writeShellScript "yubikey-lock" ''
       user=${config.cosmos.user.name}
       uid=$(${pkgs.coreutils}/bin/id -u "$user")
