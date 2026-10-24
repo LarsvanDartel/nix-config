@@ -65,6 +65,10 @@
       url = "github:nix-community/nixvim";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+    noctalia-netbird = {
+      url = "git+https://knot.lvdar.nl/did:plc:cqv2kfof3l53jrrzj553e6fb?shallow=1";
+      flake = false;
+    };
     nur = {
       url = "github:nix-community/NUR";
       inputs.nixpkgs.follows = "nixpkgs";

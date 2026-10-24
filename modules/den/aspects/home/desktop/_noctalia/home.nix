@@ -1,317 +1,181 @@
-# The noctalia home config, as a plain home-manager module factory: also imported
-# by voyager's `specialisation.niri`, which cannot `include` a den aspect.
+# The noctalia v5 home config (home-manager's `programs.noctalia`), as a plain
+# home-manager module factory: also imported by voyager's `specialisation.niri`,
+# which cannot `include` a den aspect.
 {inputs}: {
   config,
   lib,
-  pkgs,
   ...
 }: let
-  inherit (lib.options) mkOption mkEnableOption;
-  inherit (lib.types) enum bool;
-
-  cfg = config.cosmos.desktops.noctalia;
   fonts = config.cosmos.desktops.common.styling.fonts;
-
-  # stylix's noctalia-shell target never fires (gated on `options.programs ?
-  # noctalia-shell`; this is a wrapped package), so values are threaded by hand.
+  # Not stylix's sansSerif: mixing in DejaVu made the shell look off. The vector cut,
+  # which the fontconfig pixel-grid rule (_styling/fonts/fontconfig) snaps to 13px multiples.
+  font = fonts.pkgs."Cozette Vector";
   opacity = config.stylix.opacity;
   wallpapers = config.cosmos.desktops.wallpapers;
+in {
+  imports = [(import ./plugins.nix {inherit inputs;})];
 
-  widget = id: {inherit id;};
-
-  pluginWidget = id: {id = "plugin:${id}";};
-
-  valueWidget = id: {
-    inherit id;
-    displayMode = "alwaysShow";
-  };
-
-  noctalia = inputs.nix-wrapper-modules.wrappers.noctalia-shell.wrap {
-    inherit pkgs;
-
-    # No `outOfStoreConfig`: nix is authoritative, so the settings panel can no
-    # longer save — change settings here, not in the GUI.
-
+  # Colours, theme mode and popup opacity come from stylix's `noctalia` target.
+  programs.noctalia = {
+    enable = true;
+    systemd.enable = true;
     settings = {
-      bar = {
-        barType = "simple";
-        inherit (cfg.bar) position density;
-
-        showCapsule = false;
-        showOutline = false;
-        backgroundOpacity = opacity.desktop;
-        marginVertical = 0;
-        marginHorizontal = 0;
-        frameRadius = 0;
-        frameThickness = 0;
-        outerCorners = false;
-        widgetSpacing = 8;
-        contentPadding = 2;
-        displayMode = "always_visible";
-        enableExclusionZoneInset = true;
-        rightClickAction = "controlCenter";
-
-        widgets = {
-          left =
-            map widget ["Workspace" "ActiveWindow"]
-            ++ [
-              (widget "MediaMini")
-              # Only draws while the mic, camera or a screencast is live.
-              (pluginWidget "privacy-indicator")
-            ];
-          center = map widget ["Clock"];
-          right =
-            map valueWidget ["Volume" "Brightness"]
-            ++ map widget ["Network" "Bluetooth"]
-            ++ [
-              # Replaces kdeconnect-indicator's tray icon, off in plugins.nix.
-              (pluginWidget "kde-connect")
-              (pluginWidget "protonvpn")
-              (pluginWidget "netbird")
-              (pluginWidget "thinkpad-fan")
-            ]
-            # `hideIfNotDetected` relies on UPower seeing the battery (desktop.power).
-            ++ [
-              {
-                id = "Battery";
-                displayMode = "icon-always";
-                hideIfNotDetected = false;
-              }
-            ]
-            ++ [
-              {
-                id = "Tray";
-                # Two rules: noctalia matches the tooltip title when present, else the
-                # item id. The applet keeps running — it is also the pairing agent.
-                blacklist = ["blueman" "Bluetooth*"];
-              }
-            ]
-            ++ map widget ["NotificationHistory" "ControlCenter"];
-          # battery-monitor-plus and model-usage have bar widgets but no slot —
-          # add `plugin:<id>` here to surface them.
-        };
-      };
-
-      # FIVE PER SIDE max: ShortcutsCard doesn't wrap, a sixth renders outside
-      # the card. Plugins need a `controlCenterWidget` entry point to show here.
-      controlCenter.shortcuts = {
-        left =
-          map widget ["Network" "Bluetooth" "WallpaperSelector" "NoctaliaPerformance"]
-          ++ [(pluginWidget "screen-toolkit")];
-        right =
-          # No DND slot: kde-connect's control-centre widget is the only way to
-          # reach it with the phone off the network. DND stays on IPC `toggleDND`.
-          map widget ["PowerProfile" "KeepAwake" "NightLight"]
-          ++ [
-            (pluginWidget "kde-connect")
-            (pluginWidget "plugin-manager")
-          ];
-      };
-
-      dock.enabled = false;
-
-      colorSchemes = {
-        predefinedScheme = "Nord";
-        darkMode = true;
-        useWallpaperColors = false;
-      };
-
-      # Blur via `ext-background-effect` (niri 26.04 implements it); notifications,
-      # OSDs and toasts stay unblurred (see _niri/system.nix).
-      general = {
-        enableShadows = false;
-        enableBlurBehind = true;
-        showScreenCorners = false;
-        showChangelogOnStartup = false;
-
-        # Without `allowPasswordWithFprintd` a failed/absent finger locks out typing.
-        autoStartAuth = true;
-        allowPasswordWithFprintd = true;
-        enableLockScreenMediaControls = true;
-        enableLockScreenCountdown = false;
-        showSessionButtonsOnLockScreen = true;
-        showHibernateOnLockScreen = true;
-        lockScreenAnimations = false;
-        lockOnSuspend = true;
-      };
-
-      ui = {
-        # Not stylix's sansSerif: mixing in DejaVu made the shell look off.
-        fontDefault = fonts.interface.name;
-        fontFixed = fonts.monospace.name;
-        panelBackgroundOpacity = opacity.desktop;
-        # Only the panel *background* is translucent; stacking a second level
-        # turns frosted glass into an unreadable smear.
-        translucentWidgets = false;
-      };
-
-      appLauncher = {
-        enableClipboardHistory = cfg.widgets.clipboardHistory;
-        terminalCommand = "${config.cosmos.cli.terminals.defaultStandalone} -e";
-        viewMode = "list";
-        density = "compact";
-        position = "center";
-        showCategories = false;
-        showIconBackground = false;
-        sortByMostUsed = true;
-      };
-
-      sessionMenu = {
-        enableCountdown = false;
-        showKeybinds = true;
-        showHeader = false;
-        position = "center";
-        powerOptions = [
-          {
-            action = "lock";
-            enabled = true;
-            keybind = "L";
-          }
-          {
-            action = "suspend";
-            enabled = true;
-            keybind = "S";
-          }
-          {
-            action = "hibernate";
-            enabled = true;
-            keybind = "H";
-          }
-          {
-            action = "reboot";
-            enabled = true;
-            keybind = "R";
-          }
-          {
-            action = "logout";
-            enabled = true;
-            keybind = "E";
-          }
-          {
-            action = "shutdown";
-            enabled = true;
-            keybind = "P";
-          }
-          {
-            action = "rebootToUefi";
-            enabled = true;
-            keybind = "U";
-          }
+      bar.default = {
+        position = "top";
+        thickness = 25;
+        background_opacity = opacity.desktop;
+        radius = 0;
+        radius_top_left = 0;
+        radius_top_right = 0;
+        radius_bottom_left = 0;
+        radius_bottom_right = 0;
+        concave_edge_corners = false;
+        margin_ends = 0;
+        margin_edge = 0;
+        padding = 2;
+        widget_spacing = 6;
+        shadow = false;
+        capsule = true;
+        # surface_variant barely separates from the bar; outline is the next Nord shade up.
+        capsule_fill = "outline";
+        start = ["workspaces" "active_window" "media" "privacy"];
+        center = ["clock"];
+        end = [
+          "volume"
+          "brightness"
+          "network"
+          "bluetooth"
+          "phone"
+          "netbird"
+          "fan"
+          "battery"
+          "tray"
+          "notifications"
+          "control-center"
         ];
       };
 
-      brightness.enableDdcSupport = cfg.widgets.externalBrightness;
-
-      nightLight = {
-        enabled = cfg.widgets.nightLight;
-        autoSchedule = true;
+      widget = {
+        clock.format = "{:%H:%M %a, %b %d}";
+        volume.show_label = true;
+        brightness.show_label = true;
+        battery = {
+          display_mode = "glyph";
+          show_label = true;
+          label_content = "percent";
+        };
+        # Only draws while the mic, camera or a screencast is live.
+        privacy.hide_inactive = true;
+        workspaces = {
+          # stylix's Nord secondary is purple; tertiary is the cyan v4's Nord scheme used.
+          occupied_color = "tertiary";
+          empty_color = "tertiary";
+          labels_only_when_occupied = true;
+        };
+        # The applet keeps running: it is also the pairing agent.
+        tray.hidden = ["blueman"];
+        phone.type = "icefish/phone-connect:bar";
+        netbird.type = "lvdar/netbird:status";
+        fan.type = "piero-93/thinkpad-fan:widget";
       };
 
-      idle.enabled = cfg.widgets.idleInhibitor;
+      # Six at most. No DND tile: DND stays on the notifications widget's right-click.
+      control_center.shortcuts = map (type: {inherit type;}) [
+        "wifi"
+        "bluetooth"
+        "power_profile"
+        "caffeine"
+        "nightlight"
+        "icefish/phone-connect:tile"
+      ];
 
-      notifications = {
-        enabled = cfg.notifications.enable;
-        backgroundOpacity = opacity.popups;
+      shell = {
+        font_family = lib.mkForce font.name;
+        setup_wizard_enabled = false;
+        polkit_agent = true;
+        niri_overview_type_to_launch_enabled = true;
+        launcher = {
+          compact = true;
+          categories = false;
+        };
+        panel = {
+          transparency_mode = "soft";
+          session_placement = "floating";
+          session_position = "center";
+          # Volume, brightness, network and bluetooth open the control centre under the click.
+          open_near_click_control_center = true;
+        };
+        session = {
+          show_shortcuts = true;
+          # 5.3.0 has no hibernate or reboot-to-firmware action.
+          actions = [
+            {
+              action = "lock";
+              shortcut = "l";
+            }
+            {
+              action = "suspend";
+              shortcut = "s";
+            }
+            {
+              action = "command";
+              label = "Hibernate";
+              glyph = "hibernate";
+              command = "systemctl hibernate";
+              shortcut = "h";
+            }
+            {
+              action = "reboot";
+              shortcut = "r";
+            }
+            {
+              action = "logout";
+              shortcut = "e";
+            }
+            {
+              action = "shutdown";
+              shortcut = "p";
+              variant = "destructive";
+            }
+            {
+              action = "command";
+              label = "Reboot to UEFI";
+              glyph = "cpu";
+              command = "systemctl reboot --firmware-setup";
+              shortcut = "u";
+            }
+          ];
+        };
       };
 
-      osd.backgroundOpacity = opacity.popups;
-
-      wallpaper.directory = wallpapers.directory;
-
+      audio.enable_sounds = false;
+      osd.position = "top_right";
+      nightlight.enabled = true;
       location = {
-        name = "Eindhoven";
-        autoLocate = false;
+        address = "Eindhoven";
+        auto_locate = false;
+      };
+
+      wallpaper = {
+        directory = wallpapers.directory;
+        # Inside `directory`, so the picker shows it selected; stylix's image is a themed store copy.
+        default.path = lib.mkForce wallpapers.defaultWallpaper;
       };
     };
   };
 
-  # The wallpaper is runtime state in noctalia's cache; settings.json can't set a default.
-  wallpaperCache = builtins.toJSON {
-    wallpapers = {};
-    usedRandomWallpapers = {};
-    defaultWallpaper = wallpapers.defaultWallpaper;
-  };
-in {
-  imports = [(import ./plugins.nix {})];
-
-  options.cosmos.desktops.noctalia = {
-    bar = {
-      enable = mkEnableOption "the noctalia bar" // {default = true;};
-      position = mkOption {
-        type = enum ["top" "bottom" "left" "right"];
-        default = "top";
-        description = "Screen edge the bar is docked to.";
-      };
-      density = mkOption {
-        type = enum ["compact" "default" "comfortable"];
-        default = "compact";
-        description = "Bar height / padding.";
-      };
-    };
-
-    launcher.enable = mkEnableOption "noctalia's application launcher" // {default = true;};
-    notifications.enable = mkEnableOption "noctalia's notification daemon" // {default = true;};
-    lock.enable = mkEnableOption "noctalia's lock screen" // {default = true;};
-
-    widgets = {
-      clipboardHistory = mkOption {
-        type = bool;
-        default = true;
-        description = "Clipboard history in the launcher (via cliphist).";
-      };
-      nightLight = mkOption {
-        type = bool;
-        default = true;
-        description = "Scheduled colour-temperature shift (via wlsunset).";
-      };
-      externalBrightness = mkOption {
-        type = bool;
-        default = true;
-        description = "DDC/CI control of external monitor brightness (via ddcutil).";
-      };
-      idleInhibitor = mkOption {
-        type = bool;
-        default = true;
-        description = "Idle/suspend management and the keep-awake toggle.";
-      };
-    };
+  systemd.user.services.noctalia.Service = {
+    Slice = "session.slice";
+    RestartSec = 2;
+    # The launcher and plugins open terminals via $TERMINAL (binary only, no -e).
+    Environment = ["TERMINAL=${config.cosmos.cli.terminals.defaultStandalone}"];
   };
 
-  config = {
-    home.packages =
-      [noctalia]
-      ++ lib.optional cfg.widgets.clipboardHistory pkgs.cliphist;
+  cosmos.system.impermanence.persist.directories = [".local/state/noctalia"];
 
-    cosmos.system.impermanence.persist.directories = [
-      ".config/noctalia"
-      # Holds the picked wallpaper; losing it resets the background.
-      ".cache/noctalia"
-    ];
-
-    home.activation.noctaliaDefaultWallpaper = lib.hm.dag.entryAfter ["writeBoundary"] ''
-      _cache=${lib.escapeShellArg "${config.xdg.cacheHome}/noctalia"}
-      if [ ! -e "$_cache/wallpapers.json" ]; then
-        run mkdir -p "$_cache"
-        run cp ${pkgs.writeText "noctalia-wallpapers.json" wallpaperCache} "$_cache/wallpapers.json"
-        run chmod u+w "$_cache/wallpapers.json"
-      fi
-    '';
-
-    systemd.user.services.noctalia = {
-      Unit = {
-        Description = "noctalia shell";
-        PartOf = ["graphical-session.target"];
-        After = ["graphical-session.target"];
-      };
-      Service = {
-        ExecStart = lib.getExe noctalia;
-        # Deterministic PAM stack: `login` is where services.fprintd wires pam_fprintd.
-        Environment = ["NOCTALIA_PAM_SERVICE=login"];
-        Restart = "on-failure";
-        RestartSec = 2;
-        Slice = "session.slice";
-      };
-      Install.WantedBy = ["graphical-session.target"];
-    };
-  };
+  # GUI and IPC changes go to settings.toml, which overrides config.toml. Dropping it
+  # on every activation (switch and boot) keeps nix authoritative.
+  home.activation.noctaliaResetOverrides = lib.hm.dag.entryAfter ["writeBoundary"] ''
+    run rm -f ${lib.escapeShellArg "${config.xdg.stateHome}/noctalia/settings.toml"}
+  '';
 }

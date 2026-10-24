@@ -9,7 +9,7 @@
   colors = config.lib.stylix.colors.withHashtag;
 
   # Resolved from PATH so the compositor isn't coupled to user-scoped noctalia.
-  noctalia = target: action: "noctalia-shell ipc call ${target} ${action}";
+  noctalia = cmd: "noctalia msg ${cmd}";
 
   # No foot server runs under niri, so use the standalone binary.
   terminal = "foot";
@@ -141,6 +141,9 @@
 
       environment.NIXOS_OZONE_WL = "1";
 
+      # noctalia needs it for notification actions to raise windows.
+      debug.honor-xdg-activation-with-invalid-serial = _: {};
+
       binds =
         {
           "Mod+Shift+Q".quit = _: {};
@@ -178,16 +181,16 @@
           # default-column-display is "tabbed"; this is how a column gets split.
           "Mod+W".toggle-column-tabbed-display = _: {};
 
-          "Mod+Escape".spawn-sh = noctalia "sessionMenu" "toggle";
-          "Mod+Shift+Escape".spawn-sh = noctalia "lockScreen" "lock";
+          "Mod+Escape".spawn-sh = noctalia "panel-toggle session";
+          "Mod+Shift+Escape".spawn-sh = noctalia "session lock";
 
           # keyd delivers the tap unmodified, so only the bare form can match.
-          ${modTap}.spawn-sh = noctalia "controlCenter" "toggle";
+          ${modTap}.spawn-sh = noctalia "panel-toggle control-center";
 
           "Mod+Shift+Return".spawn = terminal;
-          "Mod+Tab".spawn-sh = noctalia "launcher" "toggle";
+          "Mod+Tab".spawn-sh = noctalia "panel-toggle launcher";
           "Alt+Tab".toggle-overview = _: {};
-          "Mod+V".spawn-sh = noctalia "launcher" "toggle"; # clipboard lives in the launcher
+          "Mod+V".spawn-sh = noctalia "panel-toggle clipboard";
           "Mod+S".screenshot = _: {};
           "Mod+Shift+S".screenshot-window = _: {};
 
@@ -205,12 +208,11 @@
           "Mod+O".toggle-overview = _: {};
           "Mod+Shift+Slash".show-hotkey-overlay = _: {};
 
-          # Plugin IPC targets are namespaced `plugin:<id>`.
-          "Mod+Slash".spawn-sh = noctalia "plugin:keybind-cheatsheet" "toggle";
-          "Mod+P".spawn-sh = noctalia "plugin:display-settings" "toggle";
-          "Mod+Shift+P".spawn-sh = noctalia "plugin:screen-toolkit" "colorPicker";
-          # battery-threshold has no controlCenterWidget, so no control-centre slot.
-          "Mod+Shift+B".spawn-sh = noctalia "plugin:battery-threshold" "togglePanel";
+          # Plugin panels are addressed `<author>/<plugin>:<entry>`.
+          "Mod+Slash".spawn-sh = noctalia "panel-toggle kenn/keybind-cheatsheet:cheatsheet";
+          "Mod+P".spawn-sh = noctalia "panel-toggle raycursive/niri-displays:panel";
+          "Mod+Shift+P".spawn-sh = noctalia "plugin alexander/screen-toolkit:service all colorPicker";
+          "Mod+Shift+B".spawn-sh = noctalia "panel-toggle damian-ds7/battery-threshold:panel";
 
           "XF86MonBrightnessUp" = locked {spawn = ["brightnessctl" "set" "+5%"];};
           "XF86MonBrightnessDown" = locked {spawn = ["brightnessctl" "set" "5%-"];};
@@ -264,21 +266,20 @@
             inactive-color = "${colors.base08}80";
           };
         }
+        # noctalia's settings window.
+        {
+          matches = [{app-id = "^dev\\.noctalia\\.Noctalia$";}];
+          open-floating = true;
+        }
       ];
 
       # noctalia's popups aren't windows, so window rules don't see them.
       layer-rules = [
         # Blocking Signal's window does not cover noctalia-drawn previews.
         {
-          matches = [
-            {namespace = "^noctalia-notifications-";}
-            {namespace = "^noctalia-toast-";}
-          ];
+          matches = [{namespace = "^noctalia-notification$";}];
           block-out-from = "screencast";
         }
-        # Deliberately NO layer-rule blur (tried, reverted): noctalia's popups
-        # are padded larger than the card, so whole-surface blur draws a big
-        # box around every notification. Fix belongs in noctalia (blurRegion).
       ];
     };
   };
@@ -301,8 +302,7 @@ in {
     playerctl
   ];
 
-  # No polkit agent here: noctalia's polkit-agent plugin holds the
-  # registration and a second agent would race it.
+  # No polkit agent here: noctalia's built-in agent (`shell.polkit_agent`) holds the registration.
 
   cosmos.profiles.desktop.addons.greetd.sessions = [
     {
@@ -312,5 +312,5 @@ in {
   ];
 
   # Not gated like hyprland.nix: this module is only loaded when niri is active.
-  cosmos.profiles.desktop.lockCommand = noctalia "lockScreen" "lock";
+  cosmos.profiles.desktop.lockCommand = noctalia "session lock";
 }

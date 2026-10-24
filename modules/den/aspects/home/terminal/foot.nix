@@ -20,13 +20,18 @@
       programs.foot = {
         enable = true;
         settings.main = let
-          font = config.cosmos.desktops.common.styling.fonts.monospace.name;
-          size = toString config.cosmos.desktops.common.styling.fonts.monospace.recommendedSize;
+          monospace = config.cosmos.desktops.common.styling.fonts.monospace;
+          font = monospace.name;
+          # A pixel font in points (9pt is 12px at 96 dpi) gets a rescaled, blurry strike.
+          size =
+            if monospace.pixelGrid != null
+            then "pixelsize=${toString monospace.pixelGrid}"
+            else "size=${toString monospace.recommendedSize}";
         in {
-          font = mkForce "${font}:style=Regular:size=${size}";
-          font-bold = mkForce "${font}:style=Bold:size=${size}";
-          font-italic = mkForce "${font}:style=Italic:size=${size}";
-          font-bold-italic = mkForce "${font}:style=Bold Italic:size=${size}";
+          font = mkForce "${font}:style=Regular:${size}";
+          font-bold = mkForce "${font}:style=Bold:${size}";
+          font-italic = mkForce "${font}:style=Italic:${size}";
+          font-bold-italic = mkForce "${font}:style=Bold Italic:${size}";
         };
       };
     };

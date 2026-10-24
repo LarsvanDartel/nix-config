@@ -123,8 +123,8 @@
       # and exited 0, so a unit that could not find either binary still looked
       # perfectly healthy in `systemctl --user status` and left nothing in the
       # journal to explain a background that never changed.
-      if command -v noctalia-shell >/dev/null 2>&1 &&
-         noctalia-shell ipc call wallpaper set "$path" all >/dev/null 2>&1; then
+      if command -v noctalia >/dev/null 2>&1 &&
+         noctalia msg wallpaper-set "$path" >/dev/null 2>&1; then
         echo "set $pick via noctalia"
         exit 0
       fi

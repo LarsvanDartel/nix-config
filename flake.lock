@@ -1471,6 +1471,23 @@
         "type": "github"
       }
     },
+    "noctalia-netbird": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1792842067,
+        "narHash": "sha256-SgqsSjpznZxfG9oC3+o6wlUgrhuXGXhPMwiqy4brkmE=",
+        "ref": "refs/heads/main",
+        "rev": "392236fffea7db851cabb6627f56846d049b3902",
+        "shallow": true,
+        "type": "git",
+        "url": "https://knot.lvdar.nl/did:plc:cqv2kfof3l53jrrzj553e6fb"
+      },
+      "original": {
+        "shallow": true,
+        "type": "git",
+        "url": "https://knot.lvdar.nl/did:plc:cqv2kfof3l53jrrzj553e6fb"
+      }
+    },
     "nur": {
       "inputs": {
         "flake-parts": "flake-parts_4",
@@ -1587,6 +1604,7 @@
         "nixpkgs-unstable": "nixpkgs-unstable",
         "nixpkgs-zotero-pin": "nixpkgs-zotero-pin",
         "nixvim": "nixvim",
+        "noctalia-netbird": "noctalia-netbird",
         "nur": "nur",
         "omp": "omp",
         "pre-commit-hooks": "pre-commit-hooks",

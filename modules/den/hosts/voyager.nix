@@ -56,7 +56,6 @@
         home.orca-slicer
         home.simplelogin
         home.rbw
-        home.proton.vpn-cli
       ];
 
       homeManager = {pkgs, ...}: {
