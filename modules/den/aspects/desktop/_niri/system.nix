@@ -191,6 +191,8 @@
           "Mod+Tab".spawn-sh = noctalia "panel-toggle launcher";
           "Alt+Tab".toggle-overview = _: {};
           "Mod+V".spawn-sh = noctalia "panel-toggle clipboard";
+          # Launcher pre-filled with rbw-launcher's prefix; the space leaves the cursor at the search term.
+          "Mod+B".spawn-sh = noctalia "panel-toggle launcher '/rbw '";
           "Mod+S".screenshot = _: {};
           "Mod+Shift+S".screenshot-window = _: {};
 
