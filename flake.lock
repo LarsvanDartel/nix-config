@@ -1474,10 +1474,10 @@
     "noctalia-netbird": {
       "flake": false,
       "locked": {
-        "lastModified": 1792842067,
-        "narHash": "sha256-SgqsSjpznZxfG9oC3+o6wlUgrhuXGXhPMwiqy4brkmE=",
+        "lastModified": 1792844497,
+        "narHash": "sha256-GQawj4XtjL5rh39DC/G1wJE8LOn7HfITRBe2aWNBi6Q=",
         "ref": "refs/heads/main",
-        "rev": "392236fffea7db851cabb6627f56846d049b3902",
+        "rev": "a5f8ce3a8948e7f4de45919c1e4f0cdcfcdd4661",
         "shallow": true,
         "type": "git",
         "url": "https://knot.lvdar.nl/did:plc:cqv2kfof3l53jrrzj553e6fb"

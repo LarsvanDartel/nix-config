@@ -43,7 +43,20 @@
     </match>
   '';
 
-  pixelGridContent = concatStrings (map pixelGridConfig (builtins.filter (font: font.pixelGrid != null) installedFonts));
+  # A bold cut in its own family is never picked for a bold request, so fontconfig
+  # smears the regular one (embolden). Point bold at that family, at the weight it has.
+  boldFamilyConfig = font: ''
+    <match target="pattern">
+      <test name="family" qual="any"><string>${font.name}</string></test>
+      <test name="weight" compare="more_eq"><const>bold</const></test>
+      <edit name="family" mode="prepend" binding="strong"><string>${font.boldFamily}</string></edit>
+      <edit name="weight" mode="assign"><const>medium</const></edit>
+    </match>
+  '';
+
+  pixelFontContent =
+    concatStrings (map pixelGridConfig (builtins.filter (font: font.pixelGrid != null) installedFonts))
+    + concatStrings (map boldFamilyConfig (builtins.filter (font: font.boldFamily != null) installedFonts));
 in {
   options.cosmos.desktops.common.styling.fonts.fontconfig = {
     enable = mkEnableOption "fontconfig";
@@ -74,11 +87,11 @@ in {
       '';
     };
 
-    home.file.".config/fontconfig/conf.d/30-pixel-grid.conf".text = ''
+    home.file.".config/fontconfig/conf.d/30-pixel-fonts.conf".text = ''
       <?xml version='1.0'?>
       <!DOCTYPE fontconfig SYSTEM 'urn:fontconfig:fonts.dtd'>
       <fontconfig>
-      ${pixelGridContent}
+      ${pixelFontContent}
       </fontconfig>
     '';
   };

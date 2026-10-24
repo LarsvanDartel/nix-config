@@ -14,9 +14,10 @@
 
         serif = fontpkgs."DejaVu Serif";
         sansSerif = fontpkgs."DejaVu Sans";
-        monospace = fontpkgs."Cozette";
+        # The vector cut: identical at 13px, and still crisp at 26, 39… when zoomed.
+        monospace = fontpkgs."Cozette Vector";
         emoji = fontpkgs."Noto Color Emoji";
-        interface = fontpkgs."Cozette";
+        interface = fontpkgs."Cozette Vector";
         extraFonts = [];
       };
 
