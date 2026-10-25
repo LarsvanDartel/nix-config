@@ -1,15 +1,14 @@
+# nvim lazygit — lazygit in a float on <leader>gg.
 {
-  programs.nixvim = {
-    plugins.lazygit = {
-      enable = true;
-    };
-
-    keymaps = [
-      {
-        mode = "n";
-        key = "<leader>gg";
-        action.__raw = ''function() vim.cmd("LazyGit") end'';
-      }
-    ];
+  plugins.lazygit = {
+    enable = true;
   };
+
+  keymaps = [
+    {
+      mode = "n";
+      key = "<leader>gg";
+      action.__raw = ''function() vim.cmd("LazyGit") end'';
+    }
+  ];
 }

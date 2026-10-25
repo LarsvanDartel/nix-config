@@ -1,13 +1,13 @@
+# nvim mcrl2 — mCRL2 syntax and its filetypes.
 {
   lib,
   config,
   pkgs,
   ...
 }: let
-  inherit (lib.options) mkEnableOption;
   inherit (lib.modules) mkIf;
 
-  cfg = config.cosmos.cli.programs.nvim.languages.mcrl2;
+  cfg = config.cosmos.nvim.languages.mcrl2;
 
   mcrl2-syntax = pkgs.vimUtils.buildVimPlugin {
     name = "mcrl2-syntax";
@@ -23,19 +23,14 @@
     '';
   };
 in {
-  options.cosmos.cli.programs.nvim.languages.mcrl2 = {
-    enable = mkEnableOption "mcrl2 language support nvim";
-  };
   config = mkIf cfg.enable {
-    programs.nixvim = {
-      extraPlugins = [mcrl2-syntax];
-      filetype.extension = {
-        bnf = "ebnf";
-        ebnf = "ebnf";
-        mcrl = "mcrl";
-        mcrl2 = "mcrl2";
-        mcf = "mcrl2";
-      };
+    extraPlugins = [mcrl2-syntax];
+    filetype.extension = {
+      bnf = "ebnf";
+      ebnf = "ebnf";
+      mcrl = "mcrl";
+      mcrl2 = "mcrl2";
+      mcf = "mcrl2";
     };
   };
 }

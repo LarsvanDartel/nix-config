@@ -1,13 +1,13 @@
+# nvim formal — vim-formal-package syntax and ProVerif filetypes.
 {
   lib,
   config,
   pkgs,
   ...
 }: let
-  inherit (lib.options) mkEnableOption;
   inherit (lib.modules) mkIf;
 
-  cfg = config.cosmos.cli.programs.nvim.languages.formal;
+  cfg = config.cosmos.nvim.languages.formal;
 
   vim-formal-package = pkgs.vimUtils.buildVimPlugin {
     name = "vim-formal-package";
@@ -25,16 +25,11 @@
     '';
   };
 in {
-  options.cosmos.cli.programs.nvim.languages.formal = {
-    enable = mkEnableOption "formal language support nvim";
-  };
   config = mkIf cfg.enable {
-    programs.nixvim = {
-      extraPlugins = [vim-formal-package];
-      filetype.extension = {
-        pv = "proverif";
-        pi = "proverif";
-      };
+    extraPlugins = [vim-formal-package];
+    filetype.extension = {
+      pv = "proverif";
+      pi = "proverif";
     };
   };
 }

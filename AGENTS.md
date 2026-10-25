@@ -65,7 +65,7 @@ push to main → knot (services.tangled on endeavour)
 | `docs/RESTORE.md` | Host-restore runbook — read its first section before you need it: the restic password and storage-box SSH key are themselves sops secrets, so they must exist outside the fleet |
 | `.tangled/` | Spindle CI workflow (`lint.yml`) + `nix-secrets-stub` used by build-gate/flake-bump/CI |
 
-**`_`-prefixed files/dirs are skipped by import-tree** — they hold plain modules/assets imported explicitly by the aspect that needs them (e.g. `aspects/home/editor/_nvim/` → `nvim.nix` does `homeManager.imports = [./_nvim]`). Recurring reason: specialisation bodies are plain NixOS modules that cannot `include` den aspects, so shared content lives in parameterized factories (e.g. `_niri/system.nix`) called from both the aspect and the specialisation.
+**`_`-prefixed files/dirs are skipped by import-tree** — they hold plain modules/assets imported explicitly by the aspect that needs them (e.g. `aspects/home/editor/_nvim/` → `nvim.nix` evaluates it as nixvim modules into the `nvim` package). Recurring reason: specialisation bodies are plain NixOS modules that cannot `include` den aspects, so shared content lives in parameterized factories (e.g. `_niri/system.nix`) called from both the aspect and the specialisation.
 
 ## Development Commands
 
@@ -78,6 +78,7 @@ nix build .#nixosConfigurations.<host>.config.system.build.toplevel   # build wi
 nh os switch                 # local voyager switch (also: nh os boot / nh os test)
 nix run github:serokell/deploy-rs .#<host>   # manual/out-of-band deploy (magic rollback)
 nix run .#update-blocklists  # refresh vendored unbound blocklists, then commit
+nix run .#tmux              # wrapped programs carry their own config: also .#yazi .#oh-my-posh .#nvim .#zathura .#foot
 
 sudo nix run nixpkgs#nixos-facter -- -o modules/den/hosts/_facter/<host>.facter.json   # on the host
 ```
@@ -107,6 +108,7 @@ sudo nix run nixpkgs#nixos-facter -- -o modules/den/hosts/_facter/<host>.facter.
 - **Priority discipline**: `mkDefault` for overridable defaults; `mkForce` only for real overrides — and **never at the top level of an aspect body combined with facter** (den unwraps priority wrappers to classify content → infinite recursion). Wrap such modules in an inner `imports = [({...}: {...})]`; see the comment in `modules/den/hosts/pioneer.nix`. Same trap family: avoid config reads in host aspect top level (see `gaia.nix`'s `facter.detected.graphics.enable` comment), and never call `hasAspect` inside a plain `includes =` list.
 - `mkForce` inside an `attrsOf` submodule doesn't do what you want for Hyprland's generated config; suppress bad output with `stylix.targets.<t>.disable` instead.
 - **homeManager modules** are plain HM modules that freely read `osConfig` (same host); `lib.hm.dag` for ordering.
+- **Wrapped programs** (tmux, yazi, oh-my-posh, zathura, foot via nix-wrapper-modules; nvim via nixvim's standalone builder): the aspect defines `mk<prog> = pkgs: …`, exports it as `perSystem.packages.<prog>` and has home-manager install the same wrapper built against the host's pkgs. The wrapper is the config's source of truth, so home-manager writes no config for it and stylix can't reach it: theme it from the `cosmosStyling` module arg (`desktop/styling.nix`: scheme, `colors pkgs`, opacity, fonts), which stylix reads too. Host-specific additions layer onto the wrapper (`.wrap`) from the existing `cosmos.*` HM options.
 - **Cross-host data**, three tools, cheapest first:
   1. **Host entity facts** (`den.hosts.<sys>.<name>.meshAddress`, `.server`, `.users`, names): plain data, readable from any host or flake module without evaluating that host. Used for mesh IPs, host lists, deploy-rs nodes, ssh config.
   2. **Quirks** (`den.quirks.<q>` + a `pipe.collect`/`collectAll` policy included only by the consumer): producer aspects emit entries, the consumer gets the list as a module arg. `netbird-service` (gaia's netbird server), `kanidm-provision` (kanidm on endeavour), `scrape-target` (prometheus), `mesh-dns-record` (unbound). `collect` reaches same-system hosts only; `collectAll` also reaches pioneer. Keep payloads static or `{host, ...}:`; a `{config, ...}:` payload makes the consumer instantiate the producer host's whole config (comin evaluates on gaia), and config-dependent quirks cannot be chained.
@@ -119,7 +121,7 @@ sudo nix run nixpkgs#nixos-facter -- -o modules/den/hosts/_facter/<host>.facter.
 - `modules/den/hosts/gaia.nix` — the edge: NetBird control plane, `localVhosts`, oidc.idp. Published services are declared by their own aspects (`netbird-service` key).
 - `modules/den/hosts/voyager.nix` — boot-time compositor specialisations (base/hyprland + niri as separate GRUB entries); `provides.lvdar` holds the user's host-specific home config.
 - `modules/den/aspects/core/{sops,impermanence,impermanence-options,networking,users-base}.nix` — secrets, persistence, `edgeTerminated`, primary user.
-- `modules/meta/{nixpkgs,formatter,pre-commit,devshell,deploy}.nix` — flake machinery.
+- `modules/meta/{nixpkgs,formatter,pre-commit,devshell,deploy,wrappers}.nix` — flake machinery.
 - `modules/den/hosts/_hw/<host>/disko.nix`, `_facter/<host>.facter.json` — declarative hardware; voyager's disko takes `{device}` as an argument.
 - `.tangled/workflows/lint.yml` — the only CI (spindle): builds `checks.{treefmt,pre-commit,check-flake-file,default-shell}` with the nix-secrets stub override; does *not* run `nix flake check` wholesale.
 
