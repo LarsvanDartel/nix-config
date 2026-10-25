@@ -1,5 +1,5 @@
 # home.git — full deployment git (identity from cosmos options, ssh signing,
-# allowed_signers). The portable wrapper variant stays in the hm-wrapper catalog.
+# allowed_signers).
 {cosmosLib, ...}: let
   inherit (cosmosLib) get-flake-path;
 

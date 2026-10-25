@@ -25,14 +25,6 @@
     };
     flake-file.url = "github:denful/flake-file";
     flake-parts.url = "github:hercules-ci/flake-parts";
-    hm-wrapper-modules = {
-      url = "github:sini/hm-wrapper-modules";
-      inputs = {
-        home-manager.follows = "home-manager";
-        nix-wrapper-modules.follows = "nix-wrapper-modules";
-        nixpkgs.follows = "nixpkgs";
-      };
-    };
     home-manager = {
       url = "github:nix-community/home-manager";
       inputs.nixpkgs.follows = "nixpkgs";
@@ -52,7 +44,7 @@
     nix-minecraft.url = "github:Infinidoge/nix-minecraft";
     nix-secrets.url = "git+ssh://git@github.com/LarsvanDartel/nix-secrets.git?shallow=1";
     nix-wrapper-modules = {
-      url = "github:BirdeeHub/nix-wrapper-modules";
+      url = "github:nix-community/nix-wrapper-modules";
       inputs.nixpkgs.follows = "nixpkgs";
     };
     nixos-facter-modules.url = "github:nix-community/nixos-facter-modules";

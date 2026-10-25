@@ -7,6 +7,11 @@
   inputs,
   ...
 }: {
+  flake-file.inputs.nix-wrapper-modules = {
+    url = "github:nix-community/nix-wrapper-modules";
+    inputs.nixpkgs.follows = "nixpkgs";
+  };
+
   den.aspects.desktop.niri = {
     includes = with den.aspects.desktop; [greetd keyd];
     nixos = import ./_niri/system.nix {inherit inputs;};
