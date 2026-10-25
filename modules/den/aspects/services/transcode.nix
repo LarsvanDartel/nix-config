@@ -192,9 +192,10 @@
           type = lib.types.bool;
           default = true;
           description = ''
-            After replacing a file, unmonitor it in radarr/sonarr and trigger a
-            rescan, so the arr records the new file instead of trying to
-            re-acquire the original.
+            After replacing a file, unmonitor it in radarr/sonarr, trigger a
+            rescan so the arr records the new file instead of trying to
+            re-acquire the original, then have the arr rename it so the codec
+            in its name says AV1.
           '';
         };
 
