@@ -9,12 +9,14 @@ DEST="$1"
 BIN="$(basename "$DEST").bin"
 shift 2 # DEST, MEMLIMIT
 
-# A fresh cache per compile: the std packages are rebuilt each time.
-GOCACHE="$PWD/go_cache" GOPATH="$PWD/go_path" HOME=/does/not/exist \
-	GOTOOLCHAIN=local CGO_ENABLED=0 GOMAXPROCS=4 \
+# A fresh cache per compile: the std packages are rebuilt each time. Go also
+# needs a writable work dir, and the judging chroot has no /tmp.
+mkdir go_tmp
+GOCACHE="$PWD/go_cache" GOPATH="$PWD/go_path" GOTMPDIR="$PWD/go_tmp" \
+	HOME=/does/not/exist GOTOOLCHAIN=local CGO_ENABLED=0 GOMAXPROCS=4 \
 	@go@/bin/go build -p 4 -o "$DEST.bin" "$@"
 EXITCODE=$?
-rm -rf go_cache go_path
+rm -rf go_cache go_path go_tmp
 [ "$EXITCODE" -ne 0 ] && exit "$EXITCODE"
 
 cat >"$DEST" <<EOF
