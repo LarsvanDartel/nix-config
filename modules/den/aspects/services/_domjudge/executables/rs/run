@@ -5,7 +5,7 @@
 DEST="$1"
 shift 2 # DEST, MEMLIMIT
 
-# rustc needs a writable TMPDIR; the chroot's /tmp is not.
+# rustc needs a writable TMPDIR, and the judging chroot has no /tmp.
 mkdir rust_tmp_dir
 TMPDIR=rust_tmp_dir @rust@/bin/rustc --edition 2021 -C opt-level=3 -o "$DEST" "$@"
 EXITCODE=$?
