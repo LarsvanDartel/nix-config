@@ -540,7 +540,7 @@ in {
         # Each tag needs a Traccar device whose identifier is the tag's UUID
         # (the feeder logs it).
         tile-traccar = {
-          email = "larsvandartel73@gmail.com";
+          email = "tile@lvdar.nl";
           # The phone carrying the Tile app; Traccar gets it via OsmAnd.
           ignoredTiles = ["p!fb79d495c0cb30211d73a246a5cc3c13"];
         };
