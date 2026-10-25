@@ -192,6 +192,8 @@ in {
         {
           id = "kotlin";
           name = "Kotlin ${lib.versions.majorMinor pkgs.kotlin.version}";
+          # kt/run detects the main class, as Java's script does.
+          entry_point_required = false;
           compiler.version_command = "${kotlinc}/bin/kotlinc -version";
           runner.version_command = "${kotlinc}/bin/kotlin -version";
         }
