@@ -36,25 +36,25 @@ in {
         };
         on_attach = mkLuaInline ''
           function(client, bufnr)
-            vim.keymap.set("n", "<leader>tp", function()
+            vim.keymap.set("n", "<leader>lp", function()
               client:exec_cmd({
                 title = "pin",
                 command = "tinymist.pinMain",
                 arguments = { vim.api.nvim_buf_get_name(0) },
               }, { bufnr = bufnr })
-            end, { desc = "[T]inymist [P]in", noremap = true })
+            end, { desc = "Pin main file", buffer = bufnr })
 
-            vim.keymap.set("n", "<leader>tu", function()
+            vim.keymap.set("n", "<leader>lu", function()
               client:exec_cmd({
                 title = "unpin",
                 command = "tinymist.pinMain",
                 arguments = { vim.v.null },
               }, { bufnr = bufnr })
-            end, { desc = "[T]inymist [U]npin", noremap = true })
+            end, { desc = "Unpin main file", buffer = bufnr })
 
-            vim.keymap.set("n", "<leader>tx", function()
+            vim.keymap.set("n", "<leader>lx", function()
               client:stop()
-            end, { desc = "[T]inymist [X] stop", noremap = true })
+            end, { desc = "Stop tinymist", buffer = bufnr })
           end
         '';
       };
@@ -80,5 +80,17 @@ in {
         conceal_math = 1;
       };
     };
+
+    autoCmd = [
+      {
+        event = "FileType";
+        pattern = "typst";
+        callback.__raw = ''
+          function(args)
+            vim.keymap.set("n", "<leader>lw", "<cmd>TypstWatch<CR>", { desc = "Watch and open PDF", buffer = args.buf })
+          end
+        '';
+      }
+    ];
   };
 }

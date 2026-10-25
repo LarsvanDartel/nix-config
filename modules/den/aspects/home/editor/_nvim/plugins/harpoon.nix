@@ -5,46 +5,56 @@
     enableTelescope = true;
   };
 
-  keymaps = [
-    {
+  keymaps =
+    map ({
+      key,
+      fn,
+      desc,
+    }: {
       mode = "n";
-      key = "<leader>a";
-      action.__raw = "function() require'harpoon':list():add() end";
-    }
-    {
-      mode = "n";
-      key = "<C-e>";
-      action.__raw = "function() require'harpoon'.ui:toggle_quick_menu(require'harpoon':list()) end";
-    }
-    {
-      mode = "n";
-      key = "<C-h>";
-      action.__raw = "function() require'harpoon':list():select(1) end";
-    }
-    {
-      mode = "n";
-      key = "<C-t>";
-      action.__raw = "function() require'harpoon':list():select(2) end";
-    }
-    {
-      mode = "n";
-      key = "<C-n>";
-      action.__raw = "function() require'harpoon':list():select(3) end";
-    }
-    {
-      mode = "n";
-      key = "<C-s>";
-      action.__raw = "function() require'harpoon':list():select(4) end";
-    }
-    {
-      mode = "n";
-      key = "<C-S-P>";
-      action.__raw = "function() require'harpoon':list():prev() end";
-    }
-    {
-      mode = "n";
-      key = "<C-S-N>";
-      action.__raw = "function() require'harpoon':list():next() end";
-    }
-  ];
+      inherit key;
+      action.__raw = "function() require'harpoon'${fn} end";
+      options.desc = desc;
+    }) [
+      {
+        key = "<leader>a";
+        fn = ":list():add()";
+        desc = "Harpoon add file";
+      }
+      {
+        key = "<C-e>";
+        fn = ".ui:toggle_quick_menu(require'harpoon':list())";
+        desc = "Harpoon menu";
+      }
+      {
+        key = "<C-h>";
+        fn = ":list():select(1)";
+        desc = "Harpoon file 1";
+      }
+      {
+        key = "<C-t>";
+        fn = ":list():select(2)";
+        desc = "Harpoon file 2";
+      }
+      {
+        key = "<C-n>";
+        fn = ":list():select(3)";
+        desc = "Harpoon file 3";
+      }
+      {
+        key = "<C-s>";
+        fn = ":list():select(4)";
+        desc = "Harpoon file 4";
+      }
+      {
+        key = "<C-S-P>";
+        fn = ":list():prev()";
+        desc = "Harpoon previous";
+      }
+      {
+        key = "<C-S-N>";
+        fn = ":list():next()";
+        desc = "Harpoon next";
+      }
+    ];
 }

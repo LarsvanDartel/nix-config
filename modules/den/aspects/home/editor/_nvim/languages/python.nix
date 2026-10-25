@@ -48,6 +48,11 @@ in {
             end, {
               desc = 'Organize Imports',
             })
+
+            vim.keymap.set('n', '<leader>lo', '<cmd>LspPyrightOrganizeImports<CR>', {
+              buffer = bufnr,
+              desc = 'Organize imports',
+            })
           end
         '';
       };
