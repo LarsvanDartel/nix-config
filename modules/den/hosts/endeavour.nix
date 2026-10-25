@@ -139,6 +139,9 @@ in {
       services.taskchampion
       services.vaultwarden
       services.domjudge
+      services.domjudge.sso
+      services.domjudge.languages
+      services.domjudge.contests
     ];
 
     nixos = {
