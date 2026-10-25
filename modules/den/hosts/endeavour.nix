@@ -138,6 +138,7 @@ in {
       services.ollama.librechat
       services.taskchampion
       services.vaultwarden
+      services.domjudge
     ];
 
     nixos = {
