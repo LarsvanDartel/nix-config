@@ -138,6 +138,6 @@ sudo nix run nixpkgs#nixos-facter -- -o modules/den/hosts/_facter/<host>.facter.
 ## Testing & QA
 
 - No test framework, no coverage expectations. Verification = the change evaluates and builds (`nix build .#nixosConfigurations.<host>...`) and, for the fleet, build-gate turning it green before comin touches a host.
-- `nix flake check` covers treefmt, pre-commit hooks, deploy-rs checks (`deploy-activate` is slow), `check-flake-file` and the default-shell build. Known breakage: the hm-wrapper `packages.*` fail to evaluate (`extraPackages` option does not exist — upstream hm-wrapper-modules still defines an option nix-wrapper-modules removed), which fails `nix flake check` as a whole; build the individual `checks.*` instead.
+- `nix flake check` covers treefmt, pre-commit hooks, deploy-rs checks (`deploy-activate` is slow), `check-flake-file` and the default-shell build.
 - CI on the spindle is deliberately fast-feedback: the four cheap checks with `--accept-flake-config` (abort-on-warn applies) and the secrets stub.
 - Practical smoke checks when debugging publishing/ingress: `curl -I` against the public name (probes DNS → edge TLS → netbird-proxy → app); `git log deploy..main` shows what has not passed the gate yet.
