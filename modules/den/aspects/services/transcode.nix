@@ -43,6 +43,12 @@
           url = "http://127.0.0.1:${toString arr.sonarr.port}";
           library = "${arr.mediaDir}/library/shows";
         }
+        {
+          name = "sonarr";
+          kind = "series";
+          url = "http://127.0.0.1:${toString arr.sonarr.port}";
+          library = "${arr.mediaDir}/library/anime";
+        }
       ];
 
       # Underscored so import-tree skips it.
@@ -70,6 +76,7 @@
           default = [
             "${arr.mediaDir}/library/movies"
             "${arr.mediaDir}/library/shows"
+            "${arr.mediaDir}/library/anime"
           ];
           defaultText = "the radarr and sonarr libraries";
           description = "Directory trees to walk.";
@@ -263,9 +270,10 @@
             ExecStart = "${pkgs.python3}/bin/python ${script}";
 
             # Read as root by systemd, so no access to the arr state dirs.
+            # One per arr, not per library: sonarr owns both shows and anime.
             LoadCredential =
-              map (a: "${a.name}-config:${arr.stateDir}/${a.name}/config.xml")
-              arrs;
+              map (name: "${name}-config:${arr.stateDir}/${name}/config.xml")
+              (lib.unique (map (a: a.name) arrs));
 
             StateDirectory = baseNameOf stateDir;
             WorkingDirectory = stateDir;
