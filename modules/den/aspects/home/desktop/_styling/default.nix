@@ -34,14 +34,6 @@ in {
     stylix = {
       enable = true;
       autoEnable = true;
-      # Load-bearing: `terminal` also flips btop's/helix's `transparent`, or a
-      # TUI paints an opaque rectangle through the terminal. noctalia reads these
-      # by hand (_noctalia/home.nix). `applications` stays 1.0 deliberately.
-      opacity = {
-        terminal = 0.8;
-        desktop = 0.8;
-        popups = 0.8;
-      };
 
       # TODO: Move to cursor module
       cursor = {

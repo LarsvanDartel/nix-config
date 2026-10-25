@@ -1,15 +1,14 @@
+# nvim performance — lua loader, plugin combining and byte-compilation.
 {
-  programs.nixvim = {
-    luaLoader.enable = true;
+  luaLoader.enable = true;
 
-    performance = {
-      combinePlugins = {
-        enable = true;
-        standalonePlugins = [
-          "nvim-treesitter"
-        ];
-      };
-      byteCompileLua.enable = true;
+  performance = {
+    combinePlugins = {
+      enable = true;
+      standalonePlugins = [
+        "nvim-treesitter"
+      ];
     };
+    byteCompileLua.enable = true;
   };
 }

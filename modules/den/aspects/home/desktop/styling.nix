@@ -1,25 +1,23 @@
 # home.styling — stylix theming (the _styling tree) + profile font/wallpaper
 # values. Delivered by desktop.styling (to-users), which also sets the theme
-# and auto-imports the stylix HM module (homeManagerIntegration).
-{...}: {
+# and auto-imports the stylix HM module (homeManagerIntegration). Fonts and
+# opacity come from cosmosStyling, which wrapped programs read too.
+{cosmosStyling, ...}: {
   den.aspects.home.styling.homeManager = {config, ...}: {
     imports = [./_styling];
+
+    stylix.opacity = {inherit (cosmosStyling.opacity) terminal desktop popups;};
 
     cosmos.desktops.common.styling = {
       fonts = let
         fontpkgs = config.cosmos.desktops.common.styling.fonts.pkgs;
-      in {
-        # Without enable, stylix silently falls back to DejaVu Sans Mono.
-        enable = true;
-
-        serif = fontpkgs."DejaVu Serif";
-        sansSerif = fontpkgs."DejaVu Sans";
-        # The vector cut: identical at 13px, and still crisp at 26, 39… when zoomed.
-        monospace = fontpkgs."Cozette Vector";
-        emoji = fontpkgs."Noto Color Emoji";
-        interface = fontpkgs."Cozette Vector";
-        extraFonts = [];
-      };
+      in
+        {
+          # Without enable, stylix silently falls back to DejaVu Sans Mono.
+          enable = true;
+          extraFonts = [];
+        }
+        // builtins.mapAttrs (_: name: fontpkgs.${name}) cosmosStyling.fonts;
 
       # Same top-ranked file as the picker's default, so scheme and picture
       # can't drift apart.

@@ -1,4 +1,4 @@
-# home.which-key — tmux which-key plugin (extends the tmux config).
+# home.which-key — tmux which-key plugin, layered onto this host's tmux wrapper.
 {...}: {
   den.aspects.home.which-key.homeManager = {
     config,
@@ -9,7 +9,6 @@
     inherit (lib.options) mkOption mkPackageOption;
 
     cfg = config.cosmos.cli.programs.tmux.plugins.which-key;
-    rtpPath = "tmux/plugins/tmux-which-key";
   in {
     options.cosmos.cli.programs.tmux.plugins.which-key = {
       package = mkPackageOption pkgs ["tmuxPlugins" "tmux-which-key"] {};
@@ -61,17 +60,11 @@
             config.yaml $out
         '';
     in {
-      xdg.dataFile."${rtpPath}/init.tmux".source = configTmux;
-      programs.tmux.plugins = [
-        {
-          plugin = cfg.package;
-          extraConfig = ''
-            set -g @tmux-which-key-xdg-enable 1;
-            set -g @tmux-which-key-disable-autobuild 1
-            set -g @tmux-which-key-xdg-plugin-path "${rtpPath}"
-          '';
-        }
-      ];
+      # plugin.sh.tmux only copies the prebuilt init.tmux into $XDG_DATA_HOME
+      # and sources it from there; sourcing the store copy needs no file in $HOME.
+      cosmos.cli.programs.tmux.wrapperModule.configBefore = ''
+        source-file ${configTmux}
+      '';
     };
   };
 }
