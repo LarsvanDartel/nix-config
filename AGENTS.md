@@ -15,7 +15,7 @@ Hardware comes from committed **nixos-facter** reports (`hosts/_facter/<host>.fa
 
 ## Architecture & Data Flow
 
-**Evaluation flow**: generated `flake.nix` → `mkFlake` + `import-tree ./modules` → every module auto-loads → den assembles `nixosConfigurations` from aspects → each host builds its own `pkgs` in `core.nixpkgs` (stable + unstable + NUR + `inputs.self.overlays.default`). `modules/meta/nixpkgs.nix` is perSystem's pkgs only (packages, devshell, hm-wrappers).
+**Evaluation flow**: generated `flake.nix` → `mkFlake` + `import-tree ./modules` → every module auto-loads → den assembles `nixosConfigurations` from aspects → each host builds its own `pkgs` in `core.nixpkgs` (stable + unstable + NUR + `inputs.self.overlays.default`). `modules/meta/nixpkgs.nix` is perSystem's pkgs only (packages, devshell).
 
 **Composition model** (`modules/den/`):
 
@@ -54,7 +54,7 @@ push to main → knot (services.tangled on endeavour)
 
 | Path | Purpose |
 |---|---|
-| `modules/meta/` | Flake-level infra: perSystem nixpkgs, treefmt, pre-commit, devshell, deploy-rs nodes (from `den.hosts`), flake-file, `cosmosLib` helpers, hm-wrapper catalog |
+| `modules/meta/` | Flake-level infra: perSystem nixpkgs, treefmt, pre-commit, devshell, deploy-rs nodes (from `den.hosts`), flake-file, `cosmosLib` helpers |
 | `modules/pkgs/` | Local packages, each self-registering into the overlays aggregator |
 | `modules/den/aspects/` | The configuration itself (~200 files): `core/ desktop/ hardware/ home/ roles/ services/` |
 | `modules/den/hosts/` | One aspect-bearing file per host + `_hw/` (disko) + `_facter/` (hardware reports) |
@@ -77,7 +77,6 @@ nix run .#write-flake        # REGENERATE flake.nix after changing any flake-fil
 nix build .#nixosConfigurations.<host>.config.system.build.toplevel   # build without switching
 nh os switch                 # local voyager switch (also: nh os boot / nh os test)
 nix run github:serokell/deploy-rs .#<host>   # manual/out-of-band deploy (magic rollback)
-nix run .#bat                # wrapped standalone programs (see modules/meta/hm-wrappers.nix)
 nix run .#update-blocklists  # refresh vendored unbound blocklists, then commit
 
 sudo nix run nixpkgs#nixos-facter -- -o modules/den/hosts/_facter/<host>.facter.json   # on the host
@@ -120,7 +119,7 @@ sudo nix run nixpkgs#nixos-facter -- -o modules/den/hosts/_facter/<host>.facter.
 - `modules/den/hosts/gaia.nix` — the edge: NetBird control plane, `localVhosts`, oidc.idp. Published services are declared by their own aspects (`netbird-service` key).
 - `modules/den/hosts/voyager.nix` — boot-time compositor specialisations (base/hyprland + niri as separate GRUB entries); `provides.lvdar` holds the user's host-specific home config.
 - `modules/den/aspects/core/{sops,impermanence,impermanence-options,networking,users-base}.nix` — secrets, persistence, `edgeTerminated`, primary user.
-- `modules/meta/{nixpkgs,formatter,pre-commit,devshell,deploy,hm-wrappers}.nix` — flake machinery.
+- `modules/meta/{nixpkgs,formatter,pre-commit,devshell,deploy}.nix` — flake machinery.
 - `modules/den/hosts/_hw/<host>/disko.nix`, `_facter/<host>.facter.json` — declarative hardware; voyager's disko takes `{device}` as an argument.
 - `.tangled/workflows/lint.yml` — the only CI (spindle): builds `checks.{treefmt,pre-commit,check-flake-file,default-shell}` with the nix-secrets stub override; does *not* run `nix flake check` wholesale.
 
