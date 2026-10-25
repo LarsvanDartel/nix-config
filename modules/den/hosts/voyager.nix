@@ -63,12 +63,6 @@
         cosmos = {
           cli.programs.yazi.defaultApplication = true;
 
-          cli.programs.nvim = {
-            # Needs endeavour's ollama on the mesh; manual trigger so being off
-            # the mesh costs a keypress, not a stall on every pause.
-            minuet.enable = true;
-          };
-
           desktops.hyprland.animations.enable = false;
 
           desktops.wallpapers.rotate.count = 20;
