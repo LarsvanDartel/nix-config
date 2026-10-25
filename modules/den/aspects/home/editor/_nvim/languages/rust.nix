@@ -17,12 +17,17 @@ in {
         server = {
           on_attach = ''
             function(_, bufnr)
-              vim.keymap.set("n", "<leader>cR", function()
-                vim.cmd.RustLsp("codeAction")
-              end, { desc = "Code Action", buffer = bufnr })
-              vim.keymap.set("n", "<leader>dr", function()
-                vim.cmd.RustLsp("debuggables")
-              end, { desc = "Rust Debuggables", buffer = bufnr })
+              local function map(key, cmd, desc)
+                vim.keymap.set("n", key, function() vim.cmd.RustLsp(cmd) end, { desc = desc, buffer = bufnr })
+              end
+              map("<leader>la", "codeAction", "Code action (grouped)")
+              map("<leader>le", "explainError", "Explain error")
+              map("<leader>lm", "expandMacro", "Expand macro")
+              map("<leader>lo", "openDocs", "Open docs.rs")
+              map("<leader>lc", "openCargo", "Open Cargo.toml")
+              map("<leader>lt", "testables", "Testables")
+              map("<leader>lp", "parentModule", "Parent module")
+              map("<leader>dR", "debuggables", "Rust debuggables")
             end
           '';
           default_settings = {

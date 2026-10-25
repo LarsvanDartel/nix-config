@@ -7,14 +7,6 @@
   plugins = {
     lz-n.enable = true;
 
-    gitsigns = {
-      enable = true;
-      settings.signs = {
-        add.text = "+";
-        change.text = "~";
-      };
-    };
-
     csvview.enable = true;
   };
 }

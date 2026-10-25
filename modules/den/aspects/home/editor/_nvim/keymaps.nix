@@ -1,4 +1,5 @@
-# nvim keymaps — leader and the general-purpose normal/visual maps.
+# nvim keymaps — leader and the general-purpose normal/visual maps. Feature maps
+# live with their plugin; mini.clue's group labels are in plugins/mini.nix.
 {lib, ...}: {
   globals = {
     mapleader = " ";
@@ -6,34 +7,66 @@
   };
 
   keymaps = let
-    normal =
-      lib.mapAttrsToList
-      (key: action: {
-        mode = "n";
-        inherit action key;
-      })
-      {
-        "<esc>" = ":noh<CR>";
-
-        Y = "y$";
-
-        "<C-Up>" = ":resize -2<CR>";
-        "<C-Down>" = ":resize +2<CR>";
-        "<C-Left>" = ":vertical resize +2<CR>";
-        "<C-Right>" = ":vertical resize -2<CR>";
+    map = mode:
+      lib.mapAttrsToList (key: {
+        action,
+        desc,
+      }: {
+        inherit mode key action;
+        options.desc = desc;
+      });
+    normal = map "n" {
+      "<esc>" = {
+        action = ":noh<CR>";
+        desc = "Clear search highlight";
       };
-    visual =
-      lib.mapAttrsToList
-      (key: action: {
-        mode = "v";
-        inherit action key;
-      })
-      {
-        ">" = ">gv";
-        "<" = "<gv";
-        "<TAB>" = ">gv";
-        "<S-TAB>" = "<gv";
+
+      Y = {
+        action = "y$";
+        desc = "Yank to end of line";
       };
+
+      "<C-Up>" = {
+        action = ":resize -2<CR>";
+        desc = "Decrease window height";
+      };
+      "<C-Down>" = {
+        action = ":resize +2<CR>";
+        desc = "Increase window height";
+      };
+      "<C-Left>" = {
+        action = ":vertical resize +2<CR>";
+        desc = "Increase window width";
+      };
+      "<C-Right>" = {
+        action = ":vertical resize -2<CR>";
+        desc = "Decrease window width";
+      };
+
+      "<leader>qq" = {
+        action = "<cmd>qa<CR>";
+        desc = "Quit all";
+      };
+    };
+    # x, not v: select mode belongs to snippet placeholders (<Tab> jumps there).
+    visual = map "x" {
+      ">" = {
+        action = ">gv";
+        desc = "Indent and reselect";
+      };
+      "<" = {
+        action = "<gv";
+        desc = "Dedent and reselect";
+      };
+      "<TAB>" = {
+        action = ">gv";
+        desc = "Indent and reselect";
+      };
+      "<S-TAB>" = {
+        action = "<gv";
+        desc = "Dedent and reselect";
+      };
+    };
   in
     lib.nixvim.keymaps.mkKeymaps {options.silent = true;} (normal ++ visual);
 }
