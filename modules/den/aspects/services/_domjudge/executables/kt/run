@@ -1,0 +1,44 @@
+#!/bin/sh
+# kt — DOMjudge's Kotlin compile script with kotlinc from the Nix closure
+# mounted at /nix in the judge chroot; it runs on the chroot's OpenJDK.
+# Writes $DEST as a wrapper that runs the detected main class.
+DEST="$1"
+MEMLIMIT="$2"
+shift 2
+COMPILESCRIPTDIR="$(dirname "$0")"
+KOTLIN_DIR=@kotlinc@/bin
+KOTLIN_STDLIB=@kotlinc@/lib/kotlin-stdlib.jar
+
+# KiB, deducted from MEMLIMIT for the JVM itself and the stack.
+MEMSTACK=65536
+MEMJVM=65536
+MEMLIMITJAVA=$((MEMLIMIT - MEMSTACK - MEMJVM))
+if [ "$MEMLIMITJAVA" -le 0 ]; then
+	echo "internal-error: total memory $MEMLIMIT KiB leaves no heap after $MEMJVM + $MEMSTACK KiB for the JVM and stack."
+	exit 1
+fi
+
+# java.io.tmpdir=/: kotlinc crashes when it is a missing directory (no /tmp in the chroot).
+"$KOTLIN_DIR/kotlinc" -d . -Djava.io.tmpdir=/ "$@" || exit
+
+if [ -z "$ENTRY_POINT" ]; then
+	CLASSNAMES="$(find ./* -type f -regex '^.*\.class$' |
+		sed -e 's/\.class$//' -e 's/^\.\///' -e 's/\//./g')"
+	# shellcheck disable=SC2086 # one argument per class
+	MAINCLASS=$(java -cp "$COMPILESCRIPTDIR:$KOTLIN_STDLIB" DetectMain "$(pwd)" $CLASSNAMES)
+	EXITCODE=$?
+	echo "Info: detected entry_point: $MAINCLASS"
+	[ "$EXITCODE" -ne 0 ] && exit "$EXITCODE"
+else
+	MAINCLASS="$ENTRY_POINT"
+	java -cp "$COMPILESCRIPTDIR:$KOTLIN_STDLIB" DetectMain "$(pwd)" "$MAINCLASS" >/dev/null || exit
+fi
+
+cat >"$DEST" <<EOF
+#!/bin/sh
+if [ "\${0%/*}" != "\$0" ]; then
+	cd "\${0%/*}"
+fi
+exec "$KOTLIN_DIR/kotlin" -Dfile.encoding=UTF-8 -J-XX:+UseSerialGC -J-Xss${MEMSTACK}k -J-Xms${MEMLIMITJAVA}k -J-Xmx${MEMLIMITJAVA}k '$MAINCLASS' "\$@"
+EOF
+chmod a+x "$DEST"

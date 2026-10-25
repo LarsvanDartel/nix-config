@@ -154,6 +154,56 @@ in {
         }
       ]);
 
+      # The image's judge chroot has gcc, OpenJDK 21 and pypy3 3.9. Newer
+      # languages come from this closure, copied into one tree mounted at the
+      # chroot's /nix, so submissions see it and not the host store.
+      python = pkgs.python3;
+      # The official distribution, not pkgs.kotlin: that wraps a 600 MiB
+      # OpenJDK, these launchers use the chroot's java.
+      kotlinc = pkgs.runCommand "kotlinc-${pkgs.kotlin.version}" {nativeBuildInputs = [pkgs.unzip];} ''
+        unzip -q ${pkgs.kotlin.src}
+        mv kotlinc $out
+      '';
+      chrootStore = pkgs.runCommand "domjudge-chroot-store" {} ''
+        mkdir -p $out/store
+        cp -a --reflink=auto $(<${pkgs.closureInfo {rootPaths = [python kotlinc];}}/store-paths) $out/store/
+      '';
+
+      # Compile scripts; domjudge-import uploads them when the DB's differ.
+      mkExecutable = name: substitutions:
+        pkgs.runCommand "domjudge-executable-${name}.zip" {nativeBuildInputs = [pkgs.zip];} ''
+          cp -r ${./_domjudge/executables + "/${name}"} src
+          chmod -R u+w src
+          substituteInPlace src/run ${substitutions}
+          cd src
+          find . -exec touch -h -d @315532800 {} +
+          find . -type f | sort | zip -q -X -@ $out
+        '';
+      executables = {
+        py3 = mkExecutable "py3" "--replace-fail @python3@ ${python}/bin/python3";
+        kt = mkExecutable "kt" "--replace-fail @kotlinc@ ${kotlinc}";
+      };
+
+      # Exactly these languages are enabled: POST /languages disables the rest.
+      languagesJson = pkgs.writeText "domjudge-languages.json" (builtins.toJSON [
+        {id = "c";}
+        {id = "cpp";}
+        {id = "java";}
+        {
+          id = "kotlin";
+          name = "Kotlin ${lib.versions.majorMinor pkgs.kotlin.version}";
+          compiler.version_command = "${kotlinc}/bin/kotlinc -version";
+          runner.version_command = "${kotlinc}/bin/kotlin -version";
+        }
+        {
+          id = "python3";
+          name = "Python ${lib.versions.majorMinor python.version}";
+          extensions = ["py" "py3"];
+          compiler.version_command = "${python}/bin/python3 --version";
+          runner.version_command = "${python}/bin/python3 --version";
+        }
+      ]);
+
       api = "http://127.0.0.1:${toString containerPort}/api/v4";
 
       # Its own executable so `set -e` holds per contest: inside a function
@@ -211,12 +261,13 @@ in {
 
       importAll = pkgs.writeShellApplication {
         name = "domjudge-import";
-        runtimeInputs = with pkgs; [coreutils curl jq importContest];
+        runtimeInputs = with pkgs; [coreutils curl findutils jq unzip importContest];
         text = ''
           api=${api}
           umask 077
           printf 'user = "admin:%s"\n' "$(<"$CREDENTIALS_DIRECTORY/admin-password")" >"$CACHE_DIRECTORY/curlrc"
           code() { curl -sS -o /dev/null -w '%{http_code}' "$api/info" || true; }
+          dj() { curl -sS --fail-with-body -K "$CACHE_DIRECTORY/curlrc" "$@"; }
 
           # First start installs/migrates the DB before nginx comes up.
           for _ in $(seq 120); do
@@ -225,8 +276,25 @@ in {
           done
           [ "$(code)" = 200 ] || { echo "domserver API not up after 10 minutes" >&2; exit 1; }
 
-          curl -sS --fail-with-body -K "$CACHE_DIRECTORY/curlrc" \
-            -F "json=@${accountsJson};type=application/json" "$api/users/accounts"
+          # What DOMjudge judges with: file contents and executable bits.
+          digest() {
+            local d
+            d=$(mktemp -d -p "$CACHE_DIRECTORY")
+            unzip -q "$1" -d "$d"
+            (cd "$d" && find . -type f -print0 | sort -z | xargs -0 sha256sum && find . -type f -perm -u+x | sort)
+            rm -rf "$d"
+          }
+          for e in ${lib.concatStringsSep " " (lib.mapAttrsToList (id: zip: "${id}=${zip}") executables)}; do
+            id=''${e%%=*} zip=''${e#*=}
+            dj "$api/executables/$id" | jq -r . | base64 -d >"$CACHE_DIRECTORY/current.zip"
+            if [ "$(digest "$zip")" != "$(digest "$CACHE_DIRECTORY/current.zip")" ]; then
+              echo "updating executable $id"
+              dj -F "executable=@$zip;type=application/zip" "$api/languages/$id/executable"
+            fi
+          done
+          dj -F "json=@${languagesJson};type=application/json" "$api/languages" >/dev/null
+
+          dj -F "json=@${accountsJson};type=application/json" "$api/users/accounts"
           echo
 
           failed=()
@@ -336,7 +404,13 @@ in {
             privileged = true;
             networks = ["domjudge"];
             extraOptions = ["--ip=10.89.42.4" "--cgroupns=host"];
-            volumes = ["/sys/fs/cgroup:/sys/fs/cgroup"];
+            # judgehost-start adds the toolchain mount to every judging's chroot.
+            cmd = ["/scripts/judgehost-start.sh"];
+            volumes = [
+              "/sys/fs/cgroup:/sys/fs/cgroup"
+              "${./_domjudge/judgehost-start.sh}:/scripts/judgehost-start.sh:ro"
+              "${chrootStore}:/chroot/domjudge/nix:ro"
+            ];
             environment = {
               DOMSERVER_BASEURL = "http://10.89.42.3/";
               JUDGEDAEMON_USERNAME = "judgehost";
