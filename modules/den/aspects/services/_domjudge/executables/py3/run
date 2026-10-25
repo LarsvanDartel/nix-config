@@ -1,0 +1,28 @@
+#!/bin/sh
+# py3 — DOMjudge's Python 3 compile script on CPython from the Nix closure
+# mounted at /nix in the judge chroot, instead of the image's pypy3 3.9.
+# Writes $DEST as a wrapper that runs the source.
+DEST="$1"
+shift 2 # DEST, MEMLIMIT
+MAINSOURCE="${ENTRY_POINT:-$1}"
+if [ -z "$ENTRY_POINT" ]; then
+	echo "Info: detected entry_point: $MAINSOURCE"
+fi
+
+@python3@ -m py_compile "$@" || exit
+rm -rf -- *.pyc __pycache__
+
+if [ ! -r "$MAINSOURCE" ]; then
+	echo "Error: main source file '$MAINSOURCE' is not readable" >&2
+	exit 1
+fi
+
+cat >"$DEST" <<EOF
+#!/bin/sh
+if [ "\${0%/*}" != "\$0" ]; then
+	cd "\${0%/*}"
+fi
+export HOME=/does/not/exist
+exec @python3@ "$MAINSOURCE" "\$@"
+EOF
+chmod a+x "$DEST"
