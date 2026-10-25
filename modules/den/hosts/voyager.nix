@@ -56,6 +56,7 @@
         home.orca-slicer
         home.simplelogin
         home.rbw
+        home.remmina
       ];
 
       homeManager = {pkgs, ...}: {
