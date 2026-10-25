@@ -256,8 +256,24 @@ def episode_file(base, key, series_id, path, tries=6, delay=5):
     return None
 
 
+def rename(entry, key, owner_id, file_id):
+    """Have the arr rename a file to its naming format, which now says AV1.
+
+    Through the arr, never os.rename: it would lose track of the file. Only
+    after the rescan, which is what updates the codec the template reads.
+    Returns the new path.
+    """
+    owner, files = (("movieId", "moviefile") if entry["kind"] == "movie"
+                    else ("seriesId", "episodefile"))
+    cmd = api(entry["url"], key, "command", "POST",
+              {"name": "RenameFiles", owner: owner_id, "files": [file_id]})
+    wait_for_command(entry["url"], key, cmd)
+    return Path(api(entry["url"], key, f"{files}/{file_id}")["path"])
+
+
 def notify_arr(path):
-    """Unmonitor the item, then rescan it.
+    """Unmonitor the item, rescan it, then rename the file. Returns the new
+    path, or None if the arr did not rename it.
 
     Order matters: rescanning while monitored can make the arr treat the new
     file as a downgrade and re-download the original, forever.
@@ -265,11 +281,11 @@ def notify_arr(path):
     entry = next((a for a in ARRS
                   if str(path).startswith(a["library"] + "/")), None)
     if entry is None:
-        return
+        return None
     key = api_key(entry["name"])
     if not key:
         LOGGER.warning("%s: no api key, not notifying", entry["name"])
-        return
+        return None
 
     try:
         if entry["kind"] == "movie":
@@ -279,20 +295,21 @@ def notify_arr(path):
                          None)
             if movie is None:
                 LOGGER.warning("radarr does not know %s", path)
-                return
+                return None
             movie["monitored"] = False
             api(entry["url"], key, f"movie/{movie['id']}", "PUT", movie)
             cmd = api(entry["url"], key, "command", "POST",
                       {"name": "RefreshMovie", "movieIds": [movie["id"]]})
             wait_for_command(entry["url"], key, cmd)
             LOGGER.info("radarr: unmonitored and rescanned %s", movie["title"])
+            return rename(entry, key, movie["id"], movie["movieFile"]["id"])
         else:
             all_series = api(entry["url"], key, "series")
             series = next((s for s in all_series
                            if str(path).startswith(s["path"] + "/")), None)
             if series is None:
                 LOGGER.warning("sonarr does not know %s", path)
-                return
+                return None
             ef = episode_file(entry["url"], key, series["id"], path)
             episodes = api(entry["url"], key,
                            f"episode?seriesId={series['id']}")
@@ -314,8 +331,10 @@ def notify_arr(path):
             wait_for_command(entry["url"], key, cmd)
             LOGGER.info("sonarr: unmonitored %d episode(s) of %s",
                         len(ids), series["title"])
+            return rename(entry, key, series["id"], ef["id"]) if ef else None
     except (error.URLError, error.HTTPError, ET.ParseError, OSError) as exc:
         LOGGER.warning("%s: could not notify: %s", entry["name"], exc)
+        return None
 
 
 class Budget:
@@ -404,7 +423,12 @@ def process_one(size, path, info, state, state_lock, arr_lock, budget):
         if UNMONITOR:
             # Serialised so sonarr never rescans one series twice at once.
             with arr_lock:
-                notify_arr(path)
+                renamed = notify_arr(path)
+            if renamed and renamed != path:
+                with state_lock:
+                    state[str(renamed)] = state.pop(str(path))
+                    save_state(state)
+                LOGGER.info("%s: renamed to %s", path.name, renamed.name)
         return True
     finally:
         budget.release(size)
