@@ -32,6 +32,10 @@
     impermanence.url = "github:nix-community/impermanence";
     import-tree.url = "github:vic/import-tree";
     jellarr.url = "github:venkyr77/jellarr";
+    launchpad = {
+      url = "git+https://knot.lvdar.nl/did:plc:3l35i5iht5tqeoeqlfxzgkls?shallow=1";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
     make-shell.url = "github:nicknovitski/make-shell";
     modpacks = {
       url = "git+https://knot.lvdar.nl/did:plc:lz6wnhglzbatsbxadexhf3bx?shallow=1";
@@ -53,10 +57,6 @@
     nixpkgs-stable.url = "github:NixOS/nixpkgs/nixos-25.11";
     nixpkgs-unstable.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
     nixpkgs-zotero-pin.url = "github:nixos/nixpkgs/4533d9293756b63904b7238acb84ac8fe4c8c2c4";
-    nixvim = {
-      url = "github:nix-community/nixvim";
-      inputs.nixpkgs.follows = "nixpkgs";
-    };
     noctalia-netbird = {
       url = "git+https://knot.lvdar.nl/did:plc:cqv2kfof3l53jrrzj553e6fb?shallow=1";
       flake = false;
