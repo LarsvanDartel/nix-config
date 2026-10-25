@@ -1,0 +1,30 @@
+#!/bin/sh
+# js — DOMjudge's JavaScript compile script with Node.js from the Nix closure
+# mounted at /nix in the judge chroot. Writes $DEST as a wrapper that runs
+# the source.
+#
+# runguard leaves the stack unlimited (memory is capped by cgroup), but V8
+# stops at its own ~1 MB: give it half the memory limit so deep recursion
+# behaves as in the compiled languages.
+DEST="$1"
+MEMLIMIT="$2"
+shift 2
+MAINSOURCE="${ENTRY_POINT:-$1}"
+if [ -z "$ENTRY_POINT" ]; then
+	echo "Info: detected entry_point: $MAINSOURCE"
+fi
+
+for file in "$@"; do
+	case $file in
+	*.js) @node@ --check "$file" || exit ;;
+	esac
+done
+
+cat >"$DEST" <<EOF
+#!/bin/sh
+if [ "\${0%/*}" != "\$0" ]; then
+	cd "\${0%/*}"
+fi
+exec @node@ --stack-size=$((MEMLIMIT / 2)) "$MAINSOURCE" "\$@"
+EOF
+chmod a+x "$DEST"

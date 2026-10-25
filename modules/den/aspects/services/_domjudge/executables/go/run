@@ -1,0 +1,27 @@
+#!/bin/sh
+# go — Go compile script (DOMjudge has no default) with Go from the Nix closure
+# mounted at /nix in the judge chroot. CGO is off, so binaries are static.
+#
+# Go sizes its thread pools by CPU count, but runguard caps the judge user at
+# 64 tasks on a 72-CPU host: GOMAXPROCS keeps the compiler and the
+# submission under it.
+DEST="$1"
+BIN="$(basename "$DEST").bin"
+shift 2 # DEST, MEMLIMIT
+
+# A fresh cache per compile: the std packages are rebuilt each time.
+GOCACHE="$PWD/go_cache" GOPATH="$PWD/go_path" HOME=/does/not/exist \
+	GOTOOLCHAIN=local CGO_ENABLED=0 GOMAXPROCS=4 \
+	@go@/bin/go build -p 4 -o "$DEST.bin" "$@"
+EXITCODE=$?
+rm -rf go_cache go_path
+[ "$EXITCODE" -ne 0 ] && exit "$EXITCODE"
+
+cat >"$DEST" <<EOF
+#!/bin/sh
+if [ "\${0%/*}" != "\$0" ]; then
+	cd "\${0%/*}"
+fi
+GOMAXPROCS=1 exec ./$BIN "\$@"
+EOF
+chmod a+x "$DEST"
