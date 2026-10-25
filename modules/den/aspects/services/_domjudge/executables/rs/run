@@ -1,0 +1,13 @@
+#!/bin/sh
+# rs — DOMjudge's Rust compile script with the official rustc from the Nix
+# closure mounted at /nix in the judge chroot; it links with the chroot's cc.
+# Unlike upstream's, a failed compile is not reported as success.
+DEST="$1"
+shift 2 # DEST, MEMLIMIT
+
+# rustc needs a writable TMPDIR; the chroot's /tmp is not.
+mkdir rust_tmp_dir
+TMPDIR=rust_tmp_dir @rust@/bin/rustc --edition 2021 -C opt-level=3 -o "$DEST" "$@"
+EXITCODE=$?
+rm -rf rust_tmp_dir
+exit $EXITCODE
