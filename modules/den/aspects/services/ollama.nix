@@ -178,6 +178,7 @@ in {
     nixos = {
       config,
       lib,
+      pkgs,
       ...
     }: let
       inherit (lib.options) mkOption;
@@ -213,6 +214,24 @@ in {
 
       config = {
         cosmos.services.netbird.client.exposedPorts = [cfg.port];
+
+        # Upstream's binary, not nixpkgs' `mongodb`: SSPL is unfree, so Hydra
+        # never caches it, and every staging merge meant hours of compiling
+        # it here. Held on 7.0, the data's FCV: majors upgrade one at a time.
+        services.mongodb.package = let
+          version = "7.0.45";
+        in
+          lib.warnIf (lib.versionOlder version pkgs.mongodb.version) ''
+            modules/den/aspects/services/ollama.nix: nixpkgs' mongodb is now ${pkgs.mongodb.version}, ahead of the ${version} binary.
+            Bump version + hash to the newest 7.0.x (downloads.mongodb.org/current.json); for a new major, raise the FCV first.
+          ''
+          (pkgs.mongodb-ce.overrideAttrs {
+            inherit version;
+            src = pkgs.fetchurl {
+              url = "https://fastdl.mongodb.org/linux/mongodb-linux-x86_64-ubuntu2204-${version}.tgz";
+              hash = "sha256-wu7B5Krulng4QwrFf8fUbCL1ZscY7aYDPjKt2A1Qb4s=";
+            };
+          });
 
         services.librechat = {
           enable = true;
