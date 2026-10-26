@@ -47,4 +47,6 @@
       };
     })
   ];
+
+  perSystem = {pkgs, ...}: {packages.update-blocklists = pkgs.update-blocklists;};
 }

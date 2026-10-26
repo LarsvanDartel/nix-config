@@ -60,4 +60,5 @@ steps:
         .#checks.x86_64-linux.treefmt \
         .#checks.x86_64-linux.pre-commit \
         .#checks.x86_64-linux.check-flake-file \
-        .#checks.x86_64-linux.default-shell
+        .#checks.x86_64-linux.default-shell \
+        .#checks.x86_64-linux.docs

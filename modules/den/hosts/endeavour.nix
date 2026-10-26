@@ -260,7 +260,7 @@ in {
         loki.dataDir = "/tank/monitoring/loki";
         ollama.modelsDir = "/tank/ollama/models";
 
-        # Credentials are sops secrets — see docs/RESTORE.md.
+        # Credentials are sops secrets — see docs/src/restore.md.
         restic.repository = "sftp:u649268@u649268.your-storagebox.de:/endeavour";
 
         tangled = {

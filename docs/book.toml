@@ -1,0 +1,8 @@
+[book]
+title = "cosmos — lvdar's NixOS fleet"
+authors = ["lvdar"]
+language = "en"
+src = "src"
+
+[build]
+create-missing = false

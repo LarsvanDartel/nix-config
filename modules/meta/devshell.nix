@@ -17,6 +17,7 @@
         git
         pre-commit
         deadnix
+        mdbook
         inputs'.launchpad.packages.nvim-nix
       ];
       shellHook = config.pre-commit.installationScript;
