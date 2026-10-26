@@ -9,7 +9,7 @@
     inherit (lib.options) mkEnableOption mkOption;
     inherit (lib.types) bool int float listOf str;
     inherit (lib.modules) mkIf;
-    inherit (lib.strings) optionalString concatMapStringsSep hasInfix;
+    inherit (lib.strings) optionalString concatMapStringsSep;
 
     cfg = config.cosmos.hardware.ipmi-fancontrol;
     pollInterval = toString cfg.pollInterval;
@@ -17,24 +17,7 @@
     manualSpeed = toString cfg.manualSpeed;
     curve = toString cfg.curve;
     gpuMaxTemp = toString cfg.nvidia-smi.maxTemp;
-    nvidia_x11 = config.hardware.nvidia.package;
-
-    # nixpkgs#576412: patchelf 0.19.2 setting interpreter and rpath in one call
-    # yields overlapping LOAD segments, and the driver's nvidia-smi segfaults
-    # in ld.so. This loop set the fans to manual first, then died: fans stuck.
-    # Re-patch the pristine origBin copy in two calls, rpath first (the fix in
-    # nixpkgs#576397); warns once the locked builder.sh drops the combined call.
-    nvidiaBuilder = pkgs.path + "/pkgs/os-specific/linux/nvidia-x11/builder.sh";
-    nvidiaSmi =
-      lib.warnIfNot (builtins.pathExists nvidiaBuilder && hasInfix "--set-rpath $out/lib:$libPath $bin/bin/$i" (builtins.readFile nvidiaBuilder)) ''
-        modules/den/aspects/hardware/ipmi-fancontrol.nix: nixpkgs' nvidia builder no longer sets interpreter and rpath in one patchelf call (nixpkgs#576397).
-        Drop nvidiaSmi and use the driver's own nvidia-smi.
-      ''
-      (pkgs.runCommand "nvidia-smi-repatched" {nativeBuildInputs = [pkgs.patchelf];} ''
-        install -Dm755 ${nvidia_x11.bin}/origBin/nvidia-smi $out/bin/nvidia-smi
-        patchelf --set-rpath "$(patchelf --print-rpath ${nvidia_x11.bin}/bin/nvidia-smi)" $out/bin/nvidia-smi
-        patchelf --interpreter "$(patchelf --print-interpreter ${nvidia_x11.bin}/bin/nvidia-smi)" $out/bin/nvidia-smi
-      '');
+    nvidiaSmi = "${config.hardware.nvidia.package.bin}/bin/nvidia-smi";
   in {
     options.cosmos.hardware.ipmi-fancontrol = {
       dynamic = mkOption {
@@ -114,7 +97,7 @@
                 done
 
                 ${optionalString cfg.nvidia-smi.enable ''
-                gpu_temp=$(${nvidiaSmi}/bin/nvidia-smi --query-gpu=temperature.gpu --format=csv,noheader,nounits | head -n1)
+                gpu_temp=$(${nvidiaSmi} --query-gpu=temperature.gpu --format=csv,noheader,nounits | head -n1)
                 gpu_ratio=$(${pkgs.gawk}/bin/awk "BEGIN {print $gpu_temp / ${gpuMaxTemp}}")
                 [ "$(${pkgs.gawk}/bin/awk "BEGIN {print ($gpu_ratio > 1)}")" -eq 1 ] && gpu_ratio=1
                 [ "$(${pkgs.gawk}/bin/awk "BEGIN {print ($gpu_ratio > $max_ratio)}")" -eq 1 ] && max_ratio=$gpu_ratio
