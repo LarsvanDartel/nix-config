@@ -6,16 +6,16 @@
 {...}: {
   nixpkgs.overlays = [
     (final: prev: let
-      version = "1.20.1";
+      version = "1.22.0";
 
       src = final.fetchFromGitHub {
         owner = "confirm";
         repo = "tino";
         tag = version;
-        hash = "sha256-EnFlCeX0QGNfuTPKF8kveg1Z7ryAsqQbUoQv1BRZw1I=";
+        hash = "sha256-OS7XZdqGu98Y9hNO7JihBV1sU3ATx91xZAYNW8bGiPc=";
       };
 
-      # https://github.com/confirm/tino/blob/1.20.1/Makefile — vendor-css.
+      # https://github.com/confirm/tino/blob/1.22.0/Makefile — vendor-css.
       coloursCss = final.fetchurl {
         url = "https://assets.confirm.ch/colours.css";
         hash = "sha256-QIMWQAGqD1V15fCZ8vUjGL6QE+BiHrFVdkbRnejvQE4=";
@@ -80,6 +80,11 @@
               postPatch = ''
                 install -Dm444 ${coloursCss} tino/static/css/vendor/colours.css
                 install -Dm444 ${codemirrorBundle}/codemirror.js tino/static/js/vendor/codemirror.js
+
+                # Same lockstep pinning as pythonRelaxDeps, but on the build
+                # backend, which that does not reach.
+                substituteInPlace pyproject.toml \
+                  --replace-fail "'setuptools>=84.2.1'" "'setuptools'"
 
                 # GEWIS's own crest (github.com/gewis/aurora's
                 # infoscherm/public_html/images/gewislogo.svg), recoloured
@@ -170,6 +175,12 @@
               env.SETUPTOOLS_SCM_PRETEND_VERSION = version;
 
               pythonImportsCheck = ["tino"];
+
+              # Deps are relaxed (above), so upstream's suite is what proves a
+              # nixpkgs bump left them API-compatible (mcp 2.x broke 1.20.1).
+              nativeCheckInputs = [pyFinal.pytestCheckHook final.gitMinimal final.typst];
+              # Asserts the id_token_hint the auth.py patch above removes.
+              disabledTests = ["test_logout_includes_id_token_hint"];
 
               meta = {
                 description = "Collaborative, self-hosted editing platform around Typst";
