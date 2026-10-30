@@ -20,6 +20,10 @@ Keys are kebab-case paths nested under `keys`; each host's file is encrypted to 
 |user age key|`~/.config/sops/age/keys.txt` on voyager, a symlink to `/run/secrets/keys/age`|recipient of every file (`&lvdar` on every creation rule); home-manager's sops decrypts with it|
 |`keys/ssh/voyager` (device key), `keys/ssh/idrac`|`hosts/voyager/secrets.yaml`|voyager only, placed by `home.ssh` into `~/.ssh/id_voyager`, `~/.ssh/id_idrac` (and `~/.ssh/id_ed25519` for the device key). Public halves in `modules/den/aspects/core/_ssh-keys/`|
 |`keys/flake-bump/ssh-key`|`hosts/endeavour/secrets.yaml`|build-gate and flake-bump on endeavour, pushing to the knot|
+|`keys/knot/env` (`KNOT_MASTER_KEY`), `keys/knot/repo-signing-keys`|`hosts/endeavour/secrets.yaml`|knot2: the master key unseals `/tank/knot/sealed-keys` (both are needed to restore the knot); the archive is the old knot's per-repo did:plc rotation keys, re-sealed at every start|
+|knot2's SSH host key|`/tank/knot/ssh_host_key` (snapshotted, restic)|presented for `git@knot.lvdar.nl`; its public half is pinned in core.ssh|
+|`keys/spindle/key`|`hosts/endeavour/secrets.yaml`|the P-256 key behind the spindle's did:web document|
+|`keys/pds/flake-bump-password`|`hosts/endeavour/secrets.yaml`|undeclared; logs in as the flake-bump bot (`flake-bump.pds.lvdar.nl`) to manage its key records|
 |YubiKey FIDO2 resident keys|on the YubiKeys (`ssh-keygen -K` recovers the handles)|break-glass root access ([SSH](networking.md#ssh))|
 
 Servers hold no user identity: nothing on endeavour, gaia or pioneer can log in anywhere as lvdar.
