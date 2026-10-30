@@ -11,11 +11,6 @@
   # filled the 511 MB ESP. nvidia loads at stage 2.
   facter.detected.boot.graphics.kernelModules = ["i915"];
 
-  boot = {
-    kernelParams = ["resume_offset=533760"];
-    resumeDevice = "/dev/disk/by-uuid/c2dc9bb7-f815-4c9c-bd96-68bebb100aef";
-  };
-
   hardware.nvidia = {
     open = true;
     powerManagement = {
