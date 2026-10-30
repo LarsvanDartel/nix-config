@@ -169,11 +169,19 @@
     # Every output gets its own persistent 1..9 (no `output` key).
     workspace = map (i: {name = toString i;}) (lib.range 1 9);
 
-    # As Noctalia's Umbriel compositor-settings page.
+    # As Noctalia's Umbriel compositor-settings page, except corners and
+    # shadows, which follow niri's: square tiles, and only floating windows
+    # rounded (6 px) with a shadow (window_rule below).
     appearance = {
       prefer_no_csd = true;
       border_width = 2;
-      corner_radius = 10;
+      corner_radius = 0;
+      shadow = {
+        enabled = false;
+        offset_x = 0;
+        offset_y = 4;
+        softness = 20;
+      };
       blur = {
         enabled = true;
         optimized = true;
@@ -191,6 +199,11 @@
       {
         blur = true;
         blur_optimized = true;
+      }
+      {
+        match.is_floating = true;
+        corner_radius = 6;
+        shadow = true;
       }
       {
         match.app_id = "^dev.noctalia.Noctalia$";
