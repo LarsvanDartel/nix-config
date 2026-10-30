@@ -105,6 +105,13 @@ in {
         # The master key unseals the per-repo signing keys; sops is its
         # off-server backup, and the sealed store is useless without it.
         sops.secrets."keys/knot/env" = {};
+        # knot-migrate's archive of the old knot's per-repo keys, which the
+        # repos' did:plc documents rotate on. Sealed at every start (idempotent);
+        # without it the plc reconciler gives up on every migrated repo.
+        sops.secrets."keys/knot/repo-signing-keys" = {
+          owner = config.services.tangled.knot-rs.user;
+          restartUnits = ["knot-rs.service"];
+        };
 
         services.tangled.knot-rs = {
           enable = true;
@@ -119,9 +126,18 @@ in {
               listen_addr = "0.0.0.0:${toString cfg.port}";
               ssh_listen_addr = "[::]:${toString cfg.sshPort}";
             };
-            atproto.plc_directory = "https://plc.directory";
+            atproto = {
+              plc_directory = "https://plc.directory";
+              repo_signing_keys = config.sops.secrets."keys/knot/repo-signing-keys".path;
+            };
+            # Public: served by org.tangled.knot.describeKnot.
+            contact.email = "lars@lvdar.nl";
+            # Required since v1.20.0 even without LFS in use.
+            lfs.store_path = "${cfg.stateDir}/lfs";
             # The migrated repositories are SHA-1; the module defaults to sha256.
             git.object_format = "sha1";
+            # TLS ends at netbird-proxy, so there is no certificate for h3.
+            tls.http3 = false;
             # Rate-limit visitors, not netbird-proxy.
             xrpc = lib.optionalAttrs (proxy != null) {
               trusted_proxy_header = "x-forwarded-for";
@@ -324,8 +340,14 @@ in {
           "L+ ${sCfg.imageDir}/nixos - - - - ${guestImage}"
         ];
 
+        sops.secrets."keys/spindle/key" = {};
+
         services.tangled.spindle = {
           enable = true;
+
+          # The key behind the spindle's did:web document; the spindle never makes one.
+          keyPath = config.sops.secrets."keys/spindle/key".path;
+          contact.email = "lars@lvdar.nl";
 
           server = {
             owner = cfg.owner;
