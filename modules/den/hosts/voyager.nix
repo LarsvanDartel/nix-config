@@ -19,11 +19,9 @@
       core.impermanence
       roles.desktop
       roles.gaming
-      desktop.hyprland
-      desktop.greetd.tuigreet
-      # Base-level, not specialisation-level: niri inherits the parent config
-      # and its binds read the Mod-tap option.
-      desktop.keyd
+      desktop.niri
+      desktop.greetd.noctalia
+      desktop.tablet
       services.containers
       services.netbird.client
       services.netbird-gewis
@@ -59,13 +57,14 @@
         home.simplelogin
         home.rbw
         home.remmina
+        home.xournalpp
+        home.rnote
+        home.krita
       ];
 
       homeManager = {pkgs, ...}: {
         cosmos = {
           cli.programs.yazi.defaultApplication = true;
-
-          desktops.hyprland.animations.enable = false;
 
           desktops.wallpapers.rotate.count = 20;
 
@@ -207,45 +206,16 @@
 
       cosmos.system.impermanence.device = "/dev/mapper/crypted";
 
-      # Specialisation bodies can't `include` den aspects; niri content comes
-      # from the factory modules. nh 4.4.1 reads /etc/specialisation to stay
-      # in the booted one (NixOS never writes it). Without configurationName
-      # GRUB dates every entry 1970-01-01.
-      specialisation = {
-        hyprland.configuration = {
-          environment.etc.specialisation.text = "hyprland";
-          boot.loader.grub.configurationName = "Hyprland";
-        };
+      cosmos.profiles.desktop.addons.greetd.noctalia.defaultSession = "niri";
 
-        niri.configuration = {
-          boot.loader.grub.configurationName = "niri + noctalia";
-
-          imports = [
-            (import ../aspects/desktop/_niri/system.nix {inherit inputs;})
-            # noctalia greeter to match the shell.
-            (import ../aspects/desktop/_greetd/noctalia.nix {})
-          ];
-
-          environment.etc.specialisation.text = "niri";
-
-          cosmos.profiles.desktop.addons.greetd.noctalia.defaultSession = "niri";
-
-          programs.hyprland.enable = lib.mkForce false;
-
-          home-manager.users.lvdar = {
-            imports = [
-              (import ../aspects/home/desktop/_noctalia/home.nix {inherit inputs;})
-              (import ../aspects/desktop/_niri/home.nix {})
-            ];
-
-            wayland.windowManager.hyprland.enable = lib.mkForce false;
-            programs.waybar.enable = lib.mkForce false;
-            programs.hyprlock.enable = lib.mkForce false;
-            programs.rofi.enable = lib.mkForce false;
-            services.mako.enable = lib.mkForce false;
-            services.hyprpaper.enable = lib.mkForce false;
-          };
-        };
+      # Boot-time choice; specialisation bodies can't `include` den aspects, so Umbriel comes from the _umbriel factories. nh 4.4.1 reads /etc/specialisation to stay in the booted one. Without configurationName GRUB dates every entry 1970-01-01.
+      specialisation.umbriel.configuration = {
+        boot.loader.grub.configurationName = "umbriel + noctalia";
+        environment.etc.specialisation.text = "umbriel";
+        imports = [(import ../aspects/desktop/_umbriel/system.nix {})];
+        # The entry's Name= (and DesktopNames=) is "Umbriel".
+        cosmos.profiles.desktop.addons.greetd.noctalia.defaultSession = lib.mkForce "Umbriel";
+        home-manager.users.lvdar.imports = [(import ../aspects/home/desktop/_umbriel/home.nix {})];
       };
 
       # Push the desktop closure and pioneer's toplevel (built on endeavour,

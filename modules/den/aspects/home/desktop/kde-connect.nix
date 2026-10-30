@@ -35,16 +35,12 @@
         name = "KDE Connect Indicator";
         settings.NoDisplay = "true";
       };
-      "org.kde.kdeconnect.app" = {
-        exec = "";
-        name = "KDE Connect";
-        settings.NoDisplay = "true";
-      };
     };
 
+    # noctalia's phone-connect bar widget replaces the tray indicator.
     services.kdeconnect = {
       enable = true;
-      indicator = true;
+      indicator = false;
     };
   };
 }

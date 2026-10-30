@@ -1,5 +1,5 @@
-# The niri system config, as a plain NixOS module factory shared by
-# `den.aspects.desktop.niri` and voyager's `specialisation.niri`.
+# The niri system config, as a plain NixOS module factory imported by its
+# aspect `den.aspects.desktop.niri`.
 {inputs}: {
   config,
   lib,
@@ -39,7 +39,7 @@
   ];
 
   # Refer to the workspaces by NAME (see `workspaces` below): named workspaces
-  # always exist, so 1..9 are permanently available like Hyprland's.
+  # always exist, so 1..9 are permanently available.
   workspaceBinds = lib.listToAttrs (
     lib.flatten (
       lib.imap1 (i: key: let
@@ -82,8 +82,18 @@
           accel-profile = "flat";
           accel-speed = 0.0;
         };
-        # No focus-follows-mouse: niri has no equivalent of Hyprland's
-        # detached `follow_mouse = 2`.
+        # No focus-follows-mouse: niri has no detached follow mode.
+
+        # Inert without a touchscreen or stylus.
+        touch.map-to-output = "eDP-1";
+        tablet.map-to-output = "eDP-1";
+      };
+
+      # wvkbd runs hidden (desktop.tablet); SIGUSR2 shows, SIGUSR1 hides.
+      # switch-events only take argv `spawn`.
+      switch-events = {
+        tablet-mode-on.spawn = ["pkill" "-USR2" "-x" "wvkbd-mobintl"];
+        tablet-mode-off.spawn = ["pkill" "-USR1" "-x" "wvkbd-mobintl"];
       };
 
       layout = {
@@ -313,6 +323,6 @@ in {
     }
   ];
 
-  # Not gated like hyprland.nix: this module is only loaded when niri is active.
+  # noctalia runs under every session here, so this also locks Umbriel.
   cosmos.profiles.desktop.lockCommand = noctalia "session lock";
 }

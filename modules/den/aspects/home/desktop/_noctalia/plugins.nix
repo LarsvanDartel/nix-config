@@ -65,16 +65,18 @@ in {
           enabled = true;
         }
       ];
-      enabled = [
-        "damian-ds7/battery-threshold" # needs hardware.thinkpad's battery_ctl udev rule
-        "piero-93/thinkpad-fan" # needs thinkpad_acpi fan_control=1 (hardware.thinkpad)
-        "kenn/keybind-cheatsheet" # parses ~/.config/niri/config.kdl (_niri/home.nix)
-        "raycursive/niri-displays"
-        "icefish/phone-connect"
-        "alexander/screen-toolkit"
-        "lvdar/netbird"
-        "vinnyduke/rbw-launcher" # launcher prefix /rbw
-      ];
+      enabled =
+        [
+          "damian-ds7/battery-threshold" # needs desktop.power's battery_ctl udev rule
+          "kenn/keybind-cheatsheet" # parses ~/.config/niri/config.kdl (_niri/home.nix)
+          "raycursive/niri-displays"
+          "icefish/phone-connect"
+          "alexander/screen-toolkit"
+          "lvdar/netbird"
+          "vinnyduke/rbw-launcher" # launcher prefix /rbw
+        ]
+        # needs thinkpad_acpi fan_control=1 (hardware.thinkpad)
+        ++ lib.optional config.cosmos.desktops.noctalia.thinkpadFan "piero-93/thinkpad-fan";
     };
     plugin_settings."lvdar/netbird" = {
       instance_labels = {
@@ -86,19 +88,7 @@ in {
     };
   };
 
-  # phone-connect's bar widget replaces the tray indicator. mkForce: home.kde-connect
-  # must keep it enabled for Hyprland, where the tray icon is the only way in.
-  services.kdeconnect.indicator = lib.mkForce false;
-
-  # home.kde-connect hides the launcher entry; restore it for per-device config.
-  xdg.desktopEntries."org.kde.kdeconnect.app" = {
-    exec = lib.mkForce "kdeconnect-app";
-    icon = lib.mkForce "kdeconnect";
-    categories = lib.mkForce ["Qt" "KDE" "Network"];
-    settings.NoDisplay = lib.mkForce "false";
-  };
-
-  # niri and hyprctl come from the compositor's session PATH.
+  # niri comes from the compositor's session PATH.
   home.packages = with pkgs; [
     # screen-toolkit
     slurp

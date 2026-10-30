@@ -1,5 +1,5 @@
-# The noctalia greeter, as a plain NixOS module factory shared by
-# `den.aspects.desktop.greetd.noctalia` and voyager's `specialisation.niri`.
+# The noctalia greeter, as a plain NixOS module imported by its aspect
+# `den.aspects.desktop.greetd.noctalia`.
 #
 # It hardcodes /usr/share/wayland-sessions (hence the tmpfiles symlink) and
 # calls cage/wlr-randr/dbus-run-session by name with no PATH (hence the
@@ -41,9 +41,9 @@ in {
       type = str;
       default = "greeter";
       description = ''
-        Account the greeter runs as. Unlike tuigreet this is a graphical
-        session with its own writable state, so it uses the dedicated system
-        user greetd already creates rather than the primary user.
+        Account the greeter runs as. A graphical session with its own
+        writable state, so it uses the dedicated system user greetd already
+        creates rather than the primary user.
       '';
     };
 
@@ -146,7 +146,7 @@ in {
       "f /var/log/noctalia-greeter.log 0664 ${cfg.user} ${cfg.user} -"
     ];
 
-    # A Wayland greeter must not get tuigreet's tty, or systemd hangs the unit.
+    # A Wayland greeter must not get a tty, or systemd hangs the unit.
     systemd.services.greetd.serviceConfig = {
       StandardInput = mkForce "null";
       StandardOutput = mkForce "journal";

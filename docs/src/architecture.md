@@ -9,7 +9,7 @@ Generated `flake.nix` → `mkFlake` + `import-tree ./modules` → every module a
 Lives in `modules/den/`.
 
 - **Aspect** = the unit of configuration: `den.aspects.<group>.<name>` with any of `includes` (other aspects), `nixos` (NixOS module), `homeManager` (HM module), `provides.*` (cross-entity edges, below), and quirk keys (`kanidm-provision`, `netbird-service`, `scrape-target`, `mesh-dns-record`).
-- **Where config lands**: host scope delivers only `nixos`; a `homeManager` key on a host-included aspect is **silently dropped**. Host → its users: `provides.to-users` (e.g. `services.eduvpn`, `roles.gaming`, `desktop.hyprland`, `desktop.styling`, `services.netbird-gewis`). User → its hosts: `provides.to-hosts` (e.g. `home.kde-connect`, `home.catt`, `home.taskwarrior`). Never a plain `nixos` key on a user-scope aspect: that only works through den bug #694. Host-specific user config goes in `den.aspects.<host>.provides.<user>`, not a host child named after the user.
+- **Where config lands**: host scope delivers only `nixos`; a `homeManager` key on a host-included aspect is **silently dropped**. Host → its users: `provides.to-users` (e.g. `services.eduvpn`, `roles.gaming`, `desktop.niri`, `desktop.tablet`, `desktop.styling`, `hardware.thinkpad`, `services.netbird-gewis`). User → its hosts: `provides.to-hosts` (e.g. `home.kde-connect`, `home.catt`, `home.taskwarrior`). Never a plain `nixos` key on a user-scope aspect: that only works through den bug #694. Host-specific user config goes in `den.aspects.<host>.provides.<user>`, not a host child named after the user.
 - **Roles** (`modules/den/aspects/roles/`): `default` (every host, `den.schema.host.includes`), `server` (via the `server-role` policy when the host entity has `server = true`), `desktop`, `desktop-home`, `gaming`, `home-base` (every user, `den.schema.user.includes`).
 - **Hosts** (`modules/den/hosts/<host>.nix`) register `den.hosts.<arch>.<host> = { users.<user> = {}; meshAddress; server; deployAddress; }` (facts declared in `modules/den/schema.nix`) and define a per-host aspect stacking roles + individual aspects + hardware imports. Every host has exactly one user (asserted); `cosmos.user.name` is derived from it.
 - `modules/den/defaults.nix`: what every host/user gets (batteries, `core.nixpkgs`, `core.home-manager`, HM class for all users, `roles.default` per host, user-shell zsh + `roles.home-base` per user).
@@ -33,7 +33,7 @@ Lives in `modules/den/`.
 
 ## `_`-prefixed files
 
-**`_`-prefixed files/dirs are skipped by import-tree** — they hold plain modules/assets imported explicitly by the aspect that needs them (e.g. `aspects/home/desktop/_styling/` → `styling.nix` does `homeManager.imports = [./_styling]`). Recurring reason: specialisation bodies are plain NixOS modules that cannot `include` den aspects, so shared content lives in parameterized factories (e.g. `_niri/system.nix`) called from both the aspect and the specialisation.
+**`_`-prefixed files/dirs are skipped by import-tree** — they hold plain modules/assets imported explicitly by the aspect that needs them (e.g. `aspects/home/desktop/_styling/` → `styling.nix` does `homeManager.imports = [./_styling]`). Recurring reason: specialisation bodies are plain NixOS modules that cannot `include` den aspects, so specialisation content lives in parameterized factories (e.g. `desktop/_umbriel/system.nix` and `home/desktop/_umbriel/home.nix`, imported by voyager's Umbriel specialisation). Hardware profiles (`hosts/_hw/voyager/`) follow the same shape.
 
 ## Cross-host data
 

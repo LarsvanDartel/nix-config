@@ -1,5 +1,5 @@
-# desktop.keyd — tap/hold on the Mod key. niri (and Hyprland) cannot bind a
-# bare modifier tap; keyd resolves tap-vs-hold at evdev level below xkb.
+# desktop.keyd — tap/hold on the Mod key. niri cannot bind a bare modifier
+# tap; keyd resolves tap-vs-hold at evdev level below xkb.
 # keyd grabs every keyboard; escape hatch is backspace+escape+enter.
 {...}: {
   den.aspects.desktop.keyd.nixos = {
