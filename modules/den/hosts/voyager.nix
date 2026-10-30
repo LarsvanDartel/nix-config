@@ -10,6 +10,7 @@
   den.hosts.x86_64-linux.voyager = {
     users.lvdar = {};
     meshAddress = "100.68.60.163";
+    sshHostKey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIDVfDaFhgvfE2K47EGx8P+eL6od9H/oFKQZNeXvfr6Uh";
   };
 
   den.aspects.voyager = {
@@ -136,6 +137,10 @@
         # Direct over the mesh rather than through gaia; creds from sops.
         programs.taskwarrior.sync.serverUrl = "http://endeavour.nb.lvdar.nl:10222";
       };
+
+      # A laptop joins foreign networks: sshd only over the mesh.
+      services.openssh.openFirewall = false;
+      cosmos.services.netbird.client.exposedPorts = [2222];
 
       # Keep nvidia (103 MB GSP firmware) out of the initrd: three copies
       # filled the 511 MB ESP. nvidia loads at stage 2.

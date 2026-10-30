@@ -8,7 +8,8 @@
   inherit (cosmosLib) get-file-names get-flake-path get-file-name-without-extension;
 
   keys-path = get-flake-path "modules/den/aspects/core/_ssh-keys";
-  available-identities = map (name: builtins.replaceStrings ["id_" ".pub"] ["" ""] name) (get-file-names keys-path);
+  # Only id_*.pub are identities; yubikey-*.pub and authorized.nix sit beside them.
+  available-identities = map (name: builtins.replaceStrings ["id_" ".pub"] ["" ""] name) (lib.filter (lib.hasPrefix "id_") (get-file-names keys-path));
 
   servers = lib.filter (h: h.server) (lib.attrValues (lib.mergeAttrsList (lib.attrValues den.hosts)));
   # One Host block below serves every server, so they must share an account.
@@ -41,7 +42,7 @@ in {
     options.cosmos.cli.programs.ssh = {
       identities = mkOption {
         type = listOf (enum available-identities);
-        default = [osConfig.networking.hostName];
+        default = [];
       };
     };
 
@@ -52,7 +53,7 @@ in {
 
         # Servers' account (else a misleading "Permission denied
         # (publickey)"). Must precede the catch-all (ssh keeps the first value).
-        # Port 2222: NetBird hijacks :22 on mesh addresses. See core/ssh.nix.
+        # Port 2222: sshd's only port, NetBird owns :22 on mesh addresses. See core/ssh.nix.
         settings."*.nb.lvdar.nl" = entryBefore ["*"] {
           User = serverUser;
           Port = 2222;
@@ -67,7 +68,7 @@ in {
 
         settings."*" = {
           addKeysToAgent = "yes";
-          forwardAgent = true;
+          forwardAgent = false;
           compression = false;
           serverAliveInterval = 0;
           serverAliveCountMax = 3;
@@ -89,8 +90,8 @@ in {
           })
           keys
         )
-        // {
-          # Default paths for tools that don't read IdentityFile; every host key is ed25519.
+        // lib.optionalAttrs (lib.elem osConfig.networking.hostName cfg.identities) {
+          # Default paths for tools that don't read IdentityFile; every device key is ed25519.
           ".ssh/id_ed25519.pub".source = keys-path + "/id_${osConfig.networking.hostName}.pub";
           ".ssh/id_ed25519".source = config.lib.file.mkOutOfStoreSymlink config.sops.secrets."keys/ssh/${osConfig.networking.hostName}".path;
         };

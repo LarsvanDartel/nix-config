@@ -84,6 +84,7 @@
 in {
   den.aspects.home.git.homeManager = {
     config,
+    osConfig,
     lib,
     ...
   }: let
@@ -92,7 +93,7 @@ in {
     inherit (lib.strings) fileContents;
 
     cfg = config.cosmos.cli.programs.git;
-    publicKey = "${config.cosmos.user.home}/.ssh/id_voyager.pub";
+    publicKey = "${config.cosmos.user.home}/.ssh/id_ed25519.pub";
   in {
     options.cosmos.cli.programs.git = {
       user = mkOption {
@@ -136,21 +137,19 @@ in {
             user = {
               name = cfg.user;
               inherit (cfg) email;
-              signingkey = publicKey;
             };
             url = {
               "git@github.com:${cfg.user}".insteadOf = "lvdar";
               "git@github.com:".insteadOf = "gh:";
             };
-            gpg.format = "ssh";
             gpg.ssh.allowedSignersFile = "${config.cosmos.user.home}/.ssh/allowed_signers";
-            commit.gpgsign = true;
           };
 
-        signing = {
+        # Only where home.ssh links ~/.ssh/id_ed25519 to this host's device key.
+        signing = lib.mkIf (lib.elem osConfig.networking.hostName config.cosmos.cli.programs.ssh.identities) {
           signByDefault = true;
           key = publicKey;
-          format = "openpgp";
+          format = "ssh";
         };
       };
 

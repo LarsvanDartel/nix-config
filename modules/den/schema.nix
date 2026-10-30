@@ -40,6 +40,14 @@
             default = "${config.name}.nb.lvdar.nl";
             description = "Address deploy-rs connects to.";
           };
+
+          # Pinned in every host's known_hosts (core.ssh) and in endeavour's builder authorization.
+          # Reinstalling with a fresh key means updating this and .sops.yaml together.
+          sshHostKey = lib.mkOption {
+            type = lib.types.nullOr lib.types.str;
+            default = null;
+            description = "The host's ed25519 SSH host public key (`ssh-ed25519 AAAA…`, no comment).";
+          };
         };
       })
     ];

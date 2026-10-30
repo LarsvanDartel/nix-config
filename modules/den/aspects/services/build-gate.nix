@@ -34,7 +34,8 @@
           # writes transfer progress to stderr with no tty attached and alloy
           # ships this journal to loki.
           export GIT_TERMINAL_PROMPT=0
-          export GIT_SSH_COMMAND="ssh -i ${cfg.sshKeyFile} -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new"
+          # knot.lvdar.nl is pinned in core.ssh's knownHosts.
+          export GIT_SSH_COMMAND="ssh -i ${cfg.sshKeyFile} -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes"
 
           if [ ! -d "$repo/.git" ]; then
             echo "cloning ${cfg.repository}"

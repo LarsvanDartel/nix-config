@@ -27,6 +27,7 @@ in {
     users.nixos = {};
     meshAddress = "100.68.151.172";
     server = true;
+    sshHostKey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIN8dP163K/E3NFCJNu0xw4OS1JPGRq5bs5O07bn+6oif";
   };
 
   den.aspects.endeavour = {
@@ -351,6 +352,16 @@ in {
       # resetting legitimate git traffic ("kex_exchange_identification:
       # Connection reset", build-gate 2026-08-15). crowdsec sheds scanners.
       services.openssh.settings.PerSourcePenaltyExemptList = den.hosts.x86_64-linux.gaia.meshAddress;
+
+      # gaia's public :22 is DNAT'd here, so internet clients arrive as gaia's mesh IP:
+      # only the knot's git user may log in that way. `*,!git`: a negation-only
+      # pattern list never matches. mkBefore: the knot appends `Match User git`
+      # (services/tangled.nix), and lines after it land inside that block.
+      services.openssh.extraConfig = lib.mkBefore ''
+        Match Address ${den.hosts.x86_64-linux.gaia.meshAddress} User *,!git
+          PubkeyAuthentication no
+        Match all
+      '';
 
       hardware = {
         nvidia = {
