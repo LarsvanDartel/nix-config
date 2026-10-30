@@ -3,6 +3,10 @@
 # printer's mDNS name does not resolve without the nss module, see below).
 {...}: {
   den.aspects.desktop.printing.nixos = {
+    pkgs,
+    lib,
+    ...
+  }: {
     # .local names resolve through resolved's mDNS responder, which is already
     # on for netbird-gewis's split DNS. Not nssmdns4: it races resolved's
     # responder, and avahi would only duplicate that responder.
@@ -31,5 +35,34 @@
         }
       ];
     };
+
+    # cups-filters ≥1.25.12 prefers Apple Raster (image/urf) over PWG Raster
+    # whenever a driverless printer advertises both, but the TS5100's URF
+    # duplex path prints the front side, turns the sheet, then ends the job
+    # (OpenPrinting/cups-filters#660, same bug on other Canon models). The
+    # printer's own IPP attributes advertise full PWG Raster support, so
+    # force the generated PPD onto that filter once lpadmin has (re)created
+    # it.
+    systemd.services.ts5100-pwg-raster-ppd =
+      lib.mkIf
+      (lib.warnIf (pkgs.cups-filters.version != "2.0.1") ''
+          modules/den/aspects/desktop/printing.nix: nixpkgs' cups-filters moved
+          off 2.0.1, the version this URF-duplex workaround was written
+          against. Reprint a multi-page duplex job; if the back sides print,
+          delete this service and the comment above it.
+        ''
+        true)
+      {
+        description = "Force the ts5100 queue onto PWG Raster instead of URF";
+        after = ["ensure-printers.service"];
+        requires = ["ensure-printers.service"];
+        wantedBy = ["multi-user.target"];
+        serviceConfig = {
+          Type = "oneshot";
+          RemainAfterExit = true;
+          ExecStart = "${pkgs.gnused}/bin/sed -i 's#image/urf image/urf#image/pwg-raster image/pwg-raster#' /etc/cups/ppd/ts5100.ppd";
+          ExecStartPost = "${pkgs.systemd}/bin/systemctl try-restart cups.service";
+        };
+      };
   };
 }
