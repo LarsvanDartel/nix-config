@@ -13,10 +13,50 @@
 
     cfg = config.cosmos.desktops.input.modTap;
 
-    # Spare keycodes whose XKB keysyms are XF86Launch1..9 in every layout.
-    workspaceKeycodes = ["prog1" "prog2" "prog3" "prog4" "f14" "f15" "f16" "f17" "f18"];
+    # Mod + digit key N is sent as key N here: keyd's name, and the XKB keysym it
+    # arrives as in every layout. keyd's names are its own, not the kernel's:
+    # its prog1..4 are F21..F24 (touchpad keysyms), and it spends KEY_PROG1..4
+    # (XF86Launch1..4) on scroll events, so those cannot be sent at all.
+    workspaceKeys = [
+      {
+        keyd = "scale";
+        keysym = "XF86LaunchA";
+      }
+      {
+        keyd = "dashboard";
+        keysym = "XF86LaunchB";
+      }
+      {
+        keyd = "msdos";
+        keysym = "XF86DOS";
+      }
+      {
+        keyd = "finance";
+        keysym = "XF86Finance";
+      }
+      {
+        keyd = "f14";
+        keysym = "XF86Launch5";
+      }
+      {
+        keyd = "f15";
+        keysym = "XF86Launch6";
+      }
+      {
+        keyd = "f16";
+        keysym = "XF86Launch7";
+      }
+      {
+        keyd = "f17";
+        keysym = "XF86Launch8";
+      }
+      {
+        keyd = "f18";
+        keysym = "XF86Launch9";
+      }
+    ];
     digitRow = mods:
-      lib.listToAttrs (lib.imap1 (i: key: lib.nameValuePair (toString i) "${mods}-${key}") workspaceKeycodes);
+      lib.listToAttrs (lib.imap1 (i: key: lib.nameValuePair (toString i) "${mods}-${key.keyd}") workspaceKeys);
   in {
     options.cosmos.desktops.input.modTap = {
       key = mkOption {
@@ -52,17 +92,18 @@
     options.cosmos.desktops.input.workspaceKeysyms = mkOption {
       type = listOf str;
       readOnly = true;
-      default = map (i: "XF86Launch${toString i}") (lib.range 1 9);
+      default = map (key: key.keysym) workspaceKeys;
       description = ''
         What Mod + the physical digit keys 1..9 arrive as (element N is key N),
         for the compositors' workspace binds. Both bind only keysyms, and the
         printed symbols collide across layouts: us(dvp)'s Shift turns its [ key
         into 7, so Mod+Shift+[ matched a us(intl) Mod+Shift+7 bind. keyd sends
-        prog1..4 and f14..f18, which xkeyboard-config maps to XF86Launch1..9
-        in every layout:
+        keys that no keyboard here has and that xkeyboard-config maps the same
+        in every layout (`workspaceKeys` above). To check one, look up its
+        evdev code in keyd's src/keys.h and the keysym at that code + 8:
 
           nix shell nixpkgs#libxkbcommon -c xkbcli compile-keymap \
-            --layout us --variant dvp | grep -E '<(I156|I157|I210|I211|FK1[4-8])>'
+            --layout us --variant dvp | grep -E '<I128>|= 128;'
       '';
     };
 
