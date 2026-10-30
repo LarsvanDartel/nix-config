@@ -16,16 +16,19 @@
 
   environment.systemPackages = [pkgs.wlr-randr];
 
-  # Umbriel has no tablet-mode events; libinput needs /dev/input, hence root.
-  systemd.services.tablet-mode-osk = {
-    description = "Show/hide wvkbd on the tablet-mode switch (Umbriel has no switch events)";
+  # Umbriel has no tablet-mode events, and libinput needs /dev/input, hence
+  # root. It only records the state; the session's tablet-mode.path acts on it
+  # (home/desktop/_umbriel/home.nix).
+  systemd.services.tablet-mode-switch = {
+    description = "Record the tablet-mode switch in /run/tablet-mode (Umbriel has no switch events)";
     wantedBy = ["multi-user.target"];
-    path = [pkgs.procps];
+    # libinput reports a switch already on when it starts, never one that is off.
     script = ''
+      echo 0 >/run/tablet-mode
       ${lib.getExe' pkgs.libinput "libinput"} debug-events | while read -r line; do
         case "$line" in
-          *"switch tablet-mode state 1"*) pkill -USR2 -x wvkbd-mobintl || true ;;
-          *"switch tablet-mode state 0"*) pkill -USR1 -x wvkbd-mobintl || true ;;
+          *"switch tablet-mode state 1"*) echo 1 >/run/tablet-mode ;;
+          *"switch tablet-mode state 0"*) echo 0 >/run/tablet-mode ;;
         esac
       done
     '';

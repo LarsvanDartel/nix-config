@@ -133,7 +133,8 @@
         };
       };
 
-      # Off until niri's tablet-mode switch events run `noctalia msg dock-show`.
+      # Off until tablet mode runs `noctalia msg dock-show`: niri's switch-events,
+      # Umbriel's tablet-mode unit (home/desktop/_umbriel/home.nix).
       programs.noctalia.settings.dock = {
         launcher_position = "start";
         pinned = ["zen-twilight" "foot" "thunderbird"];
