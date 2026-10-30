@@ -153,8 +153,10 @@ in {
         };
       };
 
+      # The second key is id_voyager retired 2026-10 (rotation); keeps older signatures verifiable.
       home.file.".ssh/allowed_signers".text = ''
         ${cfg.email} ${fileContents (get-flake-path "modules/den/aspects/core/_ssh-keys/id_voyager.pub")}
+        ${cfg.email} ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIDNEUz9gdN7GD8a1BNijKPl+3/CwYr+n36G4FjvqqVTt
       '';
     };
   };

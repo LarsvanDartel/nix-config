@@ -7,7 +7,6 @@
 # Does not gate flake-bump, which already builds all hosts before committing.
 {
   den,
-  inputs,
   ...
 }: {
   den.aspects.services.build-gate = {
@@ -183,7 +182,6 @@
 
       config = {
         sops.secrets."keys/flake-bump/ssh-key" = {
-          sopsFile = builtins.toString inputs.nix-secrets + "/hosts/common/secrets.yaml";
           mode = "0400";
         };
 

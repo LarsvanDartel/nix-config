@@ -33,7 +33,8 @@ in {
 
     cfg = config.cosmos.cli.programs.ssh;
 
-    private-key-file = "${config.cosmos.security.sops.sopsFolder}/common/secrets.yaml";
+    # The host's own file (hosts/<host>), decrypted here with the user age key.
+    private-key-file = osConfig.sops.defaultSopsFile;
     keys = map (name: keys-path + "/id_${name}.pub") cfg.identities;
 
     ssh-file = key: ".ssh/${get-file-name-without-extension key}";
