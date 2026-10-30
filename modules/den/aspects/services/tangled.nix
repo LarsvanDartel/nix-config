@@ -1,10 +1,10 @@
 # services.tangled — a self-hosted Tangled knot: git repositories addressed by
 # ATProto identity rather than by an account on someone else's forge.
 #
-# SSH arrives as gaia :22 forwarded to :2222 here, never :22: NetBird redirects
-# <mesh-ip>:22 to its own SSH server (see core/ssh.nix).
-# The knot appends a `Match User git` block to sshd_config, so anything later
-# added to `services.openssh.extraConfig` lands inside that Match block.
+# knot2 (the Rust knot, `knot-rs`): git over SSH is served in-process on
+# sshPort, which gaia DNATs public :22 to (hosts/gaia.nix); sshd is not
+# involved. Users' SSH keys are read live from their PDS
+# (`org.tangled.key.sshKey`, cached for an hour).
 {
   den,
   inputs,
@@ -12,6 +12,8 @@
 }: let
   # Option defaults and netbird-service targets (see services/netbird.nix).
   defaultPort = 5555;
+  # Not 2222: that is sshd's port on every host (core.ssh).
+  defaultSshPort = 2223;
   defaultSpindlePort = 6555;
 in {
   flake-file.inputs.tangled.url = "git+https://tangled.org/tangled.org/core";
@@ -42,8 +44,9 @@ in {
       inherit (lib.types) port str;
 
       cfg = config.cosmos.services.tangled;
+      proxy = config.cosmos.services.netbird.client.proxyAddress;
     in {
-      imports = [inputs.tangled.nixosModules.knot];
+      imports = [inputs.tangled.nixosModules.knot-rs];
 
       options.cosmos.services.tangled = {
         owner = mkOption {
@@ -62,10 +65,9 @@ in {
           type = str;
           default = "knot.lvdar.nl";
           description = ''
-            Public name. Covered by the existing *.lvdar.nl wildcard in
-            services/acme.nix, so it needs no certificate work — and it must
-            match what gaia publishes, since the knot signs its registration
-            with this name.
+            Public name, and the knot's did:web. Covered by the existing
+            *.lvdar.nl wildcard in services/acme.nix, and it must match what
+            gaia publishes.
           '';
         };
 
@@ -75,16 +77,21 @@ in {
           description = "HTTP listener, reached over the mesh by netbird-proxy.";
         };
 
+        sshPort = mkOption {
+          type = port;
+          default = defaultSshPort;
+          description = "The knot's own SSH listener; gaia DNATs public :22 here.";
+        };
+
         stateDir = mkOption {
           type = str;
-          example = "/srv/git";
+          example = "/srv/knot";
           description = ''
-            Repositories and the knot's SQLite database.
+            Repositories (the knot's whole state: git is its database), the
+            sealed key store and the knot's SSH host key.
 
-            On the array rather than the module's /home/git default: these are
-            the canonical copy of the code, and the 250 GB system SSD already
-            carries every other service's state. Being on /tank also means
-            sanoid snapshots cover them.
+            On the array, as its own ZFS dataset so sanoid snapshots it: these
+            are the canonical copy of the code.
 
             Deliberately NOT added to cosmos.system.impermanence.persist — /tank
             is a ZFS pool outside the persist layer, and an entry there would
@@ -95,29 +102,35 @@ in {
       };
 
       config = {
-        # No KNOT_SERVER_SECRET in this version: registration is proved by the
-        # owner DID, so no sops secret. If a release reintroduces one, add it here.
+        # The master key unseals the per-repo signing keys; sops is its
+        # off-server backup, and the sealed store is useless without it.
+        sops.secrets."keys/knot/env" = {};
 
-        systemd.tmpfiles.rules = [
-          "d ${cfg.stateDir} 0755 git git - -"
-        ];
-
-        services.tangled.knot = {
+        services.tangled.knot-rs = {
           enable = true;
           inherit (cfg) stateDir;
-
-          server = {
-            owner = cfg.owner;
-            hostname = cfg.hostname;
-            listenAddr = "0.0.0.0:${toString cfg.port}";
-          };
-
           openFirewall = false;
+          environmentFile = config.sops.secrets."keys/knot/env".path;
+
+          settings = {
+            server = {
+              inherit (cfg) hostname;
+              admins = [cfg.owner];
+              listen_addr = "0.0.0.0:${toString cfg.port}";
+              ssh_listen_addr = "[::]:${toString cfg.sshPort}";
+            };
+            atproto.plc_directory = "https://plc.directory";
+            # The migrated repositories are SHA-1; the module defaults to sha256.
+            git.object_format = "sha1";
+            # Rate-limit visitors, not netbird-proxy.
+            xrpc = lib.optionalAttrs (proxy != null) {
+              trusted_proxy_header = "x-forwarded-for";
+              trusted_proxies = [proxy];
+            };
+          };
         };
 
-        # 2222: gaia DNATs public :22 here in the kernel (hosts/gaia.nix), not
-        # via netbird-proxy. Without it the SSH hop hangs with no banner.
-        cosmos.services.netbird.client.exposedPorts = [cfg.port 2222];
+        cosmos.services.netbird.client.exposedPorts = [cfg.port cfg.sshPort];
       };
     };
   };

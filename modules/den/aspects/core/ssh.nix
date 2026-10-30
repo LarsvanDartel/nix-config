@@ -15,12 +15,18 @@
       hostNames = lib.unique (
         lib.concatMap (a: [a "[${a}]:2222"]) ([h.deployAddress "${name}.nb.lvdar.nl"] ++ lib.optional (h.meshAddress != null) h.meshAddress)
         ++ [name]
-        # knot.lvdar.nl:22 is gaia's DNAT to endeavour:2222 (gaia.nix, services/tangled.nix); hand-synced.
-        ++ lib.optional (name == "endeavour") "knot.lvdar.nl"
       );
       publicKey = h.sshHostKey;
     })
-    (lib.filterAttrs (_: h: h.sshHostKey != null) hosts);
+    (lib.filterAttrs (_: h: h.sshHostKey != null) hosts)
+    // {
+      # knot2's own key (/tank/knot/ssh_host_key on endeavour), not endeavour's:
+      # knot.lvdar.nl:22 is gaia's DNAT to the knot's in-process SSH. Hand-synced.
+      "knot.lvdar.nl" = {
+        hostNames = ["knot.lvdar.nl" "[endeavour.nb.lvdar.nl]:2223"];
+        publicKey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIEg3hdiuWPVdxL9izERD+jzYhrLr4RPcbqcCOgjvt/6f";
+      };
+    };
 in {
   den.aspects.core.ssh.nixos = {config, ...}: let
     inherit (lib.strings) optionalString;

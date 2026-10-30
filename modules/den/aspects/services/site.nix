@@ -51,7 +51,7 @@ in {
 
         # Hardcoded DID + knot layout: if pushes stop publishing within a
         # second, check this first.
-        refPath = "/tank/git/did:plc:fpotkfjfgnqg2jiskgfcyjx5/refs/heads/main";
+        refPath = "/tank/knot/repos/plc/fp/otkfjfgnqg2jiskgfcyjx5/refs/heads/main";
       };
 
       # Off: refPath covers it without a secret. Needed only if the site

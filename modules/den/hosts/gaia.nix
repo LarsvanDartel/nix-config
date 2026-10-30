@@ -120,26 +120,29 @@
       };
 
       # Kernel NAT, not an L4 service: the L4 service for this target never
-      # forwarded (cause unknown; traccar-osmand works). :2222 because
-      # NetBird's agent takes mesh :22. Masquerade is required, or replies
-      # go to the client's public address and never route back.
-      networking.nat = {
+      # forwarded (cause unknown; traccar-osmand works). Lands on knot2's own
+      # SSH listener (services/tangled.nix sshPort; hand-synced), never sshd.
+      # Masquerade is required, or replies go to the client's public address
+      # and never route back.
+      networking.nat = let
+        knotSsh = "2223";
+      in {
         enable = true;
         externalInterface = "enp1s0";
         forwardPorts = [
           {
             sourcePort = 22;
-            destination = "${endeavourMesh}:2222";
+            destination = "${endeavourMesh}:${knotSsh}";
             proto = "tcp";
           }
         ];
         extraCommands = ''
-          iptables -t nat -A POSTROUTING -d ${endeavourMesh} -p tcp --dport 2222 -j MASQUERADE
-          iptables -A FORWARD -d ${endeavourMesh} -p tcp --dport 2222 -j ACCEPT
+          iptables -t nat -A POSTROUTING -d ${endeavourMesh} -p tcp --dport ${knotSsh} -j MASQUERADE
+          iptables -A FORWARD -d ${endeavourMesh} -p tcp --dport ${knotSsh} -j ACCEPT
         '';
         extraStopCommands = ''
-          iptables -t nat -D POSTROUTING -d ${endeavourMesh} -p tcp --dport 2222 -j MASQUERADE || true
-          iptables -D FORWARD -d ${endeavourMesh} -p tcp --dport 2222 -j ACCEPT || true
+          iptables -t nat -D POSTROUTING -d ${endeavourMesh} -p tcp --dport ${knotSsh} -j MASQUERADE || true
+          iptables -D FORWARD -d ${endeavourMesh} -p tcp --dport ${knotSsh} -j ACCEPT || true
         '';
       };
 

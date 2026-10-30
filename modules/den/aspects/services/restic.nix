@@ -77,19 +77,17 @@
           type = listOf str;
           default = [
             "traccar.service"
-            "knot.service"
             "minecraft-server-create.service"
           ];
           description = ''
             Units stopped for the duration of the run and started again after.
 
             For embedded databases with no dump tool. traccar is an H2 store and
-            netbird management a live SQLite one, and the tangled knot keeps its
-            own SQLite beside the repositories; a file-level copy of any of them
+            netbird management a live SQLite one; a file-level copy of either
             while it is being written is not guaranteed to be a database, it is
             a database-shaped set of files that may or may not open. Postgres is
             absent from this list on purpose — it gets a real dump instead, and
-            never has to stop.
+            never has to stop. The knot is absent too: git is its only database.
 
             Minecraft is here for the same reason and is the one entry whose
             cost players notice: region files are written continuously and have

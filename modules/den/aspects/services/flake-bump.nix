@@ -12,10 +12,7 @@
 #     leave CI untriggered.
 #   * Upstream changes reach production unattended; the gate is only that all
 #     three hosts build (with abort-on-warn).
-{
-  den,
-  ...
-}: {
+{den, ...}: {
   den.aspects.services.flake-bump = {
     includes = [den.aspects.core.sops];
 

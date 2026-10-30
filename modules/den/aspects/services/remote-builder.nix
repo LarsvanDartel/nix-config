@@ -37,7 +37,7 @@ in {
         protocol = "ssh-ng";
         # ssh-ng builders must be trusted, i.e. root-equivalent on this daemon.
         trusted = true;
-        # from=: :2222 is also reachable through gaia's public DNAT.
+        # from=: a leaked client host key is useless off that client's mesh IP.
         keys = map (c: ''from="${c.address}" ${c.key}'') nix-builder-client;
       };
 

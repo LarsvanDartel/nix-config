@@ -266,7 +266,7 @@ in {
         restic.repository = "sftp:u649268@u649268.your-storagebox.de:/endeavour";
 
         tangled = {
-          stateDir = "/tank/git";
+          stateDir = "/tank/knot";
           spindle.stateDir = "/tank/spindle";
         };
 
@@ -274,7 +274,7 @@ in {
         # thing to check when a push stops triggering a build.
         build-gate = {
           repository = "git@knot.lvdar.nl:lvdar.nl/nix-config";
-          watchPath = "/tank/git/did:plc:a3erncqfgkcxu3yl6fpjfmwf/refs/heads/main";
+          watchPath = "/tank/knot/repos/plc/a3/erncqfgkcxu3yl6fpjfmwf/refs/heads/main";
         };
         flake-bump = {
           repository = "git@knot.lvdar.nl:lvdar.nl/nix-config";
@@ -320,7 +320,8 @@ in {
         "/tank/opencloud"
         "/tank/media/library/images"
         # sanoid snapshots live in the pool they protect; this survives the array.
-        "/tank/git"
+        # Repos, sealed key store and the knot's SSH host key; the master key is in sops.
+        "/tank/knot"
         # Same as the knot.
         "/tank/minecraft"
       ];
@@ -347,22 +348,6 @@ in {
         # Simple Voice Chat; TCP ports come from each service's aspect.
         exposedUdpPorts = [voicePort];
       };
-
-      # gaia's agent address. gaia DNATs+masquerades public :22 here, so all
-      # SSH arrives from one address and OpenSSH's srclimit penalised it,
-      # resetting legitimate git traffic ("kex_exchange_identification:
-      # Connection reset", build-gate 2026-08-15). crowdsec sheds scanners.
-      services.openssh.settings.PerSourcePenaltyExemptList = den.hosts.x86_64-linux.gaia.meshAddress;
-
-      # gaia's public :22 is DNAT'd here, so internet clients arrive as gaia's mesh IP:
-      # only the knot's git user may log in that way. `*,!git`: a negation-only
-      # pattern list never matches. mkBefore: the knot appends `Match User git`
-      # (services/tangled.nix), and lines after it land inside that block.
-      services.openssh.extraConfig = lib.mkBefore ''
-        Match Address ${den.hosts.x86_64-linux.gaia.meshAddress} User *,!git
-          PubkeyAuthentication no
-        Match all
-      '';
 
       hardware = {
         nvidia = {
