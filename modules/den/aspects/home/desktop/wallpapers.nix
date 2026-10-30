@@ -96,8 +96,8 @@
       xargs -a ${pairs} -L1 sh -c 'ln -s "$1" "$OUT/$2"' _
     '';
 
-    # Not noctalia's own automation (whole-directory shuffle, niri-only): this
-    # drives whichever shell is up.
+    # Not noctalia's own automation (whole-directory shuffle): this picks from
+    # the top of the ranking, for noctalia and the greeter.
     rotate = pkgs.writeShellScript "wallpaper-rotate" ''
       set -eu
       dir=${lib.escapeShellArg cfg.directory}
@@ -116,11 +116,8 @@
       path="$dir/$pick"
       [ -e "$path" ] || exit 0
 
-      # noctalia owns the background under niri; hyprpaper under Hyprland.
-      # Whichever is not running simply fails, so try one and fall back.
-      #
-      # Failing loudly matters here. An earlier version swallowed both attempts
-      # and exited 0, so a unit that could not find either binary still looked
+      # Failing loudly matters here. An earlier version swallowed the error
+      # and exited 0, so a unit that could not reach the shell still looked
       # perfectly healthy in `systemctl --user status` and left nothing in the
       # journal to explain a background that never changed.
       if command -v noctalia >/dev/null 2>&1 &&
@@ -128,12 +125,7 @@
         echo "set $pick via noctalia"
         exit 0
       fi
-      if command -v hyprctl >/dev/null 2>&1 &&
-         hyprctl hyprpaper reload ",$path" >/dev/null 2>&1; then
-        echo "set $pick via hyprpaper"
-        exit 0
-      fi
-      echo "could not set $pick: no running shell accepted it" >&2
+      echo "could not set $pick: noctalia is not running or refused it" >&2
       exit 1
     '';
   in {
@@ -168,8 +160,8 @@
         default = favourite.src;
         description = ''
           Store path of the top-ranked background. home.styling points
-          `stylix.image` at this, which is what hyprpaper, hyprlock and the
-          greeter display.
+          `stylix.image` at this, which is what noctalia and the greeter
+          display.
         '';
       };
 

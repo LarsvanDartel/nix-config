@@ -40,10 +40,8 @@
       default = "";
       description = ''
         Command that locks the current graphical session, run as the primary
-        user. Voyager's compositor is a boot-time specialisation switch
-        (hyprland vs. niri/noctalia — see hosts/voyager.nix), and each locks
-        differently (`hyprlock` vs. noctalia's own IPC), so whichever
-        compositor aspect is actually active sets this rather than yubikey
+        user. Each compositor locks differently (noctalia's own IPC under
+        niri), so the active compositor aspect sets this rather than yubikey
         hardcoding one. Empty means "nothing knows how to lock this session".
       '';
     };
@@ -68,7 +66,6 @@
 
       security.pam.services = {
         swaylock.u2fAuth = true;
-        hyprlock.u2fAuth = true;
         login.u2fAuth = true;
         sudo.u2fAuth = true;
       };

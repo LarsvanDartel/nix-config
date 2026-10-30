@@ -1,6 +1,6 @@
 # home.foot — foot as a nix-wrapper-modules package (`nix run .#foot`); the
-# wrapper holds the config. home-manager installs it, sets the terminal
-# defaults and (on hyprland hosts) starts `foot --server` for footclient.
+# wrapper holds the config. home-manager installs it and sets the terminal
+# defaults.
 {
   den,
   inputs,
@@ -81,15 +81,14 @@ in {
       pkgs,
       ...
     }: let
-      inherit (lib.modules) mkDefault mkOrder;
+      inherit (lib.modules) mkDefault;
       foot = mkFoot pkgs;
     in {
       home.packages = [foot];
 
-      cosmos.cli.terminals.default = mkDefault "${foot}/bin/footclient";
+      # No foot server runs (it was started by Hyprland's exec-once).
+      cosmos.cli.terminals.default = mkDefault "${foot}/bin/foot";
       cosmos.cli.terminals.defaultStandalone = mkDefault "${foot}/bin/foot";
-
-      cosmos.desktops.hyprland.exec-once-extras = mkOrder 200 ["${foot}/bin/foot --server"];
     };
   };
 }

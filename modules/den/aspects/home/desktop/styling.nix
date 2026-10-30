@@ -8,6 +8,10 @@
 
     stylix.opacity = {inherit (cosmosStyling.opacity) terminal desktop popups;};
 
+    # No rofi in the fleet, and its target still sets the renamed
+    # programs.rofi.font, which abort-on-warn turns into a build failure.
+    stylix.targets.rofi.enable = false;
+
     cosmos.desktops.common.styling = {
       fonts = let
         fontpkgs = config.cosmos.desktops.common.styling.fonts.pkgs;

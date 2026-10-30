@@ -1,5 +1,5 @@
-# The niri home config, as a plain home-manager module factory shared by
-# `den.aspects.home.niri` and voyager's `specialisation.niri`.
+# The niri home config, as a plain home-manager module factory imported by its
+# aspect `den.aspects.home.niri`.
 {}: {
   lib,
   osConfig,

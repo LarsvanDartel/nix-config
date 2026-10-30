@@ -3,6 +3,7 @@
   den.aspects.home.mpv.homeManager = {
     config,
     lib,
+    pkgs,
     ...
   }: let
     inherit (lib.options) mkOption;
@@ -17,7 +18,15 @@
     };
 
     config = {
-      programs.mpv.enable = true;
+      programs.mpv = {
+        enable = true;
+        # uosc replaces the built-in OSC: large touch targets.
+        scripts = with pkgs.mpvScripts; [uosc thumbfast];
+        config = {
+          osc = "no";
+          osd-bar = "no";
+        };
+      };
 
       xdg.mimeApps = mkIf cfg.defaultApplication {
         enable = true;

@@ -2,7 +2,7 @@
 
 |host|arch|role|
 |---|---|---|
-|`voyager`|x86_64|ThinkPad P1 gen3 laptop, nvidia, Hyprland + Zen browser. Compositor choice is a **boot-time** switch: the base config and a labelled `hyprland` specialisation are identical, and a `niri`/noctalia specialisation is a separate GRUB entry|
+|`voyager`|x86_64|ThinkPad P1 gen3 laptop, nvidia; niri + noctalia (Umbriel specialisation) + Zen browser|
 |`endeavour`|x86_64|the workhorse. jellyfin, immich, kanidm, traccar, opencloud/collabora, suwayomi + flaresolverr, ollama + librechat (chat.lvdar.nl, local models + OpenRouter) on a Tesla P100, tangled (knot + spindle), a PDS, minecraft (packwiz packs from the `modpacks` input, also served to players at packs.lvdar.nl), attic, `services.site` (lvdar.nl), DOMjudge (judge.lvdar.nl: podman containers with CHipCie practice contests; extra judge languages live in `services/domjudge/languages.nix`), the VPN-confined `*arr` stack, and the prometheus/grafana/loki/alloy monitoring. ZFS `tank` with sanoid/zed; restic offsite|
 |`gaia`|x86_64|public VPS and the fleet's only ingress. Runs the self-hosted **NetBird control plane**, and `netbird-proxy` terminates TLS and forwards to endeavour over the mesh. Also crowdsec, ntfy, stalwart, unbound, the gatus status page, and the vhosts its own nginx serves directly (`localVhosts`). Pangolin used to be the ingress and is **decommissioned** — do not reintroduce it|
 |`pioneer`|aarch64|Raspberry Pi 3; built on endeavour (binfmt) via voyager's remote builder, never on the Pi. Publishes endeavour's **iDRAC** (`services.idrac`) to the mesh — it shares nothing with endeavour but a switch, which is the whole point: out-of-band management proxied by the machine it exists to recover is not out-of-band|
@@ -23,6 +23,13 @@ Each host registers `den.hosts.<arch>.<host> = { users.<user> = {}; meshAddress;
 ## voyager
 
 The laptop and the only workstation; switches locally with `nh os switch`.
+
+### Desktop
+
+- **niri + noctalia** is the base desktop, behind the noctalia greeter (niri preselected). A second GRUB entry, **"umbriel + noctalia"**, boots the Umbriel compositor with the same shell for experimenting (`specialisation.umbriel`, built from `desktop/_umbriel/system.nix` and `home/desktop/_umbriel/home.nix`). Umbriel's keybinds copy niri's by hand; validate edits with `umbriel config validate`.
+- **Tablet mode** (`desktop.tablet`): folding the hinge makes the firmware disable keyboard and touchpad, and the tablet-mode switch shows the on-screen keyboard (wvkbd, kept running hidden; niri's `switch-events` signal it, under Umbriel a root `tablet-mode-osk` unit watching libinput does). iio-niri rotates the screen from the accelerometer (under Umbriel: `umbriel-autorotate`). Touch and stylus are mapped to `eDP-1` and follow rotation. All of it is inert on hardware without the sensor or switch.
+- **Without a keyboard**: unlock LUKS with a YubiKey touch (FIDO2) and log in at the greeter with a YubiKey (u2f, empty password).
+- **Apps** for the stylus and media: Xournal++ (notes, PDF annotation), Rnote, Krita, and mpv with the touch-friendly uosc UI.
 
 ## endeavour
 
