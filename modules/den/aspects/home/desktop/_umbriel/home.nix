@@ -25,8 +25,9 @@
     "plus"
   ];
 
-  # Positions: the named workspaces 1..9 (`workspace` below) persist and sort
-  # before dynamic ones. Actions take no `--name` in bind form.
+  # Positions on the focused output: the named workspaces 1..9 (`workspace`
+  # below) persist and sort before dynamic ones. Actions take no `--name` in
+  # bind form.
   workspaceBinds = lib.listToAttrs (
     lib.flatten (
       lib.imap1 (i: key: let
@@ -76,7 +77,7 @@
       tabs.default_display = "tabbed";
     };
 
-    # Named workspaces persist, like niri's nine.
+    # Every output gets its own persistent 1..9 (no `output` key).
     workspace = map (i: {name = toString i;}) (lib.range 1 9);
 
     # As Noctalia's Umbriel compositor-settings page.
@@ -167,6 +168,15 @@
         "Mod+Shift+J" = "window-move-down";
         "Mod+Shift+K" = "window-move-up";
         "Mod+Shift+L" = "column-move-right";
+        # Monitors: Mod+Alt is "the screen in that direction".
+        "Mod+Alt+H" = "output-focus-left";
+        "Mod+Alt+J" = "output-focus-down";
+        "Mod+Alt+K" = "output-focus-up";
+        "Mod+Alt+L" = "output-focus-right";
+        "Mod+Alt+Shift+H" = "column-move-to-output-left";
+        "Mod+Alt+Shift+J" = "column-move-to-output-down";
+        "Mod+Alt+Shift+K" = "column-move-to-output-up";
+        "Mod+Alt+Shift+L" = "column-move-to-output-right";
         "Mod+Ctrl+H" = "window-modify-primary-extent:-0.1";
         "Mod+Ctrl+L" = "window-modify-primary-extent:0.1";
         "Mod+Ctrl+K" = "window-modify-secondary-extent:-0.1";
