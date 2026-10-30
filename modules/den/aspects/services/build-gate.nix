@@ -132,9 +132,9 @@
           # of failures, so order only affects the log.
           default = lib.attrNames den.hosts.x86_64-linux;
           description = ''
-            Must all build before deploy moves. Every x86_64 host; pioneer is
-            aarch64 and this host cannot emulate it, which is the same reason
-            it was left out of the workflows this replaces.
+            Must all build before deploy moves. Every x86_64 host; pioneer
+            stays excluded because its uncached rpi kernel, built under
+            emulation, would hold the gate for hours.
 
             voyager is included even though comin does not deploy it: it is
             still a host whose closure this repo has to keep evaluable, and

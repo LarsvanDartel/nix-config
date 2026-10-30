@@ -81,6 +81,7 @@ in {
       core.impermanence
       services.nginx
       services.unbound
+      services.remote-builder
       services.kanidm
       services.jellyfin
       services.kavita
