@@ -14,7 +14,6 @@
 #     three hosts build (with abort-on-warn).
 {
   den,
-  inputs,
   ...
 }: {
   den.aspects.services.flake-bump = {
@@ -217,7 +216,6 @@
 
       config = {
         sops.secrets."keys/flake-bump/ssh-key" = {
-          sopsFile = builtins.toString inputs.nix-secrets + "/hosts/common/secrets.yaml";
           mode = "0400";
         };
 
