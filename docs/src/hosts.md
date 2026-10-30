@@ -11,7 +11,14 @@ Hardware comes from committed **nixos-facter** reports (`hosts/_facter/<host>.fa
 
 ## Host facts
 
-Each host registers `den.hosts.<arch>.<host> = { users.<user> = {}; meshAddress; server; deployAddress; }` in `modules/den/hosts/<host>.nix`; the facts are declared in `modules/den/schema.nix` and are plain data any module can read without evaluating that host.
+Each host registers `den.hosts.<arch>.<host> = { users.<user> = {}; meshAddress; server; deployAddress; sshHostKey; }` in `modules/den/hosts/<host>.nix`; the facts are declared in `modules/den/schema.nix` and are plain data any module can read without evaluating that host.
+
+|fact|meaning|
+|---|---|
+|`meshAddress`|NetBird mesh IPv4, assigned at enrolment; re-check after re-enrolling a peer|
+|`server`|headless server: gets `roles.server`|
+|`deployAddress`|what deploy-rs connects to (default `<host>.nb.lvdar.nl`; gaia uses `lvdar.nl`)|
+|`sshHostKey`|the host's ed25519 SSH host public key (`ssh-ed25519 AAAA…`, no comment). Pinned in every host's `known_hosts` (core.ssh) and used by endeavour to authorize remote-build clients. Read it with `cut -d' ' -f1,2 /persist/etc/ssh/ssh_host_ed25519_key.pub` on the host (`/etc/ssh` on pioneer), or `ssh-keyscan -t ed25519 -p 2222 <host>.nb.lvdar.nl`. A reinstall with a fresh key updates this fact and `.sops.yaml` together|
 
 ## voyager
 

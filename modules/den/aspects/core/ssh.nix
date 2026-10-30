@@ -1,28 +1,38 @@
-# core.ssh — openssh server + authorized keys for the primary user and root.
-{cosmosLib, ...}: let
-  inherit (cosmosLib) get-files get-flake-path;
+# core.ssh — sshd on :2222, the admin keys (_ssh-keys/authorized.nix) for root and the primary user, and every fleet host key pinned system-wide.
+{
+  cosmosLib,
+  den,
+  lib,
+  ...
+}: let
+  keysDir = cosmosLib.get-flake-path "modules/den/aspects/core/_ssh-keys";
+  authorizedKeys = map (f: builtins.readFile (keysDir + "/${f}")) (import (keysDir + "/authorized.nix"));
 
-  keys = get-files (get-flake-path "modules/den/aspects/core/_ssh-keys");
+  hosts = lib.mergeAttrsList (lib.attrValues den.hosts);
+  knownHosts =
+    lib.mapAttrs (name: h: {
+      # <name>.nb.lvdar.nl is what home.ssh connects to; gaia's deployAddress differs.
+      hostNames = lib.unique (
+        lib.concatMap (a: [a "[${a}]:2222"]) ([h.deployAddress "${name}.nb.lvdar.nl"] ++ lib.optional (h.meshAddress != null) h.meshAddress)
+        ++ [name]
+        # knot.lvdar.nl:22 is gaia's DNAT to endeavour:2222 (gaia.nix, services/tangled.nix); hand-synced.
+        ++ lib.optional (name == "endeavour") "knot.lvdar.nl"
+      );
+      publicKey = h.sshHostKey;
+    })
+    (lib.filterAttrs (_: h: h.sshHostKey != null) hosts);
 in {
-  den.aspects.core.ssh.nixos = {
-    config,
-    lib,
-    ...
-  }: let
-    inherit (builtins) readFile;
+  den.aspects.core.ssh.nixos = {config, ...}: let
     inherit (lib.strings) optionalString;
 
     active = config.cosmos.system.impermanence.active;
     userName = config.cosmos.user.name;
-    keyList = map readFile keys;
   in {
-    programs.ssh.startAgent = true;
     services.openssh = {
       enable = true;
 
-      # 2222 because NetBird's SSH server hijacks <netbird-ip>:22 (presents as
-      # "Permission denied (password)"); deploy-rs needs OpenSSH via the mesh.
-      ports = [22 2222];
+      # NetBird's SSH server owns <mesh-ip>:22; nothing used :22 elsewhere.
+      ports = [2222];
       hostKeys = [
         {
           comment = "${config.networking.hostName}.local";
@@ -33,13 +43,14 @@ in {
       ];
       settings = {
         PasswordAuthentication = false;
-        PermitRootLogin = "yes";
-        StreamLocalBindUnlink = "yes";
-        GatewayPorts = "clientspecified";
+        KbdInteractiveAuthentication = false;
+        PermitRootLogin = "prohibit-password";
       };
     };
 
-    users.users.${userName}.openssh.authorizedKeys.keys = keyList;
-    users.users.root.openssh.authorizedKeys.keys = keyList;
+    users.users.${userName}.openssh.authorizedKeys.keys = authorizedKeys;
+    users.users.root.openssh.authorizedKeys.keys = authorizedKeys;
+
+    programs.ssh.knownHosts = knownHosts;
   };
 }

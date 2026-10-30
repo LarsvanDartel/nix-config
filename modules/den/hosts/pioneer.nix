@@ -13,6 +13,7 @@ in {
     users.nixos = {};
     meshAddress = "100.68.78.148";
     server = true;
+    sshHostKey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIC2O35MjlmLu5JfDRV7zNzG7BrZt3lB1ttIhRZWLjCtD";
   };
 
   den.aspects.pioneer = {

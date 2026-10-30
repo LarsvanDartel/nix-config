@@ -14,6 +14,7 @@
     # Its public name, deliberately: gaia runs the mesh control plane, so it
     # must be reachable for deploys when the mesh is broken.
     deployAddress = "lvdar.nl";
+    sshHostKey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAILT7WtA9mgRcwDlP5Cw6ndr4SjFT1Wfk8idaf8fEA3Q5";
   };
 
   den.aspects.gaia = {
@@ -51,11 +52,6 @@
         }
         inputs.disko.nixosModules.disko
         ./_hw/gaia/disko.nix
-        ({lib, ...}: {
-          # Public :22 is DNAT'd to the knot; admin on :2222. Inside
-          # `imports`: a top-level mkForce recurses with facter (see pioneer.nix).
-          services.openssh.ports = lib.mkForce [2222];
-        })
       ];
 
       cosmos.system = {

@@ -15,6 +15,8 @@
     ];
 
     nixos = {...}: {
+      programs.ssh.startAgent = true;
+
       services.libinput = {
         enable = true;
         mouse = {
