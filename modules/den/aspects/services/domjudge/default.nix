@@ -5,7 +5,8 @@
 #
 # The domserver trusts REMOTE_USER (_files/start.ro/20-remote-user.py):
 # anything that can reach 127.0.0.1:8093 or the podman network can claim any
-# user. sso.nix's vhost is the only way in that sets it.
+# user. sso.nix's vhost is the only way in that sets it; its /api/ location
+# clears the header and leaves the domserver's own basic auth.
 #
 # The image digests are the PHP2Shell fix: this domserver build carries
 # php8.3-fpm 8.3.6-0ubuntu0.24.04.13; earlier builds of the 9.0.1 tag are

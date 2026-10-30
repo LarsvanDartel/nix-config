@@ -1,7 +1,8 @@
 # services.domjudge.sso — judge.lvdar.nl behind kanidm. DOMjudge has no OIDC,
 # so oauth2-proxy + nginx auth_request set Remote-User for the domserver's
 # remote_user authenticator (see default.nix). Published through gaia
-# *ungated*: kanidm SSO is already a full login.
+# *ungated*: kanidm SSO is already a full login. /api/ is the exception:
+# basic auth against the domserver itself, for the submit CLI.
 {
   den,
   inputs,
@@ -145,6 +146,25 @@ in {
               '';
             };
 
+            # DOMjudge's API authenticates with HTTP basic auth (submit CLI,
+            # judgehost); the SSO cookie can't reach it. Skip auth_request and
+            # clear Remote-User so the domserver falls back to basic auth,
+            # like it does for the judgehost on the podman network. 401s pass
+            # through instead of redirecting to the oauth2 login.
+            "^~ /api/" = {
+              proxyPass = "http://127.0.0.1:${toString containerPort}";
+              recommendedProxySettings = false;
+              extraConfig = ''
+                auth_request off;
+                error_page 401 = @api401;
+                proxy_set_header Host $host;
+                proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                proxy_set_header X-Forwarded-Proto https;
+                proxy_set_header Remote-User "";
+                proxy_read_timeout 600s;
+              '';
+            };
+
             "= /oauth2/auth" = {
               proxyPass = "http://127.0.0.1:${toString oauthPort}/oauth2/auth";
               extraConfig = ''
@@ -168,6 +188,15 @@ in {
             "@redirectToAuth2ProxyLogin" = {
               return = "307 https://${domain}/oauth2/start?rd=https://$host$request_uri";
               extraConfig = "auth_request off;";
+            };
+
+            # Entered on a proxied 401 under /api/: stop the inherited
+            # oauth2 redirect and answer with a bare 401 the CLI understands.
+            "@api401" = {
+              extraConfig = ''
+                auth_request off;
+                return 401;
+              '';
             };
           };
         };
