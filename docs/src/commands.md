@@ -13,6 +13,10 @@ nix run .#update-blocklists  # refresh vendored unbound blocklists, then commit
 nix run .#tmux              # wrapped programs carry their own config: also .#yazi .#oh-my-posh .#zathura .#foot
 
 sudo nix run nixpkgs#nixos-facter -- -o modules/den/hosts/_facter/<host>.facter.json   # on the host
+
+nix build .#installer-iso    # cosmos installer ISO (see Installing a host)
+nix run .#install-host -- keygen <host> <dir>                                 # new host key + age recipient
+nix run .#install-host -- install <host> <ip> --host-key <key> [--copy-persist …]   # nixos-anywhere install
 ```
 
 ## Testing & QA
