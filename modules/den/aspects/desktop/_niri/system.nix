@@ -26,6 +26,8 @@
   # the row's unshifted keysyms to hit the physical keys:
   #   physical:  1  2  3  4  5  6  7  8  9
   #   us(dvp):   &  [  {  }  (  =  *  )  +
+  # The digits themselves are bound too, for the us(intl) layout (Win+Space);
+  # dvp has no unshifted digits, so the two sets never collide.
   workspaceKeys = [
     "ampersand"
     "bracketleft"
@@ -44,16 +46,17 @@
     lib.flatten (
       lib.imap1 (i: key: let
         ws = toString i;
-      in [
-        {
-          name = "Mod+${key}";
-          value.focus-workspace = ws;
-        }
-        {
-          name = "Mod+Shift+${key}";
-          value.move-column-to-workspace = ws;
-        }
-      ])
+      in
+        map (k: [
+          {
+            name = "Mod+${k}";
+            value.focus-workspace = ws;
+          }
+          {
+            name = "Mod+Shift+${k}";
+            value.move-column-to-workspace = ws;
+          }
+        ]) [key ws])
       workspaceKeys
     )
   );
