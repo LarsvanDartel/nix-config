@@ -28,7 +28,7 @@
               monthly = 3;
             };
             # Own dataset because `tank` itself is not snapshotted.
-            "tank/git" = {
+            "tank/knot" = {
               hourly = 48;
               daily = 30;
               monthly = 6;

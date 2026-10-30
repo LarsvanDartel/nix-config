@@ -5,10 +5,7 @@
 # only if all are green. `git log deploy..main` is "what has not passed yet".
 # On the metal, not the spindle microVM (76 min there vs 4m36s native).
 # Does not gate flake-bump, which already builds all hosts before committing.
-{
-  den,
-  ...
-}: {
+{den, ...}: {
   den.aspects.services.build-gate = {
     includes = [den.aspects.core.sops];
 
