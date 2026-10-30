@@ -13,7 +13,14 @@
           makeDesktopItem,
           coreutils,
           util-linux,
+          graphviz,
           jdk8,
+          libGL,
+          libx11,
+          libxcursor,
+          libxrandr,
+          libxrender,
+          libxxf86vm,
         }:
           stdenvNoCC.mkDerivation (finalAttrs: {
             pname = "prom-lite";
@@ -54,7 +61,9 @@
                 --replace-fail '@shell@' "${runtimeShell}" \
                 --replace-fail '@coreutils@' "${coreutils}" \
                 --replace-fail '@util_linux@' "${util-linux}" \
-                --replace-fail '@java@' "${jdk8}/bin/java" \
+                --replace-fail '@jdk@' "${jdk8}" \
+                --replace-fail '@dot@' "${graphviz}/bin/dot" \
+                --replace-fail '@jogl_libs@' "${lib.makeLibraryPath [libGL libx11 libxcursor libxrandr libxrender libxxf86vm]}" \
                 --replace-fail '@share@' "$out/share/prom-lite"
               chmod +x $out/bin/prom-lite
 
