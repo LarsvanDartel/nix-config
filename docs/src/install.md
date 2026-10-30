@@ -93,6 +93,7 @@ voyager keeps its identity (host key, sops access, mesh address, data) and moves
    - [ ] `nix eval .#nixosConfigurations.voyager.config.hardware.cpu.intel.updateMicrocode` is `true` (else add `hardware.cpu.intel.updateMicrocode = true;` to `framework-12.nix`);
    - [ ] folding the hinge: `libinput debug-events | grep -m1 tablet-mode` prints `switch tablet-mode state 1` and wvkbd appears (if the line format differs, adjust only the `case` patterns in `desktop/_umbriel/system.nix`);
    - [ ] rotating rotates the screen, and touch and stylus follow (if inverted: pass `--transform normal 270 180 90` mapping args to iio-niri's `extraArgs` in `desktop/tablet.nix` and swap 90/270 in `umbriel-autorotate`);
+   - [ ] touch gestures follow the screen's rotation: in every orientation, swiping up from the bottom edge toggles the overview (`journalctl --user -u lisgd` for errors; if the directions are wrong, fix the `case` in `lisgd-niri` in `desktop/tablet.nix`);
    - [ ] the stylus shows pressure in Xournal++;
    - [ ] `systemctl hibernate` resumes (see [Hibernation](#hibernation));
    - [ ] `cat /etc/nix/machines` lists endeavour;

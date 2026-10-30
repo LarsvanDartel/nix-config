@@ -89,11 +89,12 @@
         tablet.map-to-output = "eDP-1";
       };
 
-      # wvkbd runs hidden (desktop.tablet); SIGUSR2 shows, SIGUSR1 hides.
+      # wvkbd runs hidden (desktop.tablet); SIGUSR2 shows, SIGUSR1 hides. The
+      # noctalia dock (configured in desktop.tablet) follows it.
       # switch-events only take argv `spawn`.
       switch-events = {
-        tablet-mode-on.spawn = ["pkill" "-USR2" "-x" "wvkbd-mobintl"];
-        tablet-mode-off.spawn = ["pkill" "-USR1" "-x" "wvkbd-mobintl"];
+        tablet-mode-on.spawn = ["sh" "-c" "pkill -USR2 -x wvkbd-mobintl; ${noctalia "dock-show"}"];
+        tablet-mode-off.spawn = ["sh" "-c" "pkill -USR1 -x wvkbd-mobintl; ${noctalia "dock-hide"}"];
       };
 
       layout = {
