@@ -1,0 +1,16 @@
+./home/lvdar/.local/share/Steam/steamapps
+./home/lvdar/dev/*/target
+./home/lvdar/dev/*/node_modules
+./home/lvdar/dev/.Trash-1000
+./home/lvdar/downloads
+./home/lvdar/software
+./home/lvdar/.mozilla
+./home/lvdar/nixos-config
+./home/lvdar/.local/share/protonmail
+./home/lvdar/.local/share/lutris
+./home/lvdar/.local/share/FreeCAD
+./home/lvdar/.local/share/containers
+./home/lvdar/.local/share/rofi
+./home/lvdar/.config/clipse
+./var/lib/fprint
+./var/cache/tuigreet

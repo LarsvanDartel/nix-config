@@ -2,7 +2,7 @@
 
 |host|arch|role|
 |---|---|---|
-|`voyager`|x86_64|ThinkPad P1 gen3 laptop, nvidia; niri + noctalia (Umbriel specialisation) + Zen browser|
+|`voyager`|x86_64|ThinkPad P1 gen3 (moving to Framework Laptop 12, profile prepared), niri + noctalia (Umbriel specialisation), remote-builds on endeavour|
 |`endeavour`|x86_64|the workhorse. jellyfin, immich, kanidm, traccar, opencloud/collabora, suwayomi + flaresolverr, ollama + librechat (chat.lvdar.nl, local models + OpenRouter) on a Tesla P100, tangled (knot + spindle), a PDS, minecraft (packwiz packs from the `modpacks` input, also served to players at packs.lvdar.nl), attic, `services.site` (lvdar.nl), DOMjudge (judge.lvdar.nl: podman containers with CHipCie practice contests; extra judge languages live in `services/domjudge/languages.nix`), the VPN-confined `*arr` stack, and the prometheus/grafana/loki/alloy monitoring. ZFS `tank` with sanoid/zed; restic offsite|
 |`gaia`|x86_64|public VPS and the fleet's only ingress. Runs the self-hosted **NetBird control plane**, and `netbird-proxy` terminates TLS and forwards to endeavour over the mesh. Also crowdsec, ntfy, stalwart, unbound, the gatus status page, and the vhosts its own nginx serves directly (`localVhosts`). Pangolin used to be the ingress and is **decommissioned** — do not reintroduce it|
 |`pioneer`|aarch64|Raspberry Pi 3; built on endeavour (binfmt) via voyager's remote builder, never on the Pi. Publishes endeavour's **iDRAC** (`services.idrac`) to the mesh — it shares nothing with endeavour but a switch, which is the whole point: out-of-band management proxied by the machine it exists to recover is not out-of-band|
@@ -22,7 +22,18 @@ Each host registers `den.hosts.<arch>.<host> = { users.<user> = {}; meshAddress;
 
 ## voyager
 
-The laptop and the only workstation; switches locally with `nh os switch`.
+The laptop and the only workstation; switches locally with `nh os switch`. Builds offload to endeavour ([Remote builds](deployment.md#remote-builds)), and its sshd is reachable over the mesh only.
+
+### Hardware
+
+`hardwareProfile` in `modules/den/hosts/voyager.nix` selects the machine voyager currently is. Each profile is a plain module in `hosts/_hw/voyager/` plus the hardware aspects it includes; facter (`_facter/voyager.facter.json`) and disko (`_hw/voyager/disko.nix` on `/dev/nvme0n1`, LUKS + btrfs, 16 GiB swapfile) are shared.
+
+- **`thinkpad-p1`** (current): ThinkPad P1 gen3, Intel + nvidia (PRIME offload, open driver), `hardware.thinkpad` (fan control, noctalia fan widget) and `hardware.fingerprint`, CUDA OBS.
+- **`framework-12`** (prepared): Framework Laptop 12 — Intel Core 3 304 (Wildcat Lake) with the Xe3 iGPU on `xe`, Intel BE213 Wi-Fi 7, 16 GB DDR5 in one slot (single channel), 256 GB 2230 NVMe, 1920×1200 touchscreen on a 360° hinge, Framework stylus (MPP 2.0), backlit keyboard, no fingerprint reader, Ethernet expansion card. The profile pins `linuxPackages_latest` (Wildcat Lake needs ≥ 7.1) and loads `pinctrl_intel_platform` before `soc_button_array` for the tablet-mode switch, both behind `lib.warnIf` guards.
+
+Moving is a runbook: [Moving voyager to the Framework 12](install.md#moving-voyager-to-the-framework-12).
+
+**Hibernation** resumes through systemd's `HibernateLocation` EFI variable; no profile hard-codes `resume=`/`resume_offset=` (see [Hibernation](install.md#hibernation) for the fallback).
 
 ### Desktop
 

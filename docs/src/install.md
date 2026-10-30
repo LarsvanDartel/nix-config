@@ -66,3 +66,63 @@ voyager's move to the Framework Laptop 12 is the worked example: [Moving voyager
   ```
   Build the `--extra-files` tree the way install-host does: the key at the path from `sops.age.sshKeyPaths`, mode 0600.
 - `nix eval .#nixosConfigurations.<host>.config.networking.hostName` failing before anything touches the disk usually means a missing `git add` of the new host file or facter report.
+
+## Moving voyager to the Framework 12
+
+voyager keeps its identity (host key, sops access, mesh address, data) and moves from the ThinkPad P1 to the Framework Laptop 12. Everything hardware-specific sits behind `hardwareProfile` in `modules/den/hosts/voyager.nix` (`_hw/voyager/thinkpad-p1.nix`, `_hw/voyager/framework-12.nix`), so the move is one word plus one `install-host` run.
+
+1. **Firmware** (F2 at power-on): Secure Boot **off** (GRUB is unsigned); stylus protocol **MPP**, because USI mode has reports of a stuck eraser on Linux; BIOS ≥ 3.00. Fit the Ethernet expansion card and plug it in.
+2. **Installer:** `nix build .#installer-iso`, `dd` it to a USB stick (see [Build the installer](#build-the-installer)) and boot the Framework from it. Note the IPv4 shown on the console.
+3. **Flip the profile.** On the P1, in `~/nix-config`: `git pull`, set `hardwareProfile = "framework-12";` in `modules/den/hosts/voyager.nix`, commit (`feat(voyager): move to the Framework Laptop 12`) and push. Do **not** `nh os switch` the P1 onto this commit. Until the Framework's facter report replaces the P1's, this commit evaluates but does not build (the P1 report puts `nvidia` in the initrd, which the Framework kernel lacks) and build-gate stays red for voyager; install-host regenerates the report from the target before building, and step 6 commits it.
+4. Close the browser, mail and IDE (their state is copied live). Then:
+   ```bash
+   sudo install -m 600 -o lvdar /persist/etc/ssh/ssh_host_ed25519_key ~/dev/voyager-hostkey
+   sudo install -m 644 -o lvdar /persist/etc/ssh/ssh_host_ed25519_key.pub ~/dev/voyager-hostkey.pub
+   nix run .#install-host -- install voyager <framework-ip> --host-key ~/dev/voyager-hostkey \
+     --copy-persist --exclude-from modules/den/hosts/_hw/voyager/persist-exclude
+   shred -u ~/dev/voyager-hostkey && rm ~/dev/voyager-hostkey.pub
+   ```
+   Enter the LUKS passphrase; it stays the fallback unlock. When prompted, plug each YubiKey into the **Framework** for FIDO2 enrolment. The copy is about 72 GiB (measured 2026-10-30 with the exclude list), roughly 15 minutes over gigabit Ethernet.
+5. Power off the P1. On the Framework console run `swapoff -a; umount -R /mnt; reboot`, then remove the USB stick.
+6. On the Framework: log in, `git -C ~/nix-config add modules/den/hosts/_facter/voyager.facter.json`, commit (`chore(voyager): framework 12 facter report`), push, then `nh os switch`.
+7. Check:
+   - [ ] boot unlocks with a YubiKey touch and with the passphrase;
+   - [ ] `journalctl -b -u rollback` is clean;
+   - [ ] `hostname` is voyager, and `sudo cat /run/secrets/keys/age >/dev/null` works (sops decrypts);
+   - [ ] `netbird status` shows 100.68.60.163, and `ssh -p 2222 root@endeavour.nb.lvdar.nl true` works;
+   - [ ] `nix eval .#nixosConfigurations.voyager.config.hardware.cpu.intel.updateMicrocode` is `true` (else add `hardware.cpu.intel.updateMicrocode = true;` to `framework-12.nix`);
+   - [ ] folding the hinge: `libinput debug-events | grep -m1 tablet-mode` prints `switch tablet-mode state 1` and wvkbd appears (if the line format differs, adjust only the `case` patterns in `desktop/_umbriel/system.nix`);
+   - [ ] rotating rotates the screen, and touch and stylus follow (if inverted: pass `--transform normal 270 180 90` mapping args to iio-niri's `extraArgs` in `desktop/tablet.nix` and swap 90/270 in `umbriel-autorotate`);
+   - [ ] the stylus shows pressure in Xournal++;
+   - [ ] `systemctl hibernate` resumes (see [Hibernation](#hibernation));
+   - [ ] `cat /etc/nix/machines` lists endeavour;
+   - [ ] `df -h /` leaves at least 100 GB free.
+8. **Cleanup commit**, once the Framework has run well for a week:
+   - delete `_hw/voyager/thinkpad-p1.nix`, `aspects/hardware/thinkpad.nix` and `aspects/hardware/fingerprint.nix`;
+   - delete the `cudaSupport` option in `home/apps/obs-studio.nix`;
+   - delete the `thinkpadFan` option and its uses in `home/desktop/_noctalia/{home,plugins}.nix`, plus the thinkpad-fan `postPatch`;
+   - delete the `hardwareProfile`/`profiles` selector, importing `framework-12.nix` directly;
+   - reword the ThinkPad comment in `desktop/bluetooth.nix`;
+   - update [Hosts](hosts.md#voyager).
+
+   Then wipe the P1 (`blkdiscard` its NVMe), or reinstall it later as a new host with fresh keys.
+
+### What the exclude list skips
+
+`modules/den/hosts/_hw/voyager/persist-exclude` keeps the copy to what the Framework needs:
+
+- the Steam library (`steamapps`): games re-download;
+- build artifacts (`dev/*/target`, `dev/*/node_modules`, `dev/.Trash-1000`): they regenerate;
+- orphans no aspect persists any more (`downloads`, `software`, `.mozilla`, `nixos-config`, `.local/share/{protonmail,lutris,FreeCAD,containers}`): if any of it matters, `rsync` it off the P1 over the mesh before wiping;
+- leftovers of removed features: rofi and clipse (Hyprland), `/var/lib/fprint` (the Framework 12 has no fingerprint reader), `/var/cache/tuigreet`.
+
+### Hibernation
+
+Neither profile hard-codes `resume=`/`resume_offset=`: systemd writes the `HibernateLocation` EFI variable (device and swap-file offset) when it hibernates, and the systemd initrd resumes from it. If the Framework boots fresh after `systemctl hibernate` instead of resuming, add to `framework-12.nix`:
+
+```nix
+boot.resumeDevice = "/dev/mapper/crypted";
+boot.kernelParams = ["resume_offset=<n>"]; # sudo btrfs inspect-internal map-swapfile -r /.swapvol/swapfile
+```
+
+install-host's checklist prints the `map-swapfile` command whenever `boot.resumeDevice` is set.
