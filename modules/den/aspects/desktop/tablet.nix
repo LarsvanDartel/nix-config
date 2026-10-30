@@ -31,15 +31,24 @@
 
       # nfingers,swipe,edge,distance,actmode,command. Edges are in screen
       # orientation (lisgd -o). One-finger swipes count only from an edge, so
-      # scrolling in apps doesn't trigger them.
+      # scrolling in apps doesn't trigger them. lisgd runs the first match, so
+      # an edge-bound gesture must come before the same gesture on `*`.
       gestures = [
         "1,DU,B,*,R,${action "toggle-overview"}"
         "1,LR,L,*,R,${action "focus-column-left"}"
         "1,RL,R,*,R,${action "focus-column-right"}"
         "1,UD,T,*,R,${noctalia "panel-toggle control-center"}"
-        "3,UD,*,*,R,${action "close-window"}"
         # 34 is SIGRTMIN (glibc), wvkbd's visibility toggle; procps rejects the name.
         "2,DU,B,*,R,${pkgs.procps}/bin/pkill --signal 34 -x wvkbd-mobintl"
+        "3,UD,T,*,R,${action "close-window"}"
+        # niri's touchpad gestures, with content following the fingers as on
+        # the touchpad's natural scrolling.
+        "3,DU,*,*,R,${action "focus-workspace-down"}"
+        "3,UD,*,*,R,${action "focus-workspace-up"}"
+        "3,RL,*,*,R,${action "focus-column-right"}"
+        "3,LR,*,*,R,${action "focus-column-left"}"
+        "4,DU,*,*,R,${action "open-overview"}"
+        "4,UD,*,*,R,${action "close-overview"}"
       ];
       gestureArgs = lib.concatMapStringsSep " " (g: "-g ${lib.escapeShellArg g}") gestures;
 
