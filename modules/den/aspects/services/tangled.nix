@@ -358,6 +358,10 @@ in {
             # Upstream's default 127.0.0.1:9091 collides with transmission on
             # endeavour, crash-looping the spindle. 9501: see services/node-exporter.nix.
             metricsListenAddr = "127.0.0.1:9501";
+
+            # The tangled.org web app calls the spindle from the browser, logs
+            # websocket included: unset, every pipeline page reads "Couldn't reach".
+            corsOrigins = ["https://tangled.org"];
           };
 
           pipelines.microvm = {
