@@ -25,4 +25,4 @@ endeavour is voyager's nix remote builder (`services.remote-builder` on endeavou
 - **Who is a client:** any host including `.client`. It emits its `meshAddress` and `sshHostKey` facts on the `nix-builder-client` quirk, which endeavour collects; nothing names the client. Both facts must be set (asserted).
 - **Off the mesh:** the connection times out after 5 s and x86_64 builds fall back to local; aarch64 builds fail.
 - **pioneer** is deployed from voyager: `nix run github:serokell/deploy-rs .#pioneer` builds its aarch64 closure on endeavour and pushes it to the Pi.
-- Checks on voyager: `cat /etc/nix/machines`, `sudo nix store ping --store ssh-ng://nix-ssh@<endeavour mesh IP>`.
+- Checks on voyager: `cat /etc/nix/machines`, and `sudo nix store info --store 'ssh-ng://nix-ssh@<endeavour mesh IP>?ssh-key=/persist/etc/ssh/ssh_host_ed25519_key'` (the key must be named: it lives only in `/etc/nix/machines`, and without it root's ssh offers its own keys and is refused).
