@@ -34,8 +34,20 @@ in {
         modules = [
           {home-manager.extraSpecialArgs.dj_url = djUrl;}
           {
-            home-manager.users.team = {config, ...}: {
+            home-manager.users.team = {
+              config,
+              lib,
+              ...
+            }: {
               programs.zsh.dotDir = lib.mkDefault config.home.homeDirectory;
+
+              # The user's contest layout, baked in: the live ISO starts
+              # fresh every time, so the TRD's gsettings step would be
+              # per-session.
+              dconf.settings."org/gnome/desktop/input-sources" = {
+                sources = [(lib.hm.gvariant.mkTuple ["xkb" "us+dvorak"])];
+                xkb-options = ["caps:escape"];
+              };
             };
           }
           {
@@ -43,6 +55,13 @@ in {
             # not wanted here; editing happens in genix's nixvim nvim.
             teammachine.users.team.ides.enable = lib.mkForce false;
             home-manager.users.team.programs.vscode.enable = lib.mkForce false;
+
+            # SSH in from the host over the slirp forward to drop the TRD
+            # toolchain and ~/.netrc into the fresh ISO; genix ships GEHACK's
+            # keys instead.
+            users.users.team.openssh.authorizedKeys.keys = lib.mkForce [
+              "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINXY0u3IG0XLICWx3ZWGqfiKLoDSnl1IDqkhHYeFd8sD lars@lvdar.nl"
+            ];
 
             # Practice toolset: C++ and Python only; drops the Java/Kotlin
             # JDKs, eclipse and netbeans.
@@ -83,13 +102,15 @@ in {
       };
       # Globbed: genix's image.fileName (gehack-teammachine.iso) does not reach
       # the builder, which writes nixos-<version>-x86_64-linux.iso instead.
+      # 127.0.0.1:2223 forwards to the guest's sshd, for copying the TRD
+      # toolchain and ~/.netrc in after each fresh start.
       script = ''
         exec ${pkgs.qemu_kvm}/bin/qemu-system-x86_64 \
           -name genix -machine q35,accel=kvm -cpu host -smp 4 -m 8G \
           -drive file="$(echo ${genix.system.build.isoImage}/iso/*.iso)",media=cdrom,readonly=on \
           -vga none -device virtio-vga,xres=1920,yres=1080 \
           -device qemu-xhci -device usb-tablet \
-          -nic user,model=virtio-net-pci \
+          -nic user,model=virtio-net-pci,hostfwd=tcp:127.0.0.1:2223-:22 \
           -display none -spice addr=127.0.0.1,port=${toString spicePort},disable-ticketing=on
       '';
     };
