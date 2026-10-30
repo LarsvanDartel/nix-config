@@ -41,6 +41,7 @@ in {
         desktop.greetd.noctalia
         desktop.tablet
         services.containers
+        services.genix-vm
         services.netbird.client
         services.netbird-gewis
         services.eduvpn

@@ -144,7 +144,6 @@ in {
       services.domjudge.sso
       services.domjudge.languages
       services.domjudge.contests
-      services.genix-vm
     ];
 
     nixos = {
