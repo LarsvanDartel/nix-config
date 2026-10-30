@@ -178,6 +178,11 @@ in {
       # DID of @lvdar.nl on this host's own PDS.
       cosmos.services.tangled.owner = "did:plc:wj6rsizbzc7fruoopsxg2k2a";
 
+      # flake-bump pushes to main and comin deploys nightly: generations churn
+      # fast enough that the fleet default 30d retention outgrew the system
+      # disk (98% full, 5.4G free). A week still covers noticing a bad deploy.
+      cosmos.system.nix.gcOlderThan = "7d";
+
       # Push what the nightly lock bump builds here, or CI rebuilds it.
       cosmos.services.attic.client.watchStore.enable = true;
 
