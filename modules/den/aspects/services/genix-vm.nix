@@ -1,11 +1,16 @@
 # services.genix-vm — the GEHACK contest workstation (genix live ISO) as an on-demand VM.
 #
 # Contest practice: `sudo systemctl start genix-vm`, then SPICE (Remmina) to
-# 127.0.0.1:5930 through an SSH tunnel to this host. Loopback only: SPICE has
-# no auth here and the guest autologins. Live ISO, so every start is a fresh
-# machine, like a contest morning.
+# 127.0.0.1:5930. Loopback only: SPICE has no auth here and the guest
+# autologins. Live ISO, so every start is a fresh machine, like a contest
+# morning.
 {inputs, ...}: let
   spicePort = 5930;
+  # The self-hosted judge (services.domjudge.sso on endeavour), reachable
+  # from the guest over its slirp NAT. Trailing slash: submit concatenates
+  # it with "api/..." verbatim. Upstream points the live ISO at the public
+  # DOMjudge demo instead.
+  djUrl = "https://judge.lvdar.nl/";
 in {
   flake-file.inputs.genix.url = "github:GEHACK/genix";
 
@@ -21,10 +26,50 @@ in {
       lib.warnIf (lib.versionAtLeast upstream.config.home-manager.users.team.home.stateVersion "26.05")
       "services/genix-vm.nix: genix's team user is on HM stateVersion >= 26.05, so the zsh dotDir warning no longer fires; delete the dotDir pin"
       (upstream.extendModules {
+        # dj_url is a specialArg of genix's flake, not an option; extendModules
+        # merges specialArgs, ours winning. The NixOS-level value only reaches
+        # the greeter module; the HM tools (submit, Firefox) read the same
+        # specialArg through home-manager.extraSpecialArgs, so override both.
+        specialArgs.dj_url = djUrl;
         modules = [
+          {home-manager.extraSpecialArgs.dj_url = djUrl;}
           {
             home-manager.users.team = {config, ...}: {
               programs.zsh.dotDir = lib.mkDefault config.home.homeDirectory;
+            };
+          }
+          {
+            # IDEs, VS Code and the ides editor set (nano/emacs/gedit/…) are
+            # not wanted here; editing happens in genix's nixvim nvim.
+            teammachine.users.team.ides.enable = lib.mkForce false;
+            home-manager.users.team.programs.vscode.enable = lib.mkForce false;
+
+            # Practice toolset: C++ and Python only; drops the Java/Kotlin
+            # JDKs, eclipse and netbeans.
+            teammachine.users.team.languages = {
+              c.enable = lib.mkForce false;
+              cpp.enable = lib.mkForce true;
+              python.enable = lib.mkForce true;
+              java.enable = lib.mkForce false;
+              kotlin.enable = lib.mkForce false;
+            };
+
+            # genix's DevDocs bookmark (docs.gehack.nl) only resolves on the
+            # TU/e contest network; drop it, keep the judge.
+            home-manager.users.team.programs.firefox.policies.Bookmarks = lib.mkForce [
+              {
+                Title = "DOMjudge";
+                URL = djUrl;
+                Placement = "toolbar";
+              }
+            ];
+
+            # The ISO ships GEHACK's staff account: wheel, passwordless sudo
+            # and the org's SSH keys. Dead weight in a private practice VM.
+            users.users.gehack = {
+              hashedPassword = lib.mkForce "!";
+              extraGroups = lib.mkForce [];
+              openssh.authorizedKeys.keyFiles = lib.mkForce [];
             };
           }
         ];
