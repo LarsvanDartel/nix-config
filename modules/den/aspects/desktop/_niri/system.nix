@@ -40,23 +40,22 @@
     "plus"
   ];
 
-  # Refer to the workspaces by NAME (see `workspaces` below): named workspaces
-  # always exist, so 1..9 are permanently available.
+  # By index (an integer, not a name): the Nth workspace of the focused monitor,
+  # so each monitor numbers its own, as Umbriel does. Past the last one, niri
+  # lands on the empty workspace at the end.
   workspaceBinds = lib.listToAttrs (
     lib.flatten (
-      lib.imap1 (i: key: let
-        ws = toString i;
-      in
+      lib.imap1 (i: key:
         map (k: [
           {
             name = "Mod+${k}";
-            value.focus-workspace = ws;
+            value.focus-workspace = i;
           }
           {
             name = "Mod+Shift+${k}";
-            value.move-column-to-workspace = ws;
+            value.move-column-to-workspace = i;
           }
-        ]) [key ws])
+        ]) [key (toString i)])
       workspaceKeys
     )
   );
@@ -134,14 +133,6 @@
         };
       };
 
-      # Named niri workspaces always exist, giving nine permanent ones.
-      workspaces = lib.listToAttrs (
-        map (i: {
-          name = toString i;
-          value = _: {};
-        }) (lib.range 1 9)
-      );
-
       # foot can't request blur (see window rule); other surfaces ask via
       # ext-background-effect.
       blur = {
@@ -181,6 +172,16 @@
           "Mod+Shift+H".move-column-left = _: {};
           "Mod+Shift+K".move-window-up = _: {};
           "Mod+Shift+J".move-window-down = _: {};
+
+          # Monitors: Mod+Alt is "the screen in that direction".
+          "Mod+Alt+H".focus-monitor-left = _: {};
+          "Mod+Alt+J".focus-monitor-down = _: {};
+          "Mod+Alt+K".focus-monitor-up = _: {};
+          "Mod+Alt+L".focus-monitor-right = _: {};
+          "Mod+Alt+Shift+H".move-column-to-monitor-left = _: {};
+          "Mod+Alt+Shift+J".move-column-to-monitor-down = _: {};
+          "Mod+Alt+Shift+K".move-column-to-monitor-up = _: {};
+          "Mod+Alt+Shift+L".move-column-to-monitor-right = _: {};
 
           "Mod+Ctrl+L".set-column-width = "+10%";
           "Mod+Ctrl+H".set-column-width = "-10%";
