@@ -26,7 +26,9 @@
 
   # A pixel font is only crisp at multiples of its grid: round every requested pixel
   # size down to one (at least one grid). Pango sizes the layout from the edited
-  # pattern, so measurement and rendering both see the snapped size.
+  # pattern, so measurement and rendering both see the snapped size. The file must
+  # sort after home-manager's 52-hm-default-fonts.conf: a request for `monospace`
+  # only names the pixel font once that alias has run.
   pixelGridConfig = font: let
     grid = "<double>${toString font.pixelGrid}</double>";
   in ''
@@ -87,7 +89,7 @@ in {
       '';
     };
 
-    home.file.".config/fontconfig/conf.d/30-pixel-fonts.conf".text = ''
+    home.file.".config/fontconfig/conf.d/55-pixel-fonts.conf".text = ''
       <?xml version='1.0'?>
       <!DOCTYPE fontconfig SYSTEM 'urn:fontconfig:fonts.dtd'>
       <fontconfig>
