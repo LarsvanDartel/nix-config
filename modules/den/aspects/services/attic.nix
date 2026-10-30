@@ -92,8 +92,9 @@
           that by tailing the store and pushing what appears.
 
           On the two hosts that actually build: voyager, which makes the
-          expensive closures and emulates pioneer's aarch64 one, and endeavour,
-          which runs the nightly lock bump for all three x86_64 systems.
+          expensive closures (its aarch64 builds run on endeavour under
+          emulation and are copied back), and endeavour, which runs the
+          nightly lock bump for all three x86_64 systems.
 
           Paths already on cache.nixos.org are skipped by attic's upstream
           filter, so what lands here is what upstream does not have — overlays,

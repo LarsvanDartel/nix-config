@@ -32,6 +32,7 @@
       services.alloy
       hardware.fingerprint
       hardware.thinkpad
+      services.remote-builder.client
       hardware.v4l2loopback
     ];
 
@@ -247,11 +248,8 @@
         };
       };
 
-      # Build aarch64 (pioneer) locally under QEMU.
-      boot.binfmt.emulatedSystems = ["aarch64-linux"];
-
-      # Push the desktop closure and the emulated aarch64 toplevel so CI
-      # needn't rebuild them.
+      # Push the desktop closure and pioneer's toplevel (built on endeavour,
+      # copied back here) so CI needn't rebuild them.
       cosmos.services.attic.client.watchStore.enable = true;
 
       system.stateVersion = "24.11";

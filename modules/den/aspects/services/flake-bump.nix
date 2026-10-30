@@ -166,8 +166,8 @@
           default = lib.attrNames den.hosts.x86_64-linux;
           description = ''
             Hosts that must build before the lock is committed. Every x86_64
-            host; pioneer is aarch64 and this host cannot emulate it, the
-            same reason CI leaves it out.
+            host; pioneer stays excluded because its uncached rpi kernel,
+            built under emulation, would hold the bump for hours.
           '';
         };
 
