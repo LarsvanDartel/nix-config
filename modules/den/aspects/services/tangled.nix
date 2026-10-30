@@ -385,12 +385,18 @@ in {
           artifactStores.s3.bucket = "";
 
           # Works despite the sandbox blackholing 100.64.0.0/10: the spindle
-          # proxies substituter reads host-side over vsock. Read from the attic
-          # client options; do not add a third copy of the URL and key.
+          # proxies substituter reads host-side over vsock. The guest's nix.conf
+          # sets `substituters` to that proxy alone (core a48f86056), so without
+          # cache.nixos.org here every pipeline builds nixpkgs from stage0. Attic
+          # comes from the attic client options; do not add a third copy of it.
           pipelines.nixCache = {
-            readUrls = [config.cosmos.services.attic.client.endpoint];
+            readUrls = [
+              "https://cache.nixos.org"
+              config.cosmos.services.attic.client.endpoint
+            ];
             trustedPublicKeys =
-              lib.lists.optional
+              ["cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY="]
+              ++ lib.lists.optional
               (config.cosmos.services.attic.client.publicKey != null)
               config.cosmos.services.attic.client.publicKey;
 
