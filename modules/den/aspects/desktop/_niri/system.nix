@@ -22,41 +22,23 @@
     content = action;
   };
 
-  # niri binds by keysym, and us/dvp shifts and reorders the digit row, so bind
-  # the row's unshifted keysyms to hit the physical keys:
-  #   physical:  1  2  3  4  5  6  7  8  9
-  #   us(dvp):   &  [  {  }  (  =  *  )  +
-  # The digits themselves are bound too, for the us(intl) layout (Win+Space);
-  # dvp has no unshifted digits, so the two sets never collide.
-  workspaceKeys = [
-    "ampersand"
-    "bracketleft"
-    "braceleft"
-    "braceright"
-    "parenleft"
-    "equal"
-    "asterisk"
-    "parenright"
-    "plus"
-  ];
-
   # By index (an integer, not a name): the Nth workspace of the focused monitor,
   # so each monitor numbers its own, as Umbriel does. Past the last one, niri
-  # lands on the empty workspace at the end.
+  # lands on the empty workspace at the end. The keys are what keyd sends for
+  # Mod + the physical digit row (desktop.keyd).
   workspaceBinds = lib.listToAttrs (
     lib.flatten (
-      lib.imap1 (i: key:
-        map (k: [
-          {
-            name = "Mod+${k}";
-            value.focus-workspace = i;
-          }
-          {
-            name = "Mod+Shift+${k}";
-            value.move-column-to-workspace = i;
-          }
-        ]) [key (toString i)])
-      workspaceKeys
+      lib.imap1 (i: key: [
+        {
+          name = "Mod+${key}";
+          value.focus-workspace = i;
+        }
+        {
+          name = "Mod+Shift+${key}";
+          value.move-column-to-workspace = i;
+        }
+      ])
+      config.cosmos.desktops.input.workspaceKeysyms
     )
   );
 

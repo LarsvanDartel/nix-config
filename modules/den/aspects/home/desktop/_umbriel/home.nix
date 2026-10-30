@@ -95,40 +95,24 @@
     '';
   };
 
-  # niri's workspaceKeys (desktop/_niri/system.nix): the unshifted keysyms of
-  # the us(dvp) digit row, plus the digits for us(intl). Like niri, Umbriel
-  # matches Mod+Shift+<key> on them (its own example binds Mod+Shift+1).
-  workspaceKeys = [
-    "ampersand"
-    "bracketleft"
-    "braceleft"
-    "braceright"
-    "parenleft"
-    "equal"
-    "asterisk"
-    "parenright"
-    "plus"
-  ];
-
   # Positions on the focused output: the named workspaces 1..9 (`workspace`
   # below) persist and sort before dynamic ones. Actions take no `--name` in
-  # bind form.
+  # bind form. The keys are what keyd sends for Mod + the physical digit row
+  # (desktop.keyd): Umbriel matches a bind on the shifted symbol too, so the
+  # printed symbols collide across layouts.
   workspaceBinds = lib.listToAttrs (
     lib.flatten (
-      lib.imap1 (i: key: let
-        ws = toString i;
-      in
-        map (k: [
-          {
-            name = "Mod+${k}";
-            value = "workspace-switch:${ws}";
-          }
-          {
-            name = "Mod+Shift+${k}";
-            value = "column-move-to-workspace:${ws}";
-          }
-        ]) [key ws])
-      workspaceKeys
+      lib.imap1 (i: key: [
+        {
+          name = "Mod+${key}";
+          value = "workspace-switch:${toString i}";
+        }
+        {
+          name = "Mod+Shift+${key}";
+          value = "column-move-to-workspace:${toString i}";
+        }
+      ])
+      osConfig.cosmos.desktops.input.workspaceKeysyms
     )
   );
 
