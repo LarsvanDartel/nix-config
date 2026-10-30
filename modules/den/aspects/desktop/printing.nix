@@ -39,30 +39,21 @@
     # cups-filters ≥1.25.12 prefers Apple Raster (image/urf) over PWG Raster
     # whenever a driverless printer advertises both, but the TS5100's URF
     # duplex path prints the front side, turns the sheet, then ends the job
-    # (OpenPrinting/cups-filters#660, same bug on other Canon models). The
-    # printer's own IPP attributes advertise full PWG Raster support, so
-    # force the generated PPD onto that filter once lpadmin has (re)created
-    # it.
-    systemd.services.ts5100-pwg-raster-ppd =
-      lib.mkIf
-      (lib.warnIf (pkgs.cups-filters.version != "2.0.1") ''
-          modules/den/aspects/desktop/printing.nix: nixpkgs' cups-filters moved
-          off 2.0.1, the version this URF-duplex workaround was written
-          against. Reprint a multi-page duplex job; if the back sides print,
-          delete this service and the comment above it.
-        ''
-        true)
-      {
-        description = "Force the ts5100 queue onto PWG Raster instead of URF";
-        after = ["ensure-printers.service"];
-        requires = ["ensure-printers.service"];
-        wantedBy = ["multi-user.target"];
-        serviceConfig = {
-          Type = "oneshot";
-          RemainAfterExit = true;
-          ExecStart = "${pkgs.gnused}/bin/sed -i 's#image/urf image/urf#image/pwg-raster image/pwg-raster#' /etc/cups/ppd/ts5100.ppd";
-          ExecStartPost = "${pkgs.systemd}/bin/systemctl try-restart cups.service";
-        };
-      };
+    # there (OpenPrinting/cups-filters#660, same bug on other Canon models).
+    # The printer's own IPP attributes advertise full PWG Raster support, so
+    # force the generated PPD onto that filter. hardware.printers'
+    # provisioning (the lpadmin -m everywhere call that (re)writes the PPD)
+    # now runs as cups.service's own postStart, not a separate unit, so the
+    # fix has to append there too — a later restart of cups.service would
+    # otherwise re-run lpadmin and silently put urf back.
+    systemd.services.cups.postStart = lib.mkIf (lib.warnIf (pkgs.cups-filters.version != "2.0.1") ''
+        modules/den/aspects/desktop/printing.nix: nixpkgs' cups-filters moved
+        off 2.0.1, the version this URF-duplex workaround was written
+        against. Reprint a multi-page duplex job; if the back sides print,
+        delete this postStart append and the comment above it.
+      ''
+      true) (lib.mkAfter ''
+      ${pkgs.gnused}/bin/sed -i 's#image/urf image/urf#image/pwg-raster image/pwg-raster#' /etc/cups/ppd/ts5100.ppd
+    '');
   };
 }
