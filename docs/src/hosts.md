@@ -53,3 +53,8 @@ The edge: NetBird control plane, `netbird-proxy`, `localVhosts`, oidc.idp.
 ## pioneer
 
 Raspberry Pi 3 publishing endeavour's iDRAC. No comin: deployed with deploy-rs.
+
+The iDRAC (iDRAC8, firmware 2.21, no Redfish) is reached on the LAN at `192.168.2.111`, over the mesh at `https://idrac.lvdar.nl`, and by SSH as `ssh idrac` (a jump through pioneer with the RSA `id_idrac` key; see `hosts/voyager.nix`).
+
+- **Set iDRAC passwords in-band, letters and digits only.** Passwords with special characters, and passwords set through the web UI, can pass IPMI yet fail the web login with `RAC0212` (2026-10-30, both accounts). From endeavour, which needs no old password: `nix run nixpkgs#ipmitool -- user set password <id> "$pw" 20`, then `user test <id> 20 "$pw"` (ids: `root` 2, `lvdar` 3; `ipmitool user list 1`).
+- `ipmitool mc reset cold` on endeavour restarts only the BMC (clears login blocks and stale web sessions); restart `ipmi-fan-control` on endeavour afterwards, since it fails while the BMC is away.
