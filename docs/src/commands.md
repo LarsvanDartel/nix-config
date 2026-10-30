@@ -23,7 +23,7 @@ nix run .#install-host -- install <host> <ip> --host-key <key> [--copy-persist �
 
 - No test framework, no coverage expectations. Verification = the change evaluates and builds (`nix build .#nixosConfigurations.<host>...`) and, for the fleet, build-gate turning it green before comin touches a host.
 - `nix flake check` covers treefmt, pre-commit hooks, deploy-rs checks (`deploy-activate` is slow), `check-flake-file`, the docs build and the default-shell build.
-- CI on the spindle is deliberately fast-feedback: the cheap checks (`treefmt`, `pre-commit`, `check-flake-file`, `default-shell`, `docs`) with `--accept-flake-config` (abort-on-warn applies) and the secrets stub.
+- CI on the spindle is deliberately fast-feedback: the cheap checks (`treefmt`, `pre-commit`, `check-flake-file`, `default-shell`, `docs`) with `--accept-flake-config` (abort-on-warn applies) and the secrets stub. The microVM substitutes only through the spindle's read proxy, whose upstreams are cache.nixos.org and attic (`pipelines.nixCache` in `services/tangled.nix`); a run that wants to build thousands of derivations means an upstream is missing there. Pipeline pages on tangled.org fetch from the spindle in the browser, so `server.corsOrigins` must list `https://tangled.org`.
 - Practical smoke checks when debugging publishing/ingress: `curl -I` against the public name (probes DNS → edge TLS → netbird-proxy → app); `git log deploy..main` shows what has not passed the gate yet.
 
 ## Proving a refactor is a no-op
