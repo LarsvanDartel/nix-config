@@ -1,4 +1,4 @@
-# voyager (x86_64 desktop/gaming laptop, ThinkPad P1 gen3 + nvidia). den-produced.
+# voyager (x86_64 laptop; hardware profile in _hw/voyager/, see `hardwareProfile` below). den-produced.
 #
 # Hardware from a nixos-facter report; filesystems from disko. Generate on voyager:
 #   sudo nix run nixpkgs#nixos-facter -- -o modules/den/hosts/_facter/voyager.facter.json
@@ -6,7 +6,24 @@
   den,
   inputs,
   ...
-}: {
+}: let
+  # The machine voyager currently is: "thinkpad-p1" or "framework-12".
+  # Switching is a runbook: docs/src/install.md, "Moving voyager to the Framework 12".
+  # Static data, not a config read, so it may choose includes. Not named
+  # `hardware`: that would shadow den.aspects.hardware inside `with den.aspects`.
+  hardwareProfile = "thinkpad-p1";
+  profiles = {
+    thinkpad-p1 = {
+      includes = with den.aspects.hardware; [thinkpad fingerprint];
+      module = import ./_hw/voyager/thinkpad-p1.nix {inherit inputs;};
+    };
+    framework-12 = {
+      includes = [];
+      module = import ./_hw/voyager/framework-12.nix {inherit inputs;};
+    };
+  };
+  profile = profiles.${hardwareProfile};
+in {
   den.hosts.x86_64-linux.voyager = {
     users.lvdar = {};
     meshAddress = "100.68.60.163";
@@ -14,25 +31,29 @@
   };
 
   den.aspects.voyager = {
-    includes = with den.aspects; [
-      core.boot
-      core.impermanence
-      roles.desktop
-      roles.gaming
-      desktop.niri
-      desktop.greetd.noctalia
-      desktop.tablet
-      services.containers
-      services.netbird.client
-      services.netbird-gewis
-      services.eduvpn
-      # Not node-exporter: a sleeping laptop would sit permanently "target down".
-      services.alloy
-      hardware.fingerprint
-      hardware.thinkpad
-      services.remote-builder.client
-      hardware.v4l2loopback
-    ];
+    includes = with den.aspects;
+      [
+        core.boot
+        core.impermanence
+        roles.desktop
+        roles.gaming
+        desktop.niri
+        desktop.greetd.noctalia
+        desktop.tablet
+        services.containers
+        services.netbird.client
+        services.netbird-gewis
+        services.eduvpn
+        # Not node-exporter: a sleeping laptop would sit permanently "target down".
+        services.alloy
+      ]
+      # Here, not appended: include order sets the order of merged `lines`
+      # options such as boot.extraModprobeConfig.
+      ++ profile.includes
+      ++ [
+        services.remote-builder.client
+        hardware.v4l2loopback
+      ];
 
     provides.lvdar = {
       includes = with den.aspects; [
@@ -75,7 +96,6 @@
             mpv.defaultApplication = true;
             thunderbird.defaultApplication = true;
             obs-studio = {
-              cudaSupport = true;
               plugins = with pkgs.obs-studio-plugins; [
                 advanced-scene-switcher
                 input-overlay
@@ -116,15 +136,12 @@
       imports = [
         inputs.nixos-facter-modules.nixosModules.facter
         {facter.reportPath = ./_facter/voyager.facter.json;}
-        inputs.nixos-hardware.nixosModules.lenovo-thinkpad-p1-gen3
-        inputs.nixos-hardware.nixosModules.common-gpu-nvidia
+        profile.module
         inputs.disko.nixosModules.disko
         (import ./_hw/voyager/disko.nix {device = "/dev/nvme0n1";})
       ];
 
       cosmos = {
-        system.boot.detect-windows = true;
-
         hardware.v4l2loopback.devices = [
           {
             number = 1;
@@ -142,13 +159,8 @@
       services.openssh.openFirewall = false;
       cosmos.services.netbird.client.exposedPorts = [2222];
 
-      # Keep nvidia (103 MB GSP firmware) out of the initrd: three copies
-      # filled the 511 MB ESP. nvidia loads at stage 2.
-      facter.detected.boot.graphics.kernelModules = ["i915"];
-
       boot = {
-        kernelParams = ["resume_offset=533760" "quiet"];
-        resumeDevice = "/dev/disk/by-uuid/c2dc9bb7-f815-4c9c-bd96-68bebb100aef";
+        kernelParams = ["quiet"];
         extraModprobeConfig = ''
           options iwlwifi power_save=0 uapsd_disable=1
           options iwlmvm power_scheme=1
@@ -160,18 +172,6 @@
 
         # Plymouth gives the LUKS FIDO2 prompt a real UI.
         plymouth.enable = true;
-      };
-
-      hardware.nvidia = {
-        open = true;
-        powerManagement = {
-          enable = true;
-          finegrained = true;
-        };
-        prime.offload = {
-          enable = true;
-          enableOffloadCmd = true;
-        };
       };
 
       # Disk swap was thrashing at 15.8/16G before RAM was exhausted. zram's
