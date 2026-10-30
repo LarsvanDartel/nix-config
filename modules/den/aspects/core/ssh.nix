@@ -47,6 +47,9 @@ in {
           type = "ed25519";
         }
       ];
+      # Only the declared keys: a hand-placed ~/.ssh/authorized_keys (pioneer's
+      # SD-image bootstrap left one) would outlive every key rotation.
+      authorizedKeysInHomedir = false;
       settings = {
         PasswordAuthentication = false;
         KbdInteractiveAuthentication = false;
