@@ -1,6 +1,8 @@
-# Umbriel's home config (config.toml + accelerometer rotation), as a plain home-manager module factory imported by voyager's `specialisation.umbriel`.
+# Umbriel's home config (config.toml, accelerometer rotation, touch gestures, tablet-mode keyboard and dock), as a plain home-manager module factory imported by voyager's `specialisation.umbriel`.
 {}: {
+  config,
   lib,
+  osConfig,
   pkgs,
   ...
 }: let
@@ -8,6 +10,89 @@
   locked = action: {
     inherit action;
     allow_when_locked = true;
+  };
+  umbriel = "${osConfig.programs.umbriel.package}/bin/umbriel";
+  noctaliaMsg = "${config.programs.noctalia.package}/bin/noctalia msg";
+
+  # The gestures of desktop/tablet.nix (format and ordering rules there), with
+  # Umbriel's actions; keep in step by hand. Touching the open overview closes
+  # it on touch-down, so the bottom swipe only opens: a toggle firing on
+  # release would reopen it.
+  gestures = [
+    "1,DU,B,*,R,${umbriel} msg overview-open"
+    "1,LR,L,*,R,${umbriel} msg window-focus-left"
+    "1,RL,R,*,R,${umbriel} msg window-focus-right"
+    "1,UD,T,*,R,${noctaliaMsg} panel-toggle control-center"
+    # 34 is SIGRTMIN (glibc), wvkbd's visibility toggle; procps rejects the name.
+    "2,DU,B,*,R,${pkgs.procps}/bin/pkill --signal 34 -x wvkbd-mobintl"
+    "3,UD,T,*,R,${umbriel} msg window-close"
+    "3,DU,*,*,R,${umbriel} msg workspace-next"
+    "3,UD,*,*,R,${umbriel} msg workspace-previous"
+    "3,RL,*,*,R,${umbriel} msg window-focus-right"
+    "3,LR,*,*,R,${umbriel} msg window-focus-left"
+    "4,DU,*,*,R,${umbriel} msg overview-open"
+    "4,UD,*,*,R,${umbriel} msg overview-close"
+  ];
+
+  lisgd-umbriel = pkgs.writeShellApplication {
+    name = "lisgd-umbriel";
+    runtimeInputs = [pkgs.lisgd pkgs.jq];
+    text = ''
+      # lisgd reads the output transform only at startup, so restart it whenever
+      # eDP-1's transform or mode changes ("" while it is off).
+      pid=""
+      current="none"
+      while read -r state; do
+        [[ $state != "$current" ]] || continue
+        current=$state
+        if [[ -n $pid ]]; then
+          kill "$pid" 2>/dev/null || true
+          wait "$pid" 2>/dev/null || true
+          pid=""
+        fi
+        [[ -n $state ]] || continue
+        read -r transform width height <<<"$state"
+        # Umbriel's 90/270 turn counter-clockwise, lisgd's -o clockwise.
+        case $transform in
+          90) o=3 ;;
+          180) o=2 ;;
+          270) o=1 ;;
+          *) o=0 ;;
+        esac
+        # -w/-h are the panel's native mode; lisgd scales raw touch coordinates to them.
+        lisgd -d /dev/input/touchscreen -o "$o" -w "$width" -h "$height" ${lib.concatMapStringsSep " " (g: "-g ${lib.escapeShellArg g}") gestures} &
+        pid=$!
+      done < <(${umbriel} subscribe outputs | jq --unbuffered -r '
+        [.data[] | select(.name == "eDP-1" and .enabled)
+          | "\(.transform) \(.modes[] | select(.current) | "\(.width) \(.height)")"]
+        | first // ""')
+      [[ -z $pid ]] || kill "$pid"
+      exit 1
+    '';
+  };
+
+  # Applies /run/tablet-mode (written by desktop/_umbriel/system.nix): wvkbd
+  # shows on SIGUSR2 and hides on SIGUSR1, and the noctalia dock follows it,
+  # as niri's switch-events do.
+  tablet-mode = pkgs.writeShellApplication {
+    name = "tablet-mode";
+    runtimeInputs = [pkgs.procps];
+    text = ''
+      if [[ $(cat /run/tablet-mode 2>/dev/null) == 1 ]]; then
+        signal=USR2 dock=dock-show
+      else
+        signal=USR1 dock=dock-hide
+      fi
+      # A session started folded runs this before noctalia listens.
+      for _ in $(seq 20); do
+        if ${noctaliaMsg} "$dock"; then
+          pkill "-$signal" -x wvkbd-mobintl || true
+          exit 0
+        fi
+        sleep 0.5
+      done
+      exit 1
+    '';
   };
 
   # niri's workspaceKeys (desktop/_niri/system.nix): the unshifted keysyms of
@@ -72,7 +157,11 @@
     # As niri's layout: new columns at half width, Mod+R cycling 1/3, 1/2, 2/3.
     layout = {
       extent_presets = [0.333 0.5 0.667];
-      scrolling.default_extent_fraction = 0.5;
+      scrolling = {
+        default_extent_fraction = 0.5;
+        # Columns that don't fill the screen start at the left edge, as in niri.
+        center_underfull_strip = false;
+      };
       # niri's default-column-display "tabbed": Mod+W is how a column gets split.
       tabs.default_display = "tabbed";
     };
@@ -210,28 +299,69 @@ in {
   # No general.autostart: noctalia's unit starts with graphical-session.target, which umbriel-session.target binds.
   xdg.configFile."umbriel/config.toml".source = (pkgs.formats.toml {}).generate "umbriel-config.toml" settings;
 
-  systemd.user.services.umbriel-autorotate = {
+  systemd.user.services = {
+    umbriel-autorotate = {
+      Unit = {
+        Description = "Rotate eDP-1 from the accelerometer (Umbriel has no iio tool)";
+        PartOf = ["umbriel-session.target"];
+        After = ["umbriel-session.target"];
+      };
+      Service = {
+        ExecStart = toString (pkgs.writeShellScript "umbriel-autorotate" ''
+          # Same orientation→transform mapping as iio-niri.
+          ${pkgs.iio-sensor-proxy}/bin/monitor-sensor --accel | while read -r line; do
+            case "$line" in
+              *"orientation: normal"*|*"orientation changed: normal"*) t=normal ;;
+              *"orientation: left-up"*|*"orientation changed: left-up"*) t=90 ;;
+              *"orientation: bottom-up"*|*"orientation changed: bottom-up"*) t=180 ;;
+              *"orientation: right-up"*|*"orientation changed: right-up"*) t=270 ;;
+              *) continue ;;
+            esac
+            ${pkgs.wlr-randr}/bin/wlr-randr --output eDP-1 --transform "$t"
+          done
+        '');
+        Restart = "on-failure";
+      };
+      Install.WantedBy = ["umbriel-session.target"];
+    };
+
+    # desktop/tablet.nix's `lisgd` is bound to niri.service, so stays off here.
+    lisgd-umbriel = {
+      Unit = {
+        Description = "lisgd touchscreen gestures for Umbriel";
+        PartOf = ["umbriel-session.target"];
+        After = ["umbriel-session.target"];
+        ConditionPathExists = "/dev/input/touchscreen";
+      };
+      Service = {
+        ExecStart = "${lisgd-umbriel}/bin/lisgd-umbriel";
+        Restart = "on-failure";
+      };
+      Install.WantedBy = ["umbriel-session.target"];
+    };
+
+    # Also run at login, for a session started folded.
+    tablet-mode = {
+      Unit = {
+        Description = "Show or hide wvkbd and the noctalia dock per /run/tablet-mode";
+        PartOf = ["umbriel-session.target"];
+        After = ["umbriel-session.target" "noctalia.service" "wvkbd.service"];
+      };
+      Service = {
+        Type = "oneshot";
+        ExecStart = "${tablet-mode}/bin/tablet-mode";
+      };
+      Install.WantedBy = ["umbriel-session.target"];
+    };
+  };
+
+  systemd.user.paths.tablet-mode = {
     Unit = {
-      Description = "Rotate eDP-1 from the accelerometer (Umbriel has no iio tool)";
+      Description = "Watch /run/tablet-mode";
       PartOf = ["umbriel-session.target"];
       After = ["umbriel-session.target"];
     };
-    Service = {
-      ExecStart = toString (pkgs.writeShellScript "umbriel-autorotate" ''
-        # Same orientation→transform mapping as iio-niri.
-        ${pkgs.iio-sensor-proxy}/bin/monitor-sensor --accel | while read -r line; do
-          case "$line" in
-            *"orientation: normal"*|*"orientation changed: normal"*) t=normal ;;
-            *"orientation: left-up"*|*"orientation changed: left-up"*) t=90 ;;
-            *"orientation: bottom-up"*|*"orientation changed: bottom-up"*) t=180 ;;
-            *"orientation: right-up"*|*"orientation changed: right-up"*) t=270 ;;
-            *) continue ;;
-          esac
-          ${pkgs.wlr-randr}/bin/wlr-randr --output eDP-1 --transform "$t"
-        done
-      '');
-      Restart = "on-failure";
-    };
+    Path.PathChanged = "/run/tablet-mode";
     Install.WantedBy = ["umbriel-session.target"];
   };
 }
