@@ -4,8 +4,9 @@
 # its stage 1 unlocks the host's LUKS (FIDO2 or passphrase) and uses the
 # host's /nix subvolume, read-only, as the lower layer of its tmpfs store
 # overlay. No ISO and no squashfs, so nothing to fit on the ESP; still a live
-# system, so every boot is a fresh machine, like a contest morning. Nothing of
-# the host but /nix is mounted.
+# system, so every boot is a fresh machine, like a contest morning. Of the
+# host it mounts only /nix and the /persist/genix subvolume, which is
+# ~/shared in genix and ~/genix on the host.
 {inputs, ...}: let
   # The self-hosted judge (services.domjudge.sso on endeavour). Trailing
   # slash: submit concatenates it with "api/..." verbatim. Upstream points
@@ -20,8 +21,11 @@ in {
     pkgs,
     ...
   }: let
-    inherit (lib.lists) filter take;
-    inherit (lib.strings) concatStringsSep hasPrefix;
+    inherit (lib.lists) filter;
+    inherit (lib.strings) concatStringsSep hasPrefix removePrefix;
+
+    user = config.cosmos.user.name;
+    subvol = fs: removePrefix "subvol=" (lib.head (filter (hasPrefix "subvol=") fs.options));
 
     hostNix = config.fileSystems."/nix";
 
@@ -98,6 +102,22 @@ in {
               extraGroups = lib.mkForce [];
               openssh.authorizedKeys.keyFiles = lib.mkForce [];
             };
+
+            # genix denies every NetworkManager action to non-root users
+            # (contest machines are wired); allow the team user to join wifi.
+            # polkit takes the first rule that answers, so this one goes first.
+            security.polkit.extraConfig = lib.mkBefore ''
+              polkit.addRule(function(action, subject) {
+                if (action.id.indexOf("org.freedesktop.NetworkManager.") === 0 &&
+                    subject.user === "team") {
+                  return polkit.Result.YES;
+                }
+              });
+            '';
+
+            # The host's primary user is its first normal user, uid 1000, so
+            # files in the shared subvolume belong to the same uid on both sides.
+            users.users.team.uid = lib.mkForce 1000;
           }
           {
             boot.initrd.luks.devices =
@@ -110,10 +130,34 @@ in {
             fileSystems."/iso" = lib.mkForce {
               inherit (hostNix) device;
               fsType = "btrfs";
-              # Even a read-only btrfs mount replays a pending log tree,
-              # i.e. writes, e.g. into a hibernated host's filesystem.
-              options = take 1 (filter (hasPrefix "subvol=") hostNix.options) ++ ["ro" "rescue=nologreplay"];
+              options = ["subvol=${subvol hostNix}" "ro"];
               neededForBoot = true;
+            };
+
+            # Writable. nofail: the host creates it on its first boot with
+            # this module (tmpfiles below).
+            fileSystems."/home/team/shared" = {
+              inherit (hostNix) device;
+              fsType = "btrfs";
+              options = ["subvol=${subvol config.fileSystems."/persist"}/genix" "compress=zstd" "noatime" "nofail"];
+            };
+
+            # A hibernated host resumes onto the filesystem as it left it, so
+            # any write from here (the shared subvolume, or the log replay a
+            # mount does) corrupts it. systemd records the hibernation image in
+            # this EFI variable until the host resumes.
+            boot.initrd.systemd.services.genix-hibernation-guard = {
+              description = "Refuse to boot while the host is hibernated";
+              requiredBy = ["sysroot-iso.mount"];
+              before = ["sysroot-iso.mount"];
+              unitConfig.DefaultDependencies = false;
+              serviceConfig.Type = "oneshot";
+              script = ''
+                if [ -e /sys/firmware/efi/efivars/HibernateLocation-8cf2644b-4b0b-428f-9387-6d876050dc67 ]; then
+                  echo "genix: the host is hibernated; boot it, resume and shut down first" >/dev/console
+                  exit 1
+                fi
+              '';
             };
             fileSystems."/nix/.ro-store" = lib.mkForce {
               # Not /sysroot/iso/store, unlike the squashfs it replaces: the
@@ -149,6 +193,12 @@ in {
   in {
     # The live store is the host's: keep genix's closure in it.
     system.extraDependencies = [genix.system.build.toplevel registration];
+
+    # The subvolume genix mounts as ~/shared ('v' creates a btrfs subvolume).
+    systemd.tmpfiles.rules = [
+      "v /persist/genix 0755 ${user} users -"
+      "L+ /home/${user}/genix - - - - /persist/genix"
+    ];
 
     boot.loader.grub = {
       extraFiles = {
