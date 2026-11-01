@@ -69,11 +69,10 @@ in {
             teammachine.users.team.ides.enable = lib.mkForce false;
             home-manager.users.team.programs.vscode.enable = lib.mkForce false;
 
-            # genix ships GEHACK's keys for the team user, which would open
-            # this laptop to them on any network it boots on.
-            users.users.team.openssh.authorizedKeys.keys = lib.mkForce [
-              "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINXY0u3IG0XLICWx3ZWGqfiKLoDSnl1IDqkhHYeFd8sD lars@lvdar.nl"
-            ];
+            # genix runs sshd with password login, and the team password is
+            # the documented "password": with wifi, anyone on the network
+            # could log in and read ~/shared.
+            services.openssh.enable = lib.mkForce false;
 
             # Practice toolset: C++ and Python only; drops the Java/Kotlin
             # JDKs, eclipse and netbeans.
@@ -95,12 +94,12 @@ in {
               }
             ];
 
-            # The ISO ships GEHACK's staff account: wheel, passwordless sudo
-            # and the org's SSH keys. Dead weight on a private practice boot.
+            # The ISO ships GEHACK's staff account: password "password", wheel
+            # and passwordless sudo, i.e. root over the host's unlocked disk
+            # from the login screen. Locked; there is no root in genix.
             users.users.gehack = {
               hashedPassword = lib.mkForce "!";
               extraGroups = lib.mkForce [];
-              openssh.authorizedKeys.keyFiles = lib.mkForce [];
             };
 
             # genix denies every NetworkManager action to non-root users
