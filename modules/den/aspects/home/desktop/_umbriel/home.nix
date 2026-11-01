@@ -118,7 +118,11 @@
 
   # Validate edits with `umbriel config validate -c <file>`; keys: `umbriel config schema`.
   settings = {
-    general.mod_key = "Super";
+    general = {
+      mod_key = "Super";
+      # Startup only; Mod+Slash still toggles it.
+      show_cheatsheet = false;
+    };
 
     input = {
       keyboard = {
