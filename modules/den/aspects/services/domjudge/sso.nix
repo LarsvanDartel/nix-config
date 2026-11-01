@@ -85,6 +85,9 @@ in {
               "client-secret:${config.sops.secrets."keys/domjudge/oauth-client-secret".path}"
               "cookie-secret:${config.sops.secrets."keys/domjudge/cookie-secret".path}"
             ];
+            # --oidc-email-claim: kanidm persons without a mail address
+            # otherwise fail the callback with a 500 ("neither the id_token
+            # nor the profileURL set an email").
             ExecStart = ''
               ${lib.getExe pkgs.oauth2-proxy} \
                 --http-address=127.0.0.1:${toString oauthPort} \
@@ -95,6 +98,7 @@ in {
                 --cookie-secret-file=%d/cookie-secret \
                 --redirect-url=https://${domain}/oauth2/callback \
                 --upstream=static://202 \
+                --oidc-email-claim=preferred_username \
                 --email-domain=* \
                 --whitelist-domain=${domain} \
                 --set-xauthrequest \
