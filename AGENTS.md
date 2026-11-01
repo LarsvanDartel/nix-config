@@ -43,4 +43,4 @@ The handbook is the mdBook in `docs/` (`nix build .#docs`). Read the relevant pa
 - Pull before push: flake-bump commits to `main` on its own ([deployment](docs/src/deployment.md)).
 - Verification = `nix build .#nixosConfigurations.<host>.config.system.build.toplevel` ([commands](docs/src/commands.md#testing--qa)).
 - `_`-prefixed files are not auto-imported ([architecture](docs/src/architecture.md#_-prefixed-files)).
-- Conventional commits, lowercase, explaining why ([conventions](docs/src/conventions.md#code)).
+- Commit messages are one short, clear conventional-commit line, lowercase, with no body and no names of people or user accounts ([conventions](docs/src/conventions.md#code)).
