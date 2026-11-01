@@ -35,6 +35,10 @@
           }
           {
             series = "bapc";
+            year = 2026;
+          }
+          {
+            series = "bapc";
             year = 2025;
           }
           {
