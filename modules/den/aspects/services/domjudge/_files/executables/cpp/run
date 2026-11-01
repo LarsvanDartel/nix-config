@@ -1,0 +1,6 @@
+#!/bin/sh
+# cpp — DOMjudge's C++ compile script with -std=gnu++20. The image's gcc 13
+# defaults to gnu++17; BAPC and NWERC jury solutions use C++20.
+DEST="$1"
+shift 2 # DEST, MEMLIMIT
+g++ -x c++ -std=gnu++20 -Wall -O2 -static -pipe -o "$DEST" "$@"

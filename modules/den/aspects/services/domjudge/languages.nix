@@ -1,4 +1,5 @@
-# services.domjudge.languages — the judge's languages beyond the image's.
+# services.domjudge.languages — the judge's languages beyond the image's, and
+# its C++ compile script with -std=gnu++20 (_files/executables/cpp).
 #
 # The judgehost image's chroot has gcc, OpenJDK 21 and pypy3 3.9. The other
 # toolchains are copied, with their closure, into one tree mounted at the
@@ -56,6 +57,7 @@
           find . -type f | sort | zip -q -X -@ $out
         '';
       executables = {
+        cpp = mkExecutable "cpp" "";
         py3 = mkExecutable "py3" "--replace-fail @python3@ ${python}/bin/python3";
         kt = mkExecutable "kt" "--replace-fail @kotlinc@ ${kotlinc}";
         rs = mkExecutable "rs" "--replace-fail @rust@ ${rust}";
