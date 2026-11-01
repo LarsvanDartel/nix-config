@@ -144,8 +144,15 @@
             DELETE FROM judgehost WHERE hostname = 'example-judgehost1';
           '';
           text = ''
-            dj -F "json=@${accountsJson};type=application/json" "$api/users/accounts"
-            echo
+            # Only missing accounts: re-importing an admin moves it back into
+            # its jury team, undoing a team set in the jury UI.
+            dj "$api/users" | jq --slurpfile want ${accountsJson} \
+              'map(.username) as $have | [$want[0][] | select(.username as $u | $have | index($u) | not)]' \
+              >"$CACHE_DIRECTORY/accounts.json"
+            if [ "$(jq length "$CACHE_DIRECTORY/accounts.json")" -gt 0 ]; then
+              dj -F "json=@$CACHE_DIRECTORY/accounts.json;type=application/json" "$api/users/accounts"
+              echo
+            fi
 
             failed=()
             while read -r c; do
