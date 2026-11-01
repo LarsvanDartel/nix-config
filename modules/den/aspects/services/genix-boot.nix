@@ -203,7 +203,7 @@ in {
     # once (the grub-reboot mechanism) whatever boot.loader.grub.default is.
     environment.systemPackages = [
       (pkgs.writeShellApplication {
-        name = "reboot-genix";
+        name = "genix";
         text = ''
           if [ "$(id -u)" -ne 0 ]; then
             exec sudo "$0" "$@"
