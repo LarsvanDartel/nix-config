@@ -8,7 +8,9 @@
 # Compile scripts in _files/executables call them by store path; the
 # domjudge-languages job uploads any that differ from the DB's and enables
 # exactly the languages below.
-{den, ...}: {
+{den, ...}: let
+  inherit (import ./_lib.nix) judgehostContainer judgehostIds;
+in {
   den.aspects.services.domjudge.languages = {
     includes = [den.aspects.services.domjudge];
 
@@ -103,13 +105,14 @@
         }
       ]);
     in {
-      virtualisation.oci-containers.containers.domjudge-judgehost = {
-        cmd = ["/scripts/judgehost-start.sh"];
-        volumes = [
-          "${./_files/judgehost-start.sh}:/scripts/judgehost-start.sh:ro"
-          "${chrootStore}:/chroot/domjudge/nix:ro"
-        ];
-      };
+      virtualisation.oci-containers.containers = lib.genAttrs' judgehostIds (id:
+        lib.nameValuePair (judgehostContainer id) {
+          cmd = ["/scripts/judgehost-start.sh"];
+          volumes = [
+            "${./_files/judgehost-start.sh}:/scripts/judgehost-start.sh:ro"
+            "${chrootStore}:/chroot/domjudge/nix:ro"
+          ];
+        });
 
       systemd.services.domjudge-languages = (import ./_lib.nix).mkApiJob {inherit config lib pkgs;} {
         name = "domjudge-languages";

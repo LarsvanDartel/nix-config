@@ -1,5 +1,5 @@
 # services.domjudge — the DOMjudge programming-contest judge: MariaDB, the
-# domserver and one judgehost as podman containers. The files beside this one
+# domserver and four judgehosts as podman containers. The files beside this one
 # add what makes it judge.lvdar.nl: sso.nix (kanidm login and publishing),
 # languages.nix (toolchains beyond the image's) and contests.nix (CHipCie).
 #
@@ -12,7 +12,7 @@
 # php8.3-fpm 8.3.6-0ubuntu0.24.04.13; earlier builds of the 9.0.1 tag are
 # vulnerable. Bump domserver and judgehost together.
 {...}: let
-  inherit (import ./_lib.nix) containerPort;
+  inherit (import ./_lib.nix) containerPort judgehostContainer judgehostIds;
 in {
   den.aspects.services.domjudge.nixos = {
     config,
@@ -22,7 +22,9 @@ in {
   }: let
     secret = name: config.sops.placeholder."keys/domjudge/${name}";
 
-    containerUnits = map (n: "podman-domjudge-${n}.service") ["mariadb" "domserver" "judgehost"];
+    containerUnits =
+      map (n: "podman-${n}.service")
+      (["domjudge-mariadb" "domjudge-domserver"] ++ map judgehostContainer judgehostIds);
 
     mariadbImage = pkgs.dockerTools.pullImage {
       imageName = "mariadb";
@@ -89,61 +91,63 @@ in {
       };
     };
 
-    virtualisation.oci-containers.containers = {
-      domjudge-mariadb = {
-        image = "docker.io/library/mariadb:11.4";
-        imageFile = mariadbImage;
-        pull = "never";
-        networks = ["domjudge"];
-        extraOptions = ["--ip=10.89.42.2"];
-        environment = {
-          MARIADB_DATABASE = "domjudge";
-          MARIADB_USER = "domjudge";
+    # Privileged + the host cgroup tree is upstream's documented judgehost
+    # setup. runguard unshares the network namespace, so submissions cannot
+    # reach the domserver.
+    virtualisation.oci-containers.containers =
+      lib.genAttrs' judgehostIds (id:
+        lib.nameValuePair (judgehostContainer id) {
+          image = "docker.io/domjudge/judgehost:9.0.1";
+          imageFile = judgehostImage;
+          pull = "never";
+          dependsOn = ["domjudge-domserver"];
+          # The judgedaemon registers as <hostname>-<DAEMON_ID>.
+          hostname = "judgehost";
+          privileged = true;
+          networks = ["domjudge"];
+          extraOptions = ["--ip=10.89.42.${toString (4 + id)}" "--cgroupns=host"];
+          volumes = ["/sys/fs/cgroup:/sys/fs/cgroup"];
+          environment = {
+            DOMSERVER_BASEURL = "http://10.89.42.3/";
+            JUDGEDAEMON_USERNAME = "judgehost";
+            DAEMON_ID = toString id;
+          };
+          environmentFiles = [config.sops.templates."domjudge-judgehost.env".path];
+        })
+      // {
+        domjudge-mariadb = {
+          image = "docker.io/library/mariadb:11.4";
+          imageFile = mariadbImage;
+          pull = "never";
+          networks = ["domjudge"];
+          extraOptions = ["--ip=10.89.42.2"];
+          environment = {
+            MARIADB_DATABASE = "domjudge";
+            MARIADB_USER = "domjudge";
+          };
+          environmentFiles = [config.sops.templates."domjudge-mariadb.env".path];
+          volumes = ["/tank/domjudge/mariadb:/var/lib/mysql"];
+          # Upstream's compose flags; the packet size is for large testcases.
+          cmd = ["--max-connections=1000" "--max-allowed-packet=512M"];
         };
-        environmentFiles = [config.sops.templates."domjudge-mariadb.env".path];
-        volumes = ["/tank/domjudge/mariadb:/var/lib/mysql"];
-        # Upstream's compose flags; the packet size is for large testcases.
-        cmd = ["--max-connections=1000" "--max-allowed-packet=512M"];
-      };
 
-      domjudge-domserver = {
-        image = "docker.io/domjudge/domserver:9.0.1";
-        imageFile = domserverImage;
-        pull = "never";
-        dependsOn = ["domjudge-mariadb"];
-        networks = ["domjudge"];
-        extraOptions = ["--ip=10.89.42.3"];
-        ports = ["127.0.0.1:${toString containerPort}:80"];
-        environment = {
-          MYSQL_HOST = "10.89.42.2";
-          MYSQL_USER = "domjudge";
-          MYSQL_DATABASE = "domjudge";
+        domjudge-domserver = {
+          image = "docker.io/domjudge/domserver:9.0.1";
+          imageFile = domserverImage;
+          pull = "never";
+          dependsOn = ["domjudge-mariadb"];
+          networks = ["domjudge"];
+          extraOptions = ["--ip=10.89.42.3"];
+          ports = ["127.0.0.1:${toString containerPort}:80"];
+          environment = {
+            MYSQL_HOST = "10.89.42.2";
+            MYSQL_USER = "domjudge";
+            MYSQL_DATABASE = "domjudge";
+          };
+          environmentFiles = [config.sops.templates."domjudge-domserver.env".path];
+          volumes = ["${./_files/start.ro}:/scripts/start.ro:ro"];
         };
-        environmentFiles = [config.sops.templates."domjudge-domserver.env".path];
-        volumes = ["${./_files/start.ro}:/scripts/start.ro:ro"];
       };
-
-      # Privileged + the host cgroup tree is upstream's documented judgehost
-      # setup. runguard unshares the network namespace, so submissions
-      # cannot reach the domserver.
-      domjudge-judgehost = {
-        image = "docker.io/domjudge/judgehost:9.0.1";
-        imageFile = judgehostImage;
-        pull = "never";
-        dependsOn = ["domjudge-domserver"];
-        hostname = "judgehost";
-        privileged = true;
-        networks = ["domjudge"];
-        extraOptions = ["--ip=10.89.42.4" "--cgroupns=host"];
-        volumes = ["/sys/fs/cgroup:/sys/fs/cgroup"];
-        environment = {
-          DOMSERVER_BASEURL = "http://10.89.42.3/";
-          JUDGEDAEMON_USERNAME = "judgehost";
-          DAEMON_ID = "0";
-        };
-        environmentFiles = [config.sops.templates."domjudge-judgehost.env".path];
-      };
-    };
 
     systemd.services = lib.mkMerge [
       # The domserver exits if the DB is not up within 90 s, the judgehost

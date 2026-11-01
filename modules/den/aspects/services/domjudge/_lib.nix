@@ -4,6 +4,13 @@ rec {
   containerPort = 8093;
   api = "http://127.0.0.1:${toString containerPort}/api/v4";
 
+  # One judgehost container per id. The id is the judgedaemon's -n: it pins
+  # every compile and run to CPU <id> and names the judgehost judgehost-<id>,
+  # so ids must stay distinct. CPUs 0-3 are separate physical cores (their
+  # hyperthread siblings are 36-39).
+  judgehostIds = [0 1 2 3];
+  judgehostContainer = id: "domjudge-judgehost-${toString id}";
+
   # A oneshot that drives the domserver API as admin. It waits for the API
   # (the first start installs the DB first), runs `rootSql` as root inside
   # the MariaDB container if given, then `text` with $api, a curlrc in its
