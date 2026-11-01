@@ -41,7 +41,7 @@ in {
         desktop.greetd.noctalia
         desktop.tablet
         services.containers
-        services.genix-vm
+        services.genix-boot
         services.netbird.client
         services.netbird-gewis
         services.eduvpn
@@ -78,7 +78,6 @@ in {
         home.orca-slicer
         home.simplelogin
         home.rbw
-        home.remmina
         home.xournalpp
         home.rnote
         home.krita
