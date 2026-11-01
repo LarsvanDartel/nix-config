@@ -79,7 +79,7 @@
       # used with `||`, errexit is ignored.
       importContest = pkgs.writeShellApplication {
         name = "domjudge-import-contest";
-        runtimeInputs = with pkgs; [coreutils curl gnugrep jq unzip yq-go zip];
+        runtimeInputs = with pkgs; [coreutils curl jq unzip yq-go zip];
         text = ''
           id=$1 name=$2 url=$3
           api=${api}
@@ -129,15 +129,27 @@
               continue
             fi
             echo "$id: importing $problem"
-            pkg="$dir/x/$problem.zip"
+            pkg="$dir/pkg"
+            rm -rf "$pkg"
+            unzip -q "$dir/x/$problem.zip" -d "$pkg"
             # 2025-09 archives wrap each package in a <problem>/ directory;
             # DOMjudge only finds problem.yaml and data/ at the zip root.
-            if unzip -Z1 "$pkg" | grep -Fx "$problem/problem.yaml" >/dev/null; then
-              unzip -q "$pkg" -d "$dir/unwrap"
-              (cd "$dir/unwrap/$problem" && zip -qr "$dir/$problem.zip" .)
-              rm -rf "$dir/unwrap"
-              pkg="$dir/$problem.zip"
+            root="$pkg"
+            [ -e "$pkg/$problem/problem.yaml" ] && root="$pkg/$problem"
+            # 2025-09 moved the default validator's flags (float tolerances)
+            # out of problem.yaml into data/test_group.yaml, which the
+            # archives only carry as generators.yaml's test_group.yaml key.
+            # DOMjudge 9 reads neither, so floats would be compared exactly.
+            args() { yq -r "$1"' | select(.) | [.] | flatten | join(" ")' "$2" 2>/dev/null || true; }
+            flags=$(args '.output_validator_args' "$root/data/test_group.yaml")
+            [ -n "$flags" ] || flags=$(args '."test_group.yaml".output_validator_args' "$root/generators/generators.yaml")
+            if [ -n "$flags" ] && ! yq -e '.validator_flags' "$root/problem.yaml" >/dev/null 2>&1; then
+              FLAGS=$flags yq -i '.validator_flags = strenv(FLAGS)' "$root/problem.yaml"
             fi
+            rm -f "$dir/$problem.zip"
+            (cd "$root" && zip -qr "$dir/$problem.zip" .)
+            rm -rf "$pkg"
+            pkg="$dir/$problem.zip"
             dj -F "zip=@$pkg;type=application/zip" -F "problem=$problem" \
               "$api/contests/$id/problems" | jq -c '{problem_id, danger: .messages.danger}'
           done
