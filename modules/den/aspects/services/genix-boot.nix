@@ -199,13 +199,28 @@ in {
       "L+ /home/${user}/genix - - - - /persist/genix"
     ];
 
+    # One-time boot into genix: install-grub's grub.cfg boots next_entry
+    # once (the grub-reboot mechanism) whatever boot.loader.grub.default is.
+    environment.systemPackages = [
+      (pkgs.writeShellApplication {
+        name = "reboot-genix";
+        text = ''
+          if [ "$(id -u)" -ne 0 ]; then
+            exec sudo "$0" "$@"
+          fi
+          ${lib.getExe' pkgs.grub2 "grub-editenv"} /boot/grub/grubenv set next_entry=genix
+          systemctl reboot
+        '';
+      })
+    ];
+
     boot.loader.grub = {
       extraFiles = {
         "genix/kernel" = "${genix.boot.kernelPackages.kernel}/${genix.system.boot.loader.kernelFile}";
         "genix/initrd" = "${genix.system.build.initialRamdisk}/${genix.system.boot.loader.initrdFile}";
       };
       extraEntries = ''
-        menuentry "GEHACK contest workstation (genix)" {
+        menuentry "GEHACK contest workstation (genix)" --id genix {
           linux @bootRoot@/genix/kernel init=${genix.system.build.toplevel}/init genix.registration=${registration}/registration ${concatStringsSep " " genix.boot.kernelParams}
           initrd @bootRoot@/genix/initrd
         }
