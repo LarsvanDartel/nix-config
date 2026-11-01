@@ -79,21 +79,22 @@
       # used with `||`, errexit is ignored.
       importContest = pkgs.writeShellApplication {
         name = "domjudge-import-contest";
-        runtimeInputs = with pkgs; [coreutils curl jq unzip yq-go];
+        runtimeInputs = with pkgs; [coreutils curl gnugrep jq unzip yq-go zip];
         text = ''
           id=$1 name=$2 url=$3
           api=${api}
           curlrc="$CACHE_DIRECTORY/curlrc"
           dj() { curl -sS --fail-with-body -K "$curlrc" "$@"; }
 
-          created=false
           if [ "$(curl -sS -o /dev/null -w '%{http_code}' -K "$curlrc" "$api/contests/$id")" = 200 ]; then
             if dj "$api/contests/$id/problems" | jq -e 'length > 0 and all(.[]; .test_data_count > 0)' >/dev/null; then
               echo "$id: already imported"
               exit 0
             fi
           else
-            created=true
+            jq -n --arg id "$id" --arg name "$name" --arg start "$(date --iso-8601=seconds)" \
+              '{id: $id, name: $name, formal_name: $name, start_time: $start, duration: "87600:00:00"}' |
+              dj -F "json=@-;type=application/json" "$api/contests" >/dev/null
           fi
 
           dir="$CACHE_DIRECTORY/$id"
@@ -105,12 +106,18 @@
           unzip -q "$dir/archive.zip" -d "$dir/x" -x samples.zip
           rm "$dir/archive.zip"
 
-          if $created; then
-            jq -n --arg id "$id" --arg name "$name" --arg start "$(date --iso-8601=seconds)" \
-              '{id: $id, name: $name, formal_name: $name, start_time: $start, duration: "87600:00:00"}' >"$dir/contest.json"
-            dj -F "json=@$dir/contest.json;type=application/json" "$api/contests" >/dev/null
-            dj -F "problemset=@$dir/x/contest.pdf;type=application/pdf" "$api/contests/$id/problemset" >/dev/null
-            # add-data is not idempotent (it always inserts), so it only ever runs here.
+          # From 2026 the archives follow problem package format 2025-09:
+          # contest.en.pdf, and per-language name maps in problems.yaml,
+          # which add-data stores verbatim as the name.
+          pdf="$dir/x/contest.pdf"
+          [ -e "$pdf" ] || pdf="$dir/x/contest.en.pdf"
+          yq -i '(.[] | select(.name | tag == "!!map") | .name) |= (.en // ([.[]] | .[0]))' "$dir/x/problems.yaml"
+
+          # add-data is not idempotent (it always inserts), so it only runs
+          # while the contest has no problems; a run that died before this
+          # point resumes here.
+          if [ "$(dj "$api/contests/$id/problems" | jq length)" = 0 ]; then
+            dj -F "problemset=@$pdf;type=application/pdf" "$api/contests/$id/problemset" >/dev/null
             if ! dj -F "data=@$dir/x/problems.yaml" "$api/contests/$id/problems/add-data" >/dev/null; then
               echo "$id: adding problems failed; delete contest $id in the jury UI, then restart domjudge-import" >&2
               exit 1
@@ -122,7 +129,16 @@
               continue
             fi
             echo "$id: importing $problem"
-            dj -F "zip=@$dir/x/$problem.zip;type=application/zip" -F "problem=$problem" \
+            pkg="$dir/x/$problem.zip"
+            # 2025-09 archives wrap each package in a <problem>/ directory;
+            # DOMjudge only finds problem.yaml and data/ at the zip root.
+            if unzip -Z1 "$pkg" | grep -Fx "$problem/problem.yaml" >/dev/null; then
+              unzip -q "$pkg" -d "$dir/unwrap"
+              (cd "$dir/unwrap/$problem" && zip -qr "$dir/$problem.zip" .)
+              rm -rf "$dir/unwrap"
+              pkg="$dir/$problem.zip"
+            fi
+            dj -F "zip=@$pkg;type=application/zip" -F "problem=$problem" \
               "$api/contests/$id/problems" | jq -c '{problem_id, danger: .messages.danger}'
           done
         '';
