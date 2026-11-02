@@ -17,7 +17,7 @@ One base16 theme, in a dark and a light mode, switched at runtime without a rebu
 
 ## Changing theme or default mode
 
-`modules/den/aspects/desktop/styling.nix`: `themes` lists each theme's dark and light scheme and icon theme, `theme` picks one, `defaultMode` is what the system and a fresh home start in.
+`modules/den/aspects/desktop/styling.nix`: `themes` lists each theme's dark and light scheme, icon theme and accent (the base16 slot for noctalia's primary and the focused-window colour in niri and Umbriel; Everforest's green), `theme` picks one, `defaultMode` is what the system and a fresh home start in.
 
 ## How it works
 

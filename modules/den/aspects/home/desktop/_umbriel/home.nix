@@ -1,5 +1,5 @@
 # Umbriel's home config (config.toml, accelerometer rotation, touch gestures, tablet-mode keyboard and dock), as a plain home-manager module factory imported by voyager's `specialisation.umbriel`.
-{}: {
+{cosmosStyling}: {
   config,
   lib,
   osConfig,
@@ -19,26 +19,27 @@
   # config includes the session's mode (home.theme). Same roles as niri.
   colorsFor = mode: let
     c = lib.mapAttrs (_: v: "${v}FF") modes.rendered.${mode}.lib.stylix.colors.withHashtag;
+    accent = c.${cosmosStyling.accent};
   in
     (pkgs.formats.toml {}).generate "umbriel-colors-${mode}.toml" {
       colors = {
         background = c.base00;
         text_primary = c.base05;
         text_muted = c.base04;
-        accent_primary = c.base0D;
+        accent_primary = accent;
         accent_secondary = c.base0A;
         warning = c.base0A;
         error = c.base08;
         border = {
-          focused = c.base0D;
+          focused = accent;
           unfocused = c.base02;
           outer = c.base01;
         };
-        overview.badge = c.base0D;
+        overview.badge = accent;
         tab_bar = {
           background = c.base01;
           text = c.base04;
-          active = c.base0D;
+          active = accent;
           active_text = c.base00;
           active_unfocused = c.base02;
           active_unfocused_text = c.base05;

@@ -1,6 +1,6 @@
 # The niri home config, as a plain home-manager module factory imported by its
 # aspect `den.aspects.home.niri`.
-{}: {
+{cosmosStyling}: {
   config,
   lib,
   osConfig,
@@ -33,7 +33,7 @@
       kdl = ''
         layout {
             focus-ring {
-                active-color "${c.base0D}"
+                active-color "${c.${cosmosStyling.accent}}"
                 inactive-color "${c.base02}"
             }
             shadow {

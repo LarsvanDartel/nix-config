@@ -5,6 +5,7 @@
 {
   den,
   inputs,
+  cosmosStyling,
   ...
 }: let
   # The machine voyager currently is: "thinkpad-p1" or "framework-12".
@@ -252,7 +253,7 @@ in {
         imports = [(import ../aspects/desktop/_umbriel/system.nix {})];
         # The entry's Name= (and DesktopNames=) is "Umbriel".
         cosmos.profiles.desktop.addons.greetd.noctalia.defaultSession = lib.mkForce "Umbriel";
-        home-manager.users.lvdar.imports = [(import ../aspects/home/desktop/_umbriel/home.nix {})];
+        home-manager.users.lvdar.imports = [(import ../aspects/home/desktop/_umbriel/home.nix {inherit cosmosStyling;})];
       };
 
       # Push the desktop closure and pioneer's toplevel (built on endeavour,

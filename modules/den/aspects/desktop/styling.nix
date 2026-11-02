@@ -10,8 +10,10 @@
   lib,
   ...
 }: let
-  # Each theme names its tinted-theming scheme per mode and its icon theme
-  # (home/desktop/_styling/icons). Switching theme is this one word.
+  # Each theme names its tinted-theming scheme per mode, its icon theme
+  # (home/desktop/_styling/icons) and its accent: the base16 slot for
+  # noctalia's primary and the focused-window colour in niri and Umbriel.
+  # Switching theme is this one word.
   themes = {
     # Not everforest-dark-medium: same background, but its base05 is the
     # grey 859289, too dim for body text.
@@ -19,11 +21,14 @@
       dark = "everforest";
       light = "everforest-light-medium";
       icons = "everforest";
+      # Its green; stylix's noctalia target would take base0D, a blue.
+      accent = "base0B";
     };
     nord = {
       dark = "nord";
       light = "nord-light";
       icons = "nordzy";
+      accent = "base0D";
     };
   };
   theme = "everforest";
@@ -51,6 +56,7 @@ in {
   _module.args.cosmosStyling = {
     inherit theme defaultMode modes schemeFile stateDir;
     iconTheme = themes.${theme}.icons;
+    inherit (themes.${theme}) accent;
     # Load-bearing: `terminal` also flips btop's/helix's `transparent`, or a
     # TUI paints an opaque rectangle through the terminal. noctalia reads these
     # by hand (_noctalia/home.nix). `applications` stays 1.0 deliberately.

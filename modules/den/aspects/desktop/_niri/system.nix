@@ -105,7 +105,7 @@
         };
         focus-ring = {
           width = 2;
-          active-color = colors.base0D;
+          active-color = colors.${cosmosStyling.accent};
           inactive-color = colors.base02;
         };
         border.off = _: {};

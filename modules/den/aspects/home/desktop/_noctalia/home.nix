@@ -1,6 +1,9 @@
 # The noctalia v5 home config (home-manager's `programs.noctalia`), as a plain
 # home-manager module factory imported by home.noctalia.
-{inputs}: {
+{
+  inputs,
+  cosmosStyling,
+}: {
   config,
   lib,
   ...
@@ -19,7 +22,8 @@ in {
 
   config = {
     # Colours, popup opacity and the default mode come from stylix's `noctalia`
-    # target; the light half of the palette from home.theme's light render.
+    # target, primary aside; the light half of the palette from home.theme's
+    # light render.
     programs.noctalia = {
       enable = true;
       systemd.enable = true;
@@ -176,8 +180,11 @@ in {
         hooks.theme_mode_changed = lib.mkIf modes.enable ''${modes.package}/bin/theme sync "$NOCTALIA_THEME_MODE"'';
       };
 
-      # The light half; stylix's target writes only the default mode's.
-      customPalettes.stylix.light = lib.mkIf modes.enable modes.rendered.light.programs.noctalia.customPalettes.stylix.dark;
+      customPalettes.stylix = {
+        dark.mPrimary = lib.mkForce config.lib.stylix.colors.withHashtag.${cosmosStyling.accent};
+        # The light half; stylix's target writes only the default mode's.
+        light = lib.mkIf modes.enable modes.rendered.light.programs.noctalia.customPalettes.stylix.dark;
+      };
     };
 
     cosmos.desktops.common.styling.modes = {
