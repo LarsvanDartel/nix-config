@@ -71,7 +71,7 @@ voyager's move to the Framework Laptop 12 is the worked example: [Moving voyager
 
 voyager keeps its identity (host key, sops access, mesh address, data) and moves from the ThinkPad P1 to the Framework Laptop 12. Everything hardware-specific sits behind `hardwareProfile` in `modules/den/hosts/voyager.nix` (`_hw/voyager/thinkpad-p1.nix`, `_hw/voyager/framework-12.nix`), so the move is one word plus one `install-host` run.
 
-1. **Firmware** (F2 at power-on): Secure Boot **off** (the installer and GRUB are unsigned; [Secure Boot](#secure-boot) comes after the move); stylus protocol **MPP**, because USI mode has reports of a stuck eraser on Linux; BIOS ≥ 3.00. Fit the Ethernet expansion card and plug it in.
+1. **Firmware** (F2 at power-on): Secure Boot **off** (the installer and GRUB are unsigned; [Secure Boot](#secure-boot) comes after the move); stylus protocol **MPP**, because USI mode has reports of a stuck eraser on Linux. Note the BIOS version on the *Main* page; updates come after the move ([Firmware updates](#firmware-updates)). Fit the Ethernet expansion card and plug it in.
 2. **Installer:** `nix build .#installer-iso`, `dd` it to a USB stick (see [Build the installer](#build-the-installer)) and boot the Framework from it. Note the IPv4 shown on the console.
 3. **Flip the profile.** On the P1, in `~/nix-config`: `git pull`, set `hardwareProfile = "framework-12";` in `modules/den/hosts/voyager.nix`, commit (`feat(voyager): move to the Framework Laptop 12`) and push. Do **not** `nh os switch` the P1 onto this commit. Until the Framework's facter report replaces the P1's, this commit evaluates but does not build (the P1 report puts `nvidia` in the initrd, which the Framework kernel lacks) and build-gate stays red for voyager; install-host regenerates the report from the target before building, and step 6 commits it.
 4. Close the browser, mail and IDE (their state is copied live). Then:
@@ -98,6 +98,7 @@ voyager keeps its identity (host key, sops access, mesh address, data) and moves
    - [ ] `systemctl hibernate` resumes (see [Hibernation](#hibernation));
    - [ ] `genix` reboots into the GEHACK entry with display and Wi-Fi working, `~/shared` is mounted (`findmnt ~/shared`), and the next boot is voyager again;
    - [ ] `cat /etc/nix/machines` lists endeavour;
+   - [ ] firmware is current: `fwupdmgr get-updates` (see [Firmware updates](#firmware-updates));
    - [ ] `df -h /` leaves at least 100 GB free.
 8. **Cleanup commit**, once the Framework has run well for a week:
    - delete `_hw/voyager/thinkpad-p1.nix`, `aspects/hardware/thinkpad.nix` and `aspects/hardware/fingerprint.nix`;
@@ -129,6 +130,20 @@ boot.kernelParams = ["resume_offset=<n>"]; # sudo btrfs inspect-internal map-swa
 ```
 
 install-host's checklist prints the `map-swapfile` command whenever `boot.resumeDevice` is set.
+
+## Firmware updates
+
+Framework publishes the Laptop 12's BIOS, a bundle that also carries the EC, PD and CSME firmware, to [LVFS](https://fwupd.org). The `framework-12` profile gets fwupd from nixos-hardware, and persists `/var/lib/fwupd`, where fwupd records a staged update and checks its result after the reboot. Update from the installed system, plugged in to a charger:
+
+```bash
+fwupdmgr refresh --force
+fwupdmgr get-updates
+fwupdmgr update        # stages a UEFI capsule on the ESP and asks to reboot
+```
+
+The firmware flashes during the reboot (progress bar; don't interrupt it), then boots voyager again. `fwupdmgr get-history` shows the result. Under [Secure Boot](#secure-boot) the same works: lanzaboote signs fwupd's EFI helper with the host's key.
+
+Releases and notes: [Framework Laptop 12 Intel Core Series 3 — BIOS & Drivers](https://resources.frame.work/downloads/laptop-12/intel-core-series-3/). Without a working system, the *EFI Shell Update* zip from that page, extracted to a FAT32 stick and booted with F12, flashes it too.
 
 ## Secure Boot
 

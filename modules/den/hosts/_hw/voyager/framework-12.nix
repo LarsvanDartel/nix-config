@@ -22,6 +22,10 @@
     softdep soc_button_array pre: pinctrl_intel_platform
   '';
 
+  # fwupd (from nixos-hardware) records a staged capsule update here and
+  # checks its result after the update reboot; the root rollback would drop it.
+  cosmos.system.impermanence.persist.directories = ["/var/lib/fwupd"];
+
   # Under cosmos.system.boot.secureBoot: Framework's own EFI tools (the BIOS
   # updater) are signed with its db/KEK, which erasing the keys removes.
   boot.lanzaboote.autoEnrollKeys.includeFirmwareBuiltinKeys = true;
