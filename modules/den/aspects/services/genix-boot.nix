@@ -1,4 +1,4 @@
-# services.genix-boot — the GEHACK contest workstation (genix) as a GRUB entry.
+# services.genix-boot — the GEHACK contest workstation (genix) as a boot entry (GRUB, or a signed UKI under lanzaboote).
 #
 # genix's live system, booted natively: its kernel and initrd sit on the ESP,
 # its stage 1 unlocks the host's LUKS (FIDO2 or passphrase) and uses the
@@ -192,42 +192,100 @@ in {
         ];
       }).config;
     registration = pkgs.closureInfo {rootPaths = [genix.system.build.toplevel];};
+
+    kernel = "${genix.boot.kernelPackages.kernel}/${genix.system.boot.loader.kernelFile}";
+    initrd = "${genix.system.build.initialRamdisk}/${genix.system.boot.loader.initrdFile}";
+    cmdline = "init=${genix.system.build.toplevel}/init genix.registration=${registration}/registration ${concatStringsSep " " genix.boot.kernelParams}";
+    title = "GEHACK contest workstation (genix)";
+
+    secureBoot = config.boot.lanzaboote.enable;
+    lanzaboote = config.boot.lanzaboote;
+    esp = config.boot.loader.efi.efiSysMountPoint;
+    osRelease = pkgs.writeText "genix-os-release" ''
+      ID=genix
+      PRETTY_NAME="${title}"
+    '';
+    # A UKI (kernel, initrd and command line in one EFI binary), so a single
+    # signature covers all three. systemd-boot lists it from EFI/Linux.
+    uki = pkgs.runCommand "genix.efi" {} ''
+      ${pkgs.buildPackages.systemdUkify}/lib/systemd/ukify build \
+        --linux=${kernel} \
+        --initrd=${initrd} \
+        --cmdline=${lib.escapeShellArg cmdline} \
+        --os-release=@${osRelease} \
+        --uname=${genix.boot.kernelPackages.kernel.modDirVersion} \
+        --stub=${config.systemd.package}/lib/systemd/boot/efi/linuxx64.efi.stub \
+        --output=$out
+    '';
   in {
-    # The live store is the host's: keep genix's closure in it.
-    system.extraDependencies = [genix.system.build.toplevel registration];
+    config = lib.mkMerge [
+      {
+        # The live store is the host's: keep genix's closure in it.
+        system.extraDependencies = [genix.system.build.toplevel registration];
 
-    # The subvolume genix mounts as ~/shared ('v' creates a btrfs subvolume).
-    systemd.tmpfiles.rules = [
-      "v /persist/genix 0755 ${user} users -"
-      "L+ /home/${user}/genix - - - - /persist/genix"
-    ];
+        # The subvolume genix mounts as ~/shared ('v' creates a btrfs subvolume).
+        systemd.tmpfiles.rules = [
+          "v /persist/genix 0755 ${user} users -"
+          "L+ /home/${user}/genix - - - - /persist/genix"
+        ];
 
-    # One-time boot into genix: install-grub's grub.cfg boots next_entry
-    # once (the grub-reboot mechanism) whatever boot.loader.grub.default is.
-    environment.systemPackages = [
-      (pkgs.writeShellApplication {
-        name = "genix";
-        text = ''
-          if [ "$(id -u)" -ne 0 ]; then
-            exec sudo "$0" "$@"
-          fi
-          ${lib.getExe' pkgs.grub2 "grub-editenv"} /boot/grub/grubenv set next_entry=genix
-          systemctl reboot
-        '';
+        # One-time boot into genix. GRUB: install-grub's grub.cfg boots
+        # next_entry once (the grub-reboot mechanism). systemd-boot: the
+        # LoaderEntryOneShot EFI variable.
+        environment.systemPackages = [
+          (pkgs.writeShellApplication {
+            name = "genix";
+            text = ''
+              if [ "$(id -u)" -ne 0 ]; then
+                exec sudo "$0" "$@"
+              fi
+              ${
+                if secureBoot
+                then "${lib.getExe' config.systemd.package "bootctl"} set-oneshot genix.efi"
+                else "${lib.getExe' pkgs.grub2 "grub-editenv"} /boot/grub/grubenv set next_entry=genix"
+              }
+              systemctl reboot
+            '';
+          })
+        ];
+      }
+      (lib.mkIf (!secureBoot) {
+        boot.loader.grub = {
+          extraFiles = {
+            "genix/kernel" = kernel;
+            "genix/initrd" = initrd;
+          };
+          extraEntries = ''
+            menuentry "${title}" --id genix {
+              linux @bootRoot@/genix/kernel ${cmdline}
+              initrd @bootRoot@/genix/initrd
+            }
+          '';
+        };
+      })
+      (lib.mkIf secureBoot {
+        # lzbt signs only NixOS's own entries, and garbage-collects only the
+        # nixos-* files in EFI/Linux. Runs on every boot and on each switch
+        # that changes the image; after generate-sb-keys, and before the
+        # auto-enroll unit, whose autoReboot would cut this short.
+        systemd.services.genix-uki = {
+          description = "Sign genix's boot image onto the ESP";
+          wantedBy = ["multi-user.target"];
+          after = ["generate-sb-keys.service"];
+          before = ["prepare-sb-auto-enroll.service"];
+          unitConfig.RequiresMountsFor = [esp lanzaboote.pkiBundle];
+          serviceConfig = {
+            Type = "oneshot";
+            RemainAfterExit = true;
+          };
+          script = ''
+            mkdir -p ${esp}/EFI/Linux
+            ${lib.getExe' pkgs.sbsigntool "sbsign"} --key ${lanzaboote.privateKeyFile} --cert ${lanzaboote.publicKeyFile} \
+              --output ${esp}/EFI/Linux/genix.efi.tmp ${uki}
+            mv ${esp}/EFI/Linux/genix.efi.tmp ${esp}/EFI/Linux/genix.efi
+          '';
+        };
       })
     ];
-
-    boot.loader.grub = {
-      extraFiles = {
-        "genix/kernel" = "${genix.boot.kernelPackages.kernel}/${genix.system.boot.loader.kernelFile}";
-        "genix/initrd" = "${genix.system.build.initialRamdisk}/${genix.system.boot.loader.initrdFile}";
-      };
-      extraEntries = ''
-        menuentry "GEHACK contest workstation (genix)" --id genix {
-          linux @bootRoot@/genix/kernel init=${genix.system.build.toplevel}/init genix.registration=${registration}/registration ${concatStringsSep " " genix.boot.kernelParams}
-          initrd @bootRoot@/genix/initrd
-        }
-      '';
-    };
   };
 }

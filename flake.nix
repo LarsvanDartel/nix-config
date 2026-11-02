@@ -33,6 +33,13 @@
     impermanence.url = "github:nix-community/impermanence";
     import-tree.url = "github:vic/import-tree";
     jellarr.url = "github:venkyr77/jellarr";
+    lanzaboote = {
+      url = "github:nix-community/lanzaboote/v1.2.0";
+      inputs = {
+        nixpkgs.follows = "nixpkgs";
+        pre-commit.follows = "pre-commit-hooks";
+      };
+    };
     launchpad = {
       url = "git+https://knot.lvdar.nl/did:plc:3l35i5iht5tqeoeqlfxzgkls?shallow=1";
       inputs.nixpkgs.follows = "nixpkgs";

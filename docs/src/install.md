@@ -13,7 +13,7 @@ The ISO is the NixOS minimal installer with the latest kernel and no ZFS, plus `
 
 ## Prepare the target
 
-1. Firmware: Secure Boot **off** (GRUB is unsigned).
+1. Firmware: Secure Boot **off** (the installer is unsigned).
 2. Boot the USB stick.
 3. Network: Ethernet, or `nmtui` for Wi-Fi.
 4. The console shows the IPv4 address and the `install-host` command line.
@@ -71,7 +71,7 @@ voyager's move to the Framework Laptop 12 is the worked example: [Moving voyager
 
 voyager keeps its identity (host key, sops access, mesh address, data) and moves from the ThinkPad P1 to the Framework Laptop 12. Everything hardware-specific sits behind `hardwareProfile` in `modules/den/hosts/voyager.nix` (`_hw/voyager/thinkpad-p1.nix`, `_hw/voyager/framework-12.nix`), so the move is one word plus one `install-host` run.
 
-1. **Firmware** (F2 at power-on): Secure Boot **off** (GRUB is unsigned); stylus protocol **MPP**, because USI mode has reports of a stuck eraser on Linux; BIOS ≥ 3.00. Fit the Ethernet expansion card and plug it in.
+1. **Firmware** (F2 at power-on): Secure Boot **off** (the installer and GRUB are unsigned; [Secure Boot](#secure-boot) comes after the move); stylus protocol **MPP**, because USI mode has reports of a stuck eraser on Linux; BIOS ≥ 3.00. Fit the Ethernet expansion card and plug it in.
 2. **Installer:** `nix build .#installer-iso`, `dd` it to a USB stick (see [Build the installer](#build-the-installer)) and boot the Framework from it. Note the IPv4 shown on the console.
 3. **Flip the profile.** On the P1, in `~/nix-config`: `git pull`, set `hardwareProfile = "framework-12";` in `modules/den/hosts/voyager.nix`, commit (`feat(voyager): move to the Framework Laptop 12`) and push. Do **not** `nh os switch` the P1 onto this commit. Until the Framework's facter report replaces the P1's, this commit evaluates but does not build (the P1 report puts `nvidia` in the initrd, which the Framework kernel lacks) and build-gate stays red for voyager; install-host regenerates the report from the target before building, and step 6 commits it.
 4. Close the browser, mail and IDE (their state is copied live). Then:
@@ -129,3 +129,28 @@ boot.kernelParams = ["resume_offset=<n>"]; # sudo btrfs inspect-internal map-swa
 ```
 
 install-host's checklist prints the `map-swapfile` command whenever `boot.resumeDevice` is set.
+
+## Secure Boot
+
+`cosmos.system.boot.secureBoot` (`core.boot`) replaces GRUB with [lanzaboote](https://github.com/nix-community/lanzaboote): systemd-boot booting images signed with the host's own keys. On the first boot or switch with it, `generate-sb-keys` creates the keys in `/var/lib/sbctl` (persisted) and `prepare-sb-auto-enroll` puts their enrolment files in `/boot/loader/keys/auto`. systemd-boot enrolls them the next time it starts with the firmware in setup mode. genix gets a signed UKI at `/boot/EFI/Linux/genix.efi` (unit `genix-uki`), and the `genix` command sets `bootctl set-oneshot genix.efi`. The `framework-12` profile also enrolls the firmware's built-in keys, Framework's db and KEK, next to Microsoft's: Framework's own EFI tools are signed with them.
+
+Turning it on for voyager, once it runs well on the Framework:
+
+1. Add `cosmos.system.boot.secureBoot = true;` to voyager's `nixos` block, commit (`feat(voyager): enable secure boot`), push, and `nh os switch`. The switch installs systemd-boot unsigned, then creates the keys, signs everything and writes the enrolment files. Check:
+   - `sudo sbctl verify` lists the files under `/boot/EFI` as signed, except lanzaboote's `kernel-*` files, which the signed stubs check by hash;
+   - `sudo ls /boot/loader/keys/auto` shows `PK.auth KEK.auth db.auth`.
+2. Boot systemd-boot. lzbt never creates a firmware boot entry, and the firmware's GRUB entry would keep booting GRUB's last, now frozen, menu:
+   ```bash
+   sudo efibootmgr --create --disk /dev/nvme0n1 --part 1 --label "Linux Boot Manager" --loader '\EFI\systemd\systemd-bootx64.efi'
+   systemctl reboot
+   ```
+   systemd-boot's menu shows NixOS, the umbriel specialisation and genix; `bootctl status` reports systemd-boot. Only then retire GRUB: `sudo efibootmgr` to find the `NixOS-boot` entry, `sudo efibootmgr --bootnum <n> --delete-bootnum`, and `sudo rm -rf /boot/EFI/NixOS-boot /boot/grub /boot/kernels /boot/genix`.
+3. Firmware: `systemctl reboot --firmware-setup`. Set an administrator password (without one, anyone can switch Secure Boot off again). Under *Security → Secure Boot*, choose *Erase all Secure Boot Settings*, which puts the firmware in setup mode, keep Secure Boot enabled, save and exit. systemd-boot enrolls the keys after a short countdown (don't press a key) and reboots.
+4. Check:
+   - [ ] `sudo sbctl status`: Secure Boot enabled, Setup Mode disabled;
+   - [ ] NixOS, umbriel and `genix` each boot;
+   - [ ] LUKS unlocks with a YubiKey touch and with the passphrase;
+   - [ ] `systemctl hibernate` still resumes;
+   - [ ] `fwupdmgr get-devices` lists the system firmware (BIOS updates need Framework's keys, enrolled above).
+
+Reinstalling a host with Secure Boot on: the installer is unsigned, so switch Secure Boot off for install-host. The fresh install generates new keys unless `--copy-persist` brings `/persist/var/lib/sbctl` along. With new keys, erase the firmware's keys again (step 3); with the copied keys, just switch Secure Boot back on.

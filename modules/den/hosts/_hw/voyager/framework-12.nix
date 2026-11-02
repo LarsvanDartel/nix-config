@@ -21,4 +21,8 @@
   boot.extraModprobeConfig = ''
     softdep soc_button_array pre: pinctrl_intel_platform
   '';
+
+  # Under cosmos.system.boot.secureBoot: Framework's own EFI tools (the BIOS
+  # updater) are signed with its db/KEK, which erasing the keys removes.
+  boot.lanzaboote.autoEnrollKeys.includeFirmwareBuiltinKeys = true;
 }
