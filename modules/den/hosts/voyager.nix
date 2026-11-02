@@ -205,6 +205,8 @@ in {
 
         # Plymouth gives the LUKS FIDO2 prompt a real UI.
         plymouth.enable = true;
+
+        loader.timeout = 0;
       };
 
       # Disk swap was thrashing at 15.8/16G before RAM was exhausted. zram's
