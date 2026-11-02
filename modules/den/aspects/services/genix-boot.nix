@@ -119,6 +119,9 @@ in {
             users.users.team.uid = lib.mkForce 1000;
           }
           {
+            # genix's own kernel (6.18) predates the Framework 12's Wildcat
+            # Lake (platform and Wi-Fi need >= 7.1); boot the host's.
+            boot.kernelPackages = lib.mkForce config.boot.kernelPackages;
             boot.initrd.luks.devices =
               lib.mapAttrs (_: d: {inherit (d) device allowDiscards crypttabExtraOpts;})
               config.boot.initrd.luks.devices;

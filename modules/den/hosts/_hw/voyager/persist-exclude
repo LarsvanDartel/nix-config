@@ -10,7 +10,10 @@
 ./home/lvdar/.local/share/lutris
 ./home/lvdar/.local/share/FreeCAD
 ./home/lvdar/.local/share/containers
+./home/lvdar/.local/share/remmina
+./home/lvdar/.config/remmina
 ./home/lvdar/.local/share/rofi
 ./home/lvdar/.config/clipse
 ./var/lib/fprint
 ./var/cache/tuigreet
+./genix

@@ -96,6 +96,7 @@ voyager keeps its identity (host key, sops access, mesh address, data) and moves
    - [ ] touch gestures follow the screen's rotation: in every orientation, swiping up from the bottom edge toggles the overview (`journalctl --user -u lisgd` for errors; if the directions are wrong, fix the `case` in `lisgd-niri` in `desktop/tablet.nix`);
    - [ ] the stylus shows pressure in Xournal++;
    - [ ] `systemctl hibernate` resumes (see [Hibernation](#hibernation));
+   - [ ] `genix` reboots into the GEHACK entry with display and Wi-Fi working, `~/shared` is mounted (`findmnt ~/shared`), and the next boot is voyager again;
    - [ ] `cat /etc/nix/machines` lists endeavour;
    - [ ] `df -h /` leaves at least 100 GB free.
 8. **Cleanup commit**, once the Framework has run well for a week:
@@ -114,8 +115,9 @@ voyager keeps its identity (host key, sops access, mesh address, data) and moves
 
 - the Steam library (`steamapps`): games re-download;
 - build artifacts (`dev/*/target`, `dev/*/node_modules`, `dev/.Trash-1000`): they regenerate;
-- orphans no aspect persists any more (`downloads`, `software`, `.mozilla`, `nixos-config`, `.local/share/{protonmail,lutris,FreeCAD,containers}`): if any of it matters, `rsync` it off the P1 over the mesh before wiping;
-- leftovers of removed features: rofi and clipse (Hyprland), `/var/lib/fprint` (the Framework 12 has no fingerprint reader), `/var/cache/tuigreet`.
+- orphans no aspect persists any more (`downloads`, `software`, `.mozilla`, `nixos-config`, `.local/share/{protonmail,lutris,FreeCAD,containers,remmina}`, `.config/remmina`): if any of it matters, `rsync` it off the P1 over the mesh before wiping;
+- leftovers of removed features: rofi and clipse (Hyprland), `/var/lib/fprint` (the Framework 12 has no fingerprint reader), `/var/cache/tuigreet`;
+- `/persist/genix`, genix's `~/shared` (`services.genix-boot`): it is a btrfs subvolume, which tar would recreate as a plain directory that genix cannot mount. tmpfiles creates the subvolume on the Framework's first boot; copy anything in `~/genix` across by hand.
 
 ### Hibernation
 
