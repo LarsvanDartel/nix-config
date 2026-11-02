@@ -22,7 +22,11 @@
     palette = palette: let
       colors = cosmosStyling.colors pkgs palette;
     in {
-      alpha = cosmosStyling.opacity.terminal;
+      # The light background at the shared 0.8 all but hides the wallpaper.
+      alpha =
+        if palette == "light"
+        then 0.65
+        else cosmosStyling.opacity.terminal;
       foreground = colors.base05;
       background = colors.base00;
       regular0 = colors.base00;
