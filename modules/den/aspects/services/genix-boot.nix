@@ -117,6 +117,17 @@ in {
             # The host's primary user is its first normal user, uid 1000, so
             # files in the shared subvolume belong to the same uid on both sides.
             users.users.team.uid = lib.mkForce 1000;
+
+            # The host's layout (us dvp) from the first prompt on: the LUKS
+            # passphrase in the initrd (earlySetup), the console and GDM's
+            # login screen. The session already gets it through dconf above.
+            services.xserver.xkb = lib.mapAttrs (_: lib.mkForce) {
+              inherit (config.services.xserver.xkb) layout variant options;
+            };
+            console = lib.mapAttrs (_: lib.mkForce) {
+              useXkbConfig = true;
+              earlySetup = true;
+            };
           }
           {
             # genix's own kernel (6.18) predates the Framework 12's Wildcat

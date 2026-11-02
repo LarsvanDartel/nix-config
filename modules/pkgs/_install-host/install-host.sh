@@ -194,8 +194,7 @@ install_host() {
 
   # 9b. FIDO2, while the passphrase file is still on the installer.
   local fidoDevs=() enrolled=() dev ans
-  # Touch only: a PIN would be typed in the initrd, whose keymap differs
-  # between boot entries (genix's is not the host's).
+  # Touch only: a PIN needs a keyboard, which a folded convertible has not.
   local enroll=(systemd-cryptenroll --fido2-device=auto --fido2-with-client-pin=no)
   mapfile -t fidoDevs < <(jq -r 'to_entries[] | select(any(.value.crypttabExtraOpts[]; startswith("fido2-device"))) | .value.device' <<<"$luks")
   if [ "$fido2" = 1 ]; then
