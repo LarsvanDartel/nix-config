@@ -143,6 +143,8 @@ fwupdmgr update        # stages a UEFI capsule on the ESP and asks to reboot
 
 The firmware flashes during the reboot (progress bar; don't interrupt it), then boots voyager again. `fwupdmgr get-history` shows the result. Under [Secure Boot](#secure-boot) the same works: lanzaboote signs fwupd's EFI helper with the host's key.
 
+You don't have to look: `core.firmware-updates` (in every host's baseline, active wherever fwupd is on) runs after each hourly `fwupd-refresh` and pushes "voyager: firmware update available" with the installed and offered versions to the `fleet` ntfy topic, once per new version. `systemctl start fwupd-refresh` checks right away; `journalctl -u firmware-updates` shows what it saw.
+
 Releases and notes: [Framework Laptop 12 Intel Core Series 3 — BIOS & Drivers](https://resources.frame.work/downloads/laptop-12/intel-core-series-3/). Without a working system, the *EFI Shell Update* zip from that page, extracted to a FAT32 stick and booted with F12, flashes it too.
 
 ## Secure Boot

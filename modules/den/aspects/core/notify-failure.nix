@@ -11,7 +11,7 @@
     ...
   }: let
     inherit (lib.options) mkOption mkEnableOption;
-    inherit (lib.types) int str;
+    inherit (lib.types) int;
     inherit (lib.modules) mkIf;
 
     cfg = config.cosmos.system.notifyFailure;
@@ -79,16 +79,6 @@
         mkEnableOption "a push notification whenever a systemd service fails"
         // {default = true;};
 
-      url = mkOption {
-        type = str;
-        default = "https://ntfy.lvdar.nl";
-        description = ''
-          The ntfy server. Public rather than the mesh address on purpose: the
-          outages worth hearing about include "the mesh is down", and a sink
-          only reachable over the mesh cannot report those.
-        '';
-      };
-
       settleSeconds = mkOption {
         type = int;
         default = 90;
@@ -98,22 +88,6 @@
           Trades alert latency for accuracy. Raise it on a host whose services
           use a long RestartSec; lowering it below the longest RestartSec on
           the host reintroduces the false alarms this exists to stop.
-        '';
-      };
-
-      topic = mkOption {
-        type = str;
-        default = "fleet";
-        description = "ntfy topic every host publishes to.";
-      };
-
-      user = mkOption {
-        type = str;
-        default = "alerts";
-        description = ''
-          ntfy user to authenticate as. Its password is the shared secret
-          `keys/ntfy/password`, and services/ntfy.nix provisions the account
-          from the same value.
         '';
       };
     };
