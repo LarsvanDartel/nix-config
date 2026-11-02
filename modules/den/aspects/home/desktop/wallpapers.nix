@@ -1,6 +1,6 @@
 # home.wallpapers — the background collection, symlinked into the picker's
 # directory. ranking.txt in the `wallpapers` input drives order, default and
-# rotation; re-rank, push, bump the input.
+# rotation; re-rank, push, bump the input. `pinned` overrides default and rotation.
 {...}: {
   # Public HTTPS, not git@knot: hosts building via build-gate have no SSH
   # credential. `did:plc:` survives a repo rename. Run `nix run .#write-flake` after editing.
@@ -17,7 +17,7 @@
     ...
   }: let
     inherit (lib.options) mkOption mkEnableOption;
-    inherit (lib.types) str path ints;
+    inherit (lib.types) str path ints nullOr;
     inherit (lib.modules) mkIf;
 
     cfg = config.cosmos.desktops.wallpapers;
@@ -49,7 +49,16 @@
       })
       ranking;
 
-    favourite = builtins.head ordered;
+    favourite =
+      if cfg.pinned == null
+      then builtins.head ordered
+      else let
+        pin = lib.findFirst (w: w.name == cfg.pinned) null ordered;
+      in
+        assert lib.assertMsg (pin != null) ''
+          cosmos.desktops.wallpapers.pinned: "${cfg.pinned}" is not in
+          ranking.txt of the wallpapers input.
+        ''; pin;
 
     # imagemagick's `-remap` takes its target colours from an image, not a list.
     palette = let
@@ -142,6 +151,18 @@
       theme.enable =
         mkEnableOption "recolouring the bundled backgrounds to the stylix palette";
 
+      pinned = mkOption {
+        type = nullOr str;
+        default = null;
+        example = "frieren-26167512.jpg";
+        description = ''
+          ranking.txt entry to keep as the background instead of the top of
+          the ranking. It becomes `favourite` and `defaultWallpaper`, and
+          rotation defaults to off. Named by its ranking entry, not its
+          rank-prefixed file, so re-ranking does not move the pin.
+        '';
+      };
+
       defaultWallpaper = mkOption {
         type = str;
         default = "${cfg.directory}/${favourite.file}";
@@ -149,8 +170,9 @@
           Background used when the shell has no wallpaper picked yet. Must be a
           path inside `directory` so the picker shows it as selected.
 
-          Defaults to the top of the ranking, so re-ranking the collection and
-          pushing it is enough to change what a fresh shell comes up with.
+          Defaults to the pinned background, else the top of the ranking, so
+          re-ranking the collection and pushing it is enough to change what a
+          fresh shell comes up with.
         '';
       };
 
@@ -159,9 +181,9 @@
         readOnly = true;
         default = favourite.src;
         description = ''
-          Store path of the top-ranked background. home.styling points
-          `stylix.image` at this, which is what noctalia and the greeter
-          display.
+          Store path of the pinned, else top-ranked, background. home.styling
+          points `stylix.image` at this, which is what noctalia and the
+          greeter display.
         '';
       };
 
@@ -170,7 +192,7 @@
           mkEnableOption ''
             cycling the background through the best-ranked images on a timer
           ''
-          // {default = true;};
+          // {default = cfg.pinned == null;};
 
         count = mkOption {
           type = ints.positive;

@@ -97,7 +97,7 @@ in {
 
           cli.programs.yazi.defaultApplication = true;
 
-          desktops.wallpapers.rotate.count = 20;
+          desktops.wallpapers.pinned = "frieren-26167512.jpg";
 
           gaming.launchers.minecraft.mcsr.enable = true;
 
