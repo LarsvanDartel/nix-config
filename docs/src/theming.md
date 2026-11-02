@@ -11,8 +11,8 @@ One base16 theme, in a dark and a light mode, switched at runtime without a rebu
 
 | When it repaints | What |
 |---|---|
-| Live | noctalia (bar, panels, launcher, OSD, lock screen), niri and Umbriel borders, foot (`SIGUSR1`/`SIGUSR2`), tmux (`source-file`), btop (`SIGUSR2`), GTK3 apps (`gtk-theme` flips adw-gtk3/adw-gtk3-dark), GTK4/libadwaita apps and zen (portal `color-scheme`), icons |
-| Next launch | Everforest tints in GTK3/GTK4 (`gtk.css`), Qt (qtct/Kvantum), zen's chrome CSS, yazi, zathura, nvim, bat, lazygit, mpv, spotify-player |
+| Live | noctalia (bar, panels, launcher, OSD, lock screen), niri and Umbriel borders, foot (`SIGUSR1`/`SIGUSR2`), tmux (`source-file`), btop (`SIGUSR2`), nvim, devshell variants included (`:LaunchpadThemeReload` over its server socket), GTK3 apps (`gtk-theme` flips adw-gtk3/adw-gtk3-dark), GTK4/libadwaita apps and zen (portal `color-scheme`), icons |
+| Next launch | Everforest tints in GTK3/GTK4 (`gtk.css`), Qt (qtct/Kvantum), zen's chrome CSS, yazi, zathura, bat, lazygit, mpv, spotify-player |
 | Never (default mode) | greeter, plymouth, console, GRUB: system-level, before any session |
 
 ## Changing theme or default mode
@@ -23,7 +23,8 @@ One base16 theme, in a dark and a light mode, switched at runtime without a rebu
 
 - `cosmosStyling` (`desktop/styling.nix`) holds both schemes: `schemeFile mode`, `colors pkgs mode`, `modes`, `defaultMode`.
 - stylix renders the default mode as usual (`home.styling`). `home.theme` (`home/desktop/theme.nix`) evaluates the home twice more with `extendModules`, once per mode with switching off, and compares every home file: whatever differs (GTK CSS and settings, Qt, btop, bat, zen CSS…) moves into a per-mode link farm and becomes an out-of-store link through `current`. New stylix targets are picked up without listing them.
-- Wrapped programs (foot, tmux, yazi, zathura, nvim) are built once per mode by `cosmosStyling.modal`, whose `bin/` entries exec the variant `current` names.
+- Wrapped programs (foot, tmux, yazi, zathura) are built once per mode by `cosmosStyling.modal`, whose `bin/` entries exec the variant `current` names.
+- nvim is built once: launchpad reads `~/.config/launchpad/palette.lua` at startup, in every variant including a devshell's `nvim-<lang>`. `home.nvim` links it to the farm's `nvim-palette.lua`, and its `onSwitch` runs `:LaunchpadThemeReload` in each nvim listening on `$XDG_RUNTIME_DIR/nvim.*.0`.
 - Extra per-mode files and repaint steps come from `cosmos.desktops.common.styling.modes` (`home.theme-options`, declared in every home): `files.<name> = mode: …` lands in the farm (niri's `niri.kdl` and Umbriel's `umbriel.toml` colours, tmux's colours), `onSwitch` runs after a switch with `$mode` and `$farm`, `exclude` keeps paths out of the farm (noctalia carries both palettes itself; systemd units can't switch).
 - niri includes `~/.local/state/cosmos/theme/current/niri.kdl` last (`include optional=true`, watched); Umbriel includes `umbriel.toml` (`[include.optional]`) and gets `umbriel msg config-reload`.
 
@@ -37,5 +38,5 @@ One base16 theme, in a dark and a light mode, switched at runtime without a rebu
 
 - stylix's gnome and kde targets are off: on niri they only rewrote dconf's `color-scheme` at every activation, undoing the mode.
 - A file whose *name* differs per mode can't be switched by a link; the build asserts against it.
-- `theme` fails with "missing" until the first activation that has `home.theme` created the farms.
 - noctalia's config is outside the farm: a colour in it must be a palette role (`primary`, `tertiary`, `error`…), not a hex from stylix, or it stays the default mode's.
+- `theme` fails with "missing" until the first activation that has `home.theme` created the farms.

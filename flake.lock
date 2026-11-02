@@ -1272,10 +1272,10 @@
         "tinted-schemes": "tinted-schemes"
       },
       "locked": {
-        "lastModified": 1792968658,
-        "narHash": "sha256-fdzj8h+6sqrKxGeSXKhBp26du4Ub2LpS8mp75W4l5yI=",
+        "lastModified": 1793644771,
+        "narHash": "sha256-7LLYFKJv04ABFOboE37ic+wJbnR+IjUaC/vMmB8jjhg=",
         "ref": "refs/heads/main",
-        "rev": "119263f607abded73bc28f6f814826fbe7d853fe",
+        "rev": "9c4cd4b67d83380d1de72558ff61bad2429bddbe",
         "shallow": true,
         "type": "git",
         "url": "https://knot.lvdar.nl/did:plc:3l35i5iht5tqeoeqlfxzgkls"
