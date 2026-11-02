@@ -11,7 +11,7 @@
   # Switching is a runbook: docs/src/install.md, "Moving voyager to the Framework 12".
   # Static data, not a config read, so it may choose includes. Not named
   # `hardware`: that would shadow den.aspects.hardware inside `with den.aspects`.
-  hardwareProfile = "thinkpad-p1";
+  hardwareProfile = "framework-12";
   profiles = {
     thinkpad-p1 = {
       includes = with den.aspects.hardware; [thinkpad fingerprint];
