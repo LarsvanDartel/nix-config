@@ -9,9 +9,9 @@
   imports = [inputs.pre-commit-hooks.flakeModule];
 
   perSystem = {config, ...}: let
-    # Vendored oisd blocklists must stay byte-for-byte upstream; keep every
-    # rewriting hook off them.
-    vendored = ["\\.unbound$"];
+    # Vendored oisd blocklists must stay byte-for-byte upstream, and a patch's
+    # blank context lines are a single space; keep every rewriting hook off them.
+    vendored = ["\\.unbound$" "\\.patch$"];
   in {
     pre-commit.settings.hooks = {
       # ========== General ==========

@@ -1,4 +1,4 @@
-# desktop.tablet — convertible support: accelerometer auto-rotation (iio-niri), wvkbd kept running hidden for niri's tablet-mode switch events, touchscreen edge-swipe gestures (lisgd) driving niri, and the noctalia dock settings for tablet mode.
+# desktop.tablet — convertible support: accelerometer auto-rotation (iio-niri), wvkbd (patched: Dvorak letters, a ▾ hide key) kept running hidden for niri's tablet-mode switch events, touchscreen edge-swipe gestures (lisgd) driving niri, and the noctalia dock settings for tablet mode.
 {...}: {
   den.aspects.desktop.tablet = {
     nixos = {pkgs, ...}: {
@@ -51,6 +51,10 @@
         "4,UD,*,*,R,${action "close-overview"}"
       ];
       gestureArgs = lib.concatMapStringsSep " " (g: "-g ${lib.escapeShellArg g}") gestures;
+
+      wvkbd = pkgs.wvkbd.overrideAttrs (old: {
+        patches = (old.patches or []) ++ [./_wvkbd-dvorak-hide.patch];
+      });
 
       lisgd-niri = pkgs.writeShellApplication {
         name = "lisgd-niri";
@@ -111,7 +115,9 @@
             After = ["graphical-session.target"];
           };
           Service = {
-            ExecStart = "${pkgs.wvkbd}/bin/wvkbd-mobintl --hidden -L 300";
+            # Heights in px at scale 1 (desktop/_niri/system.nix): about a quarter
+            # of the panel either way round.
+            ExecStart = "${wvkbd}/bin/wvkbd-mobintl --hidden -L 280 -H 450";
             Restart = "on-failure";
           };
           Install.WantedBy = ["graphical-session.target"];

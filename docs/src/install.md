@@ -35,7 +35,7 @@ The ISO is the NixOS minimal installer with the latest kernel and no ZFS, plus `
    ```bash
    nix run .#install-host -- install <host> <target-ip> --host-key ~/dev/<host>-keys/ssh_host_ed25519_key
    ```
-   It refuses to start unless the target booted the cosmos installer and the **pinned** nix-secrets decrypts `hosts/<host>` and `hosts/common` with that key. A missing facter report is generated from the target first, and every run refreshes it. LUKS layouts prompt for the passphrase, and devices with `fido2-device=auto` in `crypttabExtraOpts` prompt for YubiKeys to enroll. Then the target reboots.
+   It refuses to start unless the target booted the cosmos installer and the **pinned** nix-secrets decrypts `hosts/<host>` and `hosts/common` with that key. A missing facter report is generated from the target first, and every run refreshes it. LUKS layouts prompt for the passphrase, and devices with `fido2-device=auto` in `crypttabExtraOpts` prompt for YubiKeys to enroll, touch only (no PIN: it would be typed in the initrd, whose keymap is not the host's in every boot entry). Then the target reboots.
 5. Work through the printed checklist: commit `modules/den/hosts/_facter/<host>.facter.json`, set the `sshHostKey` fact, enroll FIDO2 keys it skipped, set `resume_offset` if the host hibernates.
 6. Enrol the host in NetBird with a setup key, then set its `meshAddress` fact.
 7. Delete the key directory once the host runs: the key lives on the host in `/persist/etc/ssh` (`/etc/ssh` without impermanence).

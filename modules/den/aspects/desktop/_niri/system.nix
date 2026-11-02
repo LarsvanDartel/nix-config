@@ -73,6 +73,11 @@
         tablet.map-to-output = "eDP-1";
       };
 
+      # niri would pick 1.5 on the Framework 12. The pixel font is only crisp at
+      # whole multiples of its grid, so fontconfig snaps text down to 13px while
+      # everything else grows: keep the laptop panel at 1.
+      outputs."eDP-1".scale = 1;
+
       # wvkbd runs hidden (desktop.tablet); SIGUSR2 shows, SIGUSR1 hides. The
       # noctalia dock (configured in desktop.tablet) follows it.
       # switch-events only take argv `spawn`.

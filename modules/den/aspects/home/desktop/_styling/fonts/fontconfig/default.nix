@@ -28,22 +28,25 @@
   # size down to one (at least one grid). Pango sizes the layout from the edited
   # pattern, so measurement and rendering both see the snapped size. The file must
   # sort after home-manager's 52-hm-default-fonts.conf: a request for `monospace`
-  # only names the pixel font once that alias has run.
+  # only names the pixel font once that alias has run. The bold family snaps too:
+  # foot asks for it by name, and off the grid it is drawn larger than regular.
   pixelGridConfig = font: let
     grid = "<double>${toString font.pixelGrid}</double>";
-  in ''
-    <match target="pattern">
-      <test name="family" qual="any"><string>${font.name}</string></test>
-      <test name="pixelsize" compare="less">${grid}</test>
-      <edit name="pixelsize" mode="assign">${grid}</edit>
-    </match>
-    <match target="pattern">
-      <test name="family" qual="any"><string>${font.name}</string></test>
-      <edit name="pixelsize" mode="assign">
-        <times><floor><divide><name>pixelsize</name>${grid}</divide></floor>${grid}</times>
-      </edit>
-    </match>
-  '';
+    snap = family: ''
+      <match target="pattern">
+        <test name="family" qual="any"><string>${family}</string></test>
+        <test name="pixelsize" compare="less">${grid}</test>
+        <edit name="pixelsize" mode="assign">${grid}</edit>
+      </match>
+      <match target="pattern">
+        <test name="family" qual="any"><string>${family}</string></test>
+        <edit name="pixelsize" mode="assign">
+          <times><floor><divide><name>pixelsize</name>${grid}</divide></floor>${grid}</times>
+        </edit>
+      </match>
+    '';
+  in
+    concatStrings (map snap ([font.name] ++ lib.optional (font.boldFamily != null) font.boldFamily));
 
   # A bold cut in its own family is never picked for a bold request, so fontconfig
   # smears the regular one (embolden). Point bold at that family, at the weight it has.

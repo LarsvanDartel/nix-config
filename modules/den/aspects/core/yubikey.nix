@@ -10,6 +10,13 @@
     # the session's display, runtime dir and bus from a user process with a
     # Wayland display open (noctalia's IPC socket is named after WAYLAND_DISPLAY).
     lockScript = pkgs.writeShellScript "yubikey-lock" ''
+      # Swapping a Framework expansion card drops the key for about a second;
+      # lock only if no YubiKey has come back.
+      sleep 3
+      for dev in /sys/bus/usb/devices/*; do
+        [ "$(${pkgs.coreutils}/bin/cat "$dev/idVendor" 2>/dev/null)" = 1050 ] && exit 0
+      done
+
       user=${config.cosmos.user.name}
       uid=$(${pkgs.coreutils}/bin/id -u "$user")
 
@@ -53,15 +60,24 @@
         dbus.packages = [pkgs.gcr_4];
 
         # `loginctl lock-sessions` would do nothing: no locker here listens for
-        # logind's Lock signal, so run lockCommand directly.
+        # logind's Lock signal, so run lockCommand directly. Through a unit: the
+        # script waits, and udev kills slow RUN programs.
         udev.extraRules = lib.mkIf (config.cosmos.profiles.desktop.lockCommand != "") ''
           ACTION=="remove",\
            ENV{ID_BUS}=="usb",\
            ENV{ID_MODEL_ID}=="0407",\
            ENV{ID_VENDOR_ID}=="1050",\
            ENV{ID_VENDOR}=="Yubico",\
-           RUN+="${lockScript}"
+           RUN+="${config.systemd.package}/bin/systemctl start --no-block yubikey-lock.service"
         '';
+      };
+
+      systemd.services.yubikey-lock = lib.mkIf (config.cosmos.profiles.desktop.lockCommand != "") {
+        description = "Lock the session once the YubiKey is gone";
+        serviceConfig = {
+          Type = "oneshot";
+          ExecStart = lockScript;
+        };
       };
 
       security.pam.services = {

@@ -142,6 +142,9 @@
       tablet.map_to_output = "eDP-1";
     };
 
+    # As niri (desktop/_niri/system.nix): the pixel font needs an integer scale.
+    output."eDP-1".scale = 1.0;
+
     # As niri's layout: new columns at half width, Mod+R cycling 1/3, 1/2, 2/3.
     layout = {
       extent_presets = [0.333 0.5 0.667];

@@ -1,0 +1,189 @@
+# wvkbd-dvorak-hide.patch — wvkbd-mobintl: Dvorak letters in the portrait and landscape layouts, and a ▾ key that hides the keyboard (desktop.tablet).
+
+--- a/keyboard.h
++++ b/keyboard.h
+@@ -24,6 +24,7 @@
+ 	NextLayer, // Layout switch to the next layout in the layers sequence
+ 	Compose,   // Compose modifier key, switches to a specific associated layout
+ 	           // upon next keypress
++	Hide,      // Hides the keyboard, as SIGUSR1 does
+ 	EndRow,    // Incidates the end of a key row
+ 	Last,      // Indicated the end of a layout
+ };
+--- a/keyboard.c
++++ b/keyboard.c
+@@ -2,6 +2,8 @@
+ #include <linux/input-event-codes.h>
+ #include <stddef.h>
+ #include <stdio.h>
++#include <signal.h>
++#include <unistd.h>
+ #include <sys/mman.h>
+ #include <ctype.h>
+ #include "keyboard.h"
+@@ -427,6 +429,10 @@
+     }
+
+     switch (k->type) {
++    case Hide:
++        // main.c reads SIGUSR1 from its signalfd and hides.
++        kill(getpid(), SIGUSR1);
++        break;
+     case Code:
+         if (k->code_mod) {
+             zwp_virtual_keyboard_v1_key_mods(kb->vkbd, time, k->code_mod, WL_KEYBOARD_KEY_STATE_PRESSED);
+--- a/layout.mobintl.h
++++ b/layout.mobintl.h
+@@ -197,40 +197,41 @@
+   {"0", ")", 1.0, Code, KEY_0, &layouts[ComposeBracket]},
+   {"", "", 0.0, EndRow},
+
+-  {"q", "Q", 1.0, Code, KEY_Q, &layouts[Emoji]},
+-  {"w", "W", 1.0, Code, KEY_W, &layouts[ComposeW]},
+-  {"e", "E", 1.0, Code, KEY_E, &layouts[ComposeE]},
++  {"'", "\"", 1.0, Code, KEY_APOSTROPHE, &layouts[ComposeBracket]},
++  {",", "'", 1.0, Code, KEY_COMMA, &layouts[ComposeMath]},
++  {".", "?", 1.0, Code, KEY_DOT, &layouts[ComposePunctuation]},
++  {"p", "P", 1.0, Code, KEY_P, &layouts[ComposeP]},
++  {"y", "Y", 1.0, Code, KEY_Y, &layouts[ComposeY]},
++  {"f", "F", 1.0, Code, KEY_F, &layouts[ComposeF]},
++  {"g", "G", 1.0, Code, KEY_G, &layouts[ComposeG]},
++  {"c", "C", 1.0, Code, KEY_C, &layouts[ComposeC]},
+   {"r", "R", 1.0, Code, KEY_R, &layouts[ComposeR]},
+-  {"t", "T", 1.0, Code, KEY_T, &layouts[ComposeT]},
+-  {"y", "Y", 1.0, Code, KEY_Y, &layouts[ComposeY]},
+-  {"u", "U", 1.0, Code, KEY_U, &layouts[ComposeU]},
+-  {"i", "I", 1.0, Code, KEY_I, &layouts[ComposeI]},
+-  {"o", "O", 1.0, Code, KEY_O, &layouts[ComposeO]},
+-  {"p", "P", 1.0, Code, KEY_P, &layouts[ComposeP]},
++  {"l", "L", 1.0, Code, KEY_L, &layouts[ComposeL]},
+   {"", "", 0.0, EndRow},
+
+-  {"", "", 0.5, Pad},
+   {"a", "A", 1.0, Code, KEY_A, &layouts[ComposeA]},
+-  {"s", "S", 1.0, Code, KEY_S, &layouts[ComposeS]},
++  {"o", "O", 1.0, Code, KEY_O, &layouts[ComposeO]},
++  {"e", "E", 1.0, Code, KEY_E, &layouts[ComposeE]},
++  {"u", "U", 1.0, Code, KEY_U, &layouts[ComposeU]},
++  {"i", "I", 1.0, Code, KEY_I, &layouts[ComposeI]},
+   {"d", "D", 1.0, Code, KEY_D, &layouts[ComposeD]},
+-  {"f", "F", 1.0, Code, KEY_F, &layouts[ComposeF]},
+-  {"g", "G", 1.0, Code, KEY_G, &layouts[ComposeG]},
+   {"h", "H", 1.0, Code, KEY_H, &layouts[ComposeH]},
++  {"t", "T", 1.0, Code, KEY_T, &layouts[ComposeT]},
++  {"n", "N", 1.0, Code, KEY_N, &layouts[ComposeN]},
++  {"s", "S", 1.0, Code, KEY_S, &layouts[ComposeS]},
++  {"", "", 0.0, EndRow},
++
++  {"⇧", "⇫", 1.0, Mod, Shift, .scheme = 1},
++  {"q", "Q", 1.0, Code, KEY_Q, &layouts[Emoji]},
+   {"j", "J", 1.0, Code, KEY_J, &layouts[ComposeJ]},
+   {"k", "K", 1.0, Code, KEY_K, &layouts[ComposeK]},
+-  {"l", "L", 1.0, Code, KEY_L, &layouts[ComposeL]},
+-  {"", "", 0.5, Pad},
+-  {"", "", 0.0, EndRow},
+-
+-  {"⇧", "⇫", 1.5, Mod, Shift, .scheme = 1},
+-  {"z", "Z", 1.0, Code, KEY_Z, &layouts[ComposeZ]},
+   {"x", "X", 1.0, Code, KEY_X, &layouts[ComposeX]},
+-  {"c", "C", 1.0, Code, KEY_C, &layouts[ComposeC]},
+-  {"v", "V", 1.0, Code, KEY_V, &layouts[ComposeV]},
+   {"b", "B", 1.0, Code, KEY_B, &layouts[ComposeB]},
+-  {"n", "N", 1.0, Code, KEY_N, &layouts[ComposeN]},
+   {"m", "M", 1.0, Code, KEY_M, &layouts[ComposeM]},
+-  {"⌫", "⌫", 1.5, Code, KEY_BACKSPACE, .scheme = 1},
++  {"w", "W", 1.0, Code, KEY_W, &layouts[ComposeW]},
++  {"v", "V", 1.0, Code, KEY_V, &layouts[ComposeV]},
++  {"z", "Z", 1.0, Code, KEY_Z, &layouts[ComposeZ]},
++  {"⌫", "⌫", 1.0, Code, KEY_BACKSPACE, .scheme = 1},
+   {"", "", 0.0, EndRow},
+
+   {"⌨͕", "⌨͔", 1.5, NextLayer, .scheme = 1},
+@@ -239,6 +240,7 @@
+   {"", "Tab", 4.0, Code, KEY_SPACE},
+   {".", "?", 1.0, Code, KEY_DOT, &layouts[ComposePunctuation]},
+   {"Enter", "Enter", 1.5, Code, KEY_ENTER, .scheme = 1},
++  {"▾", "▾", 1.0, Hide, .scheme = 1},
+
+   /* end of layout */
+   {"", "", 0.0, Last},
+@@ -1104,16 +1106,16 @@
+ static struct key keys_landscape[] = {
+   {"Esc", "Esc", 1.0, Code, KEY_ESC, .scheme = 1},
+   {"", "", 0.5, Pad, .scheme = 1},
+-  {"q", "Q", 1.0, Code, KEY_Q, &layouts[Emoji]},
+-  {"w", "W", 1.0, Code, KEY_W, &layouts[ComposeW]},
+-  {"e", "E", 1.0, Code, KEY_E, &layouts[ComposeE]},
++  {"'", "\"", 1.0, Code, KEY_APOSTROPHE, &layouts[ComposeBracket]},
++  {",", "'", 1.0, Code, KEY_COMMA, &layouts[ComposeMath]},
++  {".", "?", 1.0, Code, KEY_DOT, &layouts[ComposePunctuation]},
++  {"p", "P", 1.0, Code, KEY_P, &layouts[ComposeP]},
++  {"y", "Y", 1.0, Code, KEY_Y, &layouts[ComposeY]},
++  {"f", "F", 1.0, Code, KEY_F, &layouts[ComposeF]},
++  {"g", "G", 1.0, Code, KEY_G, &layouts[ComposeG]},
++  {"c", "C", 1.0, Code, KEY_C, &layouts[ComposeC]},
+   {"r", "R", 1.0, Code, KEY_R, &layouts[ComposeR]},
+-  {"t", "T", 1.0, Code, KEY_T, &layouts[ComposeT]},
+-  {"y", "Y", 1.0, Code, KEY_Y, &layouts[ComposeY]},
+-  {"u", "U", 1.0, Code, KEY_U, &layouts[ComposeU]},
+-  {"i", "I", 1.0, Code, KEY_I, &layouts[ComposeI]},
+-  {"o", "O", 1.0, Code, KEY_O, &layouts[ComposeO]},
+-  {"p", "P", 1.0, Code, KEY_P, &layouts[ComposeP]},
++  {"l", "L", 1.0, Code, KEY_L, &layouts[ComposeL]},
+   {"", "", 0.5, Pad, .scheme = 1},
+   {"Tab", "Tab", 1.0, Code, KEY_TAB, .scheme = 1},
+   {"", "", 0.0, EndRow},
+@@ -1122,30 +1124,32 @@
+   {"↓", "↓", 0.75, Code, KEY_DOWN, .scheme = 1},
+   {"", "", 0.5, Pad, .scheme = 1},
+   {"a", "A", 1.0, Code, KEY_A, &layouts[ComposeA]},
+-  {"s", "S", 1.0, Code, KEY_S, &layouts[ComposeS]},
++  {"o", "O", 1.0, Code, KEY_O, &layouts[ComposeO]},
++  {"e", "E", 1.0, Code, KEY_E, &layouts[ComposeE]},
++  {"u", "U", 1.0, Code, KEY_U, &layouts[ComposeU]},
++  {"i", "I", 1.0, Code, KEY_I, &layouts[ComposeI]},
+   {"d", "D", 1.0, Code, KEY_D, &layouts[ComposeD]},
+-  {"f", "F", 1.0, Code, KEY_F, &layouts[ComposeF]},
+-  {"g", "G", 1.0, Code, KEY_G, &layouts[ComposeG]},
+   {"h", "H", 1.0, Code, KEY_H, &layouts[ComposeH]},
+-  {"j", "J", 1.0, Code, KEY_J, &layouts[ComposeJ]},
+-  {"k", "K", 1.0, Code, KEY_K, &layouts[ComposeK]},
+-  {"l", "L", 1.0, Code, KEY_L, &layouts[ComposeL]},
+-  {"'", "\"", 1.0, Code, KEY_APOSTROPHE, &layouts[ComposeBracket]},
++  {"t", "T", 1.0, Code, KEY_T, &layouts[ComposeT]},
++  {"n", "N", 1.0, Code, KEY_N, &layouts[ComposeN]},
++  {"s", "S", 1.0, Code, KEY_S, &layouts[ComposeS]},
++  {"-", "_", 1.0, Code, KEY_MINUS, &layouts[ComposeBracket]},
+   {"/", ">", 1.0, Code, KEY_SLASH},
+   {"", "", 0.0, EndRow},
+
+   {"←", "←", 0.75, Code, KEY_LEFT, .scheme = 1},
+   {"→", "→", 0.75, Code, KEY_RIGHT, .scheme = 1},
+   {"⇧", "⇫", 1.5, Mod, Shift, .scheme = 1},
+-  {"z", "Z", 1.0, Code, KEY_Z, &layouts[ComposeZ]},
++  {";", ":", 1.0, Code, KEY_SEMICOLON, &layouts[ComposePunctuation]},
++  {"q", "Q", 1.0, Code, KEY_Q, &layouts[Emoji]},
++  {"j", "J", 1.0, Code, KEY_J, &layouts[ComposeJ]},
++  {"k", "K", 1.0, Code, KEY_K, &layouts[ComposeK]},
+   {"x", "X", 1.0, Code, KEY_X, &layouts[ComposeX]},
+-  {"c", "C", 1.0, Code, KEY_C, &layouts[ComposeC]},
+-  {"v", "V", 1.0, Code, KEY_V, &layouts[ComposeV]},
+   {"b", "B", 1.0, Code, KEY_B, &layouts[ComposeB]},
+-  {"n", "N", 1.0, Code, KEY_N, &layouts[ComposeN]},
+   {"m", "M", 1.0, Code, KEY_M, &layouts[ComposeM]},
+-  {"", "", 0.5, Pad, .scheme = 1},
+-  {"-", "_", 1.0, Code, KEY_MINUS, &layouts[ComposeBracket]},
++  {"w", "W", 1.0, Code, KEY_W, &layouts[ComposeW]},
++  {"v", "V", 1.0, Code, KEY_V, &layouts[ComposeV]},
++  {"z", "Z", 1.0, Code, KEY_Z, &layouts[ComposeZ]},
+   {"⌫", "⌫", 1.5, Code, KEY_BACKSPACE, .scheme = 1},
+   {"", "", 0.0, EndRow},
+
+@@ -1156,6 +1160,7 @@
+   {"", "Tab", 5.0, Code, KEY_SPACE},
+   {".", "?", 1.0, Code, KEY_DOT, &layouts[ComposePunctuation]},
+   {"Enter", "Enter", 2.0, Code, KEY_ENTER, .scheme = 1},
++  {"▾", "▾", 1.0, Hide, .scheme = 1},
+
+   /* end of layout */
+   {"", "", 0.0, Last},

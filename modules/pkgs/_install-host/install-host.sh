@@ -194,6 +194,9 @@ install_host() {
 
   # 9b. FIDO2, while the passphrase file is still on the installer.
   local fidoDevs=() enrolled=() dev ans
+  # Touch only: a PIN would be typed in the initrd, whose keymap differs
+  # between boot entries (genix's is not the host's).
+  local enroll=(systemd-cryptenroll --fido2-device=auto --fido2-with-client-pin=no)
   mapfile -t fidoDevs < <(jq -r 'to_entries[] | select(any(.value.crypttabExtraOpts[]; startswith("fido2-device"))) | .value.device' <<<"$luks")
   if [ "$fido2" = 1 ]; then
     for dev in "${fidoDevs[@]}"; do
@@ -201,10 +204,10 @@ install_host() {
         read -rp "Plug a FIDO2 key into the TARGET and press Enter to enroll it into $dev (type \"done\" to stop): " ans
         [ "$ans" = "done" ] && break
         if ssh -t -p "$port" "${sshOpts[@]}" "root@$target" \
-          systemd-cryptenroll --fido2-device=auto --unlock-key-file=/tmp/secret.key "$dev"; then
+          "${enroll[@]}" --unlock-key-file=/tmp/secret.key "$dev"; then
           enrolled+=("$dev")
         else
-          echo "enrolment failed; after first boot run: sudo systemd-cryptenroll --fido2-device=auto $dev"
+          echo "enrolment failed; after first boot run: sudo ${enroll[*]} $dev"
         fi
       done
     done
@@ -241,7 +244,7 @@ install_host() {
   echo "  - den.hosts.<sys>.$host.sshHostKey = \"$(cut -d' ' -f1,2 "$extra$keyPath.pub")\";"
   for dev in "${fidoDevs[@]}"; do
     if [[ " ${enrolled[*]} " != *" $dev "* ]]; then
-      echo "  - on $host: sudo systemd-cryptenroll --fido2-device=auto $dev"
+      echo "  - on $host: sudo ${enroll[*]} $dev"
     fi
   done
   if [ -n "$resumeDevice" ]; then
