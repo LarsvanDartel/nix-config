@@ -7,7 +7,8 @@
 #     first-run seeds. Never toggle them in the UI — "disable password auth"
 #     once locked the only account out; recovery was a sqlite UPDATE on row
 #     40 with the service stopped.
-#   * the module substitutes only TokenKey; hence the replace-secret pass below.
+#   * secrets reach appsettings.json as `@<key>@` placeholders that the module
+#     replaces from `credentials` on every start.
 {
   den,
   inputs,
@@ -77,12 +78,11 @@ in {
     nixos = {
       config,
       lib,
-      pkgs,
       ...
     }: let
       inherit (lib.options) mkOption;
       inherit (lib.types) bool path port str;
-      inherit (lib.modules) mkAfter mkIf;
+      inherit (lib.modules) mkIf;
 
       cfg = config.cosmos.services.kavita;
       arr = config.cosmos.services.arr;
@@ -139,7 +139,7 @@ in {
             OpenIdConnectSettings = {
               Authority = "https://auth.lvdar.nl/oauth2/openid/kavita";
               ClientId = "kavita";
-              Secret = "@OIDC_SECRET@";
+              Secret = "@oidc_client_secret@";
 
               # Kavita's default is .NET's schema URI, which kanidm cannot emit.
               RolesClaim = "kavita_roles";
@@ -154,7 +154,10 @@ in {
               DisablePasswordAuthentication = false;
             };
           };
-          tokenKeyFile = config.sops.secrets."keys/kavita/token".path;
+          credentials = {
+            token_key = config.sops.secrets."keys/kavita/token".path;
+            oidc_client_secret = config.sops.secrets."keys/kavita/oauth-client-secret".path;
+          };
         };
 
         users.users.kavita.extraGroups = ["media"];
@@ -162,18 +165,6 @@ in {
         systemd.tmpfiles.rules = [
           "d '${cfg.libraryDir}' 0775 root media - -"
         ];
-
-        systemd.services.kavita = {
-          serviceConfig.LoadCredential = [
-            "oidc-secret:${config.sops.secrets."keys/kavita/oauth-client-secret".path}"
-          ];
-
-          preStart = mkAfter ''
-            ${pkgs.replace-secret}/bin/replace-secret '@OIDC_SECRET@' \
-              "$CREDENTIALS_DIRECTORY/oidc-secret" \
-              '${dataDir}/config/appsettings.json'
-          '';
-        };
 
         sops.secrets = {
           # Must be stable: a new value logs everyone out. Generate with
