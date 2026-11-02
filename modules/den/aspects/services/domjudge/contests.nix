@@ -87,7 +87,7 @@
           dj() { curl -sS --fail-with-body -K "$curlrc" "$@"; }
 
           if [ "$(curl -sS -o /dev/null -w '%{http_code}' -K "$curlrc" "$api/contests/$id")" = 200 ]; then
-            if dj "$api/contests/$id/problems" | jq -e 'length > 0 and all(.[]; .test_data_count > 0)' >/dev/null; then
+            if dj "$api/contests/$id/problems" | jq -e 'length > 0 and all(.[]; .test_data_count > 0 and (.statement | length > 0))' >/dev/null; then
               echo "$id: already imported"
               exit 0
             fi
@@ -106,7 +106,7 @@
           unzip -q "$dir/archive.zip" -d "$dir/x" -x samples.zip
           rm "$dir/archive.zip"
 
-          # From 2026 the archives follow problem package format 2025-09:
+          # From BAPC 2026 the archives follow problem package format 2025-09:
           # contest.en.pdf, and per-language name maps in problems.yaml,
           # which add-data stores verbatim as the name.
           pdf="$dir/x/contest.pdf"
@@ -125,7 +125,7 @@
           fi
 
           for problem in $(yq -r '.[].id' "$dir/x/problems.yaml"); do
-            if dj "$api/contests/$id/problems/$problem" | jq -e '.test_data_count > 0' >/dev/null; then
+            if dj "$api/contests/$id/problems/$problem" | jq -e '.test_data_count > 0 and (.statement | length > 0)' >/dev/null; then
               continue
             fi
             echo "$id: importing $problem"
@@ -145,6 +145,11 @@
             [ -n "$flags" ] || flags=$(args '."test_group.yaml".output_validator_args' "$root/generators/generators.yaml")
             if [ -n "$flags" ] && ! yq -e '.validator_flags' "$root/problem.yaml" >/dev/null 2>&1; then
               FLAGS=$flags yq -i '.validator_flags = strenv(FLAGS)' "$root/problem.yaml"
+            fi
+            # 2025-09 moved the statement to statement/problem.<lang>.pdf;
+            # DOMjudge 9 only reads problem.pdf (root or problem_statement/).
+            if [ ! -e "$root/problem.pdf" ] && [ -e "$root/statement/problem.en.pdf" ]; then
+              cp "$root/statement/problem.en.pdf" "$root/problem.pdf"
             fi
             rm -f "$dir/$problem.zip"
             (cd "$root" && zip -qr "$dir/$problem.zip" .)
