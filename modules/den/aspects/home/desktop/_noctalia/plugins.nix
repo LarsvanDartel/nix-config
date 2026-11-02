@@ -83,8 +83,10 @@ in {
         netbird = "lvdar";
         netbird-gewis = "gewis";
       };
-      # The palette has no green role; base16's green is the theme's.
-      connected_color = config.lib.stylix.colors.withHashtag.base0B;
+      # A palette role, so it follows `theme`: a hex here would stay the default
+      # mode's (.config/noctalia/ is outside the farm). There is no green role;
+      # tertiary is base0C, the theme's aqua.
+      connected_color = "tertiary";
     };
   };
 

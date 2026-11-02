@@ -38,3 +38,4 @@ One base16 theme, in a dark and a light mode, switched at runtime without a rebu
 - stylix's gnome and kde targets are off: on niri they only rewrote dconf's `color-scheme` at every activation, undoing the mode.
 - A file whose *name* differs per mode can't be switched by a link; the build asserts against it.
 - `theme` fails with "missing" until the first activation that has `home.theme` created the farms.
+- noctalia's config is outside the farm: a colour in it must be a palette role (`primary`, `tertiary`, `error`…), not a hex from stylix, or it stays the default mode's.

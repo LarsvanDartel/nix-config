@@ -45,7 +45,8 @@
     tag.sort = "-taggerdate";
     color = {
       diff = {
-        meta = "black bold";
+        # Not black: that is base00, the terminal background, in both modes.
+        meta = "brightblack bold";
         frag = "magenta";
         context = "white";
         whitespace = "yellow reverse";
