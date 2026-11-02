@@ -239,6 +239,8 @@ in {
 
       cosmos.system.impermanence.device = "/dev/mapper/crypted";
 
+      cosmos.system.boot.secureBoot = true;
+
       cosmos.profiles.desktop.addons.greetd.noctalia.defaultSession = "niri";
 
       # Boot-time choice; specialisation bodies can't `include` den aspects, so Umbriel comes from the _umbriel factories. nh 4.4.1 reads /etc/specialisation to stay in the booted one. Without configurationName GRUB dates every entry 1970-01-01.
