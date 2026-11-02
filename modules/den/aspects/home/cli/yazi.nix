@@ -1,13 +1,14 @@
 # home.yazi — yazi as a nix-wrapper-modules package (`nix run .#yazi`); the
-# wrapper holds the theme (a port of stylix's yazi target), home-manager only
-# installs it plus the `y` cd-on-exit function and the defaultApplication option.
+# wrapper holds the theme (a port of stylix's yazi target), home-manager
+# installs it per mode (cosmosStyling.modal) plus the `y` cd-on-exit function
+# and the defaultApplication option.
 {
   inputs,
   cosmosStyling,
   ...
 }: let
-  mkYazi = pkgs: let
-    colors = cosmosStyling.colors pkgs;
+  mkYazi = pkgs: mode: let
+    colors = cosmosStyling.colors pkgs mode;
     c = colors.withHashtag;
     mkFg = fg: {inherit fg;};
     mkBg = bg: {inherit bg;};
@@ -185,7 +186,7 @@
       };
     };
 in {
-  perSystem = {pkgs, ...}: {packages.yazi = mkYazi pkgs;};
+  perSystem = {pkgs, ...}: {packages.yazi = mkYazi pkgs cosmosStyling.defaultMode;};
 
   den.aspects.home.yazi.homeManager = {
     config,
@@ -201,7 +202,7 @@ in {
     };
 
     config = {
-      home.packages = [(mkYazi pkgs)];
+      home.packages = [(config.cosmos.desktops.common.styling.modes.modal "yazi" (mkYazi pkgs))];
 
       cosmos.cli.shells.zsh.initContent = ''
         function y() {

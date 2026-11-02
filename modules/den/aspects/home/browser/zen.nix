@@ -103,6 +103,10 @@
           # Not stylix's Cozette: pages size code text themselves (GitHub's 12px…),
           # and Gecko ignores the fontconfig rule that keeps Cozette on its 13px grid.
           "font.name.monospace.x-western" = lib.mkForce "DejaVu Sans Mono";
+
+          # Follow the desktop's light/dark preference live (`theme`), not
+          # stylix's fixed polarity; its chrome CSS follows on restart.
+          "zen.view.window.scheme" = lib.mkForce 2;
         };
 
         search.force = true;

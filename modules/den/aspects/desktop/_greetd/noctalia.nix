@@ -98,10 +98,11 @@ in {
         # empty password field.
         auth.allow_empty_password = true;
 
-        # `scheme = "Synced"` is what makes it render this palette.
+        # `scheme = "Synced"` is what makes it render this palette. The
+        # system's default mode: the greeter has no session to switch.
         appearance = {
           scheme = "Synced";
-          theme_mode = "dark";
+          theme_mode = config.stylix.polarity;
           palette = with config.lib.stylix.colors.withHashtag; {
             primary = base07;
             on_primary = base00;

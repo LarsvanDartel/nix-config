@@ -20,7 +20,6 @@ in {
     ++ [
       ./fonts
       ./icons
-      ./themes
     ];
 
   options.cosmos.desktops.common.styling = {

@@ -1,11 +1,15 @@
 # The niri system config, as a plain NixOS module factory imported by its
 # aspect `den.aspects.desktop.niri`.
-{inputs}: {
+{
+  inputs,
+  cosmosStyling,
+}: {
   config,
   lib,
   pkgs,
   ...
 }: let
+  # The default mode's; the session's mode comes from the include at the end.
   colors = config.lib.stylix.colors.withHashtag;
 
   # Resolved from PATH so the compositor isn't coupled to user-scoped noctalia.
@@ -286,6 +290,12 @@
         }
       ];
     };
+
+    # Last, so it overrides the colours above: home.niri's file for the
+    # session's light/dark mode (home.theme), watched and live-reloaded.
+    extraSettings = [
+      {include = [{optional = true;} "~/${cosmosStyling.stateDir}/current/niri.kdl"];}
+    ];
   };
 in {
   environment.sessionVariables.NIXOS_OZONE_WL = "1";

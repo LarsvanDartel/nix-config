@@ -2,11 +2,12 @@
 {
   den,
   inputs,
+  cosmosStyling,
   ...
 }: {
   den.aspects.desktop.niri = {
     includes = with den.aspects.desktop; [greetd keyd];
     provides.to-users.includes = [den.aspects.home.niri];
-    nixos = import ./_niri/system.nix {inherit inputs;};
+    nixos = import ./_niri/system.nix {inherit inputs cosmosStyling;};
   };
 }

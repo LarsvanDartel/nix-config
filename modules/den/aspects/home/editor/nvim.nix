@@ -1,13 +1,14 @@
 # home.nvim — neovim from launchpad (lvdar's nvim + devshell flake) with the
-# fleet's theme, wayland clipboard and minuet layered on. Language support is
-# not installed here: a project's devshell brings launchpad's matching
-# `nvim-<lang>` variant, which shadows this one on PATH.
+# fleet's theme (per mode, cosmosStyling.modal), wayland clipboard and minuet
+# layered on. Language support is not installed here: a project's devshell
+# brings launchpad's matching `nvim-<lang>` variant, which shadows this one on
+# PATH.
 {
   inputs,
   cosmosStyling,
   ...
 }: let
-  mkNvim = pkgs: settings: let
+  mkNvim = pkgs: settings: mode: let
     monospace = cosmosStyling.font pkgs cosmosStyling.fonts.monospace;
   in
     (inputs.launchpad.lib.mkNvim {
@@ -15,7 +16,7 @@
       modules = [
         {
           launchpad.theme = {
-            scheme = cosmosStyling.schemeFile;
+            scheme = cosmosStyling.schemeFile mode;
             font = {
               inherit (monospace) name;
               size = monospace.recommendedSize;
@@ -57,7 +58,7 @@ in {
     };
 
     config.home = {
-      packages = [(mkNvim pkgs config.cosmos.cli.programs.nvim)];
+      packages = [(config.cosmos.desktops.common.styling.modes.modal "nvim" (mkNvim pkgs config.cosmos.cli.programs.nvim))];
       sessionVariables = {
         EDITOR = "nvim";
         VISUAL = "nvim";

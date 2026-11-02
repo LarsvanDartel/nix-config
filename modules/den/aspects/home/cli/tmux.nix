@@ -1,12 +1,19 @@
 # home.tmux — tmux as a nix-wrapper-modules package (`nix run .#tmux`); the
-# wrapper holds the config and the base16 theme, home-manager only installs it.
-# Host-specific additions go through `cosmos.cli.programs.tmux.wrapperModule`.
+# wrapper holds the config and the base16 theme, home-manager installs it per
+# mode (cosmosStyling.modal). Host-specific additions go through
+# `cosmos.cli.programs.tmux.wrapperModule`.
 {
   inputs,
   cosmosStyling,
   ...
 }: let
-  mkTmux = pkgs:
+  colors = pkgs: mode:
+    cosmosStyling.colors pkgs mode {
+      templateRepo = inputs.stylix.inputs.tinted-tmux;
+      target = "base16";
+    };
+
+  mkTmux = pkgs: mode:
     inputs.nix-wrapper-modules.wrappers.tmux.wrap {
       inherit pkgs;
 
@@ -39,10 +46,7 @@
       '';
 
       configAfter = ''
-        source-file ${cosmosStyling.colors pkgs {
-          templateRepo = inputs.stylix.inputs.tinted-tmux;
-          target = "base16";
-        }}
+        source-file ${colors pkgs mode}
 
         bind-key -T copy-mode-vi v send -X begin-selection
         bind-key -T copy-mode-vi V send -X select-line
@@ -51,7 +55,7 @@
       '';
     };
 in {
-  perSystem = {pkgs, ...}: {packages.tmux = mkTmux pkgs;};
+  perSystem = {pkgs, ...}: {packages.tmux = mkTmux pkgs cosmosStyling.defaultMode;};
 
   den.aspects.home.tmux.homeManager = {
     config,
@@ -65,6 +69,18 @@ in {
       description = "Wrapper module layered onto this host's tmux (e.g. home.which-key).";
     };
 
-    config.home.packages = [((mkTmux pkgs).wrap config.cosmos.cli.programs.tmux.wrapperModule)];
+    config = {
+      home.packages = [
+        (config.cosmos.desktops.common.styling.modes.modal "tmux" (mode: (mkTmux pkgs mode).wrap config.cosmos.cli.programs.tmux.wrapperModule))
+      ];
+
+      # A running server keeps its theme until told; one per default socket.
+      cosmos.desktops.common.styling.modes = {
+        files."tmux.conf" = colors pkgs;
+        onSwitch = ''
+          if command -v tmux >/dev/null; then tmux source-file "$farm/tmux.conf" 2>/dev/null || true; fi
+        '';
+      };
+    };
   };
 }

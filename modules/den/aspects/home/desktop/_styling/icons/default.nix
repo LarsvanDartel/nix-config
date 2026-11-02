@@ -19,7 +19,11 @@
       light-name = "Nordzy";
       dark-name = "Nordzy-dark";
     };
-    # TODO: Add more icon themes
+    "everforest" = {
+      package = pkgs.everforest-gtk-theme;
+      light-name = "Everforest-Light";
+      dark-name = "Everforest-Dark";
+    };
   };
   default-icon-theme = "adwaita";
 

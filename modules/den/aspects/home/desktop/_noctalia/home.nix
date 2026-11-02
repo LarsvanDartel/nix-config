@@ -11,13 +11,15 @@
   opacity = config.stylix.opacity;
   wallpapers = config.cosmos.desktops.wallpapers;
   cfg = config.cosmos.desktops.noctalia;
+  modes = config.cosmos.desktops.common.styling.modes;
 in {
   imports = [(import ./plugins.nix {inherit inputs;})];
 
   options.cosmos.desktops.noctalia.thinkpadFan = lib.mkEnableOption "the ThinkPad fan bar widget and plugin (set by hardware.thinkpad)";
 
   config = {
-    # Colours, theme mode and popup opacity come from stylix's `noctalia` target.
+    # Colours, popup opacity and the default mode come from stylix's `noctalia`
+    # target; the light half of the palette from home.theme's light render.
     programs.noctalia = {
       enable = true;
       systemd.enable = true;
@@ -71,7 +73,7 @@ in {
             # Only draws while the mic, camera or a screencast is live.
             privacy.hide_inactive = true;
             workspaces = {
-              # stylix's Nord secondary is purple; tertiary is the cyan v4's Nord scheme used.
+              # stylix maps tertiary to base0C, the theme's accent.
               occupied_color = "tertiary";
               empty_color = "tertiary";
               labels_only_when_occupied = true;
@@ -168,7 +170,22 @@ in {
           # Inside `directory`, so the picker shows it selected; stylix's image is a themed store copy.
           default.path = lib.mkForce wallpapers.defaultWallpaper;
         };
+
+        # noctalia's own light/dark toggle (control center, bar,
+        # `theme-mode-*`) drives home.theme here; `theme` drives noctalia back.
+        hooks.theme_mode_changed = lib.mkIf modes.enable ''${modes.package}/bin/theme sync "$NOCTALIA_THEME_MODE"'';
       };
+
+      # The light half; stylix's target writes only the default mode's.
+      customPalettes.stylix.light = lib.mkIf modes.enable modes.rendered.light.programs.noctalia.customPalettes.stylix.dark;
+    };
+
+    cosmos.desktops.common.styling.modes = {
+      # One file with both palettes: noctalia switches itself.
+      exclude = [".config/noctalia/"];
+      onSwitch = ''
+        noctalia msg theme-mode-set "$mode" >/dev/null 2>&1 || true
+      '';
     };
 
     systemd.user.services.noctalia.Service = {
@@ -180,10 +197,16 @@ in {
 
     cosmos.system.impermanence.persist.directories = [".local/state/noctalia"];
 
-    # GUI and IPC changes go to settings.toml, which overrides config.toml. Dropping it
-    # on every activation (switch and boot) keeps nix authoritative.
-    home.activation.noctaliaResetOverrides = lib.hm.dag.entryAfter ["writeBoundary"] ''
-      run rm -f ${lib.escapeShellArg "${config.xdg.stateHome}/noctalia/settings.toml"}
+    # GUI and IPC changes go to settings.toml, which overrides config.toml.
+    # Resetting it on every activation (switch and boot) keeps nix
+    # authoritative, except for the mode, which `theme` owns.
+    home.activation.noctaliaResetOverrides = lib.hm.dag.entryAfter ["writeBoundary" "theme"] ''
+      settings=${lib.escapeShellArg "${config.xdg.stateHome}/noctalia/settings.toml"}
+      run rm -f "$settings"
+      if mode=$(readlink ${lib.escapeShellArg modes.current}); then
+        run mkdir -p "$(dirname "$settings")"
+        run printf '[theme]\nmode = "%s"\n' "$mode" >"$settings"
+      fi
     '';
   };
 }

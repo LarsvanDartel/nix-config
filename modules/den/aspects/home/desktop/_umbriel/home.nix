@@ -13,6 +13,40 @@
   };
   umbriel = "${osConfig.programs.umbriel.package}/bin/umbriel";
   noctaliaMsg = "${config.programs.noctalia.package}/bin/noctalia msg";
+  modes = config.cosmos.desktops.common.styling.modes;
+
+  # Umbriel's colours in one mode, from that mode's stylix palette; the
+  # config includes the session's mode (home.theme). Same roles as niri.
+  colorsFor = mode: let
+    c = lib.mapAttrs (_: v: "${v}FF") modes.rendered.${mode}.lib.stylix.colors.withHashtag;
+  in
+    (pkgs.formats.toml {}).generate "umbriel-colors-${mode}.toml" {
+      colors = {
+        background = c.base00;
+        text_primary = c.base05;
+        text_muted = c.base04;
+        accent_primary = c.base0D;
+        accent_secondary = c.base0A;
+        warning = c.base0A;
+        error = c.base08;
+        border = {
+          focused = c.base0D;
+          unfocused = c.base02;
+          outer = c.base01;
+        };
+        overview.badge = c.base0D;
+        tab_bar = {
+          background = c.base01;
+          text = c.base04;
+          active = c.base0D;
+          active_text = c.base00;
+          active_unfocused = c.base02;
+          active_unfocused_text = c.base05;
+          urgent = c.base08;
+          urgent_text = c.base00;
+        };
+      };
+    };
 
   # The gestures of desktop/tablet.nix (format and ordering rules there), with
   # Umbriel's actions; keep in step by hand. Touching the open overview closes
@@ -118,6 +152,8 @@
 
   # Validate edits with `umbriel config validate -c <file>`; keys: `umbriel config schema`.
   settings = {
+    include.optional.files = ["${modes.current}/umbriel.toml"];
+
     general = {
       mod_key = "Super";
       # Startup only; Mod+Slash still toggles it.
@@ -302,6 +338,14 @@
 in {
   # No general.autostart: noctalia's unit starts with graphical-session.target, which umbriel-session.target binds.
   xdg.configFile."umbriel/config.toml".source = (pkgs.formats.toml {}).generate "umbriel-config.toml" settings;
+
+  cosmos.desktops.common.styling.modes = {
+    files."umbriel.toml" = colorsFor;
+    # The include is watched, but through a link that never changes.
+    onSwitch = ''
+      ${umbriel} msg config-reload >/dev/null 2>&1 || true
+    '';
+  };
 
   systemd.user.services = {
     umbriel-autorotate = {

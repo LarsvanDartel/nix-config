@@ -1,5 +1,6 @@
 # home.zathura — zathura (pdf + comic books) as a nix-wrapper-modules package
-# (`nix run .#zathura`); the wrapper holds the config, home-manager installs it.
+# (`nix run .#zathura`); the wrapper holds the config, home-manager installs
+# it per mode (cosmosStyling.modal).
 # webp/svg pages need nothing here: nixpkgs' zathura sets its own
 # GDK_PIXBUF_MODULE_FILE (with both), overriding any we pass.
 {
@@ -7,8 +8,8 @@
   cosmosStyling,
   ...
 }: let
-  mkZathura = pkgs: let
-    colors = cosmosStyling.colors pkgs;
+  mkZathura = pkgs: mode: let
+    colors = cosmosStyling.colors pkgs mode;
     channels = c: "${colors."${c}-rgb-r"}, ${colors."${c}-rgb-g"}, ${colors."${c}-rgb-b"}";
     rgb = c: "rgb(${channels c})";
     rgba = c: alpha: "rgba(${channels c}, ${toString alpha})";
@@ -44,7 +45,7 @@
       };
     };
 in {
-  perSystem = {pkgs, ...}: {packages.zathura = mkZathura pkgs;};
+  perSystem = {pkgs, ...}: {packages.zathura = mkZathura pkgs cosmosStyling.defaultMode;};
 
   den.aspects.home.zathura.homeManager = {
     config,
@@ -64,7 +65,7 @@ in {
     };
 
     config = {
-      home.packages = [(mkZathura pkgs)];
+      home.packages = [(config.cosmos.desktops.common.styling.modes.modal "zathura" (mkZathura pkgs))];
       xdg.mimeApps = mkIf cfg.defaultApplication {
         enable = true;
         defaultApplications = {

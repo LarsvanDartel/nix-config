@@ -10,5 +10,10 @@
         show_program_path = 0;
       };
     };
+
+    # stylix's theme file is switched by home.theme; SIGUSR2 rereads it.
+    cosmos.desktops.common.styling.modes.onSwitch = ''
+      pkill -USR2 -x btop || true
+    '';
   };
 }

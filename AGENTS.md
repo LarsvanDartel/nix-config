@@ -15,6 +15,7 @@ The handbook is the mdBook in `docs/` (`nix build .#docs`). Read the relevant pa
 |[`networking.md`](docs/src/networking.md)|NetBird mesh, publishing and gating services, `localVhosts`, `edgeTerminated`, SSH|
 |[`secrets.md`](docs/src/secrets.md)|sops-nix, adding a secret, the nix-secrets stub|
 |[`conventions.md`](docs/src/conventions.md)|code conventions, aspect and option shapes, priority discipline, wrapped programs, nvim/launchpad, tooling, important files|
+|[`theming.md`](docs/src/theming.md)|the theme and its light/dark modes, the `theme` command, what switches live, adding a themed program|
 |[`commands.md`](docs/src/commands.md)|development commands, testing & QA, the configurationRevision pinning trick|
 |[`install.md`](docs/src/install.md)|installing a host|
 |[`restore.md`](docs/src/restore.md)|restoring a host from backup|

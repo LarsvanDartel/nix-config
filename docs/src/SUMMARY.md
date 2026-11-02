@@ -8,6 +8,7 @@
 - [Networking & SSH](networking.md)
 - [Secrets](secrets.md)
 - [Conventions](conventions.md)
+- [Theming](theming.md)
 - [Commands](commands.md)
 - [Installing a host](install.md)
 - [Restoring a host](restore.md)

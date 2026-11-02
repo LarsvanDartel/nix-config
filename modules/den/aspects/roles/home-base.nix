@@ -19,6 +19,7 @@
       zoxide
       tmux
       misc-cli
+      theme-options
     ])
     ++ [den.aspects.home."oh-my-posh"];
 }
