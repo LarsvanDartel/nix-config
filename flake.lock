@@ -1627,11 +1627,11 @@
     },
     "nixpkgs-unstable": {
       "locked": {
-        "lastModified": 1793582901,
-        "narHash": "sha256-WDValiY9se78X2Wh7aWWaq/c7HN29U555+OKbHEzYrw=",
+        "lastModified": 1793645915,
+        "narHash": "sha256-yRzh4uc8uxFv5+5TROEIH1rUL2FF1/cvfc+uq5JGGHY=",
         "owner": "NixOS",
         "repo": "nixpkgs",
-        "rev": "5c9de89ec55bff981cb8da1a4ee92b10f1438ffc",
+        "rev": "f9887a8a434bfba06e20dfc77bc8e0628266af84",
         "type": "github"
       },
       "original": {
@@ -1998,11 +1998,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1793647778,
-        "narHash": "sha256-hxUAQqoQq0p36QxlA99hvgjRKnD6t5zNFxlgNjxwu1I=",
+        "lastModified": 1793673799,
+        "narHash": "sha256-f57pvXutxpGoRmN0E175IM73KOQdwocN1xbI44pXXv8=",
         "owner": "nix-community",
         "repo": "NUR",
-        "rev": "6776f8d4b87990addb2ff362660845c0448112d8",
+        "rev": "ca4e5ef53427d065b85718f4c6510ad48d41730b",
         "type": "github"
       },
       "original": {
@@ -2047,11 +2047,11 @@
         "rust-overlay": "rust-overlay_4"
       },
       "locked": {
-        "lastModified": 1793647406,
-        "narHash": "sha256-5IBfdeIybtVmyBGPVSmGuJlMHyFjneEGF4goedo+gfM=",
+        "lastModified": 1793669009,
+        "narHash": "sha256-GmFKreQIr2qwnZI84ZsweJkxnWKGX/TbYQx0zWFxGHE=",
         "owner": "can1357",
         "repo": "oh-my-pi",
-        "rev": "7a1fd37e82293c8761c19385ffdccd63992b04c8",
+        "rev": "83de60ad992d12e572ec3ed6fe2dd9e160cdc4a2",
         "type": "github"
       },
       "original": {
@@ -2317,11 +2317,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1793052255,
-        "narHash": "sha256-Y/JIHTnMlOabDfyaSBubWGLDIVGihLEUuoMhFvQKaDo=",
+        "lastModified": 1793657466,
+        "narHash": "sha256-GoOvpdsjO5hqZuO6T6ok9u6sJEjO0iPli2zRr9oNUNw=",
         "owner": "mic92",
         "repo": "sops-nix",
-        "rev": "60182817ee048ac94b4c68ea76d5ef2e8aac730d",
+        "rev": "b18e01ce148eb3efff5de2f2d3181ca53b2b2a54",
         "type": "github"
       },
       "original": {
@@ -2652,11 +2652,11 @@
         "timeless-fonts-src": "timeless-fonts-src"
       },
       "locked": {
-        "lastModified": 1793644946,
-        "narHash": "sha256-m+SlSKquiIANApyyKzdJjheZJ5wtqPxzEZe2I5im4AA=",
+        "lastModified": 1793674034,
+        "narHash": "sha256-4N6OuTqN/ZPTlmcRXhGLbchGSrnbfyMesE1LKZjIzsE=",
         "ref": "refs/heads/master",
-        "rev": "3922ce822c1a74009197e1aa15d4b916c5ff43a6",
-        "revCount": 6202,
+        "rev": "60108cb3ae3266cc6d8d8a0f5406f59e9e8c789a",
+        "revCount": 6213,
         "type": "git",
         "url": "https://tangled.org/tangled.org/core"
       },
