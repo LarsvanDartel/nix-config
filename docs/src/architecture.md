@@ -33,7 +33,7 @@ Lives in `modules/den/`.
 
 ## `_`-prefixed files
 
-**`_`-prefixed files/dirs are skipped by import-tree** — they hold plain modules/assets imported explicitly by the aspect that needs them (e.g. `aspects/home/desktop/_styling/` → `styling.nix` does `homeManager.imports = [./_styling]`). Recurring reason: specialisation bodies are plain NixOS modules that cannot `include` den aspects, so specialisation content lives in parameterized factories (e.g. `desktop/_umbriel/system.nix` and `home/desktop/_umbriel/home.nix`, imported by voyager's Umbriel specialisation). Hardware profiles (`hosts/_hw/voyager/`) follow the same shape.
+**`_`-prefixed files/dirs are skipped by import-tree** — they hold plain modules/assets imported explicitly by the aspect that needs them (e.g. `aspects/home/desktop/_styling/` → `styling.nix` does `homeManager.imports = [./_styling]`, `desktop/_umbriel/system.nix` → `desktop.umbriel`). Plain modules are also what a context that cannot `include` den aspects needs, e.g. a specialisation body, so such content lives in parameterized factories. Hardware profiles (`hosts/_hw/voyager/`) follow the same shape.
 
 ## Cross-host data
 

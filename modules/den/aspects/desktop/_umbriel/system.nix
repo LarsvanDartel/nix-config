@@ -1,4 +1,4 @@
-# Umbriel system config (compositor, greeter entry, tablet-mode keyboard), as a plain NixOS module factory imported by voyager's `specialisation.umbriel`.
+# Umbriel system config (compositor, greeter entry, tablet-mode switch), as a plain NixOS module imported by its aspect `den.aspects.desktop.umbriel`.
 {}: {
   config,
   lib,

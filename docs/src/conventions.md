@@ -40,7 +40,7 @@
 
 - `flake.nix` — **generated, never edit**; header says so. `nixConfig.abort-on-warn = true`.
 - `modules/den/hosts/gaia.nix` — the edge: NetBird control plane, `localVhosts`, oidc.idp. Published services are declared by their own aspects (`netbird-service` key).
-- `modules/den/hosts/voyager.nix` — niri base desktop plus the Umbriel boot-time specialisation (separate boot entry); `provides.lvdar` holds the user's host-specific home config.
+- `modules/den/hosts/voyager.nix` — niri and Umbriel desktops (both greeter sessions); `provides.lvdar` holds the user's host-specific home config.
 - `modules/den/aspects/core/{sops,impermanence,impermanence-options,networking,users-base}.nix` — secrets, persistence, `edgeTerminated`, primary user.
 - `modules/meta/{nixpkgs,formatter,pre-commit,devshell,deploy,wrappers,docs}.nix` — flake machinery.
 - `modules/den/hosts/_hw/<host>/disko.nix`, `_facter/<host>.facter.json` — declarative hardware; voyager's disko takes `{device}` as an argument.

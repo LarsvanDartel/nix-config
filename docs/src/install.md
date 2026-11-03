@@ -161,11 +161,11 @@ Turning it on for voyager, once it runs well on the Framework:
    sudo efibootmgr --create --disk /dev/nvme0n1 --part 1 --label "Linux Boot Manager" --loader '\EFI\systemd\systemd-bootx64.efi'
    systemctl reboot
    ```
-   systemd-boot's menu shows NixOS, the umbriel specialisation and genix; `bootctl status` reports systemd-boot. Only then retire GRUB: `sudo efibootmgr` to find the `NixOS-boot` entry, `sudo efibootmgr --bootnum <n> --delete-bootnum`, and `sudo rm -rf /boot/EFI/NixOS-boot /boot/grub /boot/kernels /boot/genix`.
+   systemd-boot's menu shows NixOS and genix; `bootctl status` reports systemd-boot. Only then retire GRUB: `sudo efibootmgr` to find the `NixOS-boot` entry, `sudo efibootmgr --bootnum <n> --delete-bootnum`, and `sudo rm -rf /boot/EFI/NixOS-boot /boot/grub /boot/kernels /boot/genix`.
 3. Firmware: `systemctl reboot --firmware-setup`. Set an administrator password (without one, anyone can switch Secure Boot off again). Under *Security → Secure Boot*, choose *Erase all Secure Boot Settings*, which puts the firmware in setup mode, keep Secure Boot enabled, save and exit. systemd-boot enrolls the keys after a short countdown (don't press a key) and reboots.
 4. Check:
    - [ ] `sudo sbctl status`: Secure Boot enabled, Setup Mode disabled;
-   - [ ] NixOS, umbriel and `genix` each boot;
+   - [ ] NixOS and `genix` each boot;
    - [ ] LUKS unlocks with a YubiKey touch and with the passphrase;
    - [ ] `systemctl hibernate` still resumes;
    - [ ] `fwupdmgr get-devices` lists the system firmware (BIOS updates need Framework's keys, enrolled above).

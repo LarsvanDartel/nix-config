@@ -5,7 +5,6 @@
 {
   den,
   inputs,
-  cosmosStyling,
   ...
 }: let
   # The machine voyager currently is: "thinkpad-p1" or "framework-12".
@@ -39,6 +38,7 @@ in {
         roles.desktop
         roles.gaming
         desktop.niri
+        desktop.umbriel
         desktop.greetd.noctalia
         desktop.tablet
         services.containers
@@ -166,7 +166,7 @@ in {
       };
     };
 
-    nixos = {lib, ...}: {
+    nixos = {
       imports = [
         inputs.nixos-facter-modules.nixosModules.facter
         {facter.reportPath = ./_facter/voyager.facter.json;}
@@ -243,18 +243,6 @@ in {
       cosmos.system.impermanence.device = "/dev/mapper/crypted";
 
       cosmos.system.boot.secureBoot = true;
-
-      cosmos.profiles.desktop.addons.greetd.noctalia.defaultSession = "niri";
-
-      # Boot-time choice; specialisation bodies can't `include` den aspects, so Umbriel comes from the _umbriel factories. nh 4.4.1 reads /etc/specialisation to stay in the booted one. Without configurationName GRUB dates every entry 1970-01-01.
-      specialisation.umbriel.configuration = {
-        boot.loader.grub.configurationName = "umbriel + noctalia";
-        environment.etc.specialisation.text = "umbriel";
-        imports = [(import ../aspects/desktop/_umbriel/system.nix {})];
-        # The entry's Name= (and DesktopNames=) is "Umbriel".
-        cosmos.profiles.desktop.addons.greetd.noctalia.defaultSession = lib.mkForce "Umbriel";
-        home-manager.users.lvdar.imports = [(import ../aspects/home/desktop/_umbriel/home.nix {inherit cosmosStyling;})];
-      };
 
       # Push the desktop closure and pioneer's toplevel (built on endeavour,
       # copied back here) so CI needn't rebuild them.

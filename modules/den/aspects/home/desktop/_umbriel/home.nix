@@ -1,4 +1,4 @@
-# Umbriel's home config (config.toml, accelerometer rotation, touch gestures, tablet-mode keyboard and dock), as a plain home-manager module factory imported by voyager's `specialisation.umbriel`.
+# Umbriel's home config (config.toml, accelerometer rotation, touch gestures, tablet-mode keyboard and dock), as a plain home-manager module imported by its aspect `den.aspects.home.umbriel`.
 {cosmosStyling}: {
   config,
   lib,
