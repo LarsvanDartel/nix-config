@@ -9,7 +9,9 @@
       ];
       extraLocaleSettings = {
         LC_NUMERIC = "C.UTF-8";
-        LC_TIME = "nl_NL.UTF-8";
+        # English names, ISO dates (2026-11-03), weeks start on Monday, in both
+        # glibc and CLDR; en_DK has ISO dates only in glibc.
+        LC_TIME = "en_SE.UTF-8";
         LC_MONETARY = "nl_NL.UTF-8";
       };
     };
