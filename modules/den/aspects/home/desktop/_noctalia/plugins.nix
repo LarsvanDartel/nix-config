@@ -1,25 +1,12 @@
 # Declarative noctalia plugins: read-only `path` sources from the store, never
 # cloned or auto-updated.
-{inputs}: {
-  config,
-  lib,
-  pkgs,
-  ...
-}: let
+{inputs}: {pkgs, ...}: let
   # Pinned: plugins are trusted Luau loaded straight into the shell.
-  community = pkgs.applyPatches {
-    name = "noctalia-community-plugins";
-    src = pkgs.fetchFromGitHub {
-      owner = "noctalia-dev";
-      repo = "community-plugins";
-      rev = "e9dec7443b8a70ab606dc72669fb122a9d668bce";
-      hash = "sha256-n1uQOXXjIrPvDe5dXPpcCefNsQVAoEo5lVDkOPy81vU=";
-    };
-    # The fan's RPM is the only bold bar label; Cozette has no bold cut in the same
-    # family, so it renders synthesized. --replace-fail flags an upstream change.
-    postPatch = ''
-      substituteInPlace thinkpad-fan/widget.luau --replace-fail 'fontWeight = "bold",' ""
-    '';
+  community = pkgs.fetchFromGitHub {
+    owner = "noctalia-dev";
+    repo = "community-plugins";
+    rev = "e9dec7443b8a70ab606dc72669fb122a9d668bce";
+    hash = "sha256-n1uQOXXjIrPvDe5dXPpcCefNsQVAoEo5lVDkOPy81vU=";
   };
 
   # Bitwarden search over rbw, which already holds the vault.lvdar.nl session.
@@ -65,18 +52,15 @@ in {
           enabled = true;
         }
       ];
-      enabled =
-        [
-          "damian-ds7/battery-threshold" # needs desktop.power's battery_ctl udev rule
-          "kenn/keybind-cheatsheet" # parses ~/.config/niri/config.kdl (_niri/home.nix)
-          "raycursive/niri-displays"
-          "icefish/phone-connect"
-          "alexander/screen-toolkit"
-          "lvdar/netbird"
-          "vinnyduke/rbw-launcher" # launcher prefix /rbw
-        ]
-        # needs thinkpad_acpi fan_control=1 (hardware.thinkpad)
-        ++ lib.optional config.cosmos.desktops.noctalia.thinkpadFan "piero-93/thinkpad-fan";
+      enabled = [
+        "damian-ds7/battery-threshold" # needs desktop.power's battery_ctl udev rule
+        "kenn/keybind-cheatsheet" # parses ~/.config/niri/config.kdl (_niri/home.nix)
+        "raycursive/niri-displays"
+        "icefish/phone-connect"
+        "alexander/screen-toolkit"
+        "lvdar/netbird"
+        "vinnyduke/rbw-launcher" # launcher prefix /rbw
+      ];
     };
     plugin_settings."lvdar/netbird" = {
       instance_labels = {

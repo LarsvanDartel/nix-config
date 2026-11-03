@@ -14,7 +14,7 @@
     services.upower.enable = true;
     services.power-profiles-daemon.enable = true;
 
-    # noctalia's battery-threshold plugin writes charge_control_end_threshold as the user; thinkpad_acpi and (on Framework) cros_charge-control expose it.
+    # noctalia's battery-threshold plugin writes charge_control_end_threshold as the user; cros_charge-control exposes it.
     # udev re-applies this on every battery hotplug/resume; a one-off chmod
     # does not stick.
     users.groups.battery_ctl = {};

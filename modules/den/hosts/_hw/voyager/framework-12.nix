@@ -1,4 +1,4 @@
-# voyager on the Framework Laptop 12 (Intel Core 3 304 / Wildcat Lake) — hardware profile; selected in hosts/voyager.nix.
+# voyager on the Framework Laptop 12 (Intel Core 3 304 / Wildcat Lake) — hardware module; imported by hosts/voyager.nix.
 {inputs}: {
   lib,
   pkgs,

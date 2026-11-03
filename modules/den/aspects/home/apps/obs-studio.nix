@@ -1,4 +1,4 @@
-# home.obs-studio (+ plugins/cudaSupport/virtualAudio options)
+# home.obs-studio (+ plugins/virtualAudio options)
 {...}: {
   den.aspects.home.obs-studio.homeManager = {
     config,
@@ -7,7 +7,7 @@
     ...
   }: let
     inherit (lib.options) mkOption mkEnableOption;
-    inherit (lib.types) listOf package bool str;
+    inherit (lib.types) listOf package str;
     inherit (lib.modules) mkIf;
 
     cfg = config.cosmos.programs.obs-studio;
@@ -29,11 +29,6 @@
         type = listOf package;
         default = [];
         description = "OBS Studio plugins to install.";
-      };
-      cudaSupport = mkOption {
-        type = bool;
-        default = false;
-        description = "Build OBS with NVENC support (from-source rebuild).";
       };
 
       virtualAudio = {
@@ -64,7 +59,6 @@
       programs.obs-studio = {
         enable = true;
         inherit (cfg) plugins;
-        package = mkIf cfg.cudaSupport (pkgs.obs-studio.override {cudaSupport = true;});
       };
       cosmos.system.impermanence.persist.directories = [".config/obs-studio"];
 

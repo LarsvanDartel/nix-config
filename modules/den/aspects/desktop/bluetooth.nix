@@ -9,8 +9,8 @@
       powerOnBoot = true;
     };
 
-    # powerOnBoot alone is not enough: a soft-blocked rfkill (seen on the
-    # ThinkPad P1) keeps hci0 from appearing at all. The `+` matters —
+    # powerOnBoot alone is not enough: a soft-blocked rfkill keeps hci0 from
+    # appearing at all. The `+` matters —
     # bluetoothd's sandbox lacks CAP_NET_ADMIN, so without it ExecStartPre
     # fails EPERM and takes the unit down.
     systemd.services.bluetooth.serviceConfig.ExecStartPre = [

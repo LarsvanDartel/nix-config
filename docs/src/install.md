@@ -48,8 +48,6 @@ A host keeps its identity by keeping its SSH host key: take it from the old mach
 
 To bring the data along, run `install-host` **on the machine being replaced** with `--copy-persist`: after installing, it streams this machine's `/persist` into the target's `/mnt/persist` (tar over SSH, owners, ACLs and xattrs preserved). `--exclude-from FILE` skips paths: one pattern per line, matched against the whole path `./<path under /persist>`, `*` crosses `/`, and no comment lines (tar would read them as patterns). With `--copy-persist` the target is not rebooted: power off the old machine first, so two machines never hold the same identity on the mesh, then on the target run `swapoff -a; umount -R /mnt; reboot`.
 
-voyager's move to the Framework Laptop 12 is the worked example: [Moving voyager to the Framework 12](#moving-voyager-to-the-framework-12).
-
 ## Conventions
 
 - LUKS layouts read the passphrase from `passwordFile = "/tmp/secret.key"`; install-host uploads it there.
@@ -67,62 +65,9 @@ voyager's move to the Framework Laptop 12 is the worked example: [Moving voyager
   Build the `--extra-files` tree the way install-host does: the key at the path from `sops.age.sshKeyPaths`, mode 0600.
 - `nix eval .#nixosConfigurations.<host>.config.networking.hostName` failing before anything touches the disk usually means a missing `git add` of the new host file or facter report.
 
-## Moving voyager to the Framework 12
+## Hibernation
 
-voyager keeps its identity (host key, sops access, mesh address, data) and moves from the ThinkPad P1 to the Framework Laptop 12. Everything hardware-specific sits behind `hardwareProfile` in `modules/den/hosts/voyager.nix` (`_hw/voyager/thinkpad-p1.nix`, `_hw/voyager/framework-12.nix`), so the move is one word plus one `install-host` run.
-
-1. **Firmware** (F2 at power-on): Secure Boot **off** (the installer and GRUB are unsigned; [Secure Boot](#secure-boot) comes after the move); stylus protocol **MPP**, because USI mode has reports of a stuck eraser on Linux. Note the BIOS version on the *Main* page; updates come after the move ([Firmware updates](#firmware-updates)). Fit the Ethernet expansion card and plug it in.
-2. **Installer:** `nix build .#installer-iso`, `dd` it to a USB stick (see [Build the installer](#build-the-installer)) and boot the Framework from it. Note the IPv4 shown on the console.
-3. **Flip the profile.** On the P1, in `~/nix-config`: `git pull`, set `hardwareProfile = "framework-12";` in `modules/den/hosts/voyager.nix`, commit (`feat(voyager): move to the Framework Laptop 12`) and push. Do **not** `nh os switch` the P1 onto this commit. Until the Framework's facter report replaces the P1's, this commit evaluates but does not build (the P1 report puts `nvidia` in the initrd, which the Framework kernel lacks) and build-gate stays red for voyager; install-host regenerates the report from the target before building, and step 6 commits it.
-4. Close the browser, mail and IDE (their state is copied live). Then:
-   ```bash
-   sudo install -m 600 -o lvdar /persist/etc/ssh/ssh_host_ed25519_key ~/dev/voyager-hostkey
-   sudo install -m 644 -o lvdar /persist/etc/ssh/ssh_host_ed25519_key.pub ~/dev/voyager-hostkey.pub
-   nix run .#install-host -- install voyager <framework-ip> --host-key ~/dev/voyager-hostkey \
-     --copy-persist --exclude-from modules/den/hosts/_hw/voyager/persist-exclude
-   shred -u ~/dev/voyager-hostkey && rm ~/dev/voyager-hostkey.pub
-   ```
-   Enter the LUKS passphrase; it stays the fallback unlock. When prompted, plug each YubiKey into the **Framework** for FIDO2 enrolment. The copy is about 72 GiB (measured 2026-10-30 with the exclude list), roughly 15 minutes over gigabit Ethernet.
-5. Power off the P1. On the Framework console run `swapoff -a; umount -R /mnt; reboot`, then remove the USB stick.
-6. On the Framework: log in, `git -C ~/nix-config add modules/den/hosts/_facter/voyager.facter.json`, commit (`chore(voyager): framework 12 facter report`), push, then `nh os switch`.
-7. Check:
-   - [ ] boot unlocks with a YubiKey touch and with the passphrase;
-   - [ ] `journalctl -b -u rollback` is clean;
-   - [ ] `hostname` is voyager, and `sudo cat /run/secrets/keys/age >/dev/null` works (sops decrypts);
-   - [ ] `netbird status` shows 100.68.60.163, and `ssh -p 2222 root@endeavour.nb.lvdar.nl true` works;
-   - [ ] `nix eval .#nixosConfigurations.voyager.config.hardware.cpu.intel.updateMicrocode` is `true` (else add `hardware.cpu.intel.updateMicrocode = true;` to `framework-12.nix`);
-   - [ ] folding the hinge: `libinput debug-events | grep -m1 tablet-mode` prints `switch tablet-mode state 1` and wvkbd appears (if the line format differs, adjust only the `case` patterns in `desktop/_umbriel/system.nix`);
-   - [ ] rotating rotates the screen, and touch and stylus follow (if inverted: pass `--transform normal 270 180 90` mapping args to iio-niri's `extraArgs` in `desktop/tablet.nix` and swap 90/270 in `umbriel-autorotate`);
-   - [ ] touch gestures follow the screen's rotation: in every orientation, swiping up from the bottom edge toggles the overview (`journalctl --user -u lisgd` for errors; if the directions are wrong, fix the `case` in `lisgd-niri` in `desktop/tablet.nix`);
-   - [ ] the stylus shows pressure in Xournal++;
-   - [ ] `systemctl hibernate` resumes (see [Hibernation](#hibernation));
-   - [ ] `genix` reboots into the GEHACK entry with display and Wi-Fi working, `~/shared` is mounted (`findmnt ~/shared`), and the next boot is voyager again;
-   - [ ] `cat /etc/nix/machines` lists endeavour;
-   - [ ] firmware is current: `fwupdmgr get-updates` (see [Firmware updates](#firmware-updates));
-   - [ ] `df -h /` leaves at least 100 GB free.
-8. **Cleanup commit**, once the Framework has run well for a week:
-   - delete `_hw/voyager/thinkpad-p1.nix`, `aspects/hardware/thinkpad.nix` and `aspects/hardware/fingerprint.nix`;
-   - delete the `cudaSupport` option in `home/apps/obs-studio.nix`;
-   - delete the `thinkpadFan` option and its uses in `home/desktop/_noctalia/{home,plugins}.nix`, plus the thinkpad-fan `postPatch`;
-   - delete the `hardwareProfile`/`profiles` selector, importing `framework-12.nix` directly;
-   - reword the ThinkPad comment in `desktop/bluetooth.nix`;
-   - update [Hosts](hosts.md#voyager).
-
-   Then wipe the P1 (`blkdiscard` its NVMe), or reinstall it later as a new host with fresh keys.
-
-### What the exclude list skips
-
-`modules/den/hosts/_hw/voyager/persist-exclude` keeps the copy to what the Framework needs:
-
-- the Steam library (`steamapps`): games re-download;
-- build artifacts (`dev/*/target`, `dev/*/node_modules`, `dev/.Trash-1000`): they regenerate;
-- orphans no aspect persists any more (`downloads`, `software`, `.mozilla`, `nixos-config`, `.local/share/{protonmail,lutris,FreeCAD,containers,remmina}`, `.config/remmina`): if any of it matters, `rsync` it off the P1 over the mesh before wiping;
-- leftovers of removed features: rofi and clipse (Hyprland), `/var/lib/fprint` (the Framework 12 has no fingerprint reader), `/var/cache/tuigreet`;
-- `/persist/genix`, genix's `~/shared` (`services.genix-boot`): it is a btrfs subvolume, which tar would recreate as a plain directory that genix cannot mount. tmpfiles creates the subvolume on the Framework's first boot; copy anything in `~/genix` across by hand.
-
-### Hibernation
-
-Neither profile hard-codes `resume=`/`resume_offset=`: systemd writes the `HibernateLocation` EFI variable (device and swap-file offset) when it hibernates, and the systemd initrd resumes from it. If the Framework boots fresh after `systemctl hibernate` instead of resuming, add to `framework-12.nix`:
+voyager hard-codes no `resume=`/`resume_offset=`: systemd writes the `HibernateLocation` EFI variable (device and swap-file offset) when it hibernates, and the systemd initrd resumes from it. If voyager boots fresh after `systemctl hibernate` instead of resuming, add to `_hw/voyager/framework-12.nix`:
 
 ```nix
 boot.resumeDevice = "/dev/mapper/crypted";
@@ -133,7 +78,7 @@ install-host's checklist prints the `map-swapfile` command whenever `boot.resume
 
 ## Firmware updates
 
-Framework publishes the Laptop 12's BIOS, a bundle that also carries the EC, PD and CSME firmware, to [LVFS](https://fwupd.org). The `framework-12` profile gets fwupd from nixos-hardware, and persists `/var/lib/fwupd`, where fwupd records a staged update and checks its result after the reboot. Update from the installed system, plugged in to a charger:
+Framework publishes the Laptop 12's BIOS, a bundle that also carries the EC, PD and CSME firmware, to [LVFS](https://fwupd.org). voyager's hardware module (`_hw/voyager/framework-12.nix`) gets fwupd from nixos-hardware, and persists `/var/lib/fwupd`, where fwupd records a staged update and checks its result after the reboot. Update from the installed system, plugged in to a charger:
 
 ```bash
 fwupdmgr refresh --force
@@ -149,9 +94,9 @@ Releases and notes: [Framework Laptop 12 Intel Core Series 3 — BIOS & Drivers]
 
 ## Secure Boot
 
-`cosmos.system.boot.secureBoot` (`core.boot`) replaces GRUB with [lanzaboote](https://github.com/nix-community/lanzaboote): systemd-boot booting images signed with the host's own keys. On the first boot or switch with it, `generate-sb-keys` creates the keys in `/var/lib/sbctl` (persisted) and `prepare-sb-auto-enroll` puts their enrolment files in `/boot/loader/keys/auto`. systemd-boot enrolls them the next time it starts with the firmware in setup mode. genix gets a signed UKI at `/boot/EFI/Linux/genix.efi` (unit `genix-uki`), and the `genix` command sets `bootctl set-oneshot genix.efi`. The `framework-12` profile also enrolls the firmware's built-in keys, Framework's db and KEK, next to Microsoft's: Framework's own EFI tools are signed with them.
+`cosmos.system.boot.secureBoot` (`core.boot`) replaces GRUB with [lanzaboote](https://github.com/nix-community/lanzaboote): systemd-boot booting images signed with the host's own keys. On the first boot or switch with it, `generate-sb-keys` creates the keys in `/var/lib/sbctl` (persisted) and `prepare-sb-auto-enroll` puts their enrolment files in `/boot/loader/keys/auto`. systemd-boot enrolls them the next time it starts with the firmware in setup mode. genix gets a signed UKI at `/boot/EFI/Linux/genix.efi` (unit `genix-uki`), and the `genix` command sets `bootctl set-oneshot genix.efi`. voyager's hardware module also enrolls the firmware's built-in keys, Framework's db and KEK, next to Microsoft's: Framework's own EFI tools are signed with them.
 
-Turning it on for voyager, once it runs well on the Framework:
+Turning it on for voyager:
 
 1. Add `cosmos.system.boot.secureBoot = true;` to voyager's `nixos` block, commit (`feat(voyager): enable secure boot`), push, and `nh os switch`. The switch installs systemd-boot unsigned, then creates the keys, signs everything and writes the enrolment files. Check:
    - `sudo sbctl verify` lists the files under `/boot/EFI` as signed, except lanzaboote's `kernel-*` files, which the signed stubs check by hash;

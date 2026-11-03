@@ -1,4 +1,4 @@
-# voyager (x86_64 laptop; hardware profile in _hw/voyager/, see `hardwareProfile` below). den-produced.
+# voyager (x86_64 laptop, Framework Laptop 12; hardware module in _hw/voyager/). den-produced.
 #
 # Hardware from a nixos-facter report; filesystems from disko. Generate on voyager:
 #   sudo nix run nixpkgs#nixos-facter -- -o modules/den/hosts/_facter/voyager.facter.json
@@ -6,24 +6,7 @@
   den,
   inputs,
   ...
-}: let
-  # The machine voyager currently is: "thinkpad-p1" or "framework-12".
-  # Switching is a runbook: docs/src/install.md, "Moving voyager to the Framework 12".
-  # Static data, not a config read, so it may choose includes. Not named
-  # `hardware`: that would shadow den.aspects.hardware inside `with den.aspects`.
-  hardwareProfile = "framework-12";
-  profiles = {
-    thinkpad-p1 = {
-      includes = with den.aspects.hardware; [thinkpad fingerprint];
-      module = import ./_hw/voyager/thinkpad-p1.nix {inherit inputs;};
-    };
-    framework-12 = {
-      includes = [];
-      module = import ./_hw/voyager/framework-12.nix {inherit inputs;};
-    };
-  };
-  profile = profiles.${hardwareProfile};
-in {
+}: {
   den.hosts.x86_64-linux.voyager = {
     users.lvdar = {};
     meshAddress = "100.68.60.163";
@@ -31,31 +14,25 @@ in {
   };
 
   den.aspects.voyager = {
-    includes = with den.aspects;
-      [
-        core.boot
-        core.impermanence
-        roles.desktop
-        roles.gaming
-        desktop.niri
-        desktop.umbriel
-        desktop.greetd.noctalia
-        desktop.tablet
-        services.containers
-        services.genix-boot
-        services.netbird.client
-        services.netbird-gewis
-        services.eduvpn
-        # Not node-exporter: a sleeping laptop would sit permanently "target down".
-        services.alloy
-      ]
-      # Here, not appended: include order sets the order of merged `lines`
-      # options such as boot.extraModprobeConfig.
-      ++ profile.includes
-      ++ [
-        services.remote-builder.client
-        hardware.v4l2loopback
-      ];
+    includes = with den.aspects; [
+      core.boot
+      core.impermanence
+      roles.desktop
+      roles.gaming
+      desktop.niri
+      desktop.umbriel
+      desktop.greetd.noctalia
+      desktop.tablet
+      services.containers
+      services.genix-boot
+      services.netbird.client
+      services.netbird-gewis
+      services.eduvpn
+      # Not node-exporter: a sleeping laptop would sit permanently "target down".
+      services.alloy
+      services.remote-builder.client
+      hardware.v4l2loopback
+    ];
 
     provides.lvdar = {
       includes = with den.aspects; [
@@ -170,7 +147,7 @@ in {
       imports = [
         inputs.nixos-facter-modules.nixosModules.facter
         {facter.reportPath = ./_facter/voyager.facter.json;}
-        profile.module
+        (import ./_hw/voyager/framework-12.nix {inherit inputs;})
         inputs.disko.nixosModules.disko
         (import ./_hw/voyager/disko.nix {device = "/dev/nvme0n1";})
       ];

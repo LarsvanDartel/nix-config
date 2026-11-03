@@ -13,12 +13,9 @@
   font = fonts.interface;
   opacity = config.stylix.opacity;
   wallpapers = config.cosmos.desktops.wallpapers;
-  cfg = config.cosmos.desktops.noctalia;
   modes = config.cosmos.desktops.common.styling.modes;
 in {
   imports = [(import ./plugins.nix {inherit inputs;})];
-
-  options.cosmos.desktops.noctalia.thinkpadFan = lib.mkEnableOption "the ThinkPad fan bar widget and plugin (set by hardware.thinkpad)";
 
   config = {
     # Colours, popup opacity and the default mode come from stylix's `noctalia`
@@ -46,50 +43,42 @@ in {
           shadow = false;
           start = ["workspaces" "active_window" "media" "privacy"];
           center = ["clock"];
-          end =
-            [
-              "volume"
-              "brightness"
-              "network"
-              "bluetooth"
-              "phone"
-              "netbird"
-            ]
-            ++ lib.optional cfg.thinkpadFan "fan"
-            ++ [
-              "battery"
-              "tray"
-              "notifications"
-              "control-center"
-            ];
+          end = [
+            "volume"
+            "brightness"
+            "network"
+            "bluetooth"
+            "phone"
+            "netbird"
+            "battery"
+            "tray"
+            "notifications"
+            "control-center"
+          ];
         };
 
-        widget =
-          {
-            clock.format = "{:%H:%M %a, %b %d}";
-            volume.show_label = true;
-            brightness.show_label = true;
-            battery = {
-              display_mode = "glyph";
-              show_label = true;
-              label_content = "percent";
-            };
-            # Only draws while the mic, camera or a screencast is live.
-            privacy.hide_inactive = true;
-            workspaces = {
-              # stylix maps tertiary to base0C, the theme's accent.
-              occupied_color = "tertiary";
-              empty_color = "tertiary";
-              labels_only_when_occupied = true;
-            };
-            # The applet keeps running: it is also the pairing agent.
-            tray.hidden = ["blueman"];
-            phone.type = "icefish/phone-connect:bar";
-            netbird.type = "lvdar/netbird:status";
-          }
-          // lib.optionalAttrs cfg.thinkpadFan {
-            fan.type = "piero-93/thinkpad-fan:widget";
+        widget = {
+          clock.format = "{:%H:%M %a, %b %d}";
+          volume.show_label = true;
+          brightness.show_label = true;
+          battery = {
+            display_mode = "glyph";
+            show_label = true;
+            label_content = "percent";
           };
+          # Only draws while the mic, camera or a screencast is live.
+          privacy.hide_inactive = true;
+          workspaces = {
+            # stylix maps tertiary to base0C, the theme's accent.
+            occupied_color = "tertiary";
+            empty_color = "tertiary";
+            labels_only_when_occupied = true;
+          };
+          # The applet keeps running: it is also the pairing agent.
+          tray.hidden = ["blueman"];
+          phone.type = "icefish/phone-connect:bar";
+          netbird.type = "lvdar/netbird:status";
+        };
 
         # Six at most. No DND tile: DND stays on the notifications widget's right-click.
         control_center.shortcuts = map (type: {inherit type;}) [
