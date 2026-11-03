@@ -58,9 +58,21 @@
 
       # Upstream orders this After=network.target only; it ran before DNS
       # answered and (Restart=no oneshot) wasn't retried until the timer.
+      # Every switch starts it (WantedBy=multi-user.target), so a switch that
+      # restarts unbound, this host's resolver, catches it without DNS and
+      # fails the deploy (2026-11-03). Retries ride that out. RestartMode=direct
+      # keeps OnFailure (notify-failure) off each retry, so only the start
+      # limit — a real outage — alerts.
       systemd.services.cloudflare-dyndns = {
         wants = ["network-online.target"];
         after = ["network-online.target" "nss-lookup.target"];
+        startLimitBurst = 3;
+        startLimitIntervalSec = 300;
+        serviceConfig = {
+          Restart = "on-failure";
+          RestartMode = "direct";
+          RestartSec = "30s";
+        };
       };
 
       services.cloudflare-dyndns = {
