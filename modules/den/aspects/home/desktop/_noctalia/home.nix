@@ -127,7 +127,7 @@ in {
                 shortcut = "l";
               }
               {
-                action = "suspend";
+                action = "lock_and_suspend";
                 shortcut = "s";
               }
               {
