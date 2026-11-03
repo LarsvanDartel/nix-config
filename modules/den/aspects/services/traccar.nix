@@ -147,6 +147,10 @@ in {
           groupsClaimName = "traccar_groups";
           allowGroup = "traccar";
           adminGroup = "traccar_admin";
+          # Else a first OpenID login fails "Registration disabled". allowGroup
+          # still gates it; the server-wide registration toggle would instead
+          # open anonymous sign-up.
+          allowRegistration = "true";
         };
       };
 
