@@ -45,3 +45,4 @@ The handbook is the mdBook in `docs/` (`nix build .#docs`). Read the relevant pa
 - Verification = `nix build .#nixosConfigurations.<host>.config.system.build.toplevel` ([commands](docs/src/commands.md#testing--qa)).
 - `_`-prefixed files are not auto-imported ([architecture](docs/src/architecture.md#_-prefixed-files)).
 - Commit messages are one short, clear conventional-commit line, lowercase, with no body and no names of people or user accounts ([conventions](docs/src/conventions.md#code)).
+- Commit finished changes at the end of a session; do not leave verified work uncommitted.
