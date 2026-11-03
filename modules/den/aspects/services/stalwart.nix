@@ -3,6 +3,9 @@
 {den, ...}: let
   # Option default and netbird-service target (see services/netbird.nix).
   defaultDavPort = 8089;
+  # Mesh-only name for the TLS relay; a constant so mesh-dns-record stays
+  # static (see services/unbound.nix). Inside *.lvdar.nl so the cert verifies.
+  relayDomain = "mail-relay.lvdar.nl";
 in {
   den.aspects.services.stalwart = {
     includes = [den.aspects.services.netbird.client];
@@ -20,6 +23,8 @@ in {
         ];
       };
     };
+
+    mesh-dns-record = {host, ...}: {${relayDomain} = host.meshAddress;};
 
     # Thunderbird's custom OAuth for IMAP/SMTP (home/apps/thunderbird.nix).
     # Stalwart validates tokens at this client's userinfo endpoint
@@ -61,6 +66,7 @@ in {
       # Stalwart expands these at start; the macro doesn't trim, so the
       # secret files must not end in a newline.
       cred = name: "%{file:/run/credentials/stalwart.service/${name}}%";
+      meshRelay = "(listener == 'mesh-relay' || listener == 'mesh-relay-tls')";
     in {
       options.cosmos.services.stalwart = {
         domain = mkOption {
@@ -96,10 +102,19 @@ in {
           description = "Mesh-only unauthenticated relay listener.";
         };
 
+        relayTlsPort = mkOption {
+          type = port;
+          default = 2465;
+          description = ''
+            The same relay with implicit TLS, served as ${relayDomain}. For
+            clients that refuse plaintext SMTP (kanidm-mail-sender).
+          '';
+        };
+
         relayClients = mkOption {
           type = listOf str;
           default = [];
-          description = "Mesh IPs allowed to relay through relayPort without auth.";
+          description = "Mesh IPs allowed to relay through relayPort/relayTlsPort without auth.";
         };
 
         userinfoUrl = mkOption {
@@ -171,6 +186,11 @@ in {
                 protocol = "smtp";
                 tls.enable = false;
               };
+              mesh-relay-tls = {
+                bind = ["[::]:${toString cfg.relayTlsPort}"];
+                protocol = "smtp";
+                tls.implicit = true;
+              };
               dav = {
                 bind = ["[::]:${toString cfg.davPort}"];
                 protocol = "http";
@@ -236,7 +256,7 @@ in {
             session.auth = {
               require = [
                 {
-                  "if" = "listener == 'mesh-relay'";
+                  "if" = meshRelay;
                   "then" = false;
                 }
                 {
@@ -249,7 +269,7 @@ in {
               # it with its placeholder user@example.com credentials.
               mechanisms = [
                 {
-                  "if" = "listener == 'mesh-relay'";
+                  "if" = meshRelay;
                   "then" = false;
                 }
                 {
@@ -267,7 +287,7 @@ in {
             # their notifications to the local mailbox otherwise land in Junk.
             session.data.spam-filter = [
               {
-                "if" = "listener == 'mesh-relay'";
+                "if" = meshRelay;
                 "then" = false;
               }
               {"else" = true;}
@@ -281,7 +301,7 @@ in {
                 }
               ]
               ++ lib.optional (cfg.relayClients != []) {
-                "if" = "listener == 'mesh-relay' && (${
+                "if" = "${meshRelay} && (${
                   lib.concatMapStringsSep " || " (ip: "remote_ip == '${ip}'") cfg.relayClients
                 })";
                 "then" = true;
@@ -355,7 +375,7 @@ in {
 
         # Not the module's openFirewall: that would open dav/admin/relay globally.
         networking.firewall.allowedTCPPorts = [25 465 993];
-        cosmos.services.netbird.client.exposedPorts = [cfg.davPort cfg.relayPort];
+        cosmos.services.netbird.client.exposedPorts = [cfg.davPort cfg.relayPort cfg.relayTlsPort];
 
         cosmos.system.impermanence.persist.directories = [
           {

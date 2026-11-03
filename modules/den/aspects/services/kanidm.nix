@@ -102,9 +102,65 @@ in {
             {
               "keys/kanidm/admin-password".owner = "kanidm";
               "keys/kanidm/idm-admin-password".owner = "kanidm";
+              # API token of the `mail-sender` service account (member of
+              # idm_message_senders only), created by hand: provisioning
+              # cannot make service accounts or tokens.
+              "keys/kanidm/mail-sender-token" = {};
             }
           ]
           ++ map toSecrets kanidm-provision);
+
+        # kanidmd only queues mail (`kanidm system message-queue list`);
+        # this sends it. It insists on TLS to the relay, hence gaia's
+        # mesh-relay-tls rather than the plaintext :2525 the other services
+        # use; hand-synced with services/stalwart.nix and gaia.nix relayClients.
+        sops.templates."kanidm-mail-sender.toml" = {
+          content = ''
+            token = "${config.sops.placeholder."keys/kanidm/mail-sender-token"}"
+            instance_display_name = "lvdar.nl"
+            instance_url = "https://auth.lvdar.nl"
+            mail_from_address = "auth@lvdar.nl"
+            mail_reply_to_address = "lars@lvdar.nl"
+            mail_relay = "smtps://mail-relay.lvdar.nl:2465"
+          '';
+          # Root-owned and group-readable: the sender warns about a config
+          # owned by its own uid.
+          group = "kanidm-mail-sender";
+          mode = "0440";
+          restartUnits = ["kanidm-mail-sender.service"];
+        };
+
+        users.users.kanidm-mail-sender = {
+          isSystemUser = true;
+          group = "kanidm-mail-sender";
+        };
+        users.groups.kanidm-mail-sender = {};
+
+        systemd.services.kanidm-mail-sender = {
+          description = "kanidm outbound mail queue sender";
+          after = ["kanidm.service" "network-online.target"];
+          wants = ["network-online.target"];
+          wantedBy = ["multi-user.target"];
+          serviceConfig = {
+            ExecStart = lib.escapeShellArgs [
+              "${config.services.kanidm.package}/bin/kanidm-mail-sender"
+              "--client-config"
+              (pkgs.writeText "kanidm-mail-sender-client.toml" ''
+                uri = "https://auth.lvdar.nl"
+              '')
+              "--mail-sender-config"
+              config.sops.templates."kanidm-mail-sender.toml".path
+            ];
+            User = "kanidm-mail-sender";
+            Group = "kanidm-mail-sender";
+            Restart = "on-failure";
+            RestartSec = "10s";
+            NoNewPrivileges = true;
+            ProtectSystem = "strict";
+            ProtectHome = true;
+            PrivateTmp = true;
+          };
+        };
 
         users.users.kanidm.extraGroups = ["acme"];
 

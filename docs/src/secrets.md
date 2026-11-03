@@ -24,6 +24,7 @@ Keys are kebab-case paths nested under `keys`; each host's file is encrypted to 
 |knot2's SSH host key|`/tank/knot/ssh_host_key` (snapshotted, restic)|presented for `git@knot.lvdar.nl`; its public half is pinned in core.ssh|
 |`keys/spindle/key`|`hosts/endeavour/secrets.yaml`|the P-256 key behind the spindle's did:web document|
 |`keys/pds/flake-bump-password`|`hosts/endeavour/secrets.yaml`|undeclared; logs in as the flake-bump bot (`flake-bump.pds.lvdar.nl`) to manage its key records|
+|`keys/kanidm/mail-sender-token`|`hosts/endeavour/secrets.yaml`|`kanidm-mail-sender` (services/kanidm.nix), which drains kanidm's mail queue. Read-write API token of the hand-made `mail-sender` service account (member of `idm_message_senders` only); provisioning cannot create either. Rotate with `kanidm service-account api-token generate mail-sender <label> --readwrite`|
 |YubiKey FIDO2 resident keys|on the YubiKeys (`ssh-keygen -K` recovers the handles)|break-glass root access ([SSH](networking.md#ssh))|
 
 Servers hold no user identity: nothing on endeavour, gaia or pioneer can log in anywhere as lvdar.
