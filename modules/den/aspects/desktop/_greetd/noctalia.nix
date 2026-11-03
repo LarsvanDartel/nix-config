@@ -35,6 +35,16 @@
   };
 
   sessionDir = pkgs.linkFarm "greetd-wayland-sessions" greetd.sessions;
+
+  # The clock is bare text on the wallpaper (no shadow, no backing), so on a
+  # bright image it vanishes. Blurring and dimming toward `surface` keeps it
+  # legible in either polarity, since `on_surface` contrasts with `surface`.
+  backdrop =
+    pkgs.runCommand "noctalia-greeter-wallpaper.png" {nativeBuildInputs = [pkgs.imagemagick];}
+    ''
+      magick ${cfg.wallpaper} -blur 0x12 \
+        -fill '${config.lib.stylix.colors.withHashtag.base00}' -colorize 65% $out
+    '';
 in {
   options.cosmos.profiles.desktop.addons.greetd.noctalia = {
     user = mkOption {
@@ -63,7 +73,7 @@ in {
       # A store path the unprivileged greeter can read (~/Pictures is not).
       default = config.home-manager.users.${config.cosmos.user.name}.stylix.image or null;
       defaultText = "the primary user's stylix.image";
-      description = "Background shown behind the login prompt.";
+      description = "Background shown behind the login prompt, blurred and dimmed.";
     };
   };
 
@@ -122,7 +132,7 @@ in {
             on_hover = base00;
           };
           wallpaper = lib.optionalAttrs (cfg.wallpaper != null) {
-            path = "${cfg.wallpaper}";
+            path = "${backdrop}";
             fill_mode = "crop";
           };
         };
