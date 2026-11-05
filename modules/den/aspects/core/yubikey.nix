@@ -198,6 +198,11 @@
         };
       };
 
+      # A notification while any FIDO request waits for a touch (sudo, ssh,
+      # WebAuthn, the keyring unlock), closed once touched. None at login or on
+      # the lock screen: noctalia is not up yet, or the lock covers it.
+      programs.yubikey-touch-detector.enable = locking;
+
       # noctalia's session hooks and manual enrolment call these by name.
       environment.systemPackages = lib.mkIf locking [keyringCtl keyringUnlock keyringEnroll];
 
