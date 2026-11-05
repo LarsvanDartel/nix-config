@@ -6,10 +6,16 @@ rec {
 
   # One judgehost container per id. The id is the judgedaemon's -n: it pins
   # every compile and run to CPU <id> and names the judgehost judgehost-<id>,
-  # so ids must stay distinct. CPUs 0-3 are separate physical cores (their
-  # hyperthread siblings are 36-39).
+  # so ids must stay distinct. CPUs 0-3 are separate physical cores; CPU
+  # n + 36 is CPU n's hyperthread sibling (72 CPUs: 2 sockets x 18 cores x 2).
   judgehostIds = [0 1 2 3];
   judgehostContainer = id: "domjudge-judgehost-${toString id}";
+  judgehostSibling = id: id + 36;
+  # Every CPU but the judge cores and their siblings (default.nix).
+  otherCpus = "4-35,40-71";
+  # The judge cores' fixed clock: the base clock, which holds at ±1.5% under
+  # any host load, where turbo varies ±8%.
+  judgeKHz = 2100000;
 
   # A oneshot that drives the domserver API as admin. It waits for the API
   # (the first start installs the DB first), runs `rootSql` as root inside

@@ -12,7 +12,7 @@
 # php8.3-fpm 8.3.6-0ubuntu0.24.04.13; earlier builds of the 9.0.1 tag are
 # vulnerable. Bump domserver and judgehost together.
 {...}: let
-  inherit (import ./_lib.nix) containerPort judgehostContainer judgehostIds;
+  inherit (import ./_lib.nix) containerPort judgehostContainer judgehostIds judgehostSibling otherCpus judgeKHz;
 in {
   den.aspects.services.domjudge.nixos = {
     config,
@@ -153,6 +153,13 @@ in {
         };
       };
 
+    # Judging speed must match what the contests' time limits assume, so the
+    # judge cores do nothing else: a busy hyperthread sibling slows a run
+    # 2.2x. Runs live in runguard's /domjudge cgroup, outside these slices.
+    systemd.slices = lib.genAttrs ["system" "user" "machine"] (_: {
+      sliceConfig.AllowedCPUs = otherCpus;
+    });
+
     systemd.services = lib.mkMerge [
       # The domserver exits if the DB is not up within 90 s, the judgehost
       # if the API is not up yet.
@@ -178,6 +185,34 @@ in {
           script = ''
             podman network exists domjudge || podman network create --subnet=10.89.42.0/24 --gateway=10.89.42.1 --interface-name=dj-br0 --disable-dns domjudge
           '';
+        };
+
+        # Siblings offline and the clock pinned; stopping undoes both.
+        domjudge-judge-cores = {
+          description = "Reserve DOMjudge's judge cores at a fixed clock";
+          wantedBy = ["multi-user.target"];
+          before = map (id: "podman-${judgehostContainer id}.service") judgehostIds;
+          serviceConfig = {
+            Type = "oneshot";
+            RemainAfterExit = true;
+          };
+          script =
+            lib.concatMapStrings (id: ''
+              echo 0 >/sys/devices/system/cpu/cpu${toString (judgehostSibling id)}/online
+              f=/sys/devices/system/cpu/cpu${toString id}/cpufreq
+              cat $f/cpuinfo_max_freq >$f/scaling_max_freq
+              echo ${toString judgeKHz} >$f/scaling_min_freq
+              echo ${toString judgeKHz} >$f/scaling_max_freq
+            '')
+            judgehostIds;
+          preStop =
+            lib.concatMapStrings (id: ''
+              echo 1 >/sys/devices/system/cpu/cpu${toString (judgehostSibling id)}/online
+              f=/sys/devices/system/cpu/cpu${toString id}/cpufreq
+              cat $f/cpuinfo_min_freq >$f/scaling_min_freq
+              cat $f/cpuinfo_max_freq >$f/scaling_max_freq
+            '')
+            judgehostIds;
         };
       }
     ];

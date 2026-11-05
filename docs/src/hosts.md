@@ -50,6 +50,8 @@ The hardware module pins `linuxPackages_latest` (Wildcat Lake needs ≥ 7.1) and
 
 The workhorse and the fleet's build machine: build-gate, flake-bump, and voyager's remote builder including aarch64 emulation ([Remote builds](deployment.md#remote-builds)). Hosts the knot that comin deploys every host from.
 
+CPUs 0-3 belong to DOMjudge's four judgehosts: `system`, `user` and `machine.slice` run on the other CPUs, the judge cores' hyperthread siblings (36-39) are offline, and the judge cores are held at the 2.1 GHz base clock (`domjudge-judge-cores`; stopping it undoes both). Judging times then stay within ±1.5% whatever else the host does; a busy sibling slowed runs 2.2× and turbo moved them ±8%.
+
 ## gaia
 
 The edge: NetBird control plane, `netbird-proxy`, `localVhosts`, oidc.idp.
