@@ -111,6 +111,10 @@ in {
             DOMSERVER_BASEURL = "http://10.89.42.3/";
             JUDGEDAEMON_USERNAME = "judgehost";
             DAEMON_ID = toString id;
+            # Upstream's default UID is shared by every container, and
+            # RLIMIT_NPROC counts per UID kernel-wide: one judgehost's threads
+            # then fail another's fork/exec with EAGAIN (spurious run-errors).
+            RUN_USER_UID_GID = toString (62860 + id);
           };
           environmentFiles = [config.sops.templates."domjudge-judgehost.env".path];
         })
