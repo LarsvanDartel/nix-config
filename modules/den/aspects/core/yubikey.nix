@@ -180,6 +180,24 @@
         };
       };
 
+      # The greeter's touch only proves presence (pam_u2f), so the keyring takes
+      # a second one. Before noctalia, which asks for a secret at startup and
+      # would otherwise open gnome-keyring's password dialog. No key, no
+      # enrolment or an open keyring skip at once; a missed touch costs 15 s.
+      systemd.user.services.yubikey-login-unlock = lib.mkIf locking {
+        description = "Unlock the keyring with a YubiKey touch at login";
+        unitConfig.ConditionUser = config.cosmos.user.name;
+        wantedBy = ["graphical-session.target"];
+        partOf = ["graphical-session.target"];
+        after = ["graphical-session.target"];
+        before = ["noctalia.service"];
+        serviceConfig = {
+          Type = "oneshot";
+          # `-`: a missed touch leaves the keyring to the dialog, not a failed unit.
+          ExecStart = "-${pkgs.coreutils}/bin/timeout 15 ${lib.getExe keyringUnlock}";
+        };
+      };
+
       # noctalia's session hooks and manual enrolment call these by name.
       environment.systemPackages = lib.mkIf locking [keyringCtl keyringUnlock keyringEnroll];
 
