@@ -20,7 +20,9 @@ in {
       pkgs,
       ...
     }: let
-      python = pkgs.python3;
+      # The contests' own judges ran Python on PyPy, and their jury solutions
+      # rely on its speed and behaviour; CPython times out on ~150 of them.
+      pypy = pkgs.pypy3;
       go = pkgs.go;
       node = pkgs.nodejs-slim;
       # Official distributions where nixpkgs' build drags in a toolchain the
@@ -46,7 +48,7 @@ in {
       '';
       chrootStore = pkgs.runCommand "domjudge-chroot-store" {} ''
         mkdir -p $out/store
-        cp -a --reflink=auto $(<${pkgs.closureInfo {rootPaths = [python kotlinc rust go node];}}/store-paths) $out/store/
+        cp -a --reflink=auto $(<${pkgs.closureInfo {rootPaths = [pypy kotlinc rust go node];}}/store-paths) $out/store/
       '';
 
       mkExecutable = name: substitutions:
@@ -60,7 +62,7 @@ in {
         '';
       executables = {
         cpp = mkExecutable "cpp" "";
-        py3 = mkExecutable "py3" "--replace-fail @python3@ ${python}/bin/python3";
+        py3 = mkExecutable "py3" "--replace-fail @pypy3@ ${pypy}/bin/pypy3";
         kt = mkExecutable "kt" "--replace-fail @kotlinc@ ${kotlinc}";
         rs = mkExecutable "rs" "--replace-fail @rust@ ${rust}";
         go = mkExecutable "go" "--replace-fail @go@ ${go}";
@@ -82,10 +84,10 @@ in {
         }
         {
           id = "python3";
-          name = "Python ${lib.versions.majorMinor python.version}";
+          name = "Python ${pypy.pythonVersion} (PyPy ${pypy.version})";
           extensions = ["py" "py3"];
-          compiler.version_command = "${python}/bin/python3 --version";
-          runner.version_command = "${python}/bin/python3 --version";
+          compiler.version_command = "${pypy}/bin/pypy3 --version";
+          runner.version_command = "${pypy}/bin/pypy3 --version";
         }
         {
           id = "rust";

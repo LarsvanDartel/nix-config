@@ -1,6 +1,6 @@
 #!/bin/sh
-# py3 — DOMjudge's Python 3 compile script on CPython from the Nix closure
-# mounted at /nix in the judge chroot, instead of the image's pypy3 3.9.
+# py3 — DOMjudge's Python 3 compile script on nixpkgs' PyPy from the Nix
+# closure mounted at /nix in the judge chroot, instead of the image's pypy3 3.9.
 # Writes $DEST as a wrapper that runs the source.
 DEST="$1"
 shift 2 # DEST, MEMLIMIT
@@ -9,7 +9,7 @@ if [ -z "$ENTRY_POINT" ]; then
 	echo "Info: detected entry_point: $MAINSOURCE"
 fi
 
-@python3@ -m py_compile "$@" || exit
+@pypy3@ -m py_compile "$@" || exit
 rm -rf -- *.pyc __pycache__
 
 if [ ! -r "$MAINSOURCE" ]; then
@@ -23,6 +23,6 @@ if [ "\${0%/*}" != "\$0" ]; then
 	cd "\${0%/*}"
 fi
 export HOME=/does/not/exist
-exec @python3@ "$MAINSOURCE" "\$@"
+exec @pypy3@ "$MAINSOURCE" "\$@"
 EOF
 chmod a+x "$DEST"
