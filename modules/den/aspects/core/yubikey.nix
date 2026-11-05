@@ -1,4 +1,4 @@
-# core.yubikey — pcscd/udev + u2f PAM.
+# core.yubikey — pcscd/udev + u2f PAM, and YubiKey lock/unlock of the session and keyring.
 {...}: {
   den.aspects.core.yubikey.nixos = {
     config,
@@ -41,6 +41,86 @@
         -w XDG_RUNTIME_DIR,WAYLAND_DISPLAY,DBUS_SESSION_BUS_ADDRESS \
         -l "$user" -c "${config.cosmos.profiles.desktop.lockCommand}"
     '';
+
+    locking = config.cosmos.profiles.desktop.lockCommand != "";
+
+    # Relative to $HOME, in the dir home.keyring persists; gnome-keyring only
+    # reads *.keyring files there.
+    secret = ".local/share/keyrings/yubikey-unlock.age";
+    recipients = ".local/share/keyrings/yubikey-unlock.recipients";
+
+    keyringCtl = pkgs.writers.writePython3Bin "keyring-ctl" {libraries = [pkgs.python3Packages.jeepney];} (
+      builtins.readFile ./_yubikey/keyring-ctl.py
+    );
+
+    # age finds the plugin on PATH.
+    ageTools = [pkgs.age pkgs.age-plugin-fido2-hmac];
+
+    keyringUnlock = pkgs.writeShellApplication {
+      name = "yubikey-keyring-unlock";
+      runtimeInputs = [keyringCtl pkgs.coreutils] ++ ageTools;
+      text = ''
+        keyring-ctl is-locked || exit 0
+        present=
+        for dev in /sys/bus/usb/devices/*; do
+          if [ "$(cat "$dev/idVendor" 2>/dev/null)" = 1050 ]; then present=1; fi
+        done
+        [ -n "$present" ] || exit 0
+        [ -f "$HOME/${secret}" ] || exit 0
+        # Decrypting needs an enrolled YubiKey and a touch.
+        password=$(age -d -j fido2-hmac "$HOME/${secret}")
+        printf '%s' "$password" | keyring-ctl unlock
+      '';
+    };
+
+    sessionUnlock = pkgs.writeShellApplication {
+      name = "yubikey-session-unlock";
+      runtimeInputs = [config.systemd.package pkgs.coreutils keyringCtl keyringUnlock] ++ ageTools;
+      text = ''
+        session=$(loginctl show-user "$(id -u)" -p Display --value 2>/dev/null) || exit 0
+        # Session already open: only the keyring may still be locked.
+        if [ -z "$session" ] || [ "$(loginctl show-session "$session" -p LockedHint --value)" != yes ]; then
+          exec yubikey-keyring-unlock
+        fi
+        if [ ! -f "$HOME/${secret}" ]; then
+          echo "$HOME/${secret} missing; run yubikey-keyring-enroll" >&2
+          exit 1
+        fi
+        # The decryption is the presence check: an enrolled YubiKey and a touch.
+        password=$(age -d -j fido2-hmac "$HOME/${secret}")
+        if keyring-ctl is-locked; then
+          printf '%s' "$password" | keyring-ctl unlock || echo "keyring stayed locked" >&2
+        fi
+        # noctalia unlocks on logind's Unlock signal and keeps LockedHint current.
+        loginctl unlock-session "$session"
+      '';
+    };
+
+    keyringEnroll = pkgs.writeShellApplication {
+      name = "yubikey-keyring-enroll";
+      runtimeInputs = [keyringCtl pkgs.coreutils pkgs.gnugrep pkgs.util-linux] ++ ageTools;
+      text = ''
+        work=$(mktemp -d)
+        trap 'rm -rf "$work"' EXIT
+        echo "Enrolling the inserted YubiKey. Answer 'no' to requiring a PIN for decryption and 'no' to a separate identity." >&2
+        age-plugin-fido2-hmac -g >"$work/generated"
+        recipient=$(grep -o 'age1fido2-hmac1[a-z0-9]*' "$work/generated")
+        { if [ -f "$HOME/${recipients}" ]; then cat "$HOME/${recipients}"; fi; echo "$recipient"; } >"$work/recipients"
+        read -rsp "Password of the default keyring: " password
+        echo >&2
+        printf '%s' "$password" | age -R "$work/recipients" -o "$work/secret"
+        keyring-ctl lock
+        echo "Touch the YubiKey again to check the enrolment." >&2
+        # setsid drops the TTY like the unattended unlock does, so a PIN-bound credential fails here.
+        if ! setsid -w age -d -j fido2-hmac "$work/secret" | keyring-ctl unlock; then
+          echo "Check failed; nothing saved. The keyring stays locked until its password is entered." >&2
+          exit 1
+        fi
+        install -m 600 "$work/recipients" "$HOME/${recipients}"
+        install -m 600 "$work/secret" "$HOME/${secret}"
+        echo "Enrolled. Run again with the other YubiKey inserted to add it." >&2
+      '';
+    };
   in {
     options.cosmos.profiles.desktop.lockCommand = lib.mkOption {
       type = lib.types.str;
@@ -59,26 +139,43 @@
         udev.packages = with pkgs; [yubikey-personalization];
         dbus.packages = [pkgs.gcr_4];
 
-        # `loginctl lock-sessions` would do nothing: no locker here listens for
-        # logind's Lock signal, so run lockCommand directly. Through a unit: the
-        # script waits, and udev kills slow RUN programs.
-        udev.extraRules = lib.mkIf (config.cosmos.profiles.desktop.lockCommand != "") ''
+        # Removal runs lockCommand through a unit: the script waits, and udev kills
+        # slow RUN programs. Insertion starts yubikey-unlock in the user's manager
+        # (SYSTEMD_USER_WANTS) for the session bus and the seat user's hidraw ACL.
+        udev.extraRules = lib.mkIf locking ''
           ACTION=="remove",\
            ENV{ID_BUS}=="usb",\
            ENV{ID_MODEL_ID}=="0407",\
            ENV{ID_VENDOR_ID}=="1050",\
            ENV{ID_VENDOR}=="Yubico",\
            RUN+="${config.systemd.package}/bin/systemctl start --no-block yubikey-lock.service"
+          SUBSYSTEM=="hidraw",\
+           ENV{ID_FIDO_TOKEN}=="1",\
+           ENV{ID_VENDOR_ID}=="1050",\
+           TAG+="systemd",\
+           ENV{SYSTEMD_USER_WANTS}+="yubikey-unlock.service"
         '';
       };
 
-      systemd.services.yubikey-lock = lib.mkIf (config.cosmos.profiles.desktop.lockCommand != "") {
+      systemd.services.yubikey-lock = lib.mkIf locking {
         description = "Lock the session once the YubiKey is gone";
         serviceConfig = {
           Type = "oneshot";
           ExecStart = lockScript;
         };
       };
+
+      systemd.user.services.yubikey-unlock = lib.mkIf locking {
+        description = "Unlock the session and keyring once an enrolled YubiKey is touched";
+        unitConfig.ConditionUser = config.cosmos.user.name;
+        serviceConfig = {
+          Type = "oneshot";
+          ExecStart = lib.getExe sessionUnlock;
+        };
+      };
+
+      # noctalia's session hooks and manual enrolment call these by name.
+      environment.systemPackages = lib.mkIf locking [keyringCtl keyringUnlock keyringEnroll];
 
       security.pam.services = {
         swaylock.u2fAuth = true;

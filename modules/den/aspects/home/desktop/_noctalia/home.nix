@@ -150,6 +150,10 @@ in {
           };
         };
 
+        lockscreen = {
+          allow_empty_password = true;
+        };
+
         audio.enable_sounds = false;
         osd.position = "top_right";
         nightlight.enabled = true;
@@ -167,6 +171,11 @@ in {
         # noctalia's own light/dark toggle (control center, bar,
         # `theme-mode-*`) drives home.theme here; `theme` drives noctalia back.
         hooks.theme_mode_changed = lib.mkIf modes.enable ''${modes.package}/bin/theme sync "$NOCTALIA_THEME_MODE"'';
+
+        # From core.yubikey (system PATH): the default keyring locks with the
+        # session; unlocking it again costs a YubiKey touch.
+        hooks.session_locked = "keyring-ctl lock";
+        hooks.session_unlocked = "yubikey-keyring-unlock";
       };
 
       customPalettes.stylix = {
