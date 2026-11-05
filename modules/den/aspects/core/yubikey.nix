@@ -78,8 +78,12 @@
       runtimeInputs = [config.systemd.package pkgs.coreutils keyringCtl keyringUnlock] ++ ageTools;
       text = ''
         session=$(loginctl show-user "$(id -u)" -p Display --value 2>/dev/null) || exit 0
+        # No live graphical session (greeter, logout): touching the YubiKey is
+        # the greeter's, and the keyring would start outside any session.
+        [ -n "$session" ] || exit 0
+        [ "$(loginctl show-session "$session" -p State --value)" != closing ] || exit 0
         # Session already open: only the keyring may still be locked.
-        if [ -z "$session" ] || [ "$(loginctl show-session "$session" -p LockedHint --value)" != yes ]; then
+        if [ "$(loginctl show-session "$session" -p LockedHint --value)" != yes ]; then
           exec yubikey-keyring-unlock
         fi
         if [ ! -f "$HOME/${secret}" ]; then
@@ -141,7 +145,8 @@
 
         # Removal runs lockCommand through a unit: the script waits, and udev kills
         # slow RUN programs. Insertion starts yubikey-unlock in the user's manager
-        # (SYSTEMD_USER_WANTS) for the session bus and the seat user's hidraw ACL.
+        # (SYSTEMD_USER_WANTS) for the session bus and the seat user's hidraw ACL;
+        # `add` only, as `change` events (e.g. on logout) would start it too.
         udev.extraRules = lib.mkIf locking ''
           ACTION=="remove",\
            ENV{ID_BUS}=="usb",\
@@ -149,7 +154,8 @@
            ENV{ID_VENDOR_ID}=="1050",\
            ENV{ID_VENDOR}=="Yubico",\
            RUN+="${config.systemd.package}/bin/systemctl start --no-block yubikey-lock.service"
-          SUBSYSTEM=="hidraw",\
+          ACTION=="add",\
+           SUBSYSTEM=="hidraw",\
            ENV{ID_FIDO_TOKEN}=="1",\
            ENV{ID_VENDOR_ID}=="1050",\
            TAG+="systemd",\

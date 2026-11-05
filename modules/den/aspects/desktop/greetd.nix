@@ -71,6 +71,13 @@
       # Defaults on with gnome-keyring and collides with core.ssh's
       # `programs.ssh.startAgent` (only one SSH agent may be installed).
       services.gnome.gcr-ssh-agent.enable = false;
+
+      # Stop the user manager as soon as the last session ends. With the 10 s
+      # default, logging back in within 10 s (a YubiKey touch is quick) reuses
+      # the old manager, whose compositor and noctalia units are still running
+      # against the dead session: start-umbriel refuses ("already running") and
+      # niri gets no noctalia.
+      services.logind.settings.Login.UserStopDelaySec = 0;
     };
   };
 
