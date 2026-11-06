@@ -14,7 +14,8 @@ rec {
   # Every CPU but the judge cores and their siblings (default.nix).
   otherCpus = "4-35,40-71";
   # The judge cores' fixed clock: the base clock, which holds at ±1.5% under
-  # any host load, where turbo varies ±8%.
+  # any host load, where turbo varies ±8%. languages.nix's time factors are
+  # fitted at this clock.
   judgeKHz = 2100000;
 
   # A oneshot that drives the domserver API as admin. It waits for the API

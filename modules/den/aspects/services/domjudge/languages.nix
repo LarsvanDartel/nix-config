@@ -70,15 +70,28 @@ in {
       };
 
       # Exactly these languages are enabled: POST /languages disables the rest.
+      # time_factor: the time-limit multipliers that get the most jury
+      # submissions of all ten contests right on the judge cores at judgeKHz
+      # (_lib.nix), each mid-way in its range; re-fit after changing the clock.
       languagesJson = pkgs.writeText "domjudge-languages.json" (builtins.toJSON [
-        {id = "c";}
-        {id = "cpp";}
-        {id = "java";}
+        {
+          id = "c";
+          time_factor = 0.95;
+        }
+        {
+          id = "cpp";
+          time_factor = 0.95;
+        }
+        {
+          id = "java";
+          time_factor = 1.75;
+        }
         {
           id = "kotlin";
           name = "Kotlin ${lib.versions.majorMinor pkgs.kotlin.version}";
           # kt/run detects the main class, as Java's script does.
           entry_point_required = false;
+          time_factor = 1.075;
           compiler.version_command = "${kotlinc}/bin/kotlinc -version";
           runner.version_command = "${kotlinc}/bin/kotlin -version";
         }
@@ -86,6 +99,7 @@ in {
           id = "python3";
           name = "Python ${pypy.pythonVersion} (PyPy ${pypy.version})";
           extensions = ["py" "py3"];
+          time_factor = 1.45;
           compiler.version_command = "${pypy}/bin/pypy3 --version";
           runner.version_command = "${pypy}/bin/pypy3 --version";
         }
