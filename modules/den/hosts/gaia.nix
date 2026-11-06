@@ -25,6 +25,7 @@
       services.crowdsec
       services.ntfy
       services.stalwart
+      services.bulwark
       services.unbound
       services.gatus
       services.alloy

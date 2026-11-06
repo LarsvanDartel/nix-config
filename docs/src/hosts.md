@@ -4,7 +4,7 @@
 |---|---|---|
 |`voyager`|x86_64|Framework Laptop 12, niri + noctalia (Umbriel as a second greeter session), remote-builds on endeavour|
 |`endeavour`|x86_64|the workhorse. jellyfin, immich, kanidm, traccar, opencloud/collabora, suwayomi + flaresolverr, ollama + librechat (chat.lvdar.nl, local models + OpenRouter) on a Tesla P100, tangled (knot + spindle), a PDS, minecraft (packwiz packs from the `modpacks` input, also served to players at packs.lvdar.nl), attic, `services.site` (lvdar.nl), DOMjudge (judge.lvdar.nl: podman containers with CHipCie practice contests; extra judge languages live in `services/domjudge/languages.nix`), the VPN-confined `*arr` stack, and the prometheus/grafana/loki/alloy monitoring. ZFS `tank` with sanoid/zed; restic offsite|
-|`gaia`|x86_64|public VPS and the fleet's only ingress. Runs the self-hosted **NetBird control plane**, and `netbird-proxy` terminates TLS and forwards to endeavour over the mesh. Also crowdsec, ntfy, stalwart, unbound, the gatus status page, and the vhosts its own nginx serves directly (`localVhosts`). Pangolin used to be the ingress and is **decommissioned** — do not reintroduce it|
+|`gaia`|x86_64|public VPS and the fleet's only ingress. Runs the self-hosted **NetBird control plane**, and `netbird-proxy` terminates TLS and forwards to endeavour over the mesh. Also crowdsec, ntfy, stalwart (mail.lvdar.nl) with Bulwark webmail (webmail.lvdar.nl), unbound, the gatus status page, and the vhosts its own nginx serves directly (`localVhosts`). Pangolin used to be the ingress and is **decommissioned** — do not reintroduce it|
 |`pioneer`|aarch64|Raspberry Pi 3; built on endeavour (binfmt) via voyager's remote builder, never on the Pi. Publishes endeavour's **iDRAC** (`services.idrac`) to the mesh — it shares nothing with endeavour but a switch, which is the whole point: out-of-band management proxied by the machine it exists to recover is not out-of-band|
 
 Hardware comes from committed **nixos-facter** reports (`hosts/_facter/<host>.facter.json`) plus **disko** layouts in `hosts/_hw/<host>/`. voyager, endeavour and gaia use impermanence (pioneer does not).
@@ -55,6 +55,8 @@ CPUs 0-3 belong to DOMjudge's four judgehosts: `system`, `user` and `machine.sli
 ## gaia
 
 The edge: NetBird control plane, `netbird-proxy`, `localVhosts`, oidc.idp.
+
+**Stalwart 1.0** keeps every setting in its database. `services.stalwart.provision` replays the declared ones over the loopback management API (`127.0.0.1:8088`) after each start, using the module from nixpkgs PR #552103, vendored in `services/_stalwart` until it lands. Listener and role changes take effect only on the next `stalwart` restart. Anything not declared there is database state. That includes blocked catch-all addresses: create them as `MemoryLookupKey` in namespace `blocked` with `stalwart-cli` as the recovery admin (`STALWART_URL=http://127.0.0.1:8088 STALWART_USER=admin`, password `keys/stalwart/admin`), and they take effect after `stalwart-cli create Action --json '{"@type":"ReloadLookupStores"}'`. It also includes app passwords, which the admin cannot set: the account creates them itself in Bulwark's settings. Bulwark signs in with kanidm's `stalwart` client and calls JMAP on mail.lvdar.nl directly from the browser (CORS).
 
 ## pioneer
 
