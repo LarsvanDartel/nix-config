@@ -116,13 +116,14 @@
       };
 
       # Thunderbird's calendar has no custom OAuth: DAV takes a Stalwart app
-      # password.
+      # password. Stalwart 1.0 logs in and addresses accounts by full name
+      # (`lvdar@lvdar.nl`); a bare `lvdar` fails both.
       accounts.calendar.accounts.lvdar = {
         primary = true;
         remote = {
           type = "caldav";
-          url = "https://mail.lvdar.nl/dav/cal/lvdar/default/";
-          userName = "lvdar";
+          url = "https://mail.lvdar.nl/dav/cal/lvdar%40lvdar.nl/default/";
+          userName = "lvdar@lvdar.nl";
         };
         thunderbird.enable = true;
       };
@@ -130,8 +131,8 @@
       accounts.contact.accounts.lvdar = {
         remote = {
           type = "carddav";
-          url = "https://mail.lvdar.nl/dav/card/lvdar/default/";
-          userName = "lvdar";
+          url = "https://mail.lvdar.nl/dav/card/lvdar%40lvdar.nl/default/";
+          userName = "lvdar@lvdar.nl";
         };
         thunderbird.enable = true;
       };
