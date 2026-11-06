@@ -248,9 +248,14 @@ in {
                   ];
                   "else" = "false";
                 };
-                # Single-user server: lets the account send as catch-all
-                # addresses. JetEmail still refuses non-lvdar.nl senders.
-                mustMatchSender."else" = "false";
+                # Only the owner (the catch-all target) may send as any
+                # address; any other account kanidm lets in (mail-users) is
+                # held to its own. `authenticated_as` is `<name>@<domain>`.
+                # JetEmail still refuses non-lvdar.nl senders.
+                mustMatchSender = {
+                  match = [(when "authenticated_as == 'lvdar@${cfg.domain}'" "false")];
+                  "else" = "true";
+                };
               };
 
               MtaStageRcpt = {
@@ -296,6 +301,19 @@ in {
             };
 
             objects = {
+              # Tracers have no name, hence the match on the variant. The
+              # migration left a file tracer under /var/log, which the
+              # unit's ProtectSystem makes unwritable.
+              Tracer = {
+                reconcile = true;
+                match = ["@type"];
+                objects.journal = {
+                  "@type" = "Journal";
+                  enable = true;
+                  level = "info";
+                };
+              };
+
               NetworkListener = {
                 reconcile = true;
                 match = ["name"];
@@ -334,6 +352,11 @@ in {
               };
 
               # The built-in roles, matched only to reference them above.
+              # Stalwart creates them, with their permissions, only on a
+              # normal-mode start with no roles at all. Provisioning a store
+              # that has none yet (recovery mode) makes empty roles instead,
+              # and every login fails "Unauthorized access: authenticate";
+              # delete those and restart.
               Role = {
                 match = ["description"];
                 objects = {
