@@ -100,6 +100,9 @@ in {
           FIREFLY_III_URL=https://${cfg.domain}
           # shellcheck disable=SC2034
           IMPORT_DIR_ALLOWLIST=${importDir}
+          # The importer defaults to debug: ~20k lines a run.
+          # shellcheck disable=SC2034
+          LOG_LEVEL=info
           # shellcheck disable=SC2034
           ENABLE_BANKING_APP_ID="$(< "$CREDENTIALS_DIRECTORY/eb-app-id")"
           # shellcheck disable=SC2034
@@ -311,6 +314,9 @@ in {
 
             # Lets the auto-import CLI read config.json from importDir.
             IMPORT_DIR_ALLOWLIST = importDir;
+
+            # Defaults to debug.
+            LOG_LEVEL = "info";
           };
         };
 

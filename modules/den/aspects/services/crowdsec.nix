@@ -172,6 +172,10 @@ in {
             config_paths.data_dir = "/var/lib/crowdsec/state";
             db_config.use_wal = true;
 
+            # LAPI's access log is info: both bouncers pulling every 10 s and
+            # the engine's heartbeat, ~20k lines a day. Errors still log.
+            api.server.log_level = "warning";
+
             # Every address, both families: mesh names resolve to IPv6 first,
             # and the mesh address is unknown at eval time. The firewall
             # admits it on the mesh interface alone.

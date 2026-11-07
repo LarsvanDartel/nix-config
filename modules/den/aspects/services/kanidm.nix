@@ -122,6 +122,9 @@ in {
             mail_from_address = "auth@lvdar.nl"
             mail_reply_to_address = "lars@lvdar.nl"
             mail_relay = "smtps://mail-relay.lvdar.nl:2465"
+            # Default */5: every poll logs on both ends and crosses gaia's
+            # nginx, ~150k lines a day. Mail here is resets, fine at 30 s.
+            schedule = "*/30 * * * * * *"
           '';
           # Root-owned and group-readable: the sender warns about a config
           # owned by its own uid.
@@ -151,6 +154,9 @@ in {
               "--mail-sender-config"
               config.sops.templates."kanidm-mail-sender.toml".path
             ];
+            # Its default `kanidm_mail_sender=info` logs every poll twice;
+            # failures are errors either way.
+            Environment = "RUST_LOG=kanidm_client=warn,kanidm_mail_sender=warn";
             User = "kanidm-mail-sender";
             Group = "kanidm-mail-sender";
             Restart = "on-failure";

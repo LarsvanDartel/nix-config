@@ -84,11 +84,14 @@ in {
         endpoints = mkOption {
           type = listOf str;
           default = [];
-          example = ["status.example.org" "auth"];
+          example = ["status.example.org" "auth" "grafana/api/health"];
           description = ''
             Names to probe. A bare label is taken as a subdomain of the
             deployment's base domain; a name containing a dot is used as the
-            hostname as written, which is what lets an apex be probed.
+            hostname as written, which is what lets an apex be probed. A path
+            after the name is probed instead of `/`, under the same name: use
+            it where `/` redirects, since a service may log every non-200
+            answer, so a probe of `/` is a log line every interval.
 
             Empty by default: what is worth watching is a property of a
             deployment, not of a status page.
@@ -158,12 +161,14 @@ in {
 
             endpoints =
               map (
-                n:
-                  endpoint n "https://${
-                    if lib.hasInfix "." n
-                    then n
-                    else "${n}.lvdar.nl"
-                  }"
+                e: let
+                  label = lib.head (lib.splitString "/" e);
+                  host =
+                    if lib.hasInfix "." label
+                    then label
+                    else "${label}.lvdar.nl";
+                in
+                  endpoint label "https://${host}${lib.removePrefix label e}"
               )
               cfg.endpoints;
           };

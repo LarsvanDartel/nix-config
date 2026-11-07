@@ -70,6 +70,7 @@ in {
       cfg = config.cosmos.services.grafana;
       prom = config.cosmos.services.prometheus;
       loki = config.cosmos.services.loki;
+      grafanaVersion = config.services.grafana.package.version;
 
       # See _grafana/dashboards.nix: one JSON file per dashboard.
       dashboardDir = pkgs.linkFarm "grafana-dashboards" (
@@ -144,7 +145,37 @@ in {
               root_url = "https://${cfg.domain}";
             };
 
-            analytics.reporting_enabled = false;
+            analytics = {
+              reporting_enabled = false;
+              # Only feeds the catalog's update badges, and logs every ~100 s.
+              check_for_plugin_updates = false;
+            };
+
+            # Feeds only usage reporting (off) and the unscraped grafana_stat_*
+            # gauges, and every run rebuilds the search indexes to count them.
+            metrics.disable_total_stats = true;
+
+            # Without an overrides file the dashboards page's quota banner gets
+            # a 501, logged as an error on every visit. Empty: the default
+            # limit, nothing enforced.
+            unified_storage.overrides_path =
+              lib.warnIf (grafanaVersion != "13.3.0") ''
+                modules/den/aspects/services/grafana.nix: nixpkgs' grafana is now ${grafanaVersion}.
+                Check whether /dashboards still requests quotas.grafana.app usage without an overrides file; drop overrides_path or bump this guard.
+              ''
+              "${pkgs.writeText "grafana-overrides.yaml" (builtins.toJSON {overrides = {};})}";
+
+            # No setting stops either loop: the cleanup ticker reports every
+            # 10 min, and the manifest watcher polls a discovery source that
+            # has no manifests on a single node, warning twice a minute.
+            log.filters = lib.concatStringsSep " " [
+              "cleanup:warn"
+              (lib.warnIf (grafanaVersion != "13.3.0") ''
+                  modules/den/aspects/services/grafana.nix: nixpkgs' grafana is now ${grafanaVersion}.
+                  Check whether search-manifest-watcher still warns on zero manifests; drop its log filter or bump this guard.
+                ''
+                "search-manifest-watcher:error")
+            ];
 
             security = {
               secret_key = "$__file{${config.sops.secrets."keys/grafana/secret-key".path}}";
@@ -193,6 +224,15 @@ in {
                 type = "loki";
                 access = "proxy";
                 url = "http://127.0.0.1:${toString loki.port}";
+                # Loki's drilldown-limits route skips the auth_enabled = false
+                # middleware that assigns the "fake" tenant, so it 401s "no org
+                # id" unless the tenant is sent. A tenant name, not a secret: via
+                # $__file only because the NixOS module warns on inline secureJsonData.
+                jsonData.httpHeaderName1 = "X-Scope-OrgID";
+                secureJsonData.httpHeaderValue1 = lib.warnIf (config.services.loki.package.version != "3.7.9") ''
+                  modules/den/aspects/services/grafana.nix: nixpkgs' loki is now ${config.services.loki.package.version}.
+                  Check whether /loki/api/v1/drilldown-limits still 401s without X-Scope-OrgID; drop the header or bump this guard.
+                '' "$__file{${pkgs.writeText "loki-tenant" "fake"}}";
               }
             ];
 

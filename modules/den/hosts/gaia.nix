@@ -177,7 +177,8 @@
         "traccar"
         "seerr"
         "cloud"
-        "grafana"
+        # `/` 302s to the login page, and grafana logs every non-200.
+        "grafana/api/health"
         "ntfy"
         "auth"
         "kavita"

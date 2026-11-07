@@ -6,7 +6,7 @@
   pkgs,
   ...
 }: let
-  noctalia = cmd: "spawn:noctalia msg ${cmd}";
+  noctalia = cmd: "spawn noctalia msg ${cmd}";
   locked = action: {
     inherit action;
     allow_when_locked = true;
@@ -131,20 +131,20 @@
   };
 
   # Positions on the focused output: the named workspaces 1..9 (`workspace`
-  # below) persist and sort before dynamic ones. Actions take no `--name` in
-  # bind form. The keys are what keyd sends for Mod + the physical digit row
-  # (desktop.keyd): Umbriel matches a bind on the shifted symbol too, so the
-  # printed symbols collide across layouts.
+  # below) persist and sort before dynamic ones, and a bare-digit argument
+  # selects a position, not a name. The keys are what keyd sends for Mod + the
+  # physical digit row (desktop.keyd): Umbriel matches a bind on the shifted
+  # symbol too, so the printed symbols collide across layouts.
   workspaceBinds = lib.listToAttrs (
     lib.flatten (
       lib.imap1 (i: key: [
         {
           name = "Mod+${key}";
-          value = "workspace-switch:${toString i}";
+          value = "workspace-switch ${toString i}";
         }
         {
           name = "Mod+Shift+${key}";
-          value = "column-move-to-workspace:${toString i}";
+          value = "column-move-to-workspace ${toString i}";
         }
       ])
       osConfig.cosmos.desktops.input.workspaceKeysyms
@@ -261,8 +261,8 @@
     # Alt+Print (no window screenshot), Mod+P (niri-displays is niri-only).
     keybinds =
       {
-        "Mod+Shift+Return" = "spawn:foot";
-        "Alt+Shift+Return" = "spawn:calculator";
+        "Mod+Shift+Return" = "spawn foot";
+        "Alt+Shift+Return" = "spawn calculator";
         "Mod+Tab" = noctalia "panel-toggle launcher";
         "Mod+B" = noctalia "panel-toggle launcher '/rbw '";
         "Mod+Escape" = noctalia "panel-toggle session";
@@ -307,10 +307,10 @@
         "Mod+Alt+Shift+J" = "column-move-to-output-down";
         "Mod+Alt+Shift+K" = "column-move-to-output-up";
         "Mod+Alt+Shift+L" = "column-move-to-output-right";
-        "Mod+Ctrl+H" = "window-modify-primary-extent:-0.1";
-        "Mod+Ctrl+L" = "window-modify-primary-extent:0.1";
-        "Mod+Ctrl+K" = "window-modify-secondary-extent:-0.1";
-        "Mod+Ctrl+J" = "window-modify-secondary-extent:0.1";
+        "Mod+Ctrl+H" = "window-modify-primary-extent -0.1";
+        "Mod+Ctrl+L" = "window-modify-primary-extent 0.1";
+        "Mod+Ctrl+K" = "window-modify-secondary-extent -0.1";
+        "Mod+Ctrl+J" = "window-modify-secondary-extent 0.1";
         "Mod+R" = "window-cycle-primary-extent";
 
         "Mod+Comma" = "window-consume-or-expel-left";
@@ -323,16 +323,16 @@
         "Mod+Page_Up" = "workspace-previous";
         "Mod+Shift+Q" = "session-quit";
 
-        "XF86MonBrightnessUp" = locked "spawn:brightnessctl set +5%";
-        "XF86MonBrightnessDown" = locked "spawn:brightnessctl set 5%-";
-        "XF86AudioRaiseVolume" = locked "spawn:pamixer -i 5";
-        "XF86AudioLowerVolume" = locked "spawn:pamixer -d 5";
-        "XF86AudioMute" = locked "spawn:pamixer --toggle-mute";
-        "XF86AudioMicMute" = locked "spawn:pamixer --default-source --toggle-mute";
-        "XF86AudioNext" = locked "spawn:playerctl next";
-        "XF86AudioPrev" = locked "spawn:playerctl previous";
-        "XF86AudioPlay" = locked "spawn:playerctl play-pause";
-        "XF86AudioStop" = locked "spawn:playerctl stop";
+        "XF86MonBrightnessUp" = locked "spawn brightnessctl set +5%";
+        "XF86MonBrightnessDown" = locked "spawn brightnessctl set 5%-";
+        "XF86AudioRaiseVolume" = locked "spawn pamixer -i 5";
+        "XF86AudioLowerVolume" = locked "spawn pamixer -d 5";
+        "XF86AudioMute" = locked "spawn pamixer --toggle-mute";
+        "XF86AudioMicMute" = locked "spawn pamixer --default-source --toggle-mute";
+        "XF86AudioNext" = locked "spawn playerctl next";
+        "XF86AudioPrev" = locked "spawn playerctl previous";
+        "XF86AudioPlay" = locked "spawn playerctl play-pause";
+        "XF86AudioStop" = locked "spawn playerctl stop";
       }
       // workspaceBinds;
   };

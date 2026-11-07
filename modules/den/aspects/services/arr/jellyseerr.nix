@@ -82,6 +82,8 @@ in {
           environment = {
             PORT = toString cfg.port;
             CONFIG_DIRECTORY = cfg.stateDir;
+            # Defaults to debug: every scheduled job and synced title.
+            LOG_LEVEL = "info";
           };
           serviceConfig = {
             Type = "exec";
