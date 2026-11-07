@@ -6,6 +6,9 @@
       ".local/share/Steam"
       ".config/unity3d"
       ".local/share/applications"
+      # Steam's desktop shortcuts point at steam_icon_<appid>.png in here; the
+      # rest of .local/share/icons holds home-manager symlinks.
+      ".local/share/icons/hicolor"
     ];
   };
 }
