@@ -4,5 +4,7 @@
   package = pkgs.tiny5-mono;
   recommendedSize = 12;
   pixelGrid = 8;
+  # No pixel-exact bold exists (pkgs/tiny5-mono.nix): bold gets the regular cut, not a smeared synthetic one.
+  boldFamily = "Tiny5 Mono";
   fallbackFonts = ["Symbols Nerd Font Mono"];
 }

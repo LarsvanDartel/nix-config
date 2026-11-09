@@ -46,7 +46,7 @@
       </match>
     '';
   in
-    concatStrings (map snap ([font.name] ++ lib.optional (font.boldFamily != null) font.boldFamily));
+    concatStrings (map snap (lib.unique ([font.name] ++ lib.optional (font.boldFamily != null) font.boldFamily)));
 
   # A bold cut in its own family is never picked for a bold request, so fontconfig
   # smears the regular one (embolden). Point bold at that family, at the weight it has.
