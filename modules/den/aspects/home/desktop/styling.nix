@@ -49,7 +49,7 @@
         {
           # Without enable, stylix silently falls back to DejaVu Sans Mono.
           enable = true;
-          extraFonts = [];
+          extraFonts = [fontpkgs."Tiny5 Mono"];
         }
         // builtins.mapAttrs (_: name: fontpkgs.${name}) cosmosStyling.fonts;
 
