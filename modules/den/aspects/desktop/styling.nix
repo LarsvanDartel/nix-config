@@ -70,9 +70,9 @@ in {
     fonts = {
       serif = "DejaVu Serif";
       sansSerif = "DejaVu Sans";
-      monospace = "Tiny5 Mono";
-      emoji = "Noto Color Emoji";
       # The vector cut: identical at 13px, and still crisp at 26, 39… when zoomed.
+      monospace = "Cozette Vector";
+      emoji = "Noto Color Emoji";
       interface = "Cozette Vector";
     };
     # base16.nix scheme attrs for a mode: the same value as stylix's
