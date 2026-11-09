@@ -70,17 +70,26 @@ in {
     fonts = {
       serif = "DejaVu Serif";
       sansSerif = "DejaVu Sans";
-      # The vector cut: identical at 13px, and still crisp at 26, 39… when zoomed.
-      monospace = "Cozette Vector";
+      monospace = "Tiny5 Mono";
       emoji = "Noto Color Emoji";
+      # The vector cut: identical at 13px, and still crisp at 26, 39… when zoomed.
       interface = "Cozette Vector";
     };
     # base16.nix scheme attrs for a mode: the same value as stylix's
     # config.lib.stylix.colors under that scheme.
     colors = pkgs: mode: (inputs.stylix.inputs.base16.lib {inherit pkgs lib;}).mkSchemeAttrs (schemeFile mode);
+    # Raw files skip the fontModule submodule: fill in its defaults.
     font = pkgs: name:
       lib.findFirst (f: f.name == name) (throw "cosmosStyling: no font file named ${name}")
-      (map (f: import (fontsDir + "/${f}") {inherit pkgs lib;}) fontFiles);
+      (map (f:
+        {
+          recommendedSize = null;
+          pixelGrid = null;
+          boldFamily = null;
+          fallbackFonts = [];
+        }
+        // import (fontsDir + "/${f}") {inherit pkgs lib;})
+      fontFiles);
 
     # A program whose config bakes in colours, built once per mode: every
     # bin/ entry execs the variant matching the runtime mode, so a new launch

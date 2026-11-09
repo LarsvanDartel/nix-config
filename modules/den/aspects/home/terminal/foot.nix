@@ -13,10 +13,13 @@
   mkFoot = pkgs: mode: let
     monospace = cosmosStyling.font pkgs cosmosStyling.fonts.monospace;
     font = monospace.name;
-    # A pixel font in points (9pt is 12px at 96 dpi) is drawn off its grid.
+    # A pixel font in points (9pt is 12px at 96 dpi) is drawn off its grid:
+    # the recommended size in pixels, rounded down to a grid multiple (at least one).
     size =
       if monospace.pixelGrid != null
-      then "pixelsize=${toString monospace.pixelGrid}"
+      then let
+        grid = monospace.pixelGrid;
+      in "pixelsize=${toString (grid * lib.max 1 (monospace.recommendedSize * 96 / 72 / grid))}"
       else "size=${toString monospace.recommendedSize}";
     # stylix's foot target.
     palette = palette: let
