@@ -57,6 +57,7 @@
       cfg.sansSerif.name
       cfg.monospace.name
       cfg.emoji.name
+      cfg.interface.name
     ]
     ++ map (font: font.name) cfg.extraFonts;
 
