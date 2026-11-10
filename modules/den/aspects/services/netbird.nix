@@ -608,6 +608,11 @@ in {
         then null
         else builtins.head m;
 
+      # nginx's own cert names only what the SNI splitter routes to it. Under
+      # the *.lvdar.nl wildcard, browsers coalesced proxy domains onto an nginx
+      # connection and got the "_" 421, which not every browser retries.
+      edgeCert = "netbird-edge";
+
       reconcile = pkgs.writeShellApplication {
         name = "netbird-reconcile-services";
         runtimeInputs = with pkgs; [curl jq];
@@ -1682,15 +1687,22 @@ in {
           };
         };
 
+        security.acme.certs.${edgeCert} = {
+          inherit (cfg) domain;
+          extraDomainNames =
+            lib.optional (cfg.oidc.idp.domain != null) cfg.oidc.idp.domain
+            ++ lib.attrNames cfg.localVhosts;
+        };
+
         # Loopback-only; the SNI splitter owns the public socket.
         services.nginx.virtualHosts =
           {
-            # HTTP/2 coalescing over the wildcard cert lands other domains here;
-            # 421 makes the browser reconnect with the right SNI.
+            # Last resort for a Host this listener does not serve; edgeCert
+            # keeps browsers from coalescing other domains onto it.
             "_" = {
               default = true;
               onlySSL = true;
-              useACMEHost = "lvdar.nl";
+              useACMEHost = edgeCert;
               listen = [
                 {
                   addr = "127.0.0.1";
@@ -1704,7 +1716,7 @@ in {
 
             ${cfg.domain} = {
               onlySSL = true;
-              useACMEHost = "lvdar.nl";
+              useACMEHost = edgeCert;
               listen = [
                 {
                   addr = "127.0.0.1";
@@ -1730,7 +1742,7 @@ in {
           // lib.optionalAttrs (cfg.oidc.idp.domain != null) {
             ${cfg.oidc.idp.domain} = {
               onlySSL = true;
-              useACMEHost = "lvdar.nl";
+              useACMEHost = edgeCert;
               listen = [
                 {
                   addr = "127.0.0.1";
@@ -1787,7 +1799,7 @@ in {
           # Domains the proxy cannot carry (see localVhosts); plain HTTP inside WireGuard.
           // lib.mapAttrs (_: vhost: {
             onlySSL = true;
-            useACMEHost = "lvdar.nl";
+            useACMEHost = edgeCert;
             listen = [
               {
                 addr = "127.0.0.1";
