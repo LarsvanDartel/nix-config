@@ -179,8 +179,19 @@
       tablet.map_to_output = "eDP-1";
     };
 
-    # As niri (desktop/_niri/system.nix): the pixel font needs an integer scale.
-    output."eDP-1".scale = 1.0;
+    # As niri (desktop/_niri/system.nix): the pixel font needs an integer scale,
+    # on the desk monitor too (at 0.8 its text is mangled). That monitor sits
+    # left of the laptop, bottom edges aligned.
+    output = {
+      "eDP-1" = {
+        scale = 1.0;
+        position = [1920 0];
+      };
+      "Samsung Electric Company S24F350 H4ZJ601490" = {
+        scale = 1.0;
+        position = [0 120];
+      };
+    };
 
     # As niri's layout: new columns at half width, Mod+R cycling 1/3, 1/2, 2/3.
     layout = {

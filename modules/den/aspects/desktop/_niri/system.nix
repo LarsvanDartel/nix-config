@@ -79,8 +79,28 @@
 
       # niri would pick 1.5 on the Framework 12. The pixel font is only crisp at
       # whole multiples of its grid, so fontconfig snaps text down to 13px while
-      # everything else grows: keep the laptop panel at 1.
-      outputs."eDP-1".scale = 1;
+      # everything else grows: keep every output at 1. The desk monitor matches
+      # Umbriel's (home/desktop/_umbriel/home.nix): left, bottoms aligned.
+      outputs = {
+        "eDP-1" = {
+          scale = 1;
+          position = _: {
+            props = {
+              x = 1920;
+              y = 0;
+            };
+          };
+        };
+        "Samsung Electric Company S24F350 H4ZJ601490" = {
+          scale = 1;
+          position = _: {
+            props = {
+              x = 0;
+              y = 120;
+            };
+          };
+        };
+      };
 
       # wvkbd runs hidden (desktop.tablet); SIGUSR2 shows, SIGUSR1 hides. The
       # noctalia dock (configured in desktop.tablet) follows it.
