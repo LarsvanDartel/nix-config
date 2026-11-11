@@ -1,6 +1,7 @@
 # services.stalwart.provision — vendored from nixpkgs PR #552103 (see
-# ./default.nix). Changed: meta dropped; apply uses cfg.package; `scope`
-# defaults to null (upstream throws when it is unset); `secretFiles` added.
+# ./default.nix). Changed: meta dropped; `scope` defaults to null (upstream
+# throws when it is unset); `secretFiles` added; the readiness loop sleeps
+# between attempts (upstream spins) and the script fails on any error.
 {
   config,
   lib,
@@ -12,15 +13,20 @@
 in {
   options.services.stalwart.provision = {
     enable = lib.mkEnableOption "Stalwart Configuration Provisioning";
+    enterprise = lib.mkOption {
+      type = lib.types.bool;
+      default = false;
+      description = "Allow enterprise-only settings";
+    };
     package = lib.mkPackageOption pkgs "stalwart-cli" {};
     reloadSettings = lib.mkOption {
       type = lib.types.bool;
       default = true;
       description = "Tell Stalwart to reload its settings when complete";
     };
-    url = lib.mkOption {
-      type = lib.types.str;
-      description = "The URL of the Stalwart instance to provision onto.";
+    urls = lib.mkOption {
+      type = lib.types.listOf lib.types.str;
+      description = "The URLs of the Stalwart instance to provision onto. If multiple URLs are specified, they will be cycled through until one succeeds.";
     };
     secretFiles = lib.mkOption {
       type = lib.types.attrsOf lib.types.path;
@@ -31,9 +37,15 @@ in {
         The splice is textual: contents must not need JSON escaping.
       '';
     };
+    timeout = lib.mkOption {
+      type = lib.types.nullOr lib.types.numbers.positive;
+      default = null;
+      example = 300;
+      description = "Timeout after this many seconds.";
+    };
 
     singletons = lib.mkOption {
-      type = lib.types.attrsOf lib.types.attrs;
+      type = lib.types.lazyAttrsOf lib.types.json;
       description = "Singletons to configure.";
       example = {
         SystemSettings = {
@@ -43,7 +55,7 @@ in {
       };
     };
     objects = lib.mkOption {
-      type = lib.types.attrsOf (
+      type = lib.types.lazyAttrsOf (
         lib.types.submodule {
           options = {
             reconcile = lib.mkOption {
@@ -66,7 +78,7 @@ in {
             };
 
             scope = lib.mkOption {
-              type = lib.types.nullOr lib.types.attrs;
+              type = lib.types.nullOr lib.types.json;
               default = null;
               description = ''
                 Optional scope to restrict which objects this operation can affect.
@@ -77,7 +89,7 @@ in {
             };
 
             objects = lib.mkOption {
-              type = lib.types.attrsOf lib.types.attrs;
+              type = lib.types.lazyAttrsOf lib.types.json;
               description = "The objects in the set. Attribute names define IDs that can be referenced with `#name` elsewhere where an ID is expected.";
             };
           };
@@ -92,17 +104,13 @@ in {
             nl-mgmt = {
               name = "management";
               protocol = "http";
-              bind = {
-                "[::]:8080" = true;
-              };
+              bind = ["[::]:8080"];
             };
             nl-inc = {
               name = "incoming";
               protocol = "submissions";
-              bind = {
-                "[::]:465" = true;
-              };
-              tlsImplicit = true;
+              bind = ["[::]:465"];
+              implicitTls = true;
             };
           };
         };
@@ -162,7 +170,11 @@ in {
           ];
         }
         ''
-          gzip -d ${stalwart.package.src}/resources/schema/schema.json.gz -c > ./schema.json
+          gzip -d ${stalwart.package.src}/resources/schema/${
+            if lib.versionAtLeast stalwart.package.version "1" && !cfg.enterprise
+            then "schema_oss"
+            else "schema"
+          }.json.gz -c > ./schema.json
           lua ${./provision-check-sort.lua} ${lib.escapeShellArg unsorted} $out ./schema.json ${lib.optionalString cfg.reloadSettings "--reload"}
         '';
     in {
@@ -186,22 +198,14 @@ in {
         wantedBy = ["multi-user.target"];
         partOf = ["stalwart.service"];
         after = ["stalwart.service"];
-        serviceConfig = let
-          shortBashScript = script: "${lib.getExe pkgs.bash} -c ${lib.escapeShellArg script}";
-        in {
+        bindsTo = ["stalwart.service"];
+        serviceConfig = {
           Type = "oneshot";
-          LoadCredential = let
-            uname = stalwart.admin.username;
-          in
-            [
-              "password:${stalwart.credentials.${uname} or stalwart.admin.username}"
-            ]
+          LoadCredential =
+            config.systemd.services.stalwart.serviceConfig.LoadCredential
             ++ lib.mapAttrsToList (name: path: "secret-${name}:${path}") cfg.secretFiles;
           RuntimeDirectory = "stalwart-provision";
 
-          # stalwart does not currently notify systemd that it has started
-          # see https://github.com/stalwartlabs/stalwart/pull/2383
-          ExecStartPre = shortBashScript "until ${pkgs.curl}/bin/curl --fail ${lib.escapeShellArg cfg.url} &> /dev/null; do sleep 0.25; done";
           ExecStart = pkgs.writeShellScript "stalwart-provision" ''
             set -euo pipefail
             plan="$RUNTIME_DIRECTORY/plan.ndjson"
@@ -212,10 +216,18 @@ in {
               )
               cfg.secretFiles
             )}
-            STALWART_PASSWORD="$(systemd-creds cat password)" ${lib.getExe cfg.package} apply --file "$plan"
+            while :; do
+              for url in ${lib.concatMapStringsSep " " lib.escapeShellArg cfg.urls}; do
+                if ${pkgs.curl}/bin/curl --fail "$url" &>/dev/null; then
+                  echo "connection to $url succeeded, attempting to provision onto it"
+                  STALWART_URL=$url STALWART_PASSWORD="$(systemd-creds cat ${lib.escapeShellArg stalwart.admin.username})" ${lib.getExe cfg.package} apply --file "$plan"
+                  exit
+                fi
+              done
+              sleep 0.25
+            done
           '';
           Environment = [
-            "STALWART_URL=${lib.escapeShellArg cfg.url}"
             "STALWART_USER=${lib.escapeShellArg stalwart.admin.username}"
           ];
         };

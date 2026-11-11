@@ -1,5 +1,5 @@
 # services.stalwart — vendored 0.16+ module from nixpkgs PR #552103 (head
-# 9b15e1f); delete with ./provision.nix once nixpkgs ships it (guard in
+# 772b06e); delete with ./provision.nix once nixpkgs ships it (guard in
 # ../stalwart.nix). Changed: meta dropped (doc/maintainers absent upstream).
 {
   config,
@@ -317,9 +317,13 @@ in {
           "network.target"
         ];
 
+        # Upstream service config
         serviceConfig = {
-          # Upstream service config
-          Type = "simple";
+          # 0.16.26 added sd-notify support, and we can make the service expect notifications
+          Type =
+            if lib.versionAtLeast cfg.package.version "0.16.26"
+            then "notify"
+            else "simple";
           LimitNOFILE = 65536;
           KillMode = "process";
           KillSignal = "SIGINT";

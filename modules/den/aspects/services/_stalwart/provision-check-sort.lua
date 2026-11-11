@@ -22,9 +22,24 @@ local json_object_mt = { __jsontype = "object" }
 local function nameof(ty)
 	if type(ty) == "string" then return ty
 	elseif ty == nil then return "(nil type)"
+	elseif ty == false then return "(server set)"
 	elseif ty.kind == "nullable" then return nameof(ty.of) .. "?"
 	elseif ty.kind == "prim" then
-		if ty.format then return ty.ty .. "<" .. ty.format .. ">"
+		local fmt, min, max = ty.data.format, ty.data.min, ty.data.max
+		if fmt or min or max then
+			local segments = { ty.ty, "<" }
+			if fmt then table.insert(segments, fmt) end
+			if min or max then
+				if fmt then table.insert(segments, " ") end
+				if min then table.insert(segments, tostring(min)) end
+				table.insert(segments, "..")
+				if max then
+					table.insert(segments, "=")
+					table.insert(segments, tostring(max))
+				end
+			end
+			table.insert(segments, ">")
+			return table.concat(segments)
 		else return ty.ty end
 	elseif ty.kind == "ref" then return "id<" .. nameof(ty.of) .. ">"
 	elseif ty.kind == "list" then return "list<" .. nameof(ty.of) .. ">"
@@ -54,10 +69,10 @@ do
 	local seen = {}
 
 	local function nullable(of) return { kind = "nullable", of = of } end
-	local function prim(ty, format) return { kind = "prim", ty = ty, format = format } end
+	local function prim(ty, data) return { kind = "prim", ty = ty, data = data } end
 	local function ref(of) return { kind = "ref", of = of } end
-	local function list(of) return { kind = "list", of = of } end
-	local function set(of) return { kind = "set", of = of } end
+	local function list(of, min) return { kind = "list", of = of, min } end
+	local function set(of, min) return { kind = "set", of = of, min } end
 	local function map(key, val) return { kind = "map", key = key, val = val } end
 	local function obj(name, fields) return { kind = "obj", name = name, fields = fields } end
 	local function var(name, variants) return { kind = "var", name = name, variants = variants } end
@@ -73,7 +88,7 @@ do
 
 	local function walk_ty(ty)
 		local out
-		if ty.type == "boolean" or ty.type == "number" or ty.type == "string" then out = prim(ty.type, ty.format)
+		if ty.type == "boolean" or ty.type == "number" or ty.type == "string" then out = prim(ty.type, ty)
 		elseif ty.type == "utcDateTime" then out = prim("datetime")
 		elseif ty.type == "blobId" then out = prim("blob")
 		elseif ty.type == "objectId" then out = ref(dex(ty.objectName))
@@ -104,7 +119,9 @@ do
 		if sch.type == "single" then
 			local props = schema.fields[sch.schemaName].properties
 			local fields = {}
-			for key, prop in pairs(props) do fields[key] = walk_ty(prop.type) end
+			for key, prop in pairs(props) do
+				fields[key] = prop.update ~= "serverSet" and walk_ty(prop.type) or false
+			end
 			res = obj(dex(name), fields)
 		elseif sch.type == "multiple" then
 			local variants = {}
@@ -169,18 +186,26 @@ do
 	local function recursearch(deps, ty, val, parent)
 		local beh = ty
 		while type(beh) == "string" do beh = behavior_map[beh] end
-		if not beh then return end
-		if beh.kind == "nullable" then
+		if beh == nil then return
+		elseif beh == false then err(parent, "cannot modify server-set property")
+		elseif beh.kind == "nullable" then
 			if val == json.null then return end
 			recursearch(deps, beh.of, val, parent)
 		elseif beh.kind == "prim" then
 			if beh.ty == "boolean" and type(val) ~= "boolean" then err(parent, "expected `%s` to be a boolean (got `%s`)", nameof(beh), jty(val))
-			elseif beh.ty == "number" and type(val) ~= "number" then err(parent, "expected `%s` to be a number (got `%s`)", nameof(beh), jty(val))
+			elseif beh.ty == "number" then
+				if type(val) ~= "number" then err(parent, "expected `%s` to be a number (got `%s`)", nameof(beh), jty(val))
+				else
+					if beh.data.min and val < beh.data.min then err(parent, "expected to be at least `%f`", beh.data.min) end
+					if beh.data.max and val > beh.data.max then err(parent, "expected to be at most `%f`", beh.data.max) end
+				end
 			elseif (beh.ty == "string" or beh.ty == "datetime" or beh.ty == "blob") and type(val) ~= "string" then err(parent, "expected `%s` to be a string (got `%s`)", nameof(beh), jty(val)) end
 		elseif beh.kind == "ref" then
 			if jty(val) ~= "string" then return err(parent, "expected `%s` to be a string (got `%s`)", nameof(beh), jty(val)) end
 			if val:sub(1, 1) == "#" then val = val:sub(2)
 			else err(parent, "missing `#` prefix for `Id<%s>`: `%s`", beh.of, val) end
+
+			print("ref " .. val .. " at " .. parent)
 
 			if defined[val] then
 				local def = defined[val]
@@ -193,17 +218,19 @@ do
 			end
 		elseif beh.kind == "list" then
 			if jty(val) ~= "array" then return err(parent, "expected `%s` to be an array of `%s` (got `%s`)", nameof(beh), beh.of, jty(val)) end
+			if beh.min and #val < beh.min then err(parent, "expected at least `%d` items", beh.min) end
 			-- if we don't do this, empty tables are encoded as arrays, which aren't valid
 			local new = setmetatable({}, json_object_mt)
-			for i, elem in pairs(val) do
+			for i, elem in ipairs(val) do
 				new[tostring(i - 1)] = recursearch(deps, beh.of, elem, parent .. "[" .. i .. "]") or elem
 			end
 			return new
 		elseif beh.kind == "set" then
 			if jty(val) ~= "array" then return err(parent, "expected `%s` to be a unique array of `%s` (got `%s`)", nameof(beh), nameof(beh.of), jty(val)) end
+			if beh.min and #val < beh.min then err(parent, "expected at least `%d` items", beh.min) end
 			-- see above
 			local new = setmetatable({}, json_object_mt)
-			for i, elem in pairs(val) do
+			for i, elem in ipairs(val) do
 				local current = parent .. "[" .. i .. "]"
 				elem = recursearch(deps, beh.of, elem, current) or elem
 				if new[elem] then err(current, "duplicate set key `%s`", elem) end
@@ -212,7 +239,7 @@ do
 			return new
 		elseif beh.kind == "map" then
 			if jty(val) ~= "object" then return err(parent, "expected `%s` to be an object mapping `%s` to `%s` (got `%s`)", nameof(beh), nameof(beh.key), nameof(beh.val), jty(val)) end
-			for k, v in ipairs(val) do
+			for k, v in pairs(val) do
 				recursearch(deps, beh.key, k, parent .. "[key `" .. k .. "`]")
 				recursearch(deps, beh.val, v, parent .. "[value for key `" .. k .. "`]")
 			end
@@ -264,6 +291,8 @@ do
 				end
 				if op.matchOn ~= nil and op.matchOn ~= json.null and op.matchOn ~= "*" and not match_fields then err("<operation: " .. op["@type"] .. " " .. op.object .. ">", "expected `matchOn` field to be null, \"*\", or an array of strings (got `%s`)", jty(op.matchOn)) end
 
+				-- ignore empty object sets, so stalwart-cli doesn't complain about them
+				if not next(op.value) then goto continue end
 				for id, val in pairs(op.value) do
 					local parent = "<" .. op.object .. " #" .. id .. ">"
 					if match_fields then
@@ -272,6 +301,7 @@ do
 						end
 					end
 					if defined[id] then err(parent, "duplicate id `%s` (other definition at <%s #%s>)", id, defined[id].op.object, id) end
+					print("define " .. id)
 					local entry = {
 						deps = deps,
 						op = op,
@@ -297,6 +327,7 @@ do
 				op = op,
 			})
 		end
+		::continue::
 	end
 
 	-- report any ids that went undefined

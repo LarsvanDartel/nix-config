@@ -189,7 +189,7 @@ in {
           # changes only take effect on the next stalwart restart.
           provision = {
             enable = true;
-            url = "http://127.0.0.1:${toString cfg.adminPort}";
+            urls = ["http://127.0.0.1:${toString cfg.adminPort}"];
             # MtaRoute.authUsername is a plain string, without a File variant.
             secretFiles.jetemail-username = config.sops.secrets."keys/jetemail/username".path;
 
