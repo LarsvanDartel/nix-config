@@ -14,6 +14,27 @@ in {
     meshAddress = "100.68.78.148";
     server = true;
     sshHostKey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIC2O35MjlmLu5JfDRV7zNzG7BrZt3lB1ttIhRZWLjCtD";
+
+    # A 16G SD card that only proxies the iDRAC: no YubiKey is ever plugged
+    # in, and the home baseline's editor and CLI tools only cost card space
+    # and emulated aarch64 builds. Kept: home.core, zsh, ssh, theme-options.
+    excludes = with den.aspects; [
+      core.yubikey
+      home.nvim
+      home.git
+      home.bat
+      home.btop
+      home.direnv
+      home.eza
+      home.fd
+      home.lazygit
+      home.ripgrep
+      home.yazi
+      home.zoxide
+      home.tmux
+      home.misc-cli
+      home."oh-my-posh"
+    ];
   };
 
   den.aspects.pioneer = {

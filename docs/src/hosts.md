@@ -60,7 +60,7 @@ The edge: NetBird control plane, `netbird-proxy`, `localVhosts`, oidc.idp.
 
 ## pioneer
 
-Raspberry Pi 3 publishing endeavour's iDRAC. No comin: deployed with deploy-rs.
+Raspberry Pi 3 publishing endeavour's iDRAC. No comin: deployed with deploy-rs. Its host entity `excludes` `core.yubikey` and the home baseline's editor and CLI tools (nvim, git, tmux, yazi, oh-my-posh, …), keeping only `home.core`, zsh, ssh and theme-options: the 16G SD card has no room for them and every one is an emulated aarch64 build.
 
 The iDRAC (iDRAC8, firmware 2.21, no Redfish) is reached on the LAN at `192.168.2.111`, over the mesh at `https://idrac.lvdar.nl`, and by SSH as `ssh idrac` (a jump through pioneer with the RSA `id_idrac` key; see `hosts/voyager.nix`).
 
