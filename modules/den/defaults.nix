@@ -10,7 +10,9 @@
 
   den.schema.user.classes = lib.mkDefault ["homeManager"];
 
-  den.schema.host.includes = [den.aspects.roles.default];
+  # Users' provides.to-hosts (catt, kde-connect, taskwarrior) reach their hosts
+  # only through this battery; den drops its transition default (#694).
+  den.schema.host.includes = [den.aspects.roles.default den.batteries.mutual-provider];
 
   den.schema.user.includes = [
     (den.batteries.user-shell "zsh")
