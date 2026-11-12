@@ -6,7 +6,7 @@
 #     EBUSY trap (as ntfy/gatus did); forced to a static user.
 #   * Cache contents on /tank are deliberately NOT in impermanence.persist —
 #     an entry would bind-mount /persist over it onto the system SSD. The
-#     sqlite index does get a persist entry.
+#     index lives in the host's PostgreSQL (persisted and dumped by restic).
 {
   den,
   inputs,
@@ -276,7 +276,11 @@
             # Client-facing URLs are built from this; must be the mesh name.
             api-endpoint = "http://${config.networking.hostName}.${dnsDomain}:${toString cfg.port}/";
 
-            database.url = "sqlite:///var/lib/atticd/server.db?mode=rwc";
+            # Not sqlite: its single writer timed out the connection pool
+            # under concurrent uploads during big builds (500s, after which
+            # `attic watch-store` panics and drops paths). Peer auth over the
+            # socket, as the atticd system user.
+            database.url = "postgresql://${user}@localhost/${user}?host=/run/postgresql";
 
             storage = {
               type = "local";
@@ -302,6 +306,22 @@
               default-retention-period = cfg.retention;
             };
           };
+        };
+
+        services.postgresql = {
+          enable = true;
+          ensureDatabases = [user];
+          ensureUsers = [
+            {
+              name = user;
+              ensureDBOwnership = true;
+            }
+          ];
+        };
+
+        systemd.services.atticd = {
+          requires = ["postgresql.service"];
+          after = ["postgresql.service"];
         };
 
         # Nested inside serviceConfig on purpose: a top-level mkForce recurses
