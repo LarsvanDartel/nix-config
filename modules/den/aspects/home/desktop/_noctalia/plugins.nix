@@ -2,11 +2,21 @@
 # cloned or auto-updated.
 {inputs}: {pkgs, ...}: let
   # Pinned: plugins are trusted Luau loaded straight into the shell.
-  community = pkgs.fetchFromGitHub {
-    owner = "noctalia-dev";
-    repo = "community-plugins";
-    rev = "e9dec7443b8a70ab606dc72669fb122a9d668bce";
-    hash = "sha256-n1uQOXXjIrPvDe5dXPpcCefNsQVAoEo5lVDkOPy81vU=";
+  # phone-connect's bar labels hardcode 10/11px; without a fontSize a plugin
+  # label gets the body size every built-in bar widget uses.
+  community = pkgs.applyPatches {
+    name = "noctalia-community-plugins";
+    src = pkgs.fetchFromGitHub {
+      owner = "noctalia-dev";
+      repo = "community-plugins";
+      rev = "e9dec7443b8a70ab606dc72669fb122a9d668bce";
+      hash = "sha256-n1uQOXXjIrPvDe5dXPpcCefNsQVAoEo5lVDkOPy81vU=";
+    };
+    postPatch = ''
+      substituteInPlace phone-connect/widget.luau \
+        --replace-fail 'fontSize = 10,' "" \
+        --replace-fail 'fontSize = 11,' ""
+    '';
   };
 
   # Bitwarden search over rbw, which already holds the vault.lvdar.nl session.
