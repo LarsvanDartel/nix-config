@@ -3,11 +3,34 @@
 # printer's mDNS name does not resolve without the nss module, see below).
 {...}: {
   den.aspects.desktop.printing.nixos = {
-    config,
     pkgs,
     lib,
     ...
-  }: {
+  }: let
+    # The PPD cups generated from the printer's IPP attributes (`-m
+    # everywhere`), vendored so registering the queue never needs the printer:
+    # `-m everywhere` queries it on every cups start, and while it was off that
+    # failed cups-post-start and Restart=on-failure looped cups every ~3.5s
+    # (2649 restarts on 2026-11-12).
+    #
+    # Edited from what the printer asks for: it reports
+    # `document-format-preferred: image/urf` although it also supports PWG
+    # Raster, and its URF duplex path prints the front side, turns the sheet,
+    # then ends the job (same bug class as OpenPrinting/cups-filters#660 and
+    # #490 on other Canon models). The `image/urf` cupsFilter2 line is
+    # therefore `image/pwg-raster`. Registered as a static model, cupsd loads
+    # exactly this file, so no post-start patching is needed.
+    ts5100Ppd =
+      lib.warnIf (pkgs.cups.version != "2.4.19") ''
+        modules/den/aspects/desktop/printing.nix: nixpkgs' cups moved off 2.4.19,
+        the version the PWG Raster preference in _printing/ts5100.ppd was
+        written against. Swap that cupsFilter2 line back to image/urf and print
+        a multi-page duplex job; if the back sides print, keep urf, else revert
+        and bump this guard.
+      '' (pkgs.runCommand "ts5100-ppd" {} ''
+        install -Dm444 ${./_printing/ts5100.ppd} $out/share/cups/model/ts5100.ppd
+      '');
+  in {
     # .local names resolve through resolved's mDNS responder, which is already
     # on for netbird-gewis's split DNS. Not nssmdns4: it races resolved's
     # responder, and avahi would only duplicate that responder.
@@ -21,6 +44,7 @@
     services.printing = {
       enable = true;
       browsed.enable = false;
+      drivers = [ts5100Ppd];
     };
 
     hardware.printers = {
@@ -30,50 +54,9 @@
           name = "ts5100";
           description = "Canon TS5100 series";
           deviceUri = "ipp://192.168.2.84/ipp/print";
-          # IPP Everywhere: the printer reports its capabilities (AirPrint 1.7,
-          # URF), so no vendor driver or PPD is needed.
-          model = "everywhere";
+          model = "ts5100.ppd";
         }
       ];
     };
-
-    # The TS5100 reports `document-format-preferred: image/urf` over IPP
-    # (confirmed with `ipptool get-printer-attributes`), even though it also
-    # fully supports PWG Raster (`document-format-supported` lists both).
-    # cupsd honours that preference and bakes it into the printer's *live*
-    # MIME filter graph the moment `lpadmin -m everywhere` registers the
-    # queue — editing the PPD file afterwards doesn't touch that cached
-    # routing, only the file on disk. And the TS5100's URF duplex path
-    # prints the front side, turns the sheet, then ends the job there
-    # (same bug class as OpenPrinting/cups-filters#660 and #490 on other
-    # Canon models). So: patch the generated PPD onto PWG Raster, then
-    # re-register that exact file with `-P` (not `-m`, which would
-    # re-query the printer and put urf straight back) to make cupsd
-    # re-read it into the live graph. hardware.printers' own provisioning
-    # runs as cups.service's postStart now (not a separate unit), so this
-    # has to append there too.
-    systemd.services.cups.postStart = lib.mkIf (lib.warnIf (pkgs.cups.version != "2.4.19") ''
-        modules/den/aspects/desktop/printing.nix: nixpkgs' cups moved off
-        2.4.19, the version this URF-duplex workaround was written against.
-        Reprint a multi-page duplex job; if the back sides print, delete
-        this postStart append and the comment above it.
-      ''
-      true) (lib.mkAfter ''
-      ppd=/etc/cups/ppd/ts5100.ppd
-      ${pkgs.gnused}/bin/sed -i 's#image/urf image/urf#image/pwg-raster image/pwg-raster#' "$ppd"
-      lpadmin -p ts5100 -P "$ppd"
-    '');
-
-    # `-m everywhere` asks the printer for its capabilities, so provisioning
-    # fails whenever it is off or out of reach. As a failed ExecStartPost that
-    # failed cups.service, and Restart=on-failure looped it every ~3.5s (2649
-    # restarts on 2026-11-12). cupsd is socket-activated and exits when idle,
-    # so provisioning just reruns on the next start, once the printer answers.
-    systemd.services.cups.serviceConfig.ExecStartPost = lib.mkForce [
-      "-${pkgs.writeShellScript "cups-post-start" ''
-        set -e
-        ${config.systemd.services.cups.postStart}
-      ''}"
-    ];
   };
 }
