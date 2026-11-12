@@ -167,11 +167,25 @@ in {
           toString (pkgs.writeText "unbound-blocklist" merged)
       );
 
-      # Where the agent holds :53 it must move aside first, else the deploy
-      # fails "address already in use" and rolls back the config that moves it.
-      systemd.services.unbound.after =
-        optional cfg.mesh.enable
-        "${config.services.netbird.clients.default.suffixedName}.service";
+      systemd.services.unbound = {
+        # Where the agent holds :53 it must move aside first, else the deploy
+        # fails "address already in use" and rolls back the config that moves it.
+        after =
+          optional cfg.mesh.enable
+          "${config.services.netbird.clients.default.suffixedName}.service";
+
+        # This host resolves through its own unbound, so every second it is
+        # down is a DNS outage. The default (stop before activation, start
+        # after) held it down for the whole switch — 7.5 min on 2026-11-11
+        # while judgehosts timed out — and services resolving on start
+        # (oauth2-proxy, netbird-management, stalwart-provision) failed,
+        # notify-failure included. Restart in place instead; a reload would
+        # keep the old binary across package bumps.
+        stopIfChanged = false;
+        # After logging "service stopped" it hung 90s before exiting; nothing
+        # is left to flush by then.
+        serviceConfig.TimeoutStopSec = "10s";
+      };
 
       services.unbound = {
         enable = true;
