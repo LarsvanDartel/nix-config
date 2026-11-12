@@ -22,6 +22,10 @@
     softdep soc_button_array pre: pinctrl_intel_platform
   '';
 
+  # VA-API for the Xe3 iGPU: Mesa has no Intel video driver, so without iHD
+  # browsers and mpv decode on the CPU (GeForce NOW stutters).
+  hardware.graphics.extraPackages = [pkgs.intel-media-driver];
+
   # fwupd (from nixos-hardware) records a staged capsule update here and
   # checks its result after the update reboot; the root rollback would drop it.
   cosmos.system.impermanence.persist.directories = ["/var/lib/fwupd"];
