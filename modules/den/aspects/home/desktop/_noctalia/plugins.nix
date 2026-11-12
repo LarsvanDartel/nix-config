@@ -2,8 +2,9 @@
 # cloned or auto-updated.
 {inputs}: {pkgs, ...}: let
   # Pinned: plugins are trusted Luau loaded straight into the shell.
-  # phone-connect's bar labels hardcode 10/11px; without a fontSize a plugin
-  # label gets the body size every built-in bar widget uses.
+  # phone-connect's bar widget hardcodes its label (10/11px) and glyph (12/14px)
+  # sizes; left unset, noctalia uses the body and glyph sizes every built-in bar
+  # widget uses.
   community = pkgs.applyPatches {
     name = "noctalia-community-plugins";
     src = pkgs.fetchFromGitHub {
@@ -15,7 +16,9 @@
     postPatch = ''
       substituteInPlace phone-connect/widget.luau \
         --replace-fail 'fontSize = 10,' "" \
-        --replace-fail 'fontSize = 11,' ""
+        --replace-fail 'fontSize = 11,' "" \
+        --replace-fail 'size = 14, ' "" \
+        --replace-fail 'size = 12, ' ""
     '';
   };
 
