@@ -102,8 +102,13 @@ librechat,nixos,radicale,suwayomi-server}`, `/persist/var/db/mongodb`,
   `psql -f /var/backup/postgresql/all.sql` (immich and others live in here).
 - **NetBird is not backed up** on endeavour (`/persist/var/lib/netbird`).
   Re-enrol with a setup key from sops; the peer will get a new identity.
-- Not backed up and not meant to be: jellyfin metadata, prometheus, loki, attic,
-  spindle checkouts, ollama models, suwayomi downloads. All re-derive.
+- Not backed up and not meant to be: jellyfin metadata, prometheus, loki, attic's
+  NARs (`/tank/atticd`), spindle checkouts, ollama models, suwayomi downloads.
+  All re-derive.
+- **attic's index is in that Postgres dump** but its NARs are not: after the
+  replay, empty it while keeping the `cache` row, which holds the signing
+  keypair: `psql -d atticd -c 'TRUNCATE object, nar, chunkref, chunk'`.
+  Otherwise atticd serves narinfos for NARs that no longer exist.
 
 ### 4. Verify before declaring success
 
