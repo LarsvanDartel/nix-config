@@ -3,6 +3,7 @@
 # printer's mDNS name does not resolve without the nss module, see below).
 {...}: {
   den.aspects.desktop.printing.nixos = {
+    config,
     pkgs,
     lib,
     ...
@@ -62,5 +63,17 @@
       ${pkgs.gnused}/bin/sed -i 's#image/urf image/urf#image/pwg-raster image/pwg-raster#' "$ppd"
       lpadmin -p ts5100 -P "$ppd"
     '');
+
+    # `-m everywhere` asks the printer for its capabilities, so provisioning
+    # fails whenever it is off or out of reach. As a failed ExecStartPost that
+    # failed cups.service, and Restart=on-failure looped it every ~3.5s (2649
+    # restarts on 2026-11-12). cupsd is socket-activated and exits when idle,
+    # so provisioning just reruns on the next start, once the printer answers.
+    systemd.services.cups.serviceConfig.ExecStartPost = lib.mkForce [
+      "-${pkgs.writeShellScript "cups-post-start" ''
+        set -e
+        ${config.systemd.services.cups.postStart}
+      ''}"
+    ];
   };
 }
