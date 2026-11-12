@@ -70,7 +70,11 @@ in {
         # /var/lib/private symlink and lose the generated session secret
         # (everyone signed out on every boot).
         users.users.bulwark.home = "/var/lib/bulwark";
-        systemd.services.bulwark.serviceConfig.DynamicUser = lib.mkForce false;
+        systemd.services.bulwark.serviceConfig = {
+          DynamicUser = lib.mkForce false;
+          # Exits 143 on SIGTERM: every stop would count as a failure.
+          SuccessExitStatus = 143;
+        };
 
         cosmos.services.netbird.client.exposedPorts = [cfg.port];
 
