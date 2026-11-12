@@ -1,6 +1,9 @@
 # home.oh-my-pi (https://omp.sh/)
 {inputs, ...}: {
-  flake-file.inputs.omp.url = "github:can1357/oh-my-pi";
+  # Pinned to a release tag so flake-bump cannot move it: every new rev is a
+  # ~45 min uncached Rust+Bun build. Bump by hand when omp reports an update,
+  # then `nix run .#write-flake` and `nix flake update omp`.
+  flake-file.inputs.omp.url = "github:can1357/oh-my-pi/v18.19.0";
 
   den.aspects.home.oh-my-pi.homeManager = {...}: {
     imports = [inputs.omp.homeManagerModules.default];

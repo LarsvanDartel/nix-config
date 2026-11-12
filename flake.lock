@@ -1464,10 +1464,10 @@
         "nixpkgs": "nixpkgs_12"
       },
       "locked": {
-        "lastModified": 1793953509,
-        "narHash": "sha256-sXFaMStrAH+OCsPoVNhQz8ig6GomtmUSv30urZjJAyw=",
+        "lastModified": 1794490930,
+        "narHash": "sha256-bAm4nqiHnK6UToi74EnOCBUcMSrR4H8ai4/vXlnY2qw=",
         "ref": "refs/heads/main",
-        "rev": "a94dd41bec779a36a3827bb0ec6acc78b8ccb638",
+        "rev": "aa970ba5362fa3c85a5d7a78fab6ac5cd3065821",
         "shallow": true,
         "type": "git",
         "url": "ssh://git@github.com/LarsvanDartel/nix-secrets.git"
@@ -2047,15 +2047,16 @@
         "rust-overlay": "rust-overlay_4"
       },
       "locked": {
-        "lastModified": 1794486325,
-        "narHash": "sha256-Y+QGkzGE3f9ujRPNUv06XWk5VFBkQCREML0/JYZDUPI=",
+        "lastModified": 1794452419,
+        "narHash": "sha256-EzVH8sVS4IElS+z1xbR2DF+IGP6Fghkx9YIm+MukPVc=",
         "owner": "can1357",
         "repo": "oh-my-pi",
-        "rev": "53dd4c6a3192d2934a195a4158c444ce2a6b1935",
+        "rev": "04cd1a7549a02d62ad1d24826198d52507595683",
         "type": "github"
       },
       "original": {
         "owner": "can1357",
+        "ref": "v18.19.0",
         "repo": "oh-my-pi",
         "type": "github"
       }
