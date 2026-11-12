@@ -38,6 +38,7 @@
       includes = with den.aspects; [
         roles.desktop-home
         home.minecraft
+        home.geforce-now
         home.tino
         home.kanidm
         home.mcrl2

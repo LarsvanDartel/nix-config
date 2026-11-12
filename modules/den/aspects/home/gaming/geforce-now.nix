@@ -1,4 +1,6 @@
-# home.geforce-now
+# home.geforce-now — GeForce NOW in a Chromium app window. The web client is
+# the only Linux client nixpkgs has: gfn-electron was dropped as abandoned, and
+# NVIDIA's native app ships only as a Flatpak. Firefox-based browsers are refused.
 {...}: {
   den.aspects.home.geforce-now.homeManager = {
     config,
@@ -6,31 +8,26 @@
     pkgs,
     ...
   }: let
-    inherit (lib.options) mkPackageOption mkOption;
-    inherit (lib.types) bool;
-    inherit (lib.modules) mkIf;
+    inherit (lib.options) mkPackageOption;
+    inherit (lib.meta) getExe;
 
     cfg = config.cosmos.gaming.launchers.geforce-now;
+    profile = "${config.xdg.configHome}/geforce-now";
   in {
     options.cosmos.gaming.launchers.geforce-now = {
-      gamescope = mkOption {
-        type = bool;
-        default = true;
-        description = "Wrap GeForce Now with Gamescope.";
-      };
-      package = mkPackageOption pkgs "gfn-electron" {};
+      package = mkPackageOption pkgs "chromium" {};
     };
 
     config = {
-      cosmos.system.impermanence.persist.directories = [".config/GeForce Now"];
-      home.packages = [cfg.package];
+      # Its own profile keeps the NVIDIA login and is the only Chromium state.
+      cosmos.system.impermanence.persist.directories = [".config/geforce-now"];
 
-      xdg.desktopEntries."geforce-now" = mkIf cfg.gamescope {
-        name = "GeForce Now (Gamescope)";
-        comment = "Stream games using the Nvidia GeForce Now service";
+      xdg.desktopEntries."geforce-now" = {
+        name = "GeForce NOW";
+        comment = "Stream games using the NVIDIA GeForce NOW service";
         type = "Application";
-        exec = "${pkgs.gamescope}/bin/gamescope -W 1920 -H 1080 -r 60 --backend sdl -- ${cfg.package}/bin/geforcenow-electron";
-        icon = "${cfg.package}/share/icons/hicolor/512x512/apps/geforcenow-electron.png";
+        exec = "${getExe cfg.package} --user-data-dir=${profile} --app=https://play.geforcenow.com";
+        icon = "chromium";
         categories = ["Game" "Network"];
       };
     };
