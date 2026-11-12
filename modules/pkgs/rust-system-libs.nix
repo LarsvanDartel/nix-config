@@ -26,12 +26,6 @@
         env = removeAttrs old.env ["OPENSSL_DIR" "OPENSSL_LIB_DIR"];
         buildInputs = old.buildInputs ++ [final.aws-lc final.rust-jemalloc-sys-unprefixed];
       });
-      stalwart-cli = backport "stalwart-cli" "aws-lc" (old: {
-        buildInputs = (old.buildInputs or []) ++ [final.aws-lc];
-      });
-      microbin = backport "microbin" "zstd" (old: {
-        buildInputs = old.buildInputs ++ [final.sqlite final.zstd];
-      });
       taskchampion-sync-server = backport "taskchampion-sync-server" "zstd" (old: {
         buildInputs = (old.buildInputs or []) ++ [final.sqlite final.zstd];
       });
