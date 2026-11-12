@@ -67,13 +67,16 @@ in {
       applications = 1.0;
     };
     # Family names from home/desktop/_styling/fonts; resolve with `font`.
+    # Atkinson has no serif cut: serif requests (pages without a font) get
+    # the sans too, so no text in any app falls back to a less legible face.
     fonts = {
-      serif = "DejaVu Serif";
-      sansSerif = "DejaVu Sans";
+      serif = "Atkinson Hyperlegible Next";
+      sansSerif = "Atkinson Hyperlegible Next";
       # The vector cut: identical at 13px, and still crisp at 26, 39… when zoomed.
+      # "Atkinson Hyperlegible Mono" is installed to compare against.
       monospace = "Cozette Vector";
       emoji = "Noto Color Emoji";
-      interface = "Cozette Vector";
+      interface = "Atkinson Hyperlegible Next";
     };
     # base16.nix scheme attrs for a mode: the same value as stylix's
     # config.lib.stylix.colors under that scheme.

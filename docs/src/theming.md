@@ -19,6 +19,19 @@ One base16 theme, in a dark and a light mode, switched at runtime without a rebu
 
 `modules/den/aspects/desktop/styling.nix`: `themes` lists each theme's dark and light scheme, icon theme and accent (the base16 slot for noctalia's primary and the focused-window colour in niri and Umbriel; Everforest's green), `theme` picks one, `defaultMode` is what the system and a fresh home start in.
 
+## Fonts
+
+`cosmosStyling.fonts` (same file) names a family per role. Each family has a file in `home/desktop/_styling/fonts/` (package, size, fallbacks, pixel grid).
+
+| Role | Family | Reaches |
+|---|---|---|
+| `sansSerif`, `serif` | Atkinson Hyperlegible Next | GTK, Qt, browsers and fontconfig's `sans-serif`/`serif` (it has no serif cut) |
+| `interface` | Atkinson Hyperlegible Next | noctalia (bar, launcher, lock screen) |
+| `monospace` | Cozette Vector | foot, nvim, fontconfig's `monospace` |
+| `emoji` | Noto Color Emoji | fontconfig's `emoji` |
+
+Atkinson Hyperlegible Mono and Tiny5 Mono are installed without a role, for trying out (`foot -o main.font=…`). Changing a role is one family name; a family not yet in `_styling/fonts/` needs a file there (and `git add`).
+
 ## How it works
 
 - `cosmosStyling` (`desktop/styling.nix`) holds both schemes: `schemeFile mode`, `colors pkgs mode`, `modes`, `defaultMode`.

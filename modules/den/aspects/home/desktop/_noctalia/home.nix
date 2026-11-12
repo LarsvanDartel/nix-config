@@ -9,7 +9,7 @@
   ...
 }: let
   fonts = config.cosmos.desktops.common.styling.fonts;
-  # Not stylix's sansSerif: mixing in DejaVu made the shell look off.
+  # Its own role, not stylix's sansSerif, so the shell's face can differ from apps'.
   font = fonts.interface;
   opacity = config.stylix.opacity;
   wallpapers = config.cosmos.desktops.wallpapers;
