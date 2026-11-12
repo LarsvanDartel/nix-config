@@ -25,6 +25,7 @@ Keys are kebab-case paths nested under `keys`; each host's file is encrypted to 
 |`keys/spindle/key`|`hosts/endeavour/secrets.yaml`|the P-256 key behind the spindle's did:web document|
 |`keys/pds/flake-bump-password`|`hosts/endeavour/secrets.yaml`|undeclared; logs in as the flake-bump bot (`flake-bump.pds.lvdar.nl`) to manage its key records|
 |`keys/kanidm/mail-sender-token`|`hosts/endeavour/secrets.yaml`|`kanidm-mail-sender` (services/kanidm.nix), which drains kanidm's mail queue. Read-write API token of the hand-made `mail-sender` service account (member of `idm_message_senders` only); provisioning cannot create either. Rotate with `kanidm service-account api-token generate mail-sender <label> --readwrite`|
+|`keys/netbird/api-token`|`hosts/gaia/secrets.yaml`|netbird-services (publishing) and netbird-token-expiry on gaia. A personal access token of the `lvdar` owner account, so the one exception to the rule below. Expires after at most 365 days; netbird-token-expiry alerts 21 days before. Rotate by minting a new one with the old (`POST /api/users/<id>/tokens`, `{"name": …, "expires_in": 365}` on `127.0.0.1:8011/api` on gaia), `sops set` it, pin nix-secrets, deploy, then delete the old token|
 |YubiKey FIDO2 resident keys|on the YubiKeys (`ssh-keygen -K` recovers the handles)|break-glass root access ([SSH](networking.md#ssh))|
 
 Servers hold no user identity: nothing on endeavour, gaia or pioneer can log in anywhere as lvdar.
