@@ -84,7 +84,15 @@
           imap.port = 993;
           smtp.host = "smtp.gewis.nl";
           smtp.port = 465;
-          thunderbird.enable = true;
+          thunderbird = {
+            enable = true;
+            # Mailboxes shared with this account (SOGo's "Other Users", Dovecot's
+            # `Shared/` namespace) are unsubscribed, so a subscribed-only listing
+            # hides them. List everything, as SOGo does.
+            settings = id: {
+              "mail.server.server_${id}.using_subscription" = false;
+            };
+          };
         } (mkSignature "gewis");
 
         # Enterprise office365 tenant: the flavor supplies host/port/TLS/XOAUTH2.
