@@ -12,6 +12,10 @@ nix run nixpkgs#sops -- set hosts/<host>/secrets.yaml '["keys"]["<service>"]["<n
 
 Keys are kebab-case paths nested under `keys`; each host's file is encrypted to that host's age key + the user key (`hosts/common` to all hosts). There is no `delete` subcommand; use `sops unset <file> '<path>'`. Then commit, push, and **update the pin** in nix-config (`nix flake lock --update-input nix-secrets`): hosts read secrets through the flake input, so an un-pushed or un-pinned change is invisible. The consuming aspect must declare the key in `sops.secrets`; a missing key fails `sops-install-secrets` at activation for *every* secret on that host, so land the secret before the config that references it.
 
+## Plaintext values
+
+Values that aren't secret but should stay out of this public repo, such as the GEWIS send-as addresses (`gewis-aliases`, read by `home.thunderbird`), are plain outputs of the nix-secrets flake. nix-config reads them at eval time as `inputs.nix-secrets.<name>`, so they end up in the world-readable store. Any new output must also be added to `.tangled/nix-secrets-stub/flake.nix` with an example value, or keyless builds fail to evaluate. Then pin it the same way as a sops secret.
+
 ## Where keys live
 
 |key|where|decrypted / used by|

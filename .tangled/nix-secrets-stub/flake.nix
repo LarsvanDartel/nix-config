@@ -7,8 +7,10 @@
 # manifest, and the file it names is opened at *activation* time on the host,
 # from the real secrets that shipped with the closure.
 #
-# So an empty directory satisfies every check and every build. Verified rather
-# than assumed: gaia's toplevel builds to completion against this.
+# So an empty directory satisfies every check and every build, except for the
+# real input's plaintext flake outputs, which nix-config reads at eval time:
+# those are mirrored below with example values. Verified rather than assumed:
+# gaia's toplevel builds to completion against this.
 #
 # What that buys is the whole point — CI needs no credential at all. No deploy
 # key, no repo secret, no read access to the fleet's encrypted secrets held by
@@ -23,5 +25,7 @@
 # services/tangled.nix, which is deliberately unset for its own reasons.
 {
   description = "Empty stand-in for nix-secrets, for credential-free CI";
-  outputs = _: {};
+  outputs = _: {
+    gewis-aliases = ["alias@example.org"];
+  };
 }

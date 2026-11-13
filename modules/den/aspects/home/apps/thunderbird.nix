@@ -1,5 +1,5 @@
 # home.thunderbird (+ the defaultApplication option; deployment sets it true)
-{...}: {
+{inputs, ...}: {
   den.aspects.home.thunderbird.homeManager = {
     config,
     lib,
@@ -10,6 +10,7 @@
     inherit (lib.types) bool;
     inherit (lib.modules) mkIf;
     inherit (lib.attrsets) recursiveUpdate;
+    inherit (lib.strings) concatMapStringsSep replaceStrings;
 
     cfg = config.cosmos.programs.thunderbird;
 
@@ -17,14 +18,20 @@
     # No font-family: Calibri/Segoe UI fall back to a mismatched sans on Linux.
     # Keep the tue/gewis svg inline (sized by height:100% of its row);
     # display:block pins it to the cell top. Do not reintroduce.
-    mkSignature = name: {
-      signature = {
-        showSignature = "append";
-        htmlFormat = true;
-        text = builtins.readFile ./_thunderbird/signature-${name}.html;
-      };
+    # The signature files mark their contact line with @addresses@.
+    signature = name: addresses: {
+      showSignature = "append";
+      htmlFormat = true;
+      text =
+        replaceStrings ["@addresses@"] [(concatMapStringsSep "<br>" mailto addresses)]
+        (builtins.readFile ./_thunderbird/signature-${name}.html);
+    };
+    mailto = address: ''<a href="mailto:${address}" style="color:#1a1a1a;text-decoration:none;">${address}</a>'';
 
-      # These signatures already open with "-- ".
+    mkSignature = name: addresses: {
+      signature = signature name addresses;
+
+      # These signatures already open with "-- ". Applies to aliases too.
       thunderbird.perIdentitySettings = id: {
         "mail.identity.id_${id}.suppress_signature_separator" = true;
       };
@@ -74,34 +81,49 @@
             in
               oauth "mail.server.server_${id}" // oauth "mail.smtpserver.smtp_${id}";
           };
-        } (mkSignature "lvdar");
+        } (mkSignature "lvdar" []);
 
-        gewis = recursiveUpdate {
+        gewis = let
           address = "m10243@gewis.nl";
-          userName = "m10243@gewis.nl";
-          realName = "Lars van Dartel";
-          imap.host = "imap.gewis.nl";
-          imap.port = 993;
-          smtp.host = "smtp.gewis.nl";
-          smtp.port = 465;
-          thunderbird = {
-            enable = true;
-            # Mailboxes shared with this account (SOGo's "Other Users", Dovecot's
-            # `Shared/` namespace) are unsubscribed, so a subscribed-only listing
-            # hides them. List everything, as SOGo does.
-            settings = id: {
-              "mail.server.server_${id}.using_subscription" = false;
+        in
+          recursiveUpdate {
+            inherit address;
+            userName = address;
+            realName = "Lars van Dartel";
+            imap.host = "imap.gewis.nl";
+            imap.port = 993;
+            smtp.host = "smtp.gewis.nl";
+            smtp.port = 465;
+            # Send-as addresses over this login. Plaintext in nix-secrets only to
+            # keep them out of this public repo.
+            aliases =
+              map (alias: {
+                address = alias;
+                realName = "Lars van Dartel";
+                signature = signature "gewis" [address alias];
+              })
+              inputs.nix-secrets.gewis-aliases;
+            thunderbird = {
+              enable = true;
+              # Mailboxes shared with this account (SOGo's "Other Users", Dovecot's
+              # `Shared/` namespace) are unsubscribed, so a subscribed-only listing
+              # hides them. List everything, as SOGo does.
+              settings = id: {
+                "mail.server.server_${id}.using_subscription" = false;
+              };
             };
-          };
-        } (mkSignature "gewis");
+          } (mkSignature "gewis" [address]);
 
         # Enterprise office365 tenant: the flavor supplies host/port/TLS/XOAUTH2.
-        tue = recursiveUpdate {
-          flavor = "outlook.office365.com";
+        tue = let
           address = "l.v.dartel@student.tue.nl";
-          realName = "Lars van Dartel";
-          thunderbird.enable = true;
-        } (mkSignature "tue");
+        in
+          recursiveUpdate {
+            flavor = "outlook.office365.com";
+            inherit address;
+            realName = "Lars van Dartel";
+            thunderbird.enable = true;
+          } (mkSignature "tue" [address]);
 
         # Consumer Outlook.com: SMTP host differs and no flavor covers it.
         wsvw = {
