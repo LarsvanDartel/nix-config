@@ -171,7 +171,9 @@
         }
         # SOGo's global (directory) address books: read-only, and SOGo shows no
         # CardDAV link for them; the URL is built from the id in the web UI's URL.
-        # Plaintext in nix-secrets, like the aliases.
+        # Host mail.gewis.nl, not webmail.gewis.nl: webmail sits behind TU/e's
+        # WAF, which rejects REPORT, so cards never download. Plaintext in
+        # nix-secrets, like the aliases.
         // mapAttrs (_: url: {
           remote = {
             type = "carddav";
