@@ -100,7 +100,7 @@
               map (alias: {
                 address = alias;
                 realName = "Lars van Dartel";
-                signature = signature "gewis" [address alias];
+                signature = signature "gewis" [alias];
               })
               inputs.nix-secrets.gewis-aliases;
             thunderbird = {
