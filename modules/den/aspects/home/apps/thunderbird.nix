@@ -9,7 +9,7 @@
     inherit (lib.options) mkOption;
     inherit (lib.types) bool;
     inherit (lib.modules) mkIf;
-    inherit (lib.attrsets) recursiveUpdate;
+    inherit (lib.attrsets) mapAttrs recursiveUpdate;
     inherit (lib.strings) concatMapStringsSep replaceStrings;
 
     cfg = config.cosmos.programs.thunderbird;
@@ -158,14 +158,29 @@
         thunderbird.enable = true;
       };
 
-      accounts.contact.accounts.lvdar = {
-        remote = {
-          type = "carddav";
-          url = "https://mail.lvdar.nl/dav/card/lvdar%40lvdar.nl/default/";
-          userName = "lvdar@lvdar.nl";
-        };
-        thunderbird.enable = true;
-      };
+      accounts.contact.accounts =
+        {
+          lvdar = {
+            remote = {
+              type = "carddav";
+              url = "https://mail.lvdar.nl/dav/card/lvdar%40lvdar.nl/default/";
+              userName = "lvdar@lvdar.nl";
+            };
+            thunderbird.enable = true;
+          };
+        }
+        # SOGo's global (directory) address books: read-only, and SOGo shows no
+        # CardDAV link for them; the URL is built from the id in the web UI's URL.
+        # Plaintext in nix-secrets, like the aliases.
+        // mapAttrs (_: url: {
+          remote = {
+            type = "carddav";
+            inherit url;
+            userName = "m10243@gewis.nl";
+          };
+          thunderbird.enable = true;
+        })
+        inputs.nix-secrets.gewis-address-books;
 
       programs.thunderbird = {
         enable = true;

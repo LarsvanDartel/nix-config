@@ -1464,10 +1464,10 @@
         "nixpkgs": "nixpkgs_12"
       },
       "locked": {
-        "lastModified": 1794572146,
-        "narHash": "sha256-uT4JjeeALI5B/CNv/wrmaLkAk9CGt5Ph0kH8qO4okgU=",
+        "lastModified": 1794575358,
+        "narHash": "sha256-q5a+MJ/MU5cDidYtK6e31B0DTCXF7RGw5CpxDbGv3lA=",
         "ref": "refs/heads/main",
-        "rev": "f848367c5b1d258a870751ea983cca8ea8907845",
+        "rev": "4fb3ec63a9ed79d261960e55e223f77289c84cc1",
         "shallow": true,
         "type": "git",
         "url": "ssh://git@github.com/LarsvanDartel/nix-secrets.git"

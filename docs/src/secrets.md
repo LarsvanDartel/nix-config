@@ -14,7 +14,7 @@ Keys are kebab-case paths nested under `keys`; each host's file is encrypted to 
 
 ## Plaintext values
 
-Values that aren't secret but should stay out of this public repo, such as the GEWIS send-as addresses (`gewis-aliases`, read by `home.thunderbird`), are plain outputs of the nix-secrets flake. nix-config reads them at eval time as `inputs.nix-secrets.<name>`, so they end up in the world-readable store. Any new output must also be added to `.tangled/nix-secrets-stub/flake.nix` with an example value, or keyless builds fail to evaluate. Then pin it the same way as a sops secret.
+Values that aren't secret but should stay out of this public repo, such as the GEWIS send-as addresses (`gewis-aliases`) and global address books (`gewis-address-books`), both read by `home.thunderbird`,, are plain outputs of the nix-secrets flake. nix-config reads them at eval time as `inputs.nix-secrets.<name>`, so they end up in the world-readable store. Any new output must also be added to `.tangled/nix-secrets-stub/flake.nix` with an example value, or keyless builds fail to evaluate. Then pin it the same way as a sops secret.
 
 ## Where keys live
 

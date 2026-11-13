@@ -27,5 +27,6 @@
   description = "Empty stand-in for nix-secrets, for credential-free CI";
   outputs = _: {
     gewis-aliases = ["alias@example.org"];
+    gewis-address-books.example = "https://dav.example.org/Contacts/example/";
   };
 }
