@@ -39,9 +39,15 @@ in {
     })
     servers;
 
+  # deploy-rs runs `nix flake check` before every deploy, and deploy-activate
+  # builds every node's closure: with pioneer's, that is a long wait even for
+  # `deploy .#gaia`. Checked with what a bare `deploy` covers; pioneer still
+  # gets its build when it is deployed.
   flake.checks =
     lib.mapAttrs
-    (system: deployLib: deployLib.deployChecks config.flake.deploy)
+    (system: deployLib:
+      deployLib.deployChecks (config.flake.deploy
+        // {nodes = lib.filterAttrs (name: _: servers.${name}.deployByDefault) config.flake.deploy.nodes;}))
     inputs.deploy-rs.lib;
 
   # `deploy` in the dev shell: deploy-rs from the lock, not `nix run
