@@ -87,6 +87,21 @@ in {
             maxFree = 1024 * 1024 * 1024;
           };
 
+          # The SD card again. facter turns on all of linux-firmware (825M);
+          # the only firmware this board loads is the Broadcom wireless one,
+          # which nixos-hardware's raspberry-pi-3 adds on its own. Ethernet is
+          # the USB smsc95xx, which needs none.
+          hardware.enableRedistributableFirmware = lib.mkForce false;
+
+          # Deployed with deploy-rs, never rebuilt in place: nixos-rebuild-ng
+          # is what pulls python into the closure.
+          system.disableInstallerTools = true;
+
+          # A fresh nixpkgs source (~200M) per lock update otherwise; `nix
+          # shell nixpkgs#…` here falls back to the global registry.
+          nixpkgs.flake.setFlakeRegistry = false;
+          nixpkgs.flake.setNixPath = false;
+
           # Vendor kernel isn't cached (every deploy compiled one); mainline
           # is, and supports bcm2837 headless.
           boot.kernelPackages = lib.mkForce pkgs.linuxPackages;
