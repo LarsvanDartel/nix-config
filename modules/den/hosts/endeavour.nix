@@ -538,7 +538,7 @@ in {
         };
 
         traccar = {
-          protocols = ["osmand"];
+          protocols = ["osmand" "gt06"];
           openFirewall = false;
         };
 

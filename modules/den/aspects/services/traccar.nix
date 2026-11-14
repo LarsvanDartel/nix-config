@@ -1,36 +1,46 @@
 # services.traccar — GPS tracking server (H2 db, OIDC via kanidm).
-{inputs, ...}: let
+{
+  inputs,
+  lib,
+  ...
+}: let
   # Option default and netbird-service targets (see services/netbird.nix).
   defaultPort = 8082;
-  protocolPorts.osmand = 5055;
+  protocolPorts = {
+    osmand = 5055;
+    # Jimi IoT / Concox (JM-LL01 and other LL-series asset trackers).
+    gt06 = 5023;
+  };
 in {
   den.aspects.services.traccar = {
-    netbird-service = {host, ...}: {
-      # XHR and the Manager app can't follow a gate redirect.
-      traccar = {
-        bearerAuth.enable = false;
-        targets = [
-          {
-            peer = host.name;
-            port = defaultPort;
-          }
-        ];
-      };
-
-      # Reaches the decoder only with "osmand" in cosmos.services.traccar.protocols.
-      traccar-osmand = {
-        domain = "traccar-osmand.lvdar.nl";
-        mode = "tcp";
-        listenPort = protocolPorts.osmand;
-        bearerAuth.enable = false;
-        targets = [
-          {
-            peer = host.name;
-            port = protocolPorts.osmand;
-          }
-        ];
-      };
-    };
+    netbird-service = {host, ...}:
+      {
+        # XHR and the Manager app can't follow a gate redirect.
+        traccar = {
+          bearerAuth.enable = false;
+          targets = [
+            {
+              peer = host.name;
+              port = defaultPort;
+            }
+          ];
+        };
+      }
+      # One L4 listener per decoder; it reaches the decoder only when that
+      # protocol is in cosmos.services.traccar.protocols.
+      // lib.mapAttrs' (name: port:
+        lib.nameValuePair "traccar-${name}" {
+          mode = "tcp";
+          listenPort = port;
+          bearerAuth.enable = false;
+          targets = [
+            {
+              peer = host.name;
+              inherit port;
+            }
+          ];
+        })
+      protocolPorts;
 
     kanidm-provision = {
       groups = {
