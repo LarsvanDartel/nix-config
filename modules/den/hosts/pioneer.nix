@@ -14,6 +14,9 @@ in {
     meshAddress = "100.68.78.148";
     server = true;
     sshHostKey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIC2O35MjlmLu5JfDRV7zNzG7BrZt3lB1ttIhRZWLjCtD";
+    # Copying a closure to the SD card takes far longer than the rest of the
+    # fleet's deploy: `deploy .#pioneer` on its own, and out of DeployBehind.
+    deployByDefault = false;
 
     # A 16G SD card that only proxies the iDRAC: no YubiKey is ever plugged
     # in, and the home baseline's editor and CLI tools only cost card space

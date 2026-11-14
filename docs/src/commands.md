@@ -8,7 +8,7 @@ nix build .#docs             # this book; `mdbook serve docs` in the devshell fo
 
 nix build .#nixosConfigurations.<host>.config.system.build.toplevel   # build without switching
 nh os switch                 # local voyager switch (also: nh os boot / nh os test)
-deploy                       # in the dev shell: deploy every server (magic rollback); `deploy .#<host>` for one
+deploy                       # in the dev shell: endeavour + gaia (magic rollback); `deploy .#pioneer` for the Pi, `deploy .` for all
 nix run .#update-blocklists  # refresh vendored unbound blocklists, then commit
 nix run .#tmux              # wrapped programs carry their own config: also .#yazi .#oh-my-posh .#zathura .#foot
 

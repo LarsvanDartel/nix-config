@@ -13,9 +13,15 @@
 {
   den,
   inputs,
+  lib,
   ...
 }: let
   inherit (den.lib.policy) pipe;
+
+  # Servers a bare `deploy` covers (meta/deploy.nix); the rest are deployed
+  # on their own schedule and would otherwise fire DeployBehind after every push.
+  tracked = lib.attrNames (lib.filterAttrs (_: h: h.server && h.deployByDefault) (lib.mergeAttrsList (lib.attrValues den.hosts)));
+  behind = ''nixos_configuration_info{instance=~"${lib.concatStringsSep "|" tracked}"} unless on(revision) nix_config_main_info'';
 in {
   den.quirks.scrape-target.description = "Prometheus scrape targets ({job, instance, port}), collected by services.prometheus";
 
@@ -227,7 +233,7 @@ in {
                       # host behind; HostDown covers endeavour's exporter.
                       alert = "DeployBehind";
                       expr = ''
-                        count(nixos_configuration_info unless on(revision) nix_config_main_info)
+                        count(${behind})
                           and on() count(nix_config_main_info)
                       '';
                       for = "1h";
@@ -235,7 +241,7 @@ in {
                       annotations = {
                         summary = "{{ $value }} host(s) not running main";
                         description = ''
-                          {{ range query "nixos_configuration_info unless on(revision) nix_config_main_info" }}{{ .Labels.instance }} runs {{ reReplaceAll "^([0-9a-f]{7})[0-9a-f]*" "$1" .Labels.revision }}
+                          {{ range query `${behind}` }}{{ .Labels.instance }} runs {{ reReplaceAll "^([0-9a-f]{7})[0-9a-f]*" "$1" .Labels.revision }}
                           {{ end }}main is {{ with query "nix_config_main_info" }}{{ reReplaceAll "^([0-9a-f]{7})[0-9a-f]*" "$1" (index . 0).Labels.revision }}{{ end }}. Pull and run `deploy` on voyager; a host ahead of main has an unpushed or dirty deploy.
                         '';
                       };

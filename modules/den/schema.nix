@@ -41,6 +41,12 @@
             description = "Address deploy-rs connects to.";
           };
 
+          deployByDefault = lib.mkOption {
+            type = lib.types.bool;
+            default = true;
+            description = "Whether a bare `deploy` includes this server; false still leaves it a node (`deploy .#<host>`).";
+          };
+
           # Pinned in every host's known_hosts (core.ssh) and in endeavour's builder authorization.
           # Reinstalling with a fresh key means updating this and .sops.yaml together.
           sshHostKey = lib.mkOption {

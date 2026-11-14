@@ -2,14 +2,18 @@
 # rollback. Nodes are derived from den's host entities (address and system
 # are entity data, so listing nodes does not evaluate any host); voyager is
 # not one, it switches itself with `nh os switch`. From the dev shell:
-#   deploy                           # every server, from a committed tree
-#   deploy .#<host>                  # one
+#   deploy                           # servers with deployByDefault, from a committed tree
+#   deploy .#<host>                  # one, including pioneer
+#   deploy .                         # every server
 {
   inputs,
   config,
   lib,
   ...
-}: {
+}: let
+  servers = lib.filterAttrs (_: host: host.server) (lib.mergeAttrsList (lib.attrValues config.den.hosts));
+  defaultTargets = lib.concatMapStringsSep " " (name: ".#${name}") (lib.attrNames (lib.filterAttrs (_: host: host.deployByDefault) servers));
+in {
   flake-file.inputs.deploy-rs = {
     url = "github:serokell/deploy-rs";
     inputs.nixpkgs.follows = "nixpkgs";
@@ -33,10 +37,34 @@
         path = inputs.deploy-rs.lib.${host.system}.activate.nixos config.flake.nixosConfigurations.${name};
       };
     })
-    (lib.filterAttrs (_: host: host.server) (lib.mergeAttrsList (lib.attrValues config.den.hosts)));
+    servers;
 
   flake.checks =
     lib.mapAttrs
     (system: deployLib: deployLib.deployChecks config.flake.deploy)
     inputs.deploy-rs.lib;
+
+  # `deploy` in the dev shell: deploy-rs from the lock, not `nix run
+  # github:serokell/deploy-rs` (the nodes' `activate` is built from this input
+  # and must match the CLI). Without a flake argument it deploys only the
+  # deployByDefault servers; deploy-rs itself has no notion of a default set.
+  perSystem = {
+    inputs',
+    pkgs,
+    ...
+  }: {
+    make-shells.default.packages = [
+      (pkgs.writeShellApplication {
+        name = "deploy";
+        text = ''
+          for arg in "$@"; do
+            case "$arg" in
+              .* | *"#"*) exec ${lib.getExe' inputs'.deploy-rs.packages.deploy-rs "deploy"} "$@" ;;
+            esac
+          done
+          exec ${lib.getExe' inputs'.deploy-rs.packages.deploy-rs "deploy"} "$@" --targets ${defaultTargets}
+        '';
+      })
+    ];
+  };
 }

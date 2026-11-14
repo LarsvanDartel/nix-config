@@ -40,5 +40,5 @@ For a device key (`id_<host>`) or the iDRAC key.
 2. In `~/nix-secrets`: `nix run nixpkgs#sops -- set hosts/<host>/secrets.yaml '["keys"]["ssh"]["<name>"]' "$(jq -Rs . < /tmp/rot/id_<name>)"`; commit and push.
 3. In nix-config: copy the `.pub` to `modules/den/aspects/core/_ssh-keys/id_<name>.pub`, run `nix flake lock --update-input nix-secrets`, and for the device key add the old public key to `allowed_signers` in `home/cli/git.nix` so old commits stay verifiable. Commit, push.
 4. Register the new public key where the old one is authorized (GitHub and tangled for the device key, the iDRAC user's SSH keys); keep the old one until the switch is done.
-5. Roll out so the workstation never loses access: `deploy` while voyager still holds the old key (servers now authorize the new one), then `nh os switch` on voyager. If anything locks out, use the YubiKey break-glass.
+5. Roll out so the workstation never loses access: `deploy .` (every server, pioneer included) while voyager still holds the old key (servers now authorize the new one), then `nh os switch` on voyager. If anything locks out, use the YubiKey break-glass.
 6. Remove the old public key everywhere, then `shred -u /tmp/rot/*`.
