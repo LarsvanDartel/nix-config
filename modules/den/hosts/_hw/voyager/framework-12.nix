@@ -1,5 +1,6 @@
 # voyager on the Framework Laptop 12 (Intel Core 3 304 / Wildcat Lake) — hardware module; imported by hosts/voyager.nix.
 {inputs}: {
+  config,
   lib,
   pkgs,
   ...
@@ -25,6 +26,25 @@
   # VA-API for the Xe3 iGPU: Mesa has no Intel video driver, so without iHD
   # browsers and mpv decode on the CPU (GeForce NOW stutters).
   hardware.graphics.extraPackages = [pkgs.intel-media-driver];
+
+  # The PixArt touchpad comes back from hibernation silent (no interrupts at
+  # all); re-probing it through i2c_hid_acpi brings it back.
+  systemd.services.touchpad-resume-rebind =
+    lib.warnIf (lib.versions.majorMinor config.boot.kernelPackages.kernel.version != "7.3")
+    "hosts/_hw/voyager/framework-12.nix: the kernel is no longer 7.3; hibernate voyager with touchpad-resume-rebind masked, and if the touchpad still moves the cursor after resume delete the unit, else bump this guard"
+    {
+      description = "Re-probe the touchpad after resuming from hibernation";
+      wantedBy = ["hibernate.target" "hybrid-sleep.target" "suspend-then-hibernate.target"];
+      after = ["systemd-hibernate.service" "systemd-hybrid-sleep.service" "systemd-suspend-then-hibernate.service"];
+      serviceConfig.Type = "oneshot";
+      script = ''
+        dev=i2c-PIXA3854:00
+        drv=/sys/bus/i2c/drivers/i2c_hid_acpi
+        [ -e /sys/bus/i2c/devices/$dev ] || exit 0
+        if [ -e $drv/$dev ]; then echo $dev > $drv/unbind; fi
+        echo $dev > $drv/bind
+      '';
+    };
 
   # fwupd (from nixos-hardware) records a staged capsule update here and
   # checks its result after the update reboot; the root rollback would drop it.
