@@ -19,6 +19,9 @@
         deadnix
         mdbook
         inputs'.launchpad.packages.nvim-nix
+        # From the lock, not `nix run github:serokell/deploy-rs`: the nodes'
+        # `activate` is built from this input and must match the CLI.
+        inputs'.deploy-rs.packages.deploy-rs
       ];
       shellHook = config.pre-commit.installationScript;
     };

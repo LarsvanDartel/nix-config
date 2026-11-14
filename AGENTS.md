@@ -11,7 +11,7 @@ The handbook is the mdBook in `docs/` (`nix build .#docs`). Read the relevant pa
 |[`introduction.md`](docs/src/introduction.md)|what the repo is, where to start|
 |[`hosts.md`](docs/src/hosts.md)|the four hosts and their roles, host facts, facter/disko/impermanence|
 |[`architecture.md`](docs/src/architecture.md)|evaluation flow, den composition model, key directories, `_`-prefixed files, cross-host data (facts, quirks, literals)|
-|[`deployment.md`](docs/src/deployment.md)|build-gate, comin, knot, flake-bump, deploy-rs, the blog bypass|
+|[`deployment.md`](docs/src/deployment.md)|manual deploy-rs from voyager, DeployBehind/NixpkgsStale alerts, knot, the blog bypass|
 |[`networking.md`](docs/src/networking.md)|NetBird mesh, publishing and gating services, `localVhosts`, `edgeTerminated`, SSH|
 |[`secrets.md`](docs/src/secrets.md)|sops-nix, adding a secret, the nix-secrets stub|
 |[`conventions.md`](docs/src/conventions.md)|code conventions, aspect and option shapes, priority discipline, wrapped programs, nvim/launchpad, tooling, important files|
@@ -41,7 +41,6 @@ The handbook is the mdBook in `docs/` (`nix build .#docs`). Read the relevant pa
 - Every file opens with a `# <name> — <what it is>` comment; other comments only to prevent mistakes ([conventions](docs/src/conventions.md#code)).
 - Temporary fixes carry a `lib.warnIf` guard on the condition that obsoletes them ([conventions](docs/src/conventions.md#code)).
 - Pangolin is decommissioned; do not reintroduce it ([hosts](docs/src/hosts.md)).
-- Pull before push: flake-bump commits to `main` on its own ([deployment](docs/src/deployment.md)).
 - Verification = `nix build .#nixosConfigurations.<host>.config.system.build.toplevel` ([commands](docs/src/commands.md#testing--qa)).
 - `_`-prefixed files are not auto-imported ([architecture](docs/src/architecture.md#_-prefixed-files)).
 - Commit messages are one short, clear conventional-commit line, lowercase, with no body and no names of people or user accounts ([conventions](docs/src/conventions.md#code)).

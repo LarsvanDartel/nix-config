@@ -6,7 +6,7 @@ lvdar's NixOS fleet config for four hosts (`voyager`, `endeavour`, `gaia`, `pion
 
 - [Hosts](hosts.md) — the four machines, their roles and host facts.
 - [Architecture](architecture.md) — evaluation flow, den's composition model, directory layout, cross-host data.
-- [Deployment](deployment.md) — build-gate, comin, flake-bump, deploy-rs, the blog bypass.
+- [Deployment](deployment.md) — deploying from voyager with deploy-rs, the behind-main alerts, the blog bypass.
 - [Networking & SSH](networking.md) — the NetBird mesh, publishing services, the SSH trust model.
 - [Secrets](secrets.md) — sops-nix, adding a secret, the CI stub.
 - [Conventions](conventions.md) — code style, aspect shapes, priority traps, tooling.

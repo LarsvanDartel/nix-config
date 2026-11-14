@@ -8,7 +8,7 @@ nix build .#docs             # this book; `mdbook serve docs` in the devshell fo
 
 nix build .#nixosConfigurations.<host>.config.system.build.toplevel   # build without switching
 nh os switch                 # local voyager switch (also: nh os boot / nh os test)
-nix run github:serokell/deploy-rs .#<host>   # manual/out-of-band deploy (magic rollback)
+deploy                       # in the dev shell: deploy every server (magic rollback); `deploy .#<host>` for one
 nix run .#update-blocklists  # refresh vendored unbound blocklists, then commit
 nix run .#tmux              # wrapped programs carry their own config: also .#yazi .#oh-my-posh .#zathura .#foot
 
@@ -21,10 +21,10 @@ nix run .#install-host -- install <host> <ip> --host-key <key> [--copy-persist �
 
 ## Testing & QA
 
-- No test framework, no coverage expectations. Verification = the change evaluates and builds (`nix build .#nixosConfigurations.<host>...`) and, for the fleet, build-gate turning it green before comin touches a host.
+- No test framework, no coverage expectations. Verification = the change evaluates and builds (`nix build .#nixosConfigurations.<host>...`); `deploy` runs `nix flake check` and builds every server before it activates any.
 - `nix flake check` covers treefmt, pre-commit hooks, deploy-rs checks (`deploy-activate` is slow), `check-flake-file`, the docs build and the default-shell build.
 - CI on the spindle is deliberately fast-feedback: the cheap checks (`treefmt`, `pre-commit`, `check-flake-file`, `default-shell`, `docs`) with `--accept-flake-config` (abort-on-warn applies) and the secrets stub. The microVM substitutes only through the spindle's read proxy, whose upstreams are cache.nixos.org and attic (`pipelines.nixCache` in `services/tangled.nix`); a run that wants to build thousands of derivations means an upstream is missing there. Pipeline pages on tangled.org fetch from the spindle in the browser, so `server.corsOrigins` must list `https://tangled.org`.
-- Practical smoke checks when debugging publishing/ingress: `curl -I` against the public name (probes DNS → edge TLS → netbird-proxy → app); `git log deploy..main` shows what has not passed the gate yet.
+- Practical smoke checks when debugging publishing/ingress: `curl -I` against the public name (probes DNS → edge TLS → netbird-proxy → app); the Deploy pipeline dashboard's "Running commit" shows which server runs what.
 
 ## Proving a refactor is a no-op
 

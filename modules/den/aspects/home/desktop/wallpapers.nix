@@ -2,7 +2,7 @@
 # directory. ranking.txt in the `wallpapers` input drives order, default and
 # rotation; re-rank, push, bump the input. `pinned` overrides default and rotation.
 {...}: {
-  # Public HTTPS, not git@knot: hosts building via build-gate have no SSH
+  # Public HTTPS, not git@knot: keyless builds (spindle CI) have no SSH
   # credential. `did:plc:` survives a repo rename. Run `nix run .#write-flake` after editing.
   flake-file.inputs.wallpapers = {
     url = "git+https://knot.lvdar.nl/did:plc:nmkqw2d6qov4smqqvovwmwof?shallow=1";

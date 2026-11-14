@@ -10,10 +10,6 @@
   };
 
   inputs = {
-    comin = {
-      url = "github:nlewo/comin";
-      inputs.nixpkgs.follows = "nixpkgs";
-    };
     den.url = "github:denful/den";
     deploy-rs = {
       url = "github:serokell/deploy-rs";

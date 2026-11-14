@@ -219,6 +219,40 @@ in {
                         description = "{{ $value | printf \"%.0f\" }}% available.";
                       };
                     }
+                    {
+                      # One alert for the fleet, not one per host: a push
+                      # leaves every server behind at once. Deploys are manual
+                      # (`deploy` on voyager), so this is the reminder. Silent
+                      # while main's head is unknown, rather than calling every
+                      # host behind; HostDown covers endeavour's exporter.
+                      alert = "DeployBehind";
+                      expr = ''
+                        count(nixos_configuration_info unless on(revision) nix_config_main_info)
+                          and on() count(nix_config_main_info)
+                      '';
+                      for = "1h";
+                      labels.severity = "warning";
+                      annotations = {
+                        summary = "{{ $value }} host(s) not running main";
+                        description = ''
+                          {{ range query "nixos_configuration_info unless on(revision) nix_config_main_info" }}{{ .Labels.instance }} runs {{ reReplaceAll "^([0-9a-f]{7})[0-9a-f]*" "$1" .Labels.revision }}
+                          {{ end }}main is {{ with query "nix_config_main_info" }}{{ reReplaceAll "^([0-9a-f]{7})[0-9a-f]*" "$1" (index . 0).Labels.revision }}{{ end }}. Pull and run `deploy` on voyager; a host ahead of main has an unpushed or dirty deploy.
+                        '';
+                      };
+                    }
+                    {
+                      alert = "NixpkgsStale";
+                      expr = "count(time() - nixos_nixpkgs_last_modified_seconds > ${toString (7 * 86400)})";
+                      for = "30m";
+                      labels.severity = "warning";
+                      annotations = {
+                        summary = "{{ $value }} host(s) on nixpkgs older than a week";
+                        description = ''
+                          {{ range query "time() - nixos_nixpkgs_last_modified_seconds > ${toString (7 * 86400)}" }}{{ .Labels.instance }}: {{ humanizeDuration .Value }}
+                          {{ end }}On voyager: `nix flake update`, commit, `deploy`, push.
+                        '';
+                      };
+                    }
                   ];
                 }
                 {
@@ -231,7 +265,7 @@ in {
                       labels.severity = "critical";
                       annotations = {
                         summary = "crowdsec on {{ $labels.instance }} is not answering";
-                        description = "On the LAPI host netbird-proxy fails closed: every published service, and comin, gets 403 (2026-08-29).";
+                        description = "On the LAPI host netbird-proxy fails closed: every published service gets 403 (2026-08-29).";
                       };
                     }
                     {

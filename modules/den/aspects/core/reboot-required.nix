@@ -23,8 +23,8 @@
         runtimeInputs = with pkgs; [curl coreutils];
         text = ''
           # The three things a reboot actually changes. Comparing the whole
-          # system path would fire on every activation, which is daily here
-          # thanks to flake-bump and says nothing about the kernel.
+          # system path would fire on every activation, which says nothing
+          # about the kernel.
           changed=""
           for part in kernel initrd kernel-modules; do
             booted="$(readlink -f "/run/booted-system/$part" 2>/dev/null || true)"

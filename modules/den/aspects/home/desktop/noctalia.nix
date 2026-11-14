@@ -5,7 +5,7 @@
   cosmosStyling,
   ...
 }: {
-  # Public HTTPS like home.wallpapers: build-gate has no SSH credential.
+  # Public HTTPS like home.wallpapers: keyless builds (spindle CI) have no SSH credential.
   flake-file.inputs.noctalia-netbird = {
     url = "git+https://knot.lvdar.nl/did:plc:cqv2kfof3l53jrrzj553e6fb?shallow=1";
     flake = false;

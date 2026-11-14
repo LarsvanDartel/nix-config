@@ -29,7 +29,7 @@ Lives in `modules/den/`.
 |`modules/den/defaults.nix`|Every-host/user baseline|
 |`modules/den/deployment.nix`|Facts about *this* deployment, applied to every host via `den.default.nixos` — values that would otherwise hide as option defaults inside aspects. Only options that exist on *every* host; anything narrower goes in that host's file|
 |`docs/`|This book (`nix build .#docs`)|
-|`.tangled/`|Spindle CI workflow (`lint.yml`) + `nix-secrets-stub` used by build-gate/flake-bump/CI|
+|`.tangled/`|Spindle CI workflow (`lint.yml`) + `nix-secrets-stub` used by CI and other keyless builds|
 
 ## `_`-prefixed files
 
@@ -40,5 +40,5 @@ Lives in `modules/den/`.
 Three tools, cheapest first:
 
 1. **Host entity facts** (`den.hosts.<sys>.<name>.meshAddress`, `.server`, `.users`, names): plain data, readable from any host or flake module without evaluating that host. Used for mesh IPs, host lists, deploy-rs nodes, ssh config.
-2. **Quirks** (`den.quirks.<q>` + a `pipe.collect`/`collectAll` policy included only by the consumer): producer aspects emit entries, the consumer gets the list as a module arg. `netbird-service` (gaia's netbird server), `kanidm-provision` (kanidm on endeavour), `scrape-target` (prometheus), `mesh-dns-record` (unbound). `collect` reaches same-system hosts only; `collectAll` also reaches pioneer. Keep payloads static or `{host, ...}:`; a `{config, ...}:` payload makes the consumer instantiate the producer host's whole config (comin evaluates on gaia), and config-dependent quirks cannot be chained.
+2. **Quirks** (`den.quirks.<q>` + a `pipe.collect`/`collectAll` policy included only by the consumer): producer aspects emit entries, the consumer gets the list as a module arg. `netbird-service` (gaia's netbird server), `kanidm-provision` (kanidm on endeavour), `scrape-target` (prometheus), `mesh-dns-record` (unbound). `collect` reaches same-system hosts only; `collectAll` also reaches pioneer. Keep payloads static or `{host, ...}:`; a `{config, ...}:` payload makes the consumer instantiate the producer host's whole config, and config-dependent quirks cannot be chained.
 3. **Literals**, only for what no config or entity holds (e.g. netbird-proxy's embedded-client address, preference-ordered resolver lists). Comment them as hand-synced.

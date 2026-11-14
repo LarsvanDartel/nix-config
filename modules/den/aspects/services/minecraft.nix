@@ -14,7 +14,7 @@
 
   # The packwiz packs (pkgs.modpacks.<pack>), in their own repository so they
   # are released and edited apart from the fleet. Public HTTPS, not git@knot:
-  # build-gate has no SSH credential. Run `nix run .#write-flake` after editing.
+  # keyless builds (spindle CI) have no SSH credential. Run `nix run .#write-flake` after editing.
   flake-file.inputs.modpacks = {
     url = "git+https://knot.lvdar.nl/did:plc:lz6wnhglzbatsbxadexhf3bx?shallow=1";
     inputs.nixpkgs.follows = "nixpkgs";

@@ -30,9 +30,6 @@
       services.gatus
       services.alloy
       services.restic
-      # A broken netbird-proxy takes comin's update path with it; recovery
-      # is deploy-rs over :2222, which is why that stays.
-      services.comin
     ];
 
     nixos = {
@@ -162,9 +159,6 @@
       # netbird-proxy can't serve the apex (see services/site.nix, which
       # publishes www). Ungated: a public blog.
       cosmos.services.netbird.localVhosts."lvdar.nl".upstream = "http://${endeavourMesh}:3031";
-
-      # comin pulls, so no credential here grants anything on the fleet.
-      cosmos.services.comin.repository = "https://knot.lvdar.nl/did:plc:a3erncqfgkcxu3yl6fpjfmwf";
 
       # Dotted names probe as written, bare labels as subdomains. Explicit,
       # not derived from cosmos.services.netbird.services: the order is the

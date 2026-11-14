@@ -180,40 +180,21 @@
     }
     // optionalAttrs (description != null) {inherit description;};
 
-  logs = {
-    title,
-    expr,
-    w ? 24,
-    h ? 10,
-  }: {
-    inherit title w h;
-    type = "logs";
-    datasource = loki;
-    targets = targets loki [{inherit expr;}];
-    options = {
-      showTime = true;
-      wrapLogMessage = true;
-      sortOrder = "Descending";
-    };
-  };
-
   q = expr: legendFormat: {inherit expr legendFormat;};
 
   # Every dashboard marks deploys and reboots, so a change in a graph can be
   # read against what changed on the host.
   annotations = [
     {
+      # The exporter reports the old and the new revision side by side for a
+      # scrape or two across a deploy; that overlap is the mark.
       name = "Deploys";
       enable = true;
       iconColor = "blue";
-      datasource = loki;
-      expr = ''{unit="comin.service"} |= "deploying generation"'';
-      target = {
-        refId = "Anno";
-        expr = ''{unit="comin.service"} |= "deploying generation"'';
-      };
-      titleFormat = "deploy";
-      tagKeys = "host";
+      datasource = prom;
+      expr = "count by (instance) (last_over_time(nixos_configuration_info[2m])) > 1";
+      step = "1m";
+      titleFormat = "{{instance}} deployed";
     }
     {
       name = "Reboots";
@@ -247,8 +228,8 @@
   netFilter = ''device!~"lo|veth.*|br-.*|docker.*|vb-.*|ve-.*"'';
 
   # Units a dashboard watches by timer and by outcome.
-  scheduledTimers = "flake-bump.timer|build-gate.timer|sanoid.timer|firefly-auto-import.timer|crowdsec-update-hub.timer|restic-backups-.*";
-  scheduledServices = "flake-bump.service|build-gate.service|sanoid.service|firefly-auto-import.service|crowdsec-update-hub.service|restic-backups-.*";
+  scheduledTimers = "deploy-drift.timer|sanoid.timer|firefly-auto-import.timer|crowdsec-update-hub.timer|restic-backups-.*";
+  scheduledServices = "deploy-drift.service|sanoid.service|firefly-auto-import.service|crowdsec-update-hub.service|restic-backups-.*";
 in {
   "fleet.json" = dashboard {
     title = "Fleet";
@@ -380,26 +361,16 @@ in {
     panels = [
       (row "What runs where")
       (table {
-        title = "Deployed commit";
-        description = "comin's view; the deploy branch is what build-gate let through.";
+        title = "Running commit";
+        description = "What each server's generation was built from. DeployBehind fires an hour after this stops matching main.";
         hide = ["Value"];
-        expr = "comin_deployment_info";
+        expr = "nixos_configuration_info or nix_config_main_info";
       })
-      (stat {
-        title = "comin failures";
-        w = 8;
-        queries = [
-          (q "max by (instance) (comin_last_fetch_failed)" "{{instance}} fetch")
-          (q "max by (instance) (comin_last_eval_failed)" "{{instance}} eval")
-          (q "max by (instance) (comin_last_build_failed)" "{{instance}} build")
-          (q "max by (instance) (comin_last_deployment_failed)" "{{instance}} deploy")
-        ];
-      })
-      (stat {
-        title = "Reboot pending";
-        description = "The deployed generation's kernel or initrd differs from the booted one.";
-        w = 4;
-        queries = [(q "comin_need_to_reboot" "{{instance}}")];
+      (table {
+        title = "nixpkgs age";
+        unit = "s";
+        description = "NixpkgsStale fires past a week: `nix flake update`, commit, `deploy`, push.";
+        expr = "time() - nixos_nixpkgs_last_modified_seconds";
       })
 
       (row "Scheduled work")
@@ -412,27 +383,7 @@ in {
       (table {
         title = "Failed now (1 = failed)";
         hide = ["state" "type"];
-        description = "flake-bump sat here for six days before 2026-10-21.";
         expr = ''node_systemd_unit_state{state="failed", name=~"${scheduledServices}"}'';
-      })
-      (timeseries {
-        title = "Gate and bump outcomes";
-        ds = loki;
-        w = 24;
-        queries = [
-          (q ''sum by (unit) (count_over_time({unit=~"build-gate.service|flake-bump.service"} |= "build failed for" [1h]))'' "{{unit}} failed")
-          (q ''sum(count_over_time({unit="build-gate.service"} |= "green" [1h]))'' "build-gate green")
-          (q ''sum(count_over_time({unit="flake-bump.service"} |= "pushed" [1h]))'' "flake-bump pushed")
-        ];
-      })
-      (logs {
-        title = "build-gate and flake-bump";
-        expr = ''{unit=~"build-gate.service|flake-bump.service"} |~ "^verifying|green|build failed for|reverting the lock|pushed|lock unchanged|nothing to verify"'';
-      })
-      (logs {
-        title = "comin";
-        h = 8;
-        expr = ''{unit="comin.service"} |~ "deploying generation|level=error"'';
       })
     ];
   };

@@ -92,10 +92,8 @@ in {
       services.traccar
       services.tile-traccar
       services.netbird.client
-      services.comin
-      # Only here: it pushes to main.
-      services.flake-bump
-      services.build-gate
+      # The knot is here: exports main's head for the behind-main alert.
+      services.deploy-drift
       services.suwayomi
       services.flaresolverr
       # Lets gaia's crowdsec whitelist name home.lvdar.nl instead of a
@@ -178,12 +176,12 @@ in {
       # DID of @lvdar.nl on this host's own PDS.
       cosmos.services.tangled.owner = "did:plc:wj6rsizbzc7fruoopsxg2k2a";
 
-      # flake-bump pushes to main and comin deploys nightly: generations churn
-      # fast enough that the fleet default 30d retention outgrew the system
-      # disk (98% full, 5.4G free). A week still covers noticing a bad deploy.
+      # Generations churned fast enough that the fleet default 30d retention
+      # outgrew the system disk (98% full, 5.4G free). A week still covers
+      # noticing a bad deploy.
       cosmos.system.nix.gcOlderThan = "7d";
 
-      # Push what the nightly lock bump builds here, or CI rebuilds it.
+      # Push what builds here (voyager's remote builds included), or CI rebuilds it.
       cosmos.services.attic.client.watchStore.enable = true;
 
       cosmos.services.tino.accentColour = "red";
@@ -274,20 +272,10 @@ in {
           spindle.stateDir = "/tank/spindle";
         };
 
-        # watchPath hardcodes the knot's on-disk layout and a DID: first
-        # thing to check when a push stops triggering a build.
-        build-gate = {
-          repository = "git@knot.lvdar.nl:lvdar.nl/nix-config";
-          watchPath = "/tank/knot/repos/plc/a3/erncqfgkcxu3yl6fpjfmwf/refs/heads/main";
-        };
-        flake-bump = {
-          repository = "git@knot.lvdar.nl:lvdar.nl/nix-config";
-          gitEmail = "flake-bump@lvdar.nl";
-        };
+        # Hardcodes the knot's on-disk layout and a DID: the first thing to
+        # check when DeployBehind fires with main looking stale.
+        deploy-drift.repository = "/tank/knot/repos/plc/a3/erncqfgkcxu3yl6fpjfmwf";
       };
-
-      # comin pulls, so no credential here grants anything on the fleet.
-      cosmos.services.comin.repository = "https://knot.lvdar.nl/did:plc:a3erncqfgkcxu3yl6fpjfmwf";
 
       # TaskChampion's only authentication (the port is published). In
       # hosts/common so voyager shares it.

@@ -1,7 +1,9 @@
-# deploy-rs: remote deployment of the hosts with magic rollback. Nodes are
-# derived from den's host entities (address and system are entity data, so
-# listing nodes does not evaluate any host). Deploy a host with:
-#   nix run github:serokell/deploy-rs .#<host>
+# deploy-rs: how the servers are deployed, by hand from voyager, with magic
+# rollback. Nodes are derived from den's host entities (address and system
+# are entity data, so listing nodes does not evaluate any host); voyager is
+# not one, it switches itself with `nh os switch`. From the dev shell:
+#   deploy                           # every server, from a committed tree
+#   deploy .#<host>                  # one
 {
   inputs,
   config,
@@ -31,7 +33,7 @@
         path = inputs.deploy-rs.lib.${host.system}.activate.nixos config.flake.nixosConfigurations.${name};
       };
     })
-    (lib.mergeAttrsList (lib.attrValues config.den.hosts));
+    (lib.filterAttrs (_: host: host.server) (lib.mergeAttrsList (lib.attrValues config.den.hosts)));
 
   flake.checks =
     lib.mapAttrs

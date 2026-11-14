@@ -75,8 +75,8 @@ in {
 
           null is the default because getting this wrong is expensive: this is a
           mesh resolver (see mesh.resolvers), so a host that stops answering :53
-          takes name resolution with it, and comin cannot fetch a fix over a
-          network it can no longer resolve.
+          takes name resolution with it, including the *.nb.lvdar.nl names
+          deploy-rs connects to when you push the fix.
 
           Worth setting on a host with a public interface. access-control
           already REFUSES anything outside loopback, RFC1918 and the mesh, so an
@@ -261,7 +261,7 @@ in {
       };
 
       # Global unless scoped: a wrong interface list takes DNS down for
-      # everything, including comin, which then cannot fetch the fix.
+      # everything, including the mesh names deploy-rs connects to.
       networking.firewall = mkMerge [
         (mkIf (cfg.firewallInterfaces == null) {
           allowedUDPPorts = [cfg.port];

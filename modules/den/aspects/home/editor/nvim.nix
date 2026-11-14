@@ -38,7 +38,7 @@
     }).config.build.package;
 in {
   flake-file.inputs.launchpad = {
-    # Public HTTPS, not git@knot: hosts building via build-gate have no SSH
+    # Public HTTPS, not git@knot: keyless builds (spindle CI) have no SSH
     # credential. Run `nix run .#write-flake` after editing.
     url = "git+https://knot.lvdar.nl/did:plc:3l35i5iht5tqeoeqlfxzgkls?shallow=1";
     inputs.nixpkgs.follows = "nixpkgs";

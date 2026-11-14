@@ -49,7 +49,7 @@ The hardware module pins `linuxPackages_latest` (Wildcat Lake needs ≥ 7.1) and
 
 ## endeavour
 
-The workhorse and the fleet's build machine: build-gate, flake-bump, and voyager's remote builder including aarch64 emulation ([Remote builds](deployment.md#remote-builds)). Hosts the knot that comin deploys every host from.
+The workhorse and the fleet's build machine: voyager's remote builder including aarch64 emulation ([Remote builds](deployment.md#remote-builds)), the knot, and prometheus, whose `DeployBehind` alert compares every server with the knot's `main` ([Deployment](deployment.md)).
 
 CPUs 0-3 belong to DOMjudge's four judgehosts: `system`, `user` and `machine.slice` run on the other CPUs, the judge cores' hyperthread siblings (36-39) are offline, and the judge cores are held at the 2.1 GHz base clock (`domjudge-judge-cores`; stopping it undoes both). Judging times then stay within ±1.5% whatever else the host does; a busy sibling slowed runs 2.2× and turbo moved them ±8%.
 
@@ -61,7 +61,7 @@ The edge: NetBird control plane, `netbird-proxy`, `localVhosts`, oidc.idp.
 
 ## pioneer
 
-Raspberry Pi 3 publishing endeavour's iDRAC. No comin: deployed with deploy-rs. Its host entity `excludes` `core.yubikey` and the home baseline's editor and CLI tools (nvim, git, tmux, yazi, oh-my-posh, …), keeping only `home.core`, zsh, ssh and theme-options: the 16G SD card has no room for them and every one is an emulated aarch64 build.
+Raspberry Pi 3 publishing endeavour's iDRAC. Its host entity `excludes` `core.yubikey` and the home baseline's editor and CLI tools (nvim, git, tmux, yazi, oh-my-posh, …), keeping only `home.core`, zsh, ssh and theme-options: the 16G SD card has no room for them and every one is an emulated aarch64 build.
 
 The iDRAC (iDRAC8, firmware 2.21, no Redfish) is reached on the LAN at `192.168.2.111`, over the mesh at `https://idrac.lvdar.nl`, and by SSH as `ssh idrac` (a jump through pioneer with the RSA `id_idrac` key; see `hosts/voyager.nix`).
 

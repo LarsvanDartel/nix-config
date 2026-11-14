@@ -1,7 +1,11 @@
 # services.node-exporter — host metrics, scraped over the mesh.
 #
 # Not on voyager: a sleeping laptop would sit permanently "target down".
-{den, ...}: let
+{
+  den,
+  inputs,
+  ...
+}: let
   # Shared by the option default and the scrape-target entry, which must be
   # static (see services/prometheus.nix).
   defaultPort = 9500;
@@ -18,12 +22,25 @@ in {
     nixos = {
       config,
       lib,
+      pkgs,
       ...
     }: let
       inherit (lib.options) mkOption;
       inherit (lib.types) port listOf str;
 
       cfg = config.cosmos.services.node-exporter;
+
+      # What this generation was built from, for DeployBehind and
+      # NixpkgsStale (services/prometheus.nix). A store path, so the exporter
+      # restarts with every deploy and never reports a stale revision.
+      buildInfo = pkgs.writeTextDir "build.prom" ''
+        # HELP nixos_configuration_info The nix-config revision this generation was built from.
+        # TYPE nixos_configuration_info gauge
+        nixos_configuration_info{revision="${config.system.configurationRevision}"} 1
+        # HELP nixos_nixpkgs_last_modified_seconds Commit time of the nixpkgs this generation was built from.
+        # TYPE nixos_nixpkgs_last_modified_seconds gauge
+        nixos_nixpkgs_last_modified_seconds ${toString inputs.nixpkgs.lastModified}
+      '';
     in {
       options.cosmos.services.node-exporter = {
         port = mkOption {
@@ -67,6 +84,7 @@ in {
           enable = true;
           inherit (cfg) port;
           enabledCollectors = cfg.collectors;
+          extraFlags = ["--collector.textfile.directory=${buildInfo}"];
 
           # Firewalled to the mesh; the mesh address is unknown at eval time.
           openFirewall = false;
