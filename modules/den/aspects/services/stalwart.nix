@@ -259,16 +259,19 @@ in {
               };
 
               MtaStageRcpt = {
-                # The catch-all: unknown addresses go to the account's kanidm
-                # mail address. Blocked addresses are MemoryLookupKey objects
-                # in namespace `blocked`, kept out of this public repo; they
-                # skip the rewrite and get 550 at RCPT. A new key needs
+                # Blocked addresses are MemoryLookupKey objects in namespace
+                # `blocked`, kept out of this public repo. The catch-all
+                # (Domain below) would take them, so they are rewritten to a
+                # non-local address first and fail with 550 "Relay not allowed"
+                # (relaying to it is still allowed for authenticated senders and
+                # relayClients; those bounce). Only blocked addresses: this
+                # rewrite replaces the envelope recipient outright, and the spam
+                # filter then scores mail whose To: lacks it FORGED_RECIPIENTS.
+                # A new key needs
                 # `stalwart-cli create Action --json '{"@type":"ReloadLookupStores"}'`
                 # (ReloadSettings does not reload lookups).
                 rewrite = {
-                  match = [
-                    (when "ends_with(rcpt, '@${cfg.domain}') && !key_exists('blocked', rcpt) && !is_local_address(rcpt)" "'lars@${cfg.domain}'")
-                  ];
+                  match = [(when "key_exists('blocked', rcpt)" "'blocked@blocked.invalid'")];
                   "else" = "false";
                 };
                 allowRelaying = {
@@ -345,9 +348,27 @@ in {
                 match = ["name"];
                 objects.domain = {
                   name = cfg.domain;
+                  # Unknown addresses go to the account's kanidm mail address.
+                  # Unlike an MtaStageRcpt rewrite, this keeps the original
+                  # recipient for the spam filter, so per-service aliases are
+                  # not scored FORGED_RECIPIENTS.
+                  catchAllAddress = "lars@${cfg.domain}";
                   certificateManagement."@type" = "Manual";
                   dkimManagement."@type" = "Manual";
                   dnsManagement."@type" = "Manual";
+                };
+              };
+
+              # Every service gets its own catch-all alias (steam@, discord@),
+              # and its mail names the service in the subject, so this +2.0
+              # rule hits most legitimate mail. Upstream rule updates keep local
+              # SpamTag scores.
+              SpamTag = {
+                match = ["tag"];
+                objects.rcpt-local-in-subject = {
+                  "@type" = "Score";
+                  tag = "RCPT_LOCAL_IN_SUBJECT";
+                  score = 0;
                 };
               };
 
