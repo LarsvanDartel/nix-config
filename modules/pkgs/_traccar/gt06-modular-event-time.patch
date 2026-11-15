@@ -1,0 +1,41 @@
+diff --git a/src/main/java/org/traccar/protocol/Gt06ProtocolDecoder.java b/src/main/java/org/traccar/protocol/Gt06ProtocolDecoder.java
+index 6655a7e..04adadb 100644
+--- a/src/main/java/org/traccar/protocol/Gt06ProtocolDecoder.java
++++ b/src/main/java/org/traccar/protocol/Gt06ProtocolDecoder.java
+@@ -1472,10 +1472,10 @@ public class Gt06ProtocolDecoder extends BaseProtocolDecoder {
+                             case 0x1D -> position.addAlarm(Position.ALARM_POWER_OFF);
+                             case 0x20 -> position.addAlarm(Position.ALARM_VIBRATION);
+                             case 0x21 -> position.addAlarm(Position.ALARM_POWER_CUT);
+-                            case 0x23 -> position.addAlarm(Position.ALARM_TAMPERING);
++                            case 0x13, 0x23 -> position.addAlarm(Position.ALARM_TAMPERING);
+                         }
+                         position.set(Position.KEY_EVENT, event);
+-                        buf.readUnsignedIntLE(); // time
++                        position.setDeviceTime(new Date(buf.readUnsignedInt() * 1000));
+                         buf.skipBytes(buf.readUnsignedByte()); // content
+                     }
+                     case 0x7f -> {
+diff --git a/src/test/java/org/traccar/protocol/Gt06ProtocolDecoderTest.java b/src/test/java/org/traccar/protocol/Gt06ProtocolDecoderTest.java
+index f30fea9..a2afd31 100644
+--- a/src/test/java/org/traccar/protocol/Gt06ProtocolDecoderTest.java
++++ b/src/test/java/org/traccar/protocol/Gt06ProtocolDecoderTest.java
+@@ -213,6 +213,19 @@ public class Gt06ProtocolDecoderTest extends ProtocolTest {
+                 "797900377000000001020035000103002c0004616219d00043000b013601048153931500001a0001000808652820400643521000000101004e46760d0a"),
+                 position(Checks.NONE));
+ 
++        verifyDecode(decoder, binary(
++                "797900437000000001020035000100003300126afa1eda0a00050589cd880094bd5c00153a00340006126afa24a1000043000b00cc000452e9019bb202231000000101003d55f10d0a"),
++                position(Checks.NONE)
++                        .location("2026-11-15T21:06:34Z", true, 51.62063, 5.41545)
++                        .deviceTime("2026-11-15T21:31:13Z")
++                        .attribute(Position.KEY_ALARM, Position.ALARM_REMOVING));
++
++        verifyDecode(decoder, binary(
++                "797900437000000001020035000100003300126afa1eda0a00050589cd880094bd5c00153a00340006136afa24a8000043000b00cc000452e9019bb202231000000101003e38320d0a"),
++                position(Checks.NONE)
++                        .deviceTime("2026-11-15T21:31:20Z")
++                        .attribute(Position.KEY_ALARM, Position.ALARM_TAMPERING));
++
+         verifyDecode(decoder, binary(
+                 "7878171915061810051a01f90101700d08c8f50c0000065494ae0d0a"));
+ 
