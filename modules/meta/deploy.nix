@@ -32,6 +32,12 @@ in {
         # The local username only exists on voyager; core.ssh permits root.
         sshUser = "root";
         magicRollback = true;
+        # The 240 s / 30 s defaults rolled back a good pioneer deploy
+        # (2026-11-15): its activation on the SD card outlasted them, and the
+        # rollback left it running the new system under the old profile. They
+        # only bound how long a hung activation takes to be noticed.
+        activationTimeout = 1200;
+        confirmTimeout = 120;
         # Building the uncached rpi kernel on the Pi takes ~a day and OOMs.
         remoteBuild = false;
         path = inputs.deploy-rs.lib.${host.system}.activate.nixos config.flake.nixosConfigurations.${name};
