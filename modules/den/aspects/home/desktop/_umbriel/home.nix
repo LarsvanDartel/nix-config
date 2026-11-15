@@ -282,6 +282,7 @@
         # keyd's Mod-tap keysym (desktop.input.modTap.keysym).
         "F19" = noctalia "panel-toggle control-center";
         "Mod+Shift+P" = noctalia "plugin alexander/screen-toolkit:service all colorPicker";
+        "Mod+Shift+R" = noctalia "plugin alexander/screen-toolkit:service all qr";
         "Mod+Shift+B" = noctalia "panel-toggle damian-ds7/battery-threshold:panel";
         # niri's Mod+Slash plugin parses niri's config; Umbriel has its own.
         "Mod+Slash" = "cheatsheet-toggle";

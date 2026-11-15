@@ -240,6 +240,7 @@
           "Mod+Slash".spawn-sh = noctalia "panel-toggle kenn/keybind-cheatsheet:cheatsheet";
           "Mod+P".spawn-sh = noctalia "panel-toggle raycursive/niri-displays:panel";
           "Mod+Shift+P".spawn-sh = noctalia "plugin alexander/screen-toolkit:service all colorPicker";
+          "Mod+Shift+R".spawn-sh = noctalia "plugin alexander/screen-toolkit:service all qr";
           "Mod+Shift+B".spawn-sh = noctalia "panel-toggle damian-ds7/battery-threshold:panel";
 
           "XF86MonBrightnessUp" = locked {spawn = ["brightnessctl" "set" "+5%"];};
