@@ -148,6 +148,8 @@ in {
               }
             ];
           };
+          # The persisted dir niri also writes to; the default XDG Pictures is wiped on boot.
+          screenshot.directory = "${config.home.homeDirectory}/Pictures/screenshots";
         };
 
         lockscreen = {

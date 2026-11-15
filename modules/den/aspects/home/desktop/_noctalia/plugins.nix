@@ -13,12 +13,17 @@
       rev = "e9dec7443b8a70ab606dc72669fb122a9d668bce";
       hash = "sha256-n1uQOXXjIrPvDe5dXPpcCefNsQVAoEo5lVDkOPy81vU=";
     };
+    # screen-toolkit finds captures by reading [shell.screenshot] directory from
+    # settings.toml only; home-manager writes config.toml.
     postPatch = ''
       substituteInPlace phone-connect/widget.luau \
         --replace-fail 'fontSize = 10,' "" \
         --replace-fail 'fontSize = 11,' "" \
         --replace-fail 'size = 14, ' "" \
         --replace-fail 'size = 12, ' ""
+      substituteInPlace screen-toolkit/scripts/shell-capture.sh \
+        --replace-fail '"$HOME/.config/noctalia/settings.toml"; do' \
+          '"$HOME/.config/noctalia/settings.toml" "$HOME/.config/noctalia/config.toml"; do'
     '';
   };
 
