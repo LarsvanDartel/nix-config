@@ -1,4 +1,4 @@
-# termux — `nix build .#termux-ssh`: SSH client setup for Termux on panther (keystore-backed agent, fleet host keys pinned); see docs/src/networking.md.
+# termux — `nix build .#termux-ssh`: SSH client setup for Termux on panther (Keystore key via tergent, fleet host keys pinned); see docs/src/networking.md.
 {
   cosmosLib,
   den,
@@ -22,7 +22,8 @@
     '') (lib.attrNames hosts)
     + ''
       Host *
-        IdentityAgent ~/.ssh/keystore-agent.sock
+        # No IdentitiesOnly: it drops PKCS#11 keys not named by an IdentityFile.
+        PKCS11Provider /data/data/com.termux/files/usr/lib/libtergent.so
         ServerAliveInterval 30
     '';
 
@@ -40,7 +41,6 @@ in {
         mkdir $out
         cp $configPath $out/config
         cp $knownHostsPath $out/known_hosts.fleet
-        cp ${cosmosLib.get-flake-path "modules/meta/_termux/keystore-agent.py"} $out/keystore-agent
         cp ${cosmosLib.get-flake-path "modules/meta/_termux/install.sh"} $out/install.sh
       '';
   };
