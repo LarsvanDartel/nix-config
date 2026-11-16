@@ -3,7 +3,7 @@
 set -eu
 src="$(cd "$(dirname "$0")" && pwd)"
 
-pkg install -y openssh termux-api tergent
+pkg install -y openssh mosh termux-api tergent
 mkdir -p ~/.ssh
 chmod 700 ~/.ssh
 install -m 600 "$src/config" ~/.ssh/config

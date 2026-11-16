@@ -29,3 +29,11 @@ panther is a GrapheneOS Pixel with the NetBird app, plus Termux and Termux:API, 
 - **Client:** `~/.ssh/config` loads `tergent` as a `PKCS11Provider`, and it signs through Termux:API. The config must not set `IdentitiesOnly`, which drops PKCS#11 keys.
 - **Setup / refresh** (after a host key rotation or a host change): `nix build .#termux-ssh`, copy `result/` to the phone, then run `sh install.sh` from it in Termux. The bundle holds an `~/.ssh/config` with `ssh <host>` shorthands (mesh name, :2222, the right user) and `known_hosts.fleet`, pinned from the `sshHostKey` facts. The script creates the `panther` key if it is missing and prints the public key. A new key also means replacing `panther.pub` and deploying every host.
 - **Managing from the phone:** `ssh endeavour` (or any host) from Termux, with `tmux` on the far side so a dropped mobile connection does not kill the session. To deploy, `ssh voyager` and run `deploy` there: deploy-rs keeps running from voyager, and the phone holds no deploy credential of its own. In the browser, use the published UIs: the NetBird dashboard (panther's user is in `netbird-admin`), grafana, and the gated *arr apps.
+
+## Coding agents on endeavour
+
+`services.coding-agents` (included on endeavour) adds an `agent` user that runs omp, with the same pinned build and settings as voyager.
+
+- **Unprivileged on purpose.** `nixos` has passwordless sudo, and endeavour's host key is its sops identity, so an agent running as `nixos` would be root over every secret on the box. `agent` has no wheel and no service groups, and is not a nix trusted user. It can build with nix and edit its own home, and holds no deploy, push or sops credential. Anything that has to leave the box goes through you.
+- **Login:** the keys in `_ssh-keys/authorized.nix`, directly as `agent` (no sudo hop). Every interactive SSH or mosh login execs `tmux new-session -A -s agent`, so reconnecting resumes the running session. omp's login (`/login`) and `~/dev` persist across reboots.
+- **From the phone:** `mosh agent` (or `ssh agent`) in Termux; the bundle's `Host agent` points at endeavour as `agent`. mosh survives network switches and the phone sleeping. Its UDP 60001–60010 is open on the NetBird interface only, which caps it at ten concurrent sessions.

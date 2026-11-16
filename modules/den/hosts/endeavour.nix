@@ -128,6 +128,8 @@ in {
       services.smartd
       services.zed
       services.attic
+      # The `agent` user; termux.nix's `Host agent` points here.
+      services.coding-agents
       services.restic
       services.tangled
       services.tangled.spindle

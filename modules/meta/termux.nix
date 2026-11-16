@@ -21,6 +21,14 @@
 
     '') (lib.attrNames hosts)
     + ''
+      # services.coding-agents' user; hand-synced with endeavour's includes.
+      Host agent
+        HostName ${meshName "endeavour"}
+        User agent
+        Port 2222
+        UserKnownHostsFile ~/.ssh/known_hosts.fleet
+        StrictHostKeyChecking yes
+
       Host *
         # No IdentitiesOnly: it drops PKCS#11 keys not named by an IdentityFile.
         PKCS11Provider /data/data/com.termux/files/usr/lib/libtergent.so
