@@ -3,6 +3,8 @@
 set -eu
 src="$(cd "$(dirname "$0")" && pwd)"
 
+# Termux does not support partial upgrades: mosh linked against a newer libc++ than the bootstrap had.
+pkg upgrade -y
 pkg install -y openssh mosh termux-api tergent
 mkdir -p ~/.ssh
 chmod 700 ~/.ssh
