@@ -61,21 +61,25 @@
               # than tracking tino's lockstep on every nixpkgs bump.
               pythonRelaxDeps = true;
 
-              dependencies = with pyFinal; [
-                anyio
-                authlib
-                fastapi
-                mcp
-                gitpython
-                gunicorn
-                httpx
-                itsdangerous
-                pycrdt
-                pycrdt-websocket
-                python-multipart
-                pyyaml
-                uvicorn
-              ];
+              # uvicorn[standard] upstream: without its websockets extra the
+              # collab WebSocket is refused ("Unsupported upgrade request").
+              dependencies = with pyFinal;
+                [
+                  anyio
+                  authlib
+                  fastapi
+                  mcp
+                  gitpython
+                  gunicorn
+                  httpx
+                  itsdangerous
+                  pycrdt
+                  pycrdt-websocket
+                  python-multipart
+                  pyyaml
+                  uvicorn
+                ]
+                ++ uvicorn.optional-dependencies.standard;
 
               postPatch = ''
                 install -Dm444 ${coloursCss} tino/static/css/vendor/colours.css
