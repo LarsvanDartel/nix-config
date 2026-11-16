@@ -59,6 +59,53 @@
       "xdg-email"
       "xdg-open"
     ];
+
+    # nixpkgs runs one apparmor_parser per policy, serially and uncached: ~36 s on the boot
+    # critical path. This loads the same policies with one parallel, cached call.
+    enabledPolicies = lib.filterAttrs (_: p: p.state != "disable") config.security.apparmor.policies;
+    policyDir = config.environment.etc."apparmor.d".source;
+    # nixpkgs' parser.conf says skip-cache, which no flag can undo for reads.
+    parserConf = pkgs.writeText "apparmor-parser.conf" (
+      lib.replaceStrings ["skip-cache\n"] [""] config.environment.etc."apparmor/parser.conf".text
+    );
+    # The parser won't cache anything loaded with --Complain, so complain goes into the profile
+    # headers instead, as aa-complain does it. Includes can declare child profiles too
+    # (transmission's //dirs, chromium/electron abstractions), so the header rewrite runs on the
+    # parser's preprocessed (-p, all includes expanded) text. That compiles byte-identical to -C for
+    # every loaded policy (checked 2026-11-16), and -p output doesn't depend on kernel features.
+    # Enforce policies load as written, like nixpkgs' --add without -C.
+    loadedPolicies = pkgs.runCommand "apparmor-policies" {} ''
+      mkdir $out
+      sed 's#^Include /etc/apparmor.d$#Include ${policyDir}#' ${parserConf} > parser.conf
+      ${lib.concatStrings (lib.mapAttrsToList (n: p:
+        if p.state == "complain"
+        then ''
+          ${pkgs.apparmor-parser}/bin/apparmor_parser -p --config-file parser.conf \
+            -M ${pkgs.apparmor-profiles}/etc/apparmor.d/abi/5.0 ${policyDir}/${n} | sed -E \
+            -e '/^\s*(profile\s|\^)\S.*flags=\(/{/[(,]complain[,)]|unconfined/! s/flags=\(/flags=(complain,/;}' \
+            -e '/^\s*(profile\s|\^)\S/{/flags=/! s/\s*\{\s*$/ flags=(complain) {/;}' \
+            > $out/${n}
+          grep -qE '^\s*(profile\s|\^)\S.*flags=\([^)]*complain' $out/${n} \
+            || { echo "${n}: no profile header to put in complain mode" >&2; exit 1; }
+        ''
+        else ''
+          cp ${policyDir}/${n} $out/${n}
+        '')
+      enabledPolicies)}
+    '';
+    # Store mtimes never change, so the parser's own staleness check is blind to a changed profile
+    # or include: key the cache on everything that shapes a binary. The parser adds the kernel-features hash.
+    cacheKey = builtins.hashString "sha256" (builtins.toJSON {
+      inherit policyDir loadedPolicies parserConf;
+      parser = pkgs.apparmor-parser;
+    });
+    loadPolicies = pkgs.writeShellScript "apparmor-load" ''
+      set -eu
+      find /var/cache/apparmor -mindepth 1 -maxdepth 1 ! -name ${cacheKey} ! -name logprof -exec rm -rf {} +
+      mkdir -p /var/cache/apparmor/${cacheKey}
+      ${pkgs.apparmor-parser}/bin/apparmor_parser "$1" --verbose --show-cache -j auto \
+        --config-file ${parserConf} --cache-loc /var/cache/apparmor/${cacheKey} --write-cache ${loadedPolicies}
+    '';
   in {
     options.cosmos.security.apparmor = {
       state = mkOption {
@@ -85,6 +132,15 @@
         description = "apparmor.d profile names to drop on this host.";
       };
     };
+
+    imports = [
+      {
+        systemd.services.apparmor.serviceConfig = {
+          ExecStart = lib.mkForce ["${loadPolicies} --add"];
+          ExecReload = lib.mkForce ["${loadPolicies} --replace" "${pkgs.apparmor-utils}/bin/aa-remove-unknown"];
+        };
+      }
+    ];
 
     config = {
       security.apparmor = {
@@ -119,6 +175,8 @@
       };
 
       environment.systemPackages = [pkgs.apparmor-parser];
+
+      cosmos.system.impermanence.persist.directories = ["/var/cache/apparmor"];
 
       # podman applies containers-default only when it finds apparmor_parser on PATH.
       systemd.services = lib.mkIf (config.virtualisation.oci-containers.backend == "podman") (

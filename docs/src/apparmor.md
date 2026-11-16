@@ -30,7 +30,13 @@
 
 - **Complain mode still enforces explicit `deny` rules.** The hand-written profiles' denies (secrets, `/persist`, other services' state) are live from day one. The NixOS drop-in `abstractions/base-strict.d/nixos` only widens access.
 - **The LSM only loads after a reboot.** Enabling AppArmor puts `apparmor` into `lsm=`. Until the host reboots, `apparmor.service` is skipped (`ConditionSecurity=apparmor`).
-- **Boot and switch cost.** `apparmor.service` runs one `apparmor_parser` per policy, serially, with the cache off (store mtimes are constant). Each run costs ~40–55 s of CPU on x86 and is paid at every boot and every switch that changes a policy.
+- **Boot and switch cost.** nixpkgs' `apparmor.service` runs one `apparmor_parser` per policy, serially and without a cache, before `sysinit.target`; that added ~36 s to voyager's boot. Core replaces its `ExecStart`/`ExecReload` with `apparmor-load`, which loads every policy with one parallel (`-j auto`) call and uses the parser's cache in `/var/cache/apparmor/<key>` (persisted).
+  - The parser won't cache a policy loaded with `--Complain`. So complain-state policies are expanded at build time (`apparmor_parser -p`, all includes inlined; includes can declare child profiles) and get `complain` written into every profile header, which is what `aa-complain` does. The loader then passes no mode flag. For all 831 loaded policies this compiled byte-identical to `--Complain` (2026-11-16). The build fails if a complain policy ends up without a complain header.
+  - Enforce-state policies load as written, as nixpkgs did. The roughly 60 apparmor.d profiles that ship `flags=(complain)` stay in complain mode even when `state = "enforce"`.
+  - `<key>` hashes the `/etc/apparmor.d` farm (policies and includes), the mode-rewritten policy copy, the parser config and the parser. Store mtimes never change, so the parser alone can't tell that a profile changed. Any change gets a new directory, and the old ones are deleted.
+  - The parser keys a subdirectory on the running kernel's feature set and recompiles on its own after a kernel update.
+  - A switch compiles into the new key, so the next boot only loads cached binaries.
+  - Policy is not compiled at build time: the output depends on the running kernel's feature set. Binaries compiled against the declared `abi/5.0` differ from runtime ones (12 KB of 35 KB for pcscd on 6.18), and the kernel would accept them silently.
 - **ssh reaches its child profiles by name.** NixOS has no `libexec/openssh/`, so `sshd-session`, `sshd-auth` and `sftp-server` attach through `px` rules in `local/sshd` and `local/sshd-session`, not by path.
 - **Profiles core never loads:**
   - `systemd`, `systemd-user` and `sd*` are full-system policy.
