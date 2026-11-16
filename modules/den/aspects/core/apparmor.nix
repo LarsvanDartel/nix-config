@@ -33,11 +33,6 @@
       # Name collisions: an unrelated bin/orca; the parser apparmor.service itself runs.
       "orca"
       "apparmor_parser"
-      # No attach_disconnected: journal/notify/nscd socket sends fail with EACCES even in
-      # complain mode (smartd's Type=notify start timed out on endeavour).
-      "smartd"
-      "nvidia-persistenced"
-      "resolvconf"
       # Still "conflicting x modifiers" on store paths after the package's priority fix.
       "aa-notify"
       "bitwarden"

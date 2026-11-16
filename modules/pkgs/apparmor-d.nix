@@ -45,6 +45,12 @@
               find . -type f -exec sed -E -i \
                 -e "/$skip/! s#$broad#\1priority=-1 \2\4\5\6#" \
                 -e "/$skip/! s#$exact#\1priority=1 \2\4\5\6#" {} +
+              # Units hand profiles systemd-owned fds (activation sockets, sandboxed mounts). Without
+              # attach_disconnected those fail EACCES even in complain mode (pcscd hung voyager's login).
+              att='attach_disconnected'
+              find . -type f -exec sed -E -i \
+                -e "/^\s*profile\s.*flags=\(/{/attach_disconnected|unconfined/! s#flags=\(#flags=($att,#;}" \
+                -e "/^\s*profile\s/{/flags=/! s#\s*\{\s*\$# flags=($att) {#;}" {} +
               mkdir -p $out/etc/apparmor.d
               cp -r abstractions tunables mappings $out/etc/apparmor.d/
               find groups profiles-* -type f -exec cp -t $out/etc/apparmor.d/ {} +

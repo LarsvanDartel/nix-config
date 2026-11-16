@@ -7,6 +7,7 @@
 - **`pkgs.apparmor-d`** (`modules/pkgs/apparmor-d.nix`): apparmor.d built with its `prebuild` tool for NixOS.
   - `@{bin}`/`@{sbin}`/`@{lib}` gain a `/{nix/store/*/,}` prefix, so profiles attach to `/nix/store/*/bin/<x>`.
   - A sed gives exec rules priorities. Without it, the store glob turns FHS "exact path beats glob" rules into `conflicting x modifiers` errors.
+  - A second sed adds `attach_disconnected` to every profile header that lacks it (about a third of them; plain, without `attach_disconnected.path`, which upstream pairs with per-profile `@{att}` rules). Without it, a file or socket the process got from systemd (an activation socket, a path inside a sandboxed unit's mounts) fails with EACCES even in complain mode, and it isn't logged as `DENIED`. pcscd hung voyager's login this way: pam_u2f waited on it forever. smartd's start timed out on endeavour the same way.
   - nixpkgs' `roddhjav-apparmor-rules` is the raw, unbuilt source and is not loadable.
   - The rev is pinned. On a bump, `--replace-fail` fails loudly if upstream moved the `@{bin}`/`@{lib}` lines.
 - **Coverage** (`cosmos.security.apparmor.coverage`):
@@ -37,7 +38,6 @@
   - `orca` collides with an unrelated binary.
   - `apparmor_parser` would confine the parser itself.
   - A set of desktop profiles still fails to compile on store paths.
-  - `smartd`, `nvidia-persistenced` and `resolvconf` lack `attach_disconnected`, so their journal, notify and nscd socket sends fail with EACCES even in complain mode (`info="Failed name lookup - disconnected path"`). smartd's start timed out because of it. Any profile that logs this error breaks its service the same way: exclude it.
 
   The list is `excluded` in `core/apparmor.nix`.
 
