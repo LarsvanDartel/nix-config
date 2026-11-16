@@ -26,6 +26,14 @@ in {
     };
     cosmos.services.netbird.client.exposedUdpPorts = lib.range 60001 60010;
 
+    # A mosh-server whose client vanished (Termux killed, phone off) never
+    # exits on its own and keeps its port; ten of those lock mosh out.
+    # tmux keeps the agent running regardless.
+    services.openssh.extraConfig = ''
+      Match User agent
+        SetEnv MOSH_SERVER_NETWORK_TMOUT=86400
+    '';
+
     home-manager.users.agent = {
       imports = [
         den.aspects.home.core.homeManager
