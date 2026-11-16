@@ -112,6 +112,9 @@ in {
         })
       ];
 
+      # Pi 3: parsing ~250 profiles each boot is too slow.
+      cosmos.security.apparmor.coverage = "daemons";
+
       # Predates disko: partitioned by the aarch64 SD-image installer.
       fileSystems."/" = {
         device = "/dev/disk/by-uuid/44444444-4444-4444-8888-888888888888";

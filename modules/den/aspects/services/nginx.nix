@@ -19,6 +19,57 @@
         sslCiphers = "AES256+EECDH:AES256+EDH:!aNULL";
       };
 
+      # NoNewPrivileges unit: no exec transitions out of this profile.
+      security.apparmor.policies.nginx = {
+        inherit (config.cosmos.security.apparmor) state;
+        profile = ''
+          abi <abi/5.0>,
+          include <tunables/global>
+
+          profile nginx ${config.services.nginx.package}/bin/nginx flags=(attach_disconnected,mediate_deleted) {
+            include <abstractions/base-strict>
+            include <abstractions/nameservice>
+            include <abstractions/ssl_certs>
+
+            capability net_bind_service,
+            capability sys_resource,
+
+            network inet stream,
+            network inet6 stream,
+            network inet dgram,
+            network inet6 dgram,
+            network unix stream,
+
+            ${config.services.nginx.package}/bin/nginx mr,
+            @{sys}/devices/system/cpu/online r,
+
+            /run/nginx/ rw,
+            /run/nginx/** rwk,
+            /var/log/nginx/ rw,
+            /var/log/nginx/* rw,
+            /var/cache/nginx/ rw,
+            /var/cache/nginx/** rwkl,
+            /tmp/ r,
+            /tmp/nginx_*/ rw,
+            /tmp/nginx_*/** rw,
+
+            /var/lib/acme/*/ r,
+            /var/lib/acme/*/{cert,chain,fullchain,key}.pem r,
+            /run/phpfpm/*.sock rw,
+
+            signal (send, receive) peer=nginx,
+            signal (receive) peer=unconfined,
+
+            deny /run/secrets{,.d}/** rwlkmx,
+            deny /run/secrets-for-users{,.d}/** rwlkmx,
+            deny /run/credentials/** rwlkmx,
+            deny /persist/** rwlkmx,
+
+            include if exists <local/nginx>
+          }
+        '';
+      };
+
       # Build-time `nginx -t` on the real config. `validateConfigFile` only runs
       # gixy, which once accepted an invalid map variable that killed every vhost.
       # nginx's exit status is useless in the sandbox; grep for "syntax is ok".

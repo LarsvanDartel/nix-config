@@ -154,6 +154,8 @@
       ];
 
       cosmos = {
+        security.apparmor.profiles = import ./_apparmor/voyager.nix;
+
         hardware.v4l2loopback.devices = [
           {
             number = 1;

@@ -64,6 +64,7 @@ in {
       };
 
       config = {
+        security.apparmor.policies."bin.transmission-daemon".state = config.cosmos.security.apparmor.state;
         users.users.${cfg.user} = {
           isSystemUser = true;
           group = "media";

@@ -9,6 +9,7 @@
     core.ntfy-options
     core.networking
     core.sudo
+    core.apparmor
     core.yubikey
     core.ssh
     core.sops

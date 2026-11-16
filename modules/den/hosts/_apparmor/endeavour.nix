@@ -1,0 +1,19 @@
+# apparmor-endeavour — apparmor.d profiles matching software only endeavour has, on top of core/_apparmor/common.nix; regenerate with core/_apparmor/match.py.
+[
+  "acpid"
+  "containerd"
+  "dhcpcd"
+  "docker"
+  "dockerd"
+  "mount-zfs"
+  "nvidia-persistenced"
+  "nvidia-settings"
+  "nvidia-smi"
+  "ollama"
+  "orca"
+  "resolvconf"
+  "smartctl"
+  "smartd"
+  "zfs"
+  "zpool"
+]

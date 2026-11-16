@@ -9,13 +9,117 @@
   keysDir = cosmosLib.get-flake-path "modules/den/aspects/core/_ssh-keys";
   authorizedKeys = map (f: builtins.readFile (keysDir + "/${f}")) (import (keysDir + "/authorized.nix"));
 in {
-  den.aspects.services.coding-agents.nixos = {pkgs, ...}: {
+  den.aspects.services.coding-agents.nixos = {
+    config,
+    pkgs,
+    ...
+  }: let
+    # AppArmor attaches by resolved path: a copy keeps root's and nixos' bash
+    # out of agent-session. A symlink resolves to the shared bash; a wrapper
+    # script loses the login -argv0.
+    agentShell = pkgs.runCommand "agent-shell" {} ''
+      install -Dm755 ${pkgs.bashInteractive}/bin/bash $out/bin/agent-shell
+    '';
+  in {
     # No wheel and no service groups: a prompt-injected agent gets this home
     # and nix builds, not the host's secrets or sudo.
     users.users.agent = {
       isNormalUser = true;
       description = "Coding agents";
+      shell = "${agentShell}/bin/agent-shell";
       openssh.authorizedKeys.keys = authorizedKeys;
+    };
+    environment.shells = ["${agentShell}/bin/agent-shell"];
+
+    # sshd-session's `@{shells_path} Ux` doesn't match the name agent-shell.
+    security.apparmor.includes."local/sshd-session" = ''
+      ${agentShell}/bin/agent-shell px -> agent-session,
+    '';
+
+    # Children inherit (ix); the deny rules hold even in complain mode.
+    security.apparmor.policies.agent-session = {
+      inherit (config.cosmos.security.apparmor) state;
+      profile = ''
+        abi <abi/5.0>,
+        include <tunables/global>
+
+        profile agent-session ${agentShell}/bin/agent-shell flags=(attach_disconnected,mediate_deleted) {
+          include <abstractions/base-strict>
+          include <abstractions/nameservice>
+          include <abstractions/ssl_certs>
+
+          network inet stream,
+          network inet6 stream,
+          network inet dgram,
+          network inet6 dgram,
+          network netlink raw,
+          network unix stream,
+          network unix dgram,
+
+          /nix/store/** mrix,
+          /run/current-system/** r,
+          /etc/** r,
+
+          owner /home/agent/ r,
+          owner /home/agent/** rwlkmix,
+          /tmp/ r,
+          owner /tmp/** rwlkmix,
+          /var/tmp/ r,
+          owner /var/tmp/** rwlkmix,
+          owner /run/user/*/ r,
+          owner /run/user/*/** rwk,
+
+          /nix/var/nix/daemon-socket/socket rw,
+          /nix/var/nix/profiles/per-user/agent/** rwl,
+          /nix/var/nix/gcroots/per-user/agent/** rwl,
+
+          /dev/ptmx rw,
+          /dev/pts/* rw,
+          /dev/tty rw,
+
+          @{PROC}/ r,
+          @{PROC}/{loadavg,meminfo,stat,uptime,cpuinfo,version,mounts} r,
+          @{PROC}/sys/** r,
+          @{PROC}/@{pids}/{stat,status,cmdline,comm} r,
+          owner @{PROC}/@{pids}/** rw,
+          @{sys}/devices/system/cpu/** r,
+          @{sys}/fs/cgroup/user.slice/** r,
+
+          /run/wrappers/wrappers.*/utempter ix,
+          /run/utmp rwk,
+
+          ptrace (read, trace) peer=agent-session,
+          signal (send, receive) peer=agent-session,
+
+          deny /run/wrappers/wrappers.*/{su,sudo,sudoedit,sg,newgrp,mount,umount,newuidmap,newgidmap,unix_chkpwd,fusermount,fusermount3,pkexec} x,
+          deny userns,
+          deny mount,
+          deny umount,
+          deny pivot_root,
+          deny capability,
+          deny ptrace (trace) peer=unconfined,
+          deny /etc/ssh/ssh_host_* rwlkmx,
+          deny /etc/shadow rwlk,
+          deny /home/agent/.config/systemd/** wl,
+          deny /home/agent/.local/share/systemd/** wl,
+          deny /home/agent/.config/environment.d/** wl,
+          deny /run/user/*/bus rw,
+          deny /run/user/*/systemd/** rw,
+          deny /run/dbus/system_bus_socket rw,
+          deny /run/secrets{,.d}/** rwlkmx,
+          deny /run/secrets-for-users{,.d}/** rwlkmx,
+          deny /run/credentials/** rwlkmx,
+          deny /run/keys/** rwlkmx,
+          deny /persist/** rwlkmx,
+          deny /run/{docker.sock,podman/**,libpod/**,containers/**,phpfpm/**,postgresql/**,kanidmd/**,minecraft/**,nginx/**} rwlkmx,
+          deny /var/lib/** rwlkmx,
+          deny /tank/** rwlkmx,
+          deny /home/nixos/** rwlkmx,
+          deny /root/** rwlkmx,
+
+          include if exists <local/agent-session>
+        }
+      '';
     };
 
     # Mesh only. mosh-server binds the first free port from 60001, so this

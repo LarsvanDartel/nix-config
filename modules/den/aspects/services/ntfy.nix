@@ -129,6 +129,47 @@ in {
 
         cosmos.services.netbird.client.exposedPorts = [cfg.port];
 
+        # NoNewPrivileges unit: no exec transitions out of this profile.
+        security.apparmor.policies.ntfy-sh = {
+          inherit (config.cosmos.security.apparmor) state;
+          profile = ''
+            abi <abi/5.0>,
+            include <tunables/global>
+
+            profile ntfy-sh ${config.services.ntfy-sh.package}/bin/ntfy flags=(attach_disconnected,mediate_deleted) {
+              include <abstractions/base-strict>
+              include <abstractions/nameservice>
+              include <abstractions/ssl_certs>
+
+              capability net_bind_service,
+
+              network inet stream,
+              network inet6 stream,
+              network inet dgram,
+              network inet6 dgram,
+
+              ${config.services.ntfy-sh.package}/bin/ntfy mr,
+
+              /var/lib/{,private/}ntfy-sh/ rw,
+              /var/lib/{,private/}ntfy-sh/** rwkl,
+              /run/ntfy-sh/ rw,
+              /run/ntfy-sh/** rwk,
+              owner @{PROC}/@{pid}/{cgroup,mountinfo,stat,status,limits} r,
+              @{sys}/fs/cgroup/** r,
+              @{sys}/kernel/mm/transparent_hugepage/hpage_pmd_size r,
+              /tmp/ r,
+              owner /tmp/** rwk,
+
+              deny /run/credentials/** rwlkmx,
+              deny /run/secrets{,.d}/** rwlkmx,
+              deny /run/secrets-for-users{,.d}/** rwlkmx,
+              deny /persist/** rwlkmx,
+
+              include if exists <local/ntfy-sh>
+            }
+          '';
+        };
+
         services.ntfy-sh = {
           enable = true;
           settings = {

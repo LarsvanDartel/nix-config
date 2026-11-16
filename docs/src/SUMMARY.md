@@ -7,6 +7,7 @@
 - [Deployment](deployment.md)
 - [Networking & SSH](networking.md)
 - [Secrets](secrets.md)
+- [AppArmor](apparmor.md)
 - [Conventions](conventions.md)
 - [Theming](theming.md)
 - [Commands](commands.md)

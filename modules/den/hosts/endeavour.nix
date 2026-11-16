@@ -171,6 +171,8 @@ in {
         ./_hw/endeavour/disko.nix
       ];
 
+      cosmos.security.apparmor.profiles = import ./_apparmor/endeavour.nix;
+
       # Boot defaults (UEFI, device "nodev") are correct; don't copy gaia's
       # legacy settings: there's no bios_grub partition, and /dev/sda is a
       # tank SAS member, not the system M.2.

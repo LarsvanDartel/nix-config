@@ -162,6 +162,58 @@ in {
           "keys/jetemail/password".restartUnits = ["stalwart.service"];
         };
 
+        # NoNewPrivileges unit: no exec transitions out of this profile.
+        security.apparmor.policies.stalwart = {
+          inherit (config.cosmos.security.apparmor) state;
+          profile = ''
+            abi <abi/5.0>,
+            include <tunables/global>
+
+            profile stalwart ${lib.getExe config.services.stalwart.package} flags=(attach_disconnected,mediate_deleted) {
+              include <abstractions/base-strict>
+              include <abstractions/nameservice>
+              include <abstractions/ssl_certs>
+
+              capability net_bind_service,
+
+              network inet stream,
+              network inet6 stream,
+              network inet dgram,
+              network inet6 dgram,
+              network unix dgram,
+              network unix stream,
+
+              ${lib.getExe config.services.stalwart.package} mr,
+
+              /var/lib/stalwart/ rw,
+              /var/lib/stalwart/** rwkl,
+              /var/cache/stalwart/ rw,
+              /var/cache/stalwart/** rwkl,
+              /run/credentials/stalwart.service/ r,
+              /run/credentials/stalwart.service/{tls-cert,tls-key,jetemail-password} r,
+
+              /run/systemd/notify w,
+              /run/systemd/journal/socket w,
+
+              @{PROC}/sys/vm/overcommit_memory r,
+              @{sys}/kernel/mm/transparent_hugepage/** r,
+              @{sys}/devices/system/cpu/{online,possible} r,
+              @{sys}/fs/cgroup/** r,
+              owner @{PROC}/@{pid}/{cgroup,mountinfo,stat,statm,status,limits} r,
+              owner @{PROC}/@{pid}/task/ r,
+              /tmp/ r,
+              owner /tmp/** rwk,
+
+              deny /run/credentials/stalwart.service/admin rwlkmx,
+              deny /run/secrets{,.d}/** rwlkmx,
+              deny /run/secrets-for-users{,.d}/** rwlkmx,
+              deny /persist/** rwlkmx,
+
+              include if exists <local/stalwart>
+            }
+          '';
+        };
+
         services.stalwart = {
           enable = true;
           # No unversioned 1.x attribute yet: `stalwart` is a warnAlias for

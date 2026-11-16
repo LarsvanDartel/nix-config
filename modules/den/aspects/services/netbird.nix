@@ -1984,6 +1984,58 @@ in {
           '';
         };
 
+        # NoNewPrivileges unit: no exec transitions out of this profile.
+        security.apparmor.policies.netbird-proxy = {
+          inherit (config.cosmos.security.apparmor) state;
+          profile = ''
+            abi <abi/5.0>,
+            include <tunables/global>
+
+            profile netbird-proxy ${lib.getExe pkgs.netbird-proxy} flags=(attach_disconnected,mediate_deleted) {
+              include <abstractions/base-strict>
+              include <abstractions/nameservice>
+              include <abstractions/ssl_certs>
+
+              capability net_admin,
+              capability net_bind_service,
+
+              network inet stream,
+              network inet6 stream,
+              network inet dgram,
+              network inet6 dgram,
+              network netlink raw,
+
+              ${lib.getExe pkgs.netbird-proxy} mr,
+
+              /var/lib/netbird-proxy/ rw,
+              /var/lib/netbird-proxy/** rwkl,
+              /tmp/ r,
+              owner /tmp/** rwk,
+
+              @{PROC}/sys/net/core/somaxconn r,
+              owner @{PROC}/@{pid}/{stat,status,limits,cgroup,mountinfo} r,
+              owner @{PROC}/@{pid}/net/** r,
+              @{sys}/class/net/ r,
+              @{sys}/devices/**/net/** r,
+              @{sys}/fs/cgroup/** r,
+              /dev/net/tun rw,
+
+              deny capability dac_override,
+              deny capability dac_read_search,
+              deny capability sys_admin,
+              deny capability sys_ptrace,
+              deny /run/credentials/** rwlkmx,
+              deny /run/secrets{,.d}/** rwlkmx,
+              deny /run/secrets-for-users{,.d}/** rwlkmx,
+              deny /persist/** rwlkmx,
+              deny /var/lib/{netbird,netbird-mgmt,acme,stalwart,crowdsec,bulwark,gatus,private}/** rwlkmx,
+              deny /etc/ssh/ssh_host_* rwlkmx,
+
+              include if exists <local/netbird-proxy>
+            }
+          '';
+        };
+
         # Timer-driven, NOT multi-user.target: it cannot succeed before peers
         # enrol and a real token exists, and an activation failure makes deploy-rs roll back.
         systemd.services.netbird-services = {

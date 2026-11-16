@@ -52,6 +52,8 @@
         ./_hw/gaia/disko.nix
       ];
 
+      cosmos.security.apparmor.profiles = import ./_apparmor/gaia.nix;
+
       cosmos.system = {
         boot = {
           legacy = true;
