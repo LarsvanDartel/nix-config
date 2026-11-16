@@ -184,11 +184,13 @@
       # Ad-blocking DNS follows roaming devices; gaia is the fallback.
       cosmos.services.netbird.dnsPeers = ["endeavour" "gaia"];
 
-      # Non-fleet peers get DNS only. panther deliberately absent: it only
-      # uses published names. `enforce` retires All -> All; getting it wrong
-      # takes out SSH to everything at once.
+      # Non-fleet peers get DNS only. panther, the phone, is an operator: it
+      # reaches the fleet (Termux SSH, mesh-only names) and nothing reaches it.
+      # `enforce` retires All -> All; getting it wrong takes out SSH to
+      # everything at once.
       cosmos.services.netbird.mesh = {
         fleet = denHosts;
+        operators = ["panther"];
         resolvers = [
           "endeavour"
           "gaia"
@@ -196,7 +198,7 @@
         enforce = true;
       };
 
-      # panther is a phone with no shell.
+      # Not panther: the Android app runs no SSH server, and Termux uses OpenSSH.
       cosmos.services.netbird.sshPeers = denHosts;
 
       system.stateVersion = "24.11";

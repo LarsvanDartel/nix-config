@@ -1,0 +1,47 @@
+# termux — `nix build .#termux-ssh`: SSH client setup for Termux on panther (keystore-backed agent, fleet host keys pinned); see docs/src/networking.md.
+{
+  cosmosLib,
+  den,
+  lib,
+  ...
+}: let
+  hosts = lib.mergeAttrsList (lib.attrValues den.hosts);
+  # Hand-synced with cosmos.services.netbird.dnsDomain, as in den/schema.nix.
+  meshName = name: "${name}.nb.lvdar.nl";
+  userOf = h: (lib.head (lib.attrValues h.users)).userName;
+
+  sshConfig =
+    lib.concatMapStrings (name: ''
+      Host ${name} ${meshName name}
+        HostName ${meshName name}
+        User ${userOf hosts.${name}}
+        Port 2222
+        UserKnownHostsFile ~/.ssh/known_hosts.fleet
+        StrictHostKeyChecking yes
+
+    '') (lib.attrNames hosts)
+    + ''
+      Host *
+        IdentityAgent ~/.ssh/keystore-agent.sock
+        ServerAliveInterval 30
+    '';
+
+  knownHosts = lib.concatStrings (lib.mapAttrsToList (name: h: ''
+    ${meshName name},[${meshName name}]:2222 ${h.sshHostKey}
+  '') (lib.filterAttrs (_: h: h.sshHostKey != null) hosts));
+in {
+  perSystem = {pkgs, ...}: {
+    packages.termux-ssh =
+      pkgs.runCommand "termux-ssh" {
+        config = sshConfig;
+        inherit knownHosts;
+        passAsFile = ["config" "knownHosts"];
+      } ''
+        mkdir $out
+        cp $configPath $out/config
+        cp $knownHostsPath $out/known_hosts.fleet
+        cp ${cosmosLib.get-flake-path "modules/meta/_termux/keystore-agent.py"} $out/keystore-agent
+        cp ${cosmosLib.get-flake-path "modules/meta/_termux/install.sh"} $out/install.sh
+      '';
+  };
+}

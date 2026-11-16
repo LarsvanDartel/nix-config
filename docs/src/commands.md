@@ -15,6 +15,7 @@ nix run .#tmux              # wrapped programs carry their own config: also .#ya
 sudo nix run nixpkgs#nixos-facter -- -o modules/den/hosts/_facter/<host>.facter.json   # on the host
 
 nix build .#installer-iso    # cosmos installer ISO (see Installing a host)
+nix build .#termux-ssh       # panther's Termux SSH bundle (see Networking & SSH → The phone)
 nix run .#install-host -- keygen <host> <dir>                                 # new host key + age recipient
 nix run .#install-host -- install <host> <ip> --host-key <key> [--copy-persist …]   # nixos-anywhere install
 ```

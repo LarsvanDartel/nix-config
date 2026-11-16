@@ -429,6 +429,7 @@ in {
       policyPrefix = managedPrefix;
       fleetGroup = "${managedPrefix}fleet";
       resolverGroup = "${managedPrefix}resolvers";
+      operatorGroup = "${managedPrefix}operators";
 
       # Same-host read: the fleet resolvers serve these names (gaia runs one).
       # attrByPath, as this module must not require the unbound aspect.
@@ -845,16 +846,19 @@ in {
 
             fleet_ids="$(peer_ids '${builtins.toJSON cfg.mesh.fleet}')"
             resolver_ids="$(peer_ids '${builtins.toJSON cfg.mesh.resolvers}')"
+            operator_ids="$(peer_ids '${builtins.toJSON cfg.mesh.operators}')"
 
             if [ "$(jq 'length' <<<"$fleet_ids")" -eq 0 ]; then
               echo "netbird: no declared fleet peer exists yet; leaving mesh policy alone"
             else
               ensure_group ${fleetGroup} "$fleet_ids"
               ensure_group ${resolverGroup} "$resolver_ids"
+              ${lib.optionalString (cfg.mesh.operators != []) ''ensure_group ${operatorGroup} "$operator_ids"''}
 
               gid() { jq -r --arg n "$1" '.[] | select(.name == $n) | .id' <<<"$groups" | head -n1; }
               fleet_gid="$(gid ${fleetGroup})"
               resolver_gid="$(gid ${resolverGroup})"
+              operator_gid="$(gid ${operatorGroup})"
               all_gid="$(gid All)"
 
               # One rule per policy. NetBird keeps only the first rule of a
@@ -862,15 +866,17 @@ in {
               # udp half and no tcp half and no error about it — so the split is
               # forced rather than stylistic.
               #
-              # Three of them, answering two questions: which machines are peers
-              # of each other, and what every other peer may still do. DNS is
-              # the whole of that second answer — nix-resolver is the primary
-              # nameserver group for All, so dropping :53 leaves every phone
-              # resolving nothing at all, which is not a boundary, just an
+              # Four of them, answering three questions: which machines are
+              # peers of each other, which devices may reach into them without
+              # being reachable back, and what every other peer may still do.
+              # DNS is the whole of that last answer — nix-resolver is the
+              # primary nameserver group for All, so dropping :53 leaves every
+              # phone resolving nothing at all, which is not a boundary, just an
               # outage. tcp as well as udp, for responses that do not fit in a
               # datagram.
               desired_policies="$(jq -n \
                 --arg fleet "$fleet_gid" --arg resolver "$resolver_gid" --arg all "$all_gid" \
+                --arg operator "${lib.optionalString (cfg.mesh.operators != []) "$operator_gid"}" \
                 '[
                   { name: "${policyPrefix}fleet",
                     description: "The fleet'"'"'s own machines, freely",
@@ -890,7 +896,15 @@ in {
                     rules: [{ name: "${policyPrefix}dns-tcp", enabled: true, action: "accept",
                               bidirectional: false, protocol: "tcp", ports: ["53"],
                               sources: [$all], destinations: [$resolver] }] }
-                ]')"
+                ]
+                + if $operator == "" then [] else [
+                  { name: "${policyPrefix}operators",
+                    description: "Operator devices into the fleet, not back",
+                    enabled: true,
+                    rules: [{ name: "${policyPrefix}operators", enabled: true, action: "accept",
+                              bidirectional: false, protocol: "all",
+                              sources: [$operator], destinations: [$fleet] }] }
+                ] end')"
 
               existing_policies="$(req "$api/policies")"
 
@@ -1514,12 +1528,29 @@ in {
             '';
           };
 
+          operators = mkOption {
+            type = listOf str;
+            default = [];
+            example = ["panther"];
+            description = ''
+              Non-fleet peers, by name, that may open connections to every fleet
+              host on any port, while the fleet cannot open any back to them. For
+              a phone that administers the fleet over SSH: as a fleet member it
+              would be reachable from every host, and as a plain peer it gets
+              DNS and nothing else. That includes mesh-only names, which then
+              resolve but never connect.
+
+              A mesh grant only, not a login: sshd still wants a key from
+              core/_ssh-keys/authorized.nix.
+            '';
+          };
+
           enforce = mkOption {
             type = bool;
             default = false;
             description = ''
               Disable NetBird's built-in All -> All policy, leaving the ones
-              built from `fleet` and `resolvers` as the whole of mesh access.
+              built from `fleet`, `resolvers` and `operators` as the whole of mesh access.
 
               Separate from creating those policies on purpose. Deploy once with
               this off, confirm the new rules have appeared in
