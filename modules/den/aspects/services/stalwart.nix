@@ -486,11 +486,22 @@ in {
         };
         security.acme.certs."lvdar.nl".reloadServices = ["stalwart.service"];
 
-        systemd.services.stalwart-provision.serviceConfig = {
-          # Active after success, so a changed plan restarts it on switch.
-          RemainAfterExit = true;
-          # Its readiness probe loops forever on a wrong URL or a dead server.
-          TimeoutStartSec = "5min";
+        # Cold boot: the reload validates the OIDC directory against kanidm, which
+        # is reached over the mesh that netbird-management brings up ~1.5 min in;
+        # the 30 s fetch timed out on every boot since 2026-11-06. Retries ride
+        # that out; RestartMode=direct keeps notify-failure to real outages.
+        systemd.services.stalwart-provision = {
+          startLimitBurst = 5;
+          startLimitIntervalSec = 600;
+          serviceConfig = {
+            # Active after success, so a changed plan restarts it on switch.
+            RemainAfterExit = true;
+            # Its readiness probe loops forever on a wrong URL or a dead server.
+            TimeoutStartSec = "5min";
+            Restart = "on-failure";
+            RestartMode = "direct";
+            RestartSec = "30s";
+          };
         };
 
         # Not the module's openFirewall: that would open dav/admin/relay globally.
