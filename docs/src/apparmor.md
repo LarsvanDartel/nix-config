@@ -22,7 +22,7 @@
   These units run with `NoNewPrivileges`, so the profiles have no exec transitions: under NNP, a `Px` to another profile is refused.
 - **Other policies:**
   - transmission keeps nixpkgs' own `bin.transmission-daemon` policy, but its mode follows `state`.
-  - podman containers get podman's `containers-default`. It is always enforced, and podman applies it only because core puts `apparmor_parser` on each oci-container unit's `path`.
+  - podman containers get podman's `containers-default`. It is always enforced, and podman applies it only because core puts `apparmor_parser` on each oci-container unit's `path`. podman generates the profile itself and includes `<tunables/global>` only if `/etc/apparmor.d/tunables/global` exists, so core forwards that file to apparmor-profiles' (apparmor.d ships only `tunables/*.d`). Without it, the profile fails to parse and every container fails to start.
   - docker (endeavour) stays unconfined: moby only looks for `/sbin/apparmor_parser`.
 
 ## Traps
@@ -37,6 +37,7 @@
   - `orca` collides with an unrelated binary.
   - `apparmor_parser` would confine the parser itself.
   - A set of desktop profiles still fails to compile on store paths.
+  - `smartd`, `nvidia-persistenced` and `resolvconf` lack `attach_disconnected`, so their journal, notify and nscd socket sends fail with EACCES even in complain mode (`info="Failed name lookup - disconnected path"`). smartd's start timed out because of it. Any profile that logs this error breaks its service the same way: exclude it.
 
   The list is `excluded` in `core/apparmor.nix`.
 

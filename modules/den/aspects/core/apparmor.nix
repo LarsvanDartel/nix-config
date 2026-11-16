@@ -33,6 +33,11 @@
       # Name collisions: an unrelated bin/orca; the parser apparmor.service itself runs.
       "orca"
       "apparmor_parser"
+      # No attach_disconnected: journal/notify/nscd socket sends fail with EACCES even in
+      # complain mode (smartd's Type=notify start timed out on endeavour).
+      "smartd"
+      "nvidia-persistenced"
+      "resolvconf"
       # Still "conflicting x modifiers" on store paths after the package's priority fix.
       "aa-notify"
       "bitwarden"
@@ -108,6 +113,12 @@
           "local/sshd-session" = ''
             ${openssh}/libexec/sshd-auth px -> sshd-auth,
             ${openssh}/libexec/sftp-server px -> sftp-server,
+          '';
+          # podman includes <tunables/global> only if /etc/apparmor.d/tunables/global exists;
+          # without it containers-default fails to parse and the container won't start.
+          # apparmor.d ships no global: this is the file the search path resolved to before.
+          "tunables/global" = ''
+            include "${pkgs.apparmor-profiles}/etc/apparmor.d/tunables/global"
           '';
         };
       };
