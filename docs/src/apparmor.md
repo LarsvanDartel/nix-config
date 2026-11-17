@@ -18,7 +18,7 @@
   - `netbird-proxy` in `services/netbird.nix`;
   - `stalwart` in `services/stalwart.nix`;
   - `ntfy-sh` in `services/ntfy.nix`;
-  - `agent-session` in `services/coding-agents.nix` (see [Networking & SSH](networking.md#coding-agents-on-endeavour)).
+  - `agent-session` and its child `agent-sandbox` in `services/coding-agents.nix` (see [Networking & SSH](networking.md#coding-agents-on-endeavour)).
 
   These units run with `NoNewPrivileges`, so the profiles have no exec transitions: under NNP, a `Px` to another profile is refused.
 - **Other policies:**
