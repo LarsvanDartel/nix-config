@@ -1,4 +1,4 @@
-# apparmor-common — apparmor.d profiles matching software installed on every x86 host; regenerate with core/_apparmor/match.py.
+# apparmor-common — apparmor.d profiles matching software installed on both x86 servers (endeavour, gaia); regenerate with core/_apparmor/match.py.
 [
   "agetty"
   "blkid"

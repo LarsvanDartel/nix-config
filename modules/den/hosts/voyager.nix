@@ -11,6 +11,9 @@
     users.lvdar = {};
     meshAddress = "100.68.60.163";
     sshHostKey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIDVfDaFhgvfE2K47EGx8P+eL6od9H/oFKQZNeXvfr6Uh";
+    # Reboots daily, so the profile load lands on every boot; the protection pays off on the
+    # servers, not here (zen and the session would stay unconfined anyway).
+    excludes = with den.aspects; [core.apparmor];
   };
 
   den.aspects.voyager = {
@@ -154,8 +157,6 @@
       ];
 
       cosmos = {
-        security.apparmor.profiles = import ./_apparmor/voyager.nix;
-
         hardware.v4l2loopback.devices = [
           {
             number = 1;

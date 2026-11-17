@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # apparmor-collect — prints "<tag>\t<resolved path>" for every executable on this host (installed, running, systemd ExecStart); input for match.py.
-# Run as a sudoer: `ssh <host> 'bash -s' < collect.sh > <host>.tsv` (locally: `bash collect.sh > voyager.tsv`).
+# Run as a sudoer: `ssh <host> 'bash -s' < collect.sh > <host>.tsv`.
 {
   for d in /run/current-system/sw/bin /run/current-system/sw/sbin /run/current-system/sw/libexec /run/current-system/sw/lib/systemd /etc/profiles/per-user/*/bin /home/*/.local/state/nix/profiles/profile/bin /home/*/.local/state/nix/profiles/profile/libexec /run/wrappers/bin; do
     case "$d" in /home/agent/*) continue ;; esac
