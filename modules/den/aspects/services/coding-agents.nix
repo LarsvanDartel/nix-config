@@ -78,7 +78,8 @@ in {
         unset XDG_CACHE_HOME XDG_DATA_HOME XDG_STATE_HOME XDG_CONFIG_HOME DBUS_SESSION_BUS_ADDRESS SSH_AUTH_SOCK
         export OMP_SANDBOX_REPO=$root XDG_RUNTIME_DIR=$home/run TMPDIR=$home/tmp
         export HOME=$home
-        while IFS= read -r var; do args+=(--env "$var"); done < <(compgen -e)
+        # landrun passes only the variables named here; compgen is missing from non-interactive bash.
+        while IFS= read -r -d "" kv; do args+=(--env "''${kv%%=*}"); done < <(env -0)
 
         exec ${sandboxRunner}/bin/omp-landrun "''${args[@]}" -- ${ompPkg}/bin/omp "$@"
       '';
@@ -217,6 +218,7 @@ in {
           signal (receive) peer=agent-session,
 
           # Landlock ABI v7 can't stop connect() on path sockets; this keeps a sandboxed omp from driving the tmux server outside the sandbox.
+          # Plain deny: enforced and silent even in complain mode; `audit deny` is downgraded to allow+log there.
           deny /tmp/tmux-*/** rw,
           deny /run/user/*/tmux-*/** rw,
 
