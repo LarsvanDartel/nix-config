@@ -286,10 +286,16 @@ in {
         - You have no push, ssh or deploy credentials. Leave commits for the user to pull.
       '';
 
-      home.packages = [
-        pkgs.git
-        inputs.self.packages.${pkgs.stdenv.hostPlatform.system}.tmux
-      ];
+      # Not home.git: its SSH signing and git@github.com rewrites need keys agent lacks.
+      programs.git = {
+        enable = true;
+        settings.user = {
+          name = "agent@endeavour";
+          email = "agent@endeavour.nb.lvdar.nl";
+        };
+      };
+
+      home.packages = [inputs.self.packages.${pkgs.stdenv.hostPlatform.system}.tmux];
 
       cosmos.system.impermanence.persist.directories = ["dev"];
 
