@@ -13,6 +13,9 @@
     inherit (lib.strings) concatMapStringsSep replaceStrings;
 
     cfg = config.cosmos.programs.thunderbird;
+    # Per mode: home.theme moves user.js into the mode farm, so calendar
+    # colours follow `theme` on Thunderbird's next start.
+    colors = config.lib.stylix.colors.withHashtag;
 
     # recursiveUpdate, not `//`: a shallow merge silently drops thunderbird.enable.
     # No font-family: Calibri/Segoe UI fall back to a mismatched sans on Linux.
@@ -155,7 +158,10 @@
           url = "https://mail.lvdar.nl/dav/cal/lvdar%40lvdar.nl/default/";
           userName = "lvdar@lvdar.nl";
         };
-        thunderbird.enable = true;
+        thunderbird = {
+          enable = true;
+          color = colors.base05;
+        };
       };
 
       # Written by services.holiday-calendar; local edits would be undone.
@@ -168,6 +174,20 @@
         thunderbird = {
           enable = true;
           readOnly = true;
+          color = colors.base0B;
+        };
+      };
+
+      # Created by hand (MKCALENDAR): Stalwart calendars are account data.
+      accounts.calendar.accounts.sailing = {
+        remote = {
+          type = "caldav";
+          url = "https://mail.lvdar.nl/dav/cal/lvdar%40lvdar.nl/sailing/";
+          userName = "lvdar@lvdar.nl";
+        };
+        thunderbird = {
+          enable = true;
+          color = colors.base0A;
         };
       };
 
@@ -213,22 +233,30 @@
             paperless-ngx-uploader
           ];
 
-          settings = {
-            # Store-dropped extensions start disabled otherwise.
-            "extensions.autoDisableScopes" = 0;
+          settings =
+            {
+              # Store-dropped extensions start disabled otherwise.
+              "extensions.autoDisableScopes" = 0;
 
-            "extensions.activeThemeID" = pkgs.thunderbird-addons.theme-ancient-time.addonId;
+              "extensions.activeThemeID" = pkgs.thunderbird-addons.theme-ancient-time.addonId;
 
-            # paperless-ngx-uploader is unsigned (ships from GitHub, see
-            # thunderbird-addons.nix); all other add-ons arrive via nix.
-            "xpinstall.signatures.required" = false;
+              # paperless-ngx-uploader is unsigned (ships from GitHub, see
+              # thunderbird-addons.nix); all other add-ons arrive via nix.
+              "xpinstall.signatures.required" = false;
 
-            # Identity-pref fallbacks, so they cover every account. With the
-            # reply on top, sig_bottom = false puts the signature between the
-            # reply and the quote instead of under the quote.
-            "mail.identity.default.reply_on_top" = 1;
-            "mail.identity.default.sig_bottom" = false;
-          };
+              # Identity-pref fallbacks, so they cover every account. With the
+              # reply on top, sig_bottom = false puts the signature between the
+              # reply and the quote instead of under the quote.
+              "mail.identity.default.reply_on_top" = 1;
+              "mail.identity.default.sig_bottom" = false;
+            }
+            # Calendars added by hand in Thunderbird, keyed by registry id:
+            # the Canvas and TU/e feed URLs carry tokens, Home is local.
+            // lib.mapAttrs' (id: color: lib.nameValuePair "calendar.registry.${id}.color" color) {
+              "49aedaac-e948-44dd-9c56-01cf9aff81e9" = colors.base0C; # Canvas
+              "d2c40193-0ebf-4bae-9bf9-9c5a29e84b4a" = colors.base0D; # TU/e
+              "a1913f45-a082-4d35-bed6-60eb16ecdca2" = colors.base0E; # Home
+            };
         };
       };
 
