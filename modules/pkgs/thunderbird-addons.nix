@@ -1,4 +1,4 @@
-# thunderbird-addons — extensions and themes from addons.thunderbird.net,
+# thunderbird-addons — extensions from addons.thunderbird.net and GitHub,
 # repackaged for programs.thunderbird.profiles.<p>.extensions. Pinned to
 # exact attachment URLs, never "latest".
 {...}: {
@@ -44,22 +44,6 @@
           addonId = "{2ab1b709-ba03-4361-abf9-c50b964ff75d}";
           url = "https://addons.thunderbird.net/user-media/addons/_attachments/611/signature_switch-2.20.1-tb.xpi";
           hash = "sha256-fjt7MmjYRw3WhXZoxBpQmWOj2fX9/5tnp10ouBoRmoo=";
-        };
-
-        theme-ancient-time = mkThunderbirdXpi {
-          pname = "thunderbird-theme-ancient-time";
-          version = "1.0";
-          addonId = "{46950db7-5edd-486f-bcd1-277af4133845}";
-          url = "https://addons.thunderbird.net/user-media/addons/_attachments/987189/the_universe_of_ancient_times-1.0-tb.xpi";
-          hash = "sha256-pw98/Hpmf7uU3nAKM6DN9lRbArbPa5U85VOlHZyBGIE=";
-        };
-
-        theme-nord-dark = mkThunderbirdXpi {
-          pname = "thunderbird-theme-nord-dark";
-          version = "1.0";
-          addonId = "nord-dark@yannic-hock.themes.thunderbird.net";
-          url = "https://addons.thunderbird.net/user-media/addons/_attachments/988111/nord_dark-1.0-tb.xpi";
-          hash = "sha256-z782Ywv0D8Lipj2mLzXtgXyRD3aEONDNcyLSP4dXH4M=";
         };
       };
     })

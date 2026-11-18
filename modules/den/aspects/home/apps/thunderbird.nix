@@ -1,5 +1,9 @@
 # home.thunderbird (+ the defaultApplication option; deployment sets it true)
-{inputs, ...}: {
+{
+  inputs,
+  cosmosStyling,
+  ...
+}: {
   den.aspects.home.thunderbird.homeManager = {
     config,
     lib,
@@ -16,6 +20,93 @@
     # Per mode: home.theme moves user.js into the mode farm, so calendar
     # colours follow `theme` on Thunderbird's next start.
     colors = config.lib.stylix.colors.withHashtag;
+
+    # One add-on for both modes: Thunderbird applies dark_theme while the
+    # desktop's colour scheme is dark, and follows `theme` live. The header
+    # is a band of the default wallpaper, dimmed towards the background so
+    # the tab titles on it stay readable. Gecko installs every dropped-in
+    # theme disabled and ignores extensions.activeThemeID for it: enable it
+    # once under Add-ons → Themes; the stable id keeps it enabled after.
+    themeId = "cosmos@lvdar.nl";
+    themeAddon = let
+      header = mode: let
+        c = (cosmosStyling.colors pkgs mode).withHashtag;
+      in
+        pkgs.runCommand "thunderbird-header-${mode}.jpg" {nativeBuildInputs = [pkgs.imagemagick];} ''
+          magick ${config.cosmos.desktops.wallpapers.favourite} -resize 3000x \
+            -gravity center -crop 3000x200+0+0 +repage \
+            -fill '${c.base00}' -colorize ${
+            if mode == "dark"
+            then "60"
+            else "45"
+          }% -quality 90 $out
+        '';
+      variant = mode: let
+        c = (cosmosStyling.colors pkgs mode).withHashtag;
+        accent = c.${cosmosStyling.accent};
+      in {
+        images.theme_frame = "header-${mode}.jpg";
+        colors = {
+          frame = c.base01;
+          frame_inactive = c.base01;
+          tab_background_text = c.base05;
+          tab_selected = c.base00;
+          tab_text = c.base05;
+          tab_line = accent;
+          tab_loading = accent;
+          toolbar = c.base00;
+          toolbar_text = c.base05;
+          toolbar_top_separator = c.base02;
+          toolbar_bottom_separator = c.base02;
+          toolbar_field = c.base01;
+          toolbar_field_text = c.base05;
+          toolbar_field_border = c.base02;
+          toolbar_field_focus = c.base01;
+          toolbar_field_text_focus = c.base05;
+          toolbar_field_border_focus = accent;
+          toolbar_field_highlight = c.base02;
+          toolbar_field_highlight_text = c.base06;
+          button_background_hover = c.base02;
+          button_background_active = c.base03;
+          icons = c.base05;
+          icons_attention = accent;
+          popup = c.base01;
+          popup_text = c.base05;
+          popup_border = c.base02;
+          popup_highlight = c.base02;
+          popup_highlight_text = c.base06;
+          sidebar = c.base01;
+          sidebar_text = c.base05;
+          sidebar_border = c.base02;
+          sidebar_highlight = c.base02;
+          sidebar_highlight_text = c.base06;
+        };
+        properties = {
+          color_scheme = mode;
+          content_color_scheme = mode;
+        };
+      };
+      manifest = pkgs.writeText "manifest.json" (builtins.toJSON {
+        manifest_version = 2;
+        name = "Cosmos (${cosmosStyling.theme})";
+        version = "1.0";
+        browser_specific_settings.gecko.id = themeId;
+        theme = variant "light";
+        dark_theme = variant "dark";
+      });
+    in
+      pkgs.runCommand "thunderbird-theme-cosmos" {
+        nativeBuildInputs = [pkgs.zip];
+        passthru.addonId = themeId;
+      } ''
+        mkdir src
+        cp ${manifest} src/manifest.json
+        cp ${header "dark"} src/header-dark.jpg
+        cp ${header "light"} src/header-light.jpg
+        dir="$out/share/mozilla/extensions/{ec8030f7-c20a-464f-9b0e-13a3a9e97384}"
+        mkdir -p "$dir"
+        (cd src && zip -qX "$dir/${themeId}.xpi" manifest.json header-dark.jpg header-light.jpg)
+      '';
 
     # recursiveUpdate, not `//`: a shallow merge silently drops thunderbird.enable.
     # No font-family: Calibri/Segoe UI fall back to a mismatched sans on Linux.
@@ -227,8 +318,7 @@
           accountsOrder = ["lvdar" "gewis" "tue" "wsvw"];
 
           extensions = with pkgs.thunderbird-addons; [
-            theme-ancient-time
-            theme-nord-dark
+            themeAddon
             signature-switch
             paperless-ngx-uploader
           ];
@@ -238,10 +328,9 @@
               # Store-dropped extensions start disabled otherwise.
               "extensions.autoDisableScopes" = 0;
 
-              "extensions.activeThemeID" = pkgs.thunderbird-addons.theme-ancient-time.addonId;
-
-              # paperless-ngx-uploader is unsigned (ships from GitHub, see
-              # thunderbird-addons.nix); all other add-ons arrive via nix.
+              # paperless-ngx-uploader and the theme are unsigned (GitHub,
+              # see thunderbird-addons.nix; built here); the rest arrive via
+              # nix.
               "xpinstall.signatures.required" = false;
 
               # Identity-pref fallbacks, so they cover every account. With the
