@@ -36,10 +36,13 @@
             inherit region;
             description = false;
           }) ["noord" "midden" "zuid"];
+        # Carnaval is computed. Where this region's advised spring holiday
+        # misses it, the week around carnaval is added as well.
+        carnavalRegion = "zuid";
       });
 
       sync = pkgs.writers.writePython3Bin "holiday-calendar" {
-        libraries = [pkgs.python3Packages.icalendar];
+        libraries = with pkgs.python3Packages; [icalendar python-dateutil];
       } (builtins.readFile ./_holiday-calendar.py);
     in {
       systemd.services.holiday-calendar = {

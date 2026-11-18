@@ -14,10 +14,11 @@ import os
 import sys
 import urllib.parse
 import urllib.request
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from xml.etree import ElementTree
 from xml.sax.saxutils import escape
 
+from dateutil.easter import easter
 from icalendar import Calendar, Event
 
 DAV = "{DAV:}"
@@ -86,9 +87,55 @@ def convert(src, timezones, description, regions=None, uid=None):
     return str(ev["UID"]), name, cal.to_ical()
 
 
-def desired(feeds):
+def synthetic(key, summary, start, end, description=None):
+    ev = Event()
+    ev.add("UID", f"{key}@holiday-calendar.lvdar.nl")
+    ev.add("DTSTART", start)
+    ev.add("DTEND", end)
+    ev.add("SUMMARY", summary)
+    if description:
+        ev.add("DESCRIPTION", description)
+    return convert(ev, {}, True)
+
+
+def carnaval(years, spring, region):
+    # In no feed: Sunday to Tuesday before Ash Wednesday.
+    out = []
+    for year in sorted(years):
+        sunday = easter(year) - timedelta(days=49)
+        wednesday = sunday + timedelta(days=3)
+        out.append(
+            synthetic(f"carnaval-{year}", "Carnaval", sunday, wednesday)
+        )
+        # The region's spring holiday is only advised; where it misses
+        # carnaval, many schools there move it to the week around carnaval.
+        advised = [span for span in spring if span[0].year == year]
+        if advised and not any(
+            start <= sunday and wednesday <= end for start, end in advised
+        ):
+            dates = ", ".join(
+                f"{start:%d-%m} t/m {end - timedelta(days=1):%d-%m}"
+                for start, end in advised
+            )
+            out.append(
+                synthetic(
+                    f"voorjaarsvakantie-carnaval-{year}",
+                    f"Voorjaarsvakantie rond carnaval ({region})",
+                    sunday - timedelta(days=1),
+                    sunday + timedelta(days=8),
+                    f"Afwijkend van het advies ({dates}), dat carnaval "
+                    f"mist; veel scholen in regio {region} doen dit.",
+                )
+            )
+    return out
+
+
+def desired(feeds, carnaval_region):
     regions = [feed["region"] for feed in feeds if feed["region"]]
     converted = []
+    years = set()
+    # carnaval_region's spring holidays as (start, end) dates.
+    spring = []
     # (SUMMARY, DTSTART, DTEND) -> [(region, feed, event, timezones)]
     shared = {}
     for feed in feeds:
@@ -99,6 +146,11 @@ def desired(feeds):
             sys.exit(f"{feed['url']}: no events")
         timezones = {str(tz["TZID"]): tz for tz in source.walk("VTIMEZONE")}
         for src in found:
+            years.add(src["DTSTART"].dt.year)
+            if feed["region"] == carnaval_region and str(
+                src.get("SUMMARY", "")
+            ).startswith("Voorjaarsvakantie"):
+                spring.append((src["DTSTART"].dt, src["DTEND"].dt))
             if feed["region"]:
                 key = tuple(
                     src[k].to_ical() if k in src else b""
@@ -130,6 +182,7 @@ def desired(feeds):
                 uid,
             )
         )
+    converted += carnaval(years, spring, carnaval_region)
 
     events = {}
     uids = set()
@@ -196,7 +249,7 @@ def main():
     with open(os.path.join(os.environ["CREDENTIALS_DIRECTORY"], "admin")) as f:
         password = f.read().strip()
 
-    want = desired(cfg["feeds"])
+    want = desired(cfg["feeds"], cfg["carnavalRegion"])
     dav = Dav(cfg["calendar"], cfg["user"], password)
     have = dav.existing(cfg["name"])
 
