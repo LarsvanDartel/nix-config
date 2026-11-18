@@ -3,7 +3,9 @@
 #
 # Each event is stored under a hash of its content (without DTSTAMP, the
 # upload time), so a run deletes what changed or vanished and uploads what
-# is new; unchanged events are never rewritten.
+# is new; unchanged events are never rewritten. Regional feeds' events with
+# the same title and dates become one event naming its regions, or none
+# when every region has it.
 import base64
 import hashlib
 import http.client
@@ -38,19 +40,27 @@ def fetch(url):
         return Calendar.from_ical(resp.read())
 
 
-def convert(src, feed, timezones):
+def label(regions):
+    if len(regions) == 1:
+        return regions[0]
+    return ", ".join(regions[:-1]) + " & " + regions[-1]
+
+
+def convert(src, timezones, description, regions=None, uid=None):
     ev = Event()
     for key in KEEP:
         if key in src:
             ev[key] = src[key]
-    if feed["suffix"]:
+    if uid:
+        ev["UID"] = uid
+    if regions:
         summary = str(src.get("SUMMARY", ""))
         if summary.endswith(")"):
-            summary = f"{summary[:-1]}, {feed['suffix']})"
+            summary = f"{summary[:-1]}, {label(regions)})"
         else:
-            summary = f"{summary} ({feed['suffix']})"
+            summary = f"{summary} ({label(regions)})"
         ev["SUMMARY"] = summary
-    if feed["description"] and "DESCRIPTION" in src:
+    if description and "DESCRIPTION" in src:
         lines = str(src["DESCRIPTION"]).splitlines()
         if lines:
             ev.add("DESCRIPTION", lines[0])
@@ -73,12 +83,14 @@ def convert(src, feed, timezones):
     # Upload time; agenda-abonnement.nl's stamps are floating and in the
     # future.
     ev.add("DTSTAMP", datetime.now(timezone.utc))
-    return str(src["UID"]), name, cal.to_ical()
+    return str(ev["UID"]), name, cal.to_ical()
 
 
 def desired(feeds):
-    events = {}
-    uids = set()
+    regions = [feed["region"] for feed in feeds if feed["region"]]
+    converted = []
+    # (SUMMARY, DTSTART, DTEND) -> [(region, feed, event, timezones)]
+    shared = {}
     for feed in feeds:
         source = fetch(feed["url"])
         found = source.walk("VEVENT")
@@ -87,11 +99,45 @@ def desired(feeds):
             sys.exit(f"{feed['url']}: no events")
         timezones = {str(tz["TZID"]): tz for tz in source.walk("VTIMEZONE")}
         for src in found:
-            uid, name, body = convert(src, feed, timezones)
-            if uid in uids:
-                sys.exit(f"{feed['url']}: duplicate UID {uid}")
-            uids.add(uid)
-            events[name] = body
+            if feed["region"]:
+                key = tuple(
+                    src[k].to_ical() if k in src else b""
+                    for k in ("SUMMARY", "DTSTART", "DTEND")
+                )
+                shared.setdefault(key, []).append(
+                    (feed["region"], feed, src, timezones)
+                )
+            else:
+                converted.append(
+                    convert(src, timezones, feed["description"])
+                )
+
+    for members in shared.values():
+        names = [region for region, _, _, _ in members]
+        _, feed, src, timezones = members[0]
+        uid = None
+        if len(members) > 1:
+            # Stable across runs: changes only with the merged events.
+            joined = " ".join(sorted(str(m[2]["UID"]) for m in members))
+            digest = hashlib.sha256(joined.encode()).hexdigest()[:32]
+            uid = f"{digest}@holiday-calendar.lvdar.nl"
+        converted.append(
+            convert(
+                src,
+                timezones,
+                feed["description"],
+                None if sorted(names) == sorted(regions) else names,
+                uid,
+            )
+        )
+
+    events = {}
+    uids = set()
+    for uid, name, body in converted:
+        if uid in uids:
+            sys.exit(f"duplicate UID {uid}")
+        uids.add(uid)
+        events[name] = body
     return events
 
 

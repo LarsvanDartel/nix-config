@@ -27,13 +27,13 @@
               # Public holidays and observances; the description's first
               # line tells them apart ("Officiële feestdag" or "Viering").
               url = "https://calendar.google.com/calendar/ical/nl.dutch%23holiday%40group.v.calendar.google.com/public/basic.ics";
-              suffix = null;
+              region = null;
               description = true;
             }
           ]
           ++ map (region: {
             url = "https://agenda-abonnement.nl/schoolvakanties${region}nederland.ics";
-            suffix = region;
+            inherit region;
             description = false;
           }) ["noord" "midden" "zuid"];
       });
