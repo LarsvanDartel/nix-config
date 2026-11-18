@@ -15,7 +15,7 @@ One base16 theme, in a dark and a light mode, switched at runtime without a rebu
 | Next launch | Everforest tints in GTK3/GTK4 (`gtk.css`), Qt (qtct/Kvantum), zen's chrome CSS, yazi, zathura, bat, lazygit, mpv, spotify-player |
 | Never (default mode) | greeter, plymouth, console, GRUB: system-level, before any session |
 
-Thunderbird stays light in both modes (`ui.systemUsesDarkTheme = 0`): its generated theme add-on (a band of the default wallpaper as header) and its calendar colours use the light palette. The add-on is copied into the profile rather than linked, because Gecko only notices a changed add-on by its mtime; enable it once under Add-ons → Themes.
+Thunderbird stays light in both modes (`ui.systemUsesDarkTheme = 0`): its generated theme add-on (a band of the default wallpaper as header) and its calendar and category colours use the light palette: calendars as pastels (accents faded two thirds into the background), categories as the full accents so they stand out on them. The add-on is copied into the profile rather than linked, because Gecko only notices a changed add-on by its mtime; enable it once under Add-ons → Themes.
 
 ## Changing theme or default mode
 

@@ -21,6 +21,16 @@
     # (ui.systemUsesDarkTheme below), so everything here uses the light
     # palette.
     colors = (cosmosStyling.colors pkgs "light").withHashtag;
+    # Calendar colours fill whole events: the accent faded two thirds into
+    # the background, so text stays dark on them and category stripes (full
+    # accents) stand out.
+    pastel = slot: let
+      raw = cosmosStyling.colors pkgs "light";
+      channel = c: i: lib.fromHexString (builtins.substring i 2 c);
+      blend = i:
+        lib.fixedWidthString 2 "0" (lib.toLower (lib.toHexString
+            ((channel raw.${slot} i + 2 * channel raw.base00 i) / 3)));
+    in "#${blend 0}${blend 2}${blend 4}";
 
     # The header is a band of the default wallpaper, faded towards the
     # background so the tab titles on it stay readable. Gecko installs every
@@ -233,7 +243,7 @@
         };
         thunderbird = {
           enable = true;
-          color = colors.base05;
+          color = pastel "base05";
         };
       };
 
@@ -247,7 +257,7 @@
         thunderbird = {
           enable = true;
           readOnly = true;
-          color = colors.base0B;
+          color = pastel "base0B";
         };
       };
 
@@ -260,7 +270,7 @@
         };
         thunderbird = {
           enable = true;
-          color = colors.base0A;
+          color = pastel "base0A";
         };
       };
 
@@ -325,8 +335,18 @@
             # Calendars added by hand in Thunderbird, keyed by registry id:
             # their feed URLs carry tokens.
             // lib.mapAttrs' (id: color: lib.nameValuePair "calendar.registry.${id}.color" color) {
-              "49aedaac-e948-44dd-9c56-01cf9aff81e9" = colors.base0C; # Canvas
-              "d2c40193-0ebf-4bae-9bf9-9c5a29e84b4a" = colors.base0D; # TU/e
+              "49aedaac-e948-44dd-9c56-01cf9aff81e9" = pastel "base0C"; # Canvas
+              "d2c40193-0ebf-4bae-9bf9-9c5a29e84b4a" = pastel "base0D"; # TU/e
+            }
+            # The categories made in Thunderbird (calendar.categories.names).
+            // lib.mapAttrs' (name: color: lib.nameValuePair "calendar.category.color.${name}" color) {
+              birthday = colors.base0C;
+              meeting = colors.base08;
+              personal = colors.base0B;
+              projects = colors.base0A;
+              public_holiday = colors.base0E;
+              school = colors.base09;
+              sport = colors.base0D;
             };
         };
       };
