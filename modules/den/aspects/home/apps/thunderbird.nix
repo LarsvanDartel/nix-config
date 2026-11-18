@@ -251,11 +251,10 @@
               "mail.identity.default.sig_bottom" = false;
             }
             # Calendars added by hand in Thunderbird, keyed by registry id:
-            # the Canvas and TU/e feed URLs carry tokens, Home is local.
+            # their feed URLs carry tokens.
             // lib.mapAttrs' (id: color: lib.nameValuePair "calendar.registry.${id}.color" color) {
               "49aedaac-e948-44dd-9c56-01cf9aff81e9" = colors.base0C; # Canvas
               "d2c40193-0ebf-4bae-9bf9-9c5a29e84b4a" = colors.base0D; # TU/e
-              "a1913f45-a082-4d35-bed6-60eb16ecdca2" = colors.base0E; # Home
             };
         };
       };
