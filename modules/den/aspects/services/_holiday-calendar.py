@@ -119,8 +119,8 @@ def carnaval(years, spring, region):
             )
             out.append(
                 synthetic(
-                    f"voorjaarsvakantie-carnaval-{year}",
-                    f"Voorjaarsvakantie rond carnaval ({region})",
+                    f"carnavalvakantie-{year}",
+                    f"Carnavalvakantie ({region})",
                     sunday - timedelta(days=1),
                     sunday + timedelta(days=8),
                     f"Afwijkend van het advies ({dates}), dat carnaval "
