@@ -158,6 +158,19 @@
         thunderbird.enable = true;
       };
 
+      # Written by services.holiday-calendar; local edits would be undone.
+      accounts.calendar.accounts.feestdagen = {
+        remote = {
+          type = "caldav";
+          url = "https://mail.lvdar.nl/dav/cal/lvdar%40lvdar.nl/feestdagen/";
+          userName = "lvdar@lvdar.nl";
+        };
+        thunderbird = {
+          enable = true;
+          readOnly = true;
+        };
+      };
+
       accounts.contact.accounts =
         {
           lvdar = {

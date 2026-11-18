@@ -26,6 +26,7 @@
       services.ntfy
       services.stalwart
       services.bulwark
+      services.holiday-calendar
       services.unbound
       services.gatus
       services.alloy
