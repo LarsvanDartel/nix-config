@@ -11,9 +11,11 @@ One base16 theme, in a dark and a light mode, switched at runtime without a rebu
 
 | When it repaints | What |
 |---|---|
-| Live | noctalia (bar, panels, launcher, OSD, lock screen), niri and Umbriel borders, foot (`SIGUSR1`/`SIGUSR2`), tmux (`source-file`), btop (`SIGUSR2`), nvim, devshell variants included (`:LaunchpadThemeReload` over its server socket), GTK3 apps (`gtk-theme` flips adw-gtk3/adw-gtk3-dark), GTK4/libadwaita apps and zen (portal `color-scheme`), Thunderbird's theme (one generated add-on with a `dark_theme`, wallpaper band as header; enable it once under Add-ons → Themes), icons |
-| Next launch | Everforest tints in GTK3/GTK4 (`gtk.css`), Qt (qtct/Kvantum), zen's chrome CSS, yazi, zathura, bat, lazygit, mpv, spotify-player, Thunderbird's calendar colours (`user.js`) |
+| Live | noctalia (bar, panels, launcher, OSD, lock screen), niri and Umbriel borders, foot (`SIGUSR1`/`SIGUSR2`), tmux (`source-file`), btop (`SIGUSR2`), nvim, devshell variants included (`:LaunchpadThemeReload` over its server socket), GTK3 apps (`gtk-theme` flips adw-gtk3/adw-gtk3-dark), GTK4/libadwaita apps and zen (portal `color-scheme`), icons |
+| Next launch | Everforest tints in GTK3/GTK4 (`gtk.css`), Qt (qtct/Kvantum), zen's chrome CSS, yazi, zathura, bat, lazygit, mpv, spotify-player |
 | Never (default mode) | greeter, plymouth, console, GRUB: system-level, before any session |
+
+Thunderbird stays light in both modes (`ui.systemUsesDarkTheme = 0`): its generated theme add-on (a band of the default wallpaper as header) and its calendar colours use the light palette. The add-on is copied into the profile rather than linked, because Gecko only notices a changed add-on by its mtime; enable it once under Add-ons → Themes.
 
 ## Changing theme or default mode
 
