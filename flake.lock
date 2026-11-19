@@ -1614,6 +1614,22 @@
         "type": "github"
       }
     },
+    "nixpkgs-stalwart-pin": {
+      "locked": {
+        "lastModified": 1794964372,
+        "narHash": "sha256-WaNO3Q6hE6PGy54gx2eNhePahiNIx5aG8b7utBR37JA=",
+        "owner": "nixos",
+        "repo": "nixpkgs",
+        "rev": "8370dc40d6df4d236eeaf88f8ca03afbf57916c5",
+        "type": "github"
+      },
+      "original": {
+        "owner": "nixos",
+        "repo": "nixpkgs",
+        "rev": "8370dc40d6df4d236eeaf88f8ca03afbf57916c5",
+        "type": "github"
+      }
+    },
     "nixpkgs-unstable": {
       "locked": {
         "lastModified": 1794840529,
@@ -2115,6 +2131,7 @@
         "nixos-hardware": "nixos-hardware",
         "nixpkgs": "nixpkgs_14",
         "nixpkgs-stable": "nixpkgs-stable",
+        "nixpkgs-stalwart-pin": "nixpkgs-stalwart-pin",
         "nixpkgs-unstable": "nixpkgs-unstable",
         "nixpkgs-zotero-pin": "nixpkgs-zotero-pin",
         "noctalia-netbird": "noctalia-netbird",

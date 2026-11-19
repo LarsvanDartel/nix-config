@@ -1,4 +1,4 @@
-# services.stalwart — Stalwart 1.0 mail/CalDAV/CardDAV/JMAP server; logins
+# services.stalwart — Stalwart 1.x mail/CalDAV/CardDAV/JMAP server; logins
 # via kanidm OIDC, outbound via the JetEmail relay. All settings live in
 # Stalwart's database and are applied by services.stalwart.provision.
 {den, ...}: let
@@ -216,9 +216,9 @@ in {
 
         services.stalwart = {
           enable = true;
-          # No unversioned 1.x attribute yet: `stalwart` is a warnAlias for
-          # 0.15, fatal under abort-on-warn.
-          package = pkgs.stalwart_1_0;
+          # `stalwart` is a warnAlias for 0.15, fatal under abort-on-warn.
+          # stalwart_1 is pinned ahead of nixpkgs (pkgs/stalwart.nix).
+          package = pkgs.stalwart_1;
           stateVersion = "26.11";
           url = "https://${cfg.hostname}";
 
@@ -483,6 +483,11 @@ in {
         systemd.services.stalwart = {
           wants = ["acme-lvdar.nl.service"];
           after = ["acme-lvdar.nl.service"];
+          # Releases add permissions only to the default roles of new
+          # installs. This adds the missing ones at each start; it touches
+          # only the default role sets (Authentication above), never re-adds
+          # a permission 1.0.0 already had, and respects disabledPermissions.
+          environment.STALWART_UPDATE_ROLE_PERMISSIONS = "true";
         };
         security.acme.certs."lvdar.nl".reloadServices = ["stalwart.service"];
 
