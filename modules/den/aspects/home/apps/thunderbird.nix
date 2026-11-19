@@ -20,20 +20,28 @@
     # Thunderbird stays light whatever the desktop mode
     # (ui.systemUsesDarkTheme below), so everything here uses the light
     # palette.
-    colors = (cosmosStyling.colors pkgs "light").withHashtag;
-    # Calendar colours fill whole events: the accent faded two thirds into
-    # the background, so text stays dark on them and category stripes (full
-    # accents) stand out.
-    pastel = slot: let
-      raw = cosmosStyling.colors pkgs "light";
+    light = cosmosStyling.colors pkgs "light";
+    colors = light.withHashtag;
+    # pct percent of raw colour a, the rest b, as "#rrggbb".
+    mix = pct: a: b: let
       channel = c: i: lib.fromHexString (builtins.substring i 2 c);
       blend = i:
         lib.fixedWidthString 2 "0" (lib.toLower (lib.toHexString
-            ((channel raw.${slot} i + 2 * channel raw.base00 i) / 3)));
+            ((channel a i * pct + channel b i * (100 - pct)) / 100)));
     in "#${blend 0}${blend 2}${blend 4}";
+    # Calendar colours fill whole events: the accent faded two thirds into
+    # the background, so text stays dark on them and category stripes (full
+    # accents) stand out.
+    pastel = slot: mix 33 light.${slot} light.base00;
+    # The chrome: Everforest's sage (its dark mode's green), deepened towards
+    # the dark background for the frame, borders and highlights, lightened
+    # towards the light one for toolbars, panes and fields.
+    dark = cosmosStyling.colors pkgs "dark";
+    sage = pct: mix pct dark.base0B light.base00;
+    deep = pct: mix pct dark.base0B dark.base00;
 
-    # The header is a band of the default wallpaper, faded towards the
-    # background so the tab titles on it stay readable. Gecko installs every
+    # The header is a band of the default wallpaper, faded towards the sage
+    # so the tab titles on it stay readable. Gecko installs every
     # dropped-in theme disabled and ignores extensions.activeThemeID for it:
     # enable it once under Add-ons → Themes; the stable id keeps it enabled.
     themeId = "cosmos@lvdar.nl";
@@ -41,7 +49,7 @@
       header = pkgs.runCommand "thunderbird-header.jpg" {nativeBuildInputs = [pkgs.imagemagick];} ''
         magick ${config.cosmos.desktops.wallpapers.favourite} -resize 3000x \
           -gravity center -crop 3000x200+0+0 +repage \
-          -fill '${colors.base00}' -colorize 45% -quality 90 $out
+          -fill '${deep 85}' -colorize 45% -quality 90 $out
       '';
       accent = colors.${cosmosStyling.accent};
       manifest = pkgs.writeText "manifest.json" (builtins.toJSON {
@@ -52,39 +60,39 @@
         theme = {
           images.theme_frame = "header.jpg";
           colors = with colors; {
-            frame = base01;
-            frame_inactive = base01;
-            tab_background_text = base05;
-            tab_selected = base00;
-            tab_text = base05;
+            frame = deep 85;
+            frame_inactive = deep 85;
+            tab_background_text = base07;
+            tab_selected = sage 90;
+            tab_text = base07;
             tab_line = accent;
             tab_loading = accent;
-            toolbar = base00;
-            toolbar_text = base05;
-            toolbar_top_separator = base02;
-            toolbar_bottom_separator = base02;
-            toolbar_field = base01;
-            toolbar_field_text = base05;
-            toolbar_field_border = base02;
-            toolbar_field_focus = base01;
-            toolbar_field_text_focus = base05;
+            toolbar = sage 90;
+            toolbar_text = base07;
+            toolbar_top_separator = deep 70;
+            toolbar_bottom_separator = deep 70;
+            toolbar_field = sage 50;
+            toolbar_field_text = base07;
+            toolbar_field_border = deep 70;
+            toolbar_field_focus = sage 35;
+            toolbar_field_text_focus = base07;
             toolbar_field_border_focus = accent;
-            toolbar_field_highlight = base02;
-            toolbar_field_highlight_text = base06;
-            button_background_hover = base02;
-            button_background_active = base03;
-            icons = base05;
+            toolbar_field_highlight = deep 85;
+            toolbar_field_highlight_text = base07;
+            button_background_hover = deep 90;
+            button_background_active = deep 75;
+            icons = base06;
             icons_attention = accent;
-            popup = base01;
-            popup_text = base05;
-            popup_border = base02;
-            popup_highlight = base02;
-            popup_highlight_text = base06;
-            sidebar = base01;
-            sidebar_text = base05;
-            sidebar_border = base02;
-            sidebar_highlight = base02;
-            sidebar_highlight_text = base06;
+            popup = sage 50;
+            popup_text = base07;
+            popup_border = deep 70;
+            popup_highlight = sage 90;
+            popup_highlight_text = base07;
+            sidebar = sage 75;
+            sidebar_text = base07;
+            sidebar_border = deep 70;
+            sidebar_highlight = deep 90;
+            sidebar_highlight_text = base07;
           };
           properties = {
             color_scheme = "light";
