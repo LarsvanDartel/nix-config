@@ -87,6 +87,7 @@ in {
     config,
     osConfig,
     lib,
+    pkgs,
     ...
   }: let
     inherit (lib.options) mkEnableOption mkOption;
@@ -95,6 +96,34 @@ in {
 
     cfg = config.cosmos.cli.programs.git;
     publicKey = "${config.cosmos.user.home}/.ssh/id_ed25519.pub";
+
+    # `git agent-pull [branch]`: the agent's commits from endeavour, re-authored
+    # (and re-signed) as this user on top of the current branch.
+    agentPull = pkgs.writeShellApplication {
+      name = "git-agent-pull";
+      runtimeInputs = [config.programs.git.package];
+      text = ''
+        target=$(git symbolic-ref --quiet --short HEAD) || {
+          echo "git agent-pull: check out the branch to pull into" >&2
+          exit 1
+        }
+        branch=''${1:-$target}
+
+        if ! git remote get-url agent >/dev/null 2>&1; then
+          git remote add agent "ssh://agent@endeavour:2222/home/agent/dev/$(basename "$(git rev-parse --show-toplevel)")"
+        fi
+        git fetch agent
+
+        # Commits pulled before are skipped by patch-id, so a re-run only takes new ones.
+        if ! git rebase --exec 'git commit --amend --no-edit --reset-author' "$target" "agent/$branch"; then
+          echo "git agent-pull: after the rebase finishes: git switch $target && git merge --ff-only 'HEAD@{1}'" >&2
+          exit 1
+        fi
+        rewritten=$(git rev-parse HEAD)
+        git switch --quiet "$target"
+        git merge --ff-only "$rewritten"
+      '';
+    };
   in {
     options.cosmos.cli.programs.git = {
       user = mkOption {
@@ -123,6 +152,8 @@ in {
         gi = "git init";
         gcl = "git clone";
       };
+
+      home.packages = [agentPull];
 
       programs.delta = {
         inherit (cfg.delta) enable;
