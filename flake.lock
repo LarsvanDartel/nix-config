@@ -912,10 +912,10 @@
         "presentypst": "presentypst"
       },
       "locked": {
-        "lastModified": 1795095052,
-        "narHash": "sha256-kgRTv0t5MFqV9Iq9NQDq3wNGV0Tf8u1/ZvYdTskH1sU=",
+        "lastModified": 1795096949,
+        "narHash": "sha256-67+rfI9NYFB5PhroU08U1vc61/nrVYrh6LWKlr1oa2I=",
         "ref": "refs/heads/main",
-        "rev": "fab0d79665f23064ed931bff75a77c7aefb264c6",
+        "rev": "1d6aeb2f7c46d0f21e4abfaf25c57d945eef4b46",
         "shallow": true,
         "type": "git",
         "url": "https://knot.lvdar.nl/did:plc:aomkxcjtprbtc6rzsho5rexe"
