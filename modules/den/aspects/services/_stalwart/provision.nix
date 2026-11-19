@@ -1,7 +1,7 @@
 # services.stalwart.provision — vendored from nixpkgs PR #552103 (see
 # ./default.nix). Changed: meta dropped; `scope` defaults to null (upstream
-# throws when it is unset); `secretFiles` added; the readiness loop sleeps
-# between attempts (upstream spins) and the script fails on any error.
+# throws when it is unset); `secretFiles` added; `timeout` unset omits
+# TimeoutSec (upstream writes an empty one); the script fails on any error.
 {
   config,
   lib,
@@ -205,6 +205,7 @@ in {
             config.systemd.services.stalwart.serviceConfig.LoadCredential
             ++ lib.mapAttrsToList (name: path: "secret-${name}:${path}") cfg.secretFiles;
           RuntimeDirectory = "stalwart-provision";
+          TimeoutSec = lib.mkIf (cfg.timeout != null) cfg.timeout;
 
           ExecStart = pkgs.writeShellScript "stalwart-provision" ''
             set -euo pipefail
@@ -218,13 +219,13 @@ in {
             )}
             while :; do
               for url in ${lib.concatMapStringsSep " " lib.escapeShellArg cfg.urls}; do
-                if ${pkgs.curl}/bin/curl --fail "$url" &>/dev/null; then
+                if ${pkgs.curl}/bin/curl --fail "$url/healthz/live" &>/dev/null; then
                   echo "connection to $url succeeded, attempting to provision onto it"
                   STALWART_URL=$url STALWART_PASSWORD="$(systemd-creds cat ${lib.escapeShellArg stalwart.admin.username})" ${lib.getExe cfg.package} apply --file "$plan"
                   exit
                 fi
+                sleep 0.25
               done
-              sleep 0.25
             done
           '';
           Environment = [

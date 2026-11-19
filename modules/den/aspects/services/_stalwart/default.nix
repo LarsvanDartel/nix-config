@@ -1,5 +1,5 @@
 # services.stalwart — vendored 0.16+ module from nixpkgs PR #552103 (head
-# 772b06e); delete with ./provision.nix once nixpkgs ships it (guard in
+# cf92dec); delete with ./provision.nix once nixpkgs ships it (guard in
 # ../stalwart.nix). Changed: meta dropped (doc/maintainers absent upstream).
 {
   config,
