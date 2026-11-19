@@ -84,6 +84,7 @@
 
           programs = {
             zathura.defaultApplication = true;
+            xournalpp.defaultApplication = true;
             mpv.defaultApplication = true;
             thunderbird.defaultApplication = true;
             obs-studio = {
