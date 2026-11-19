@@ -148,10 +148,17 @@
           systemd.services.attic-watch-store = {
             description = "Upload new store paths to the attic cache";
             wantedBy = ["multi-user.target"];
-            after = ["network-online.target" "netbird.service"];
+            after = ["network-online.target" "netbird.service" "nix-daemon.socket"];
             wants = ["network-online.target"];
+            requires = ["nix-daemon.socket"];
 
-            environment.XDG_CONFIG_HOME = configHome;
+            # Through the daemon, not the local store: attic links its own Nix
+            # (nixpkgs pins one), and opening the DB directly holds big-lock for
+            # the unit's lifetime, deadlocking a newer Nix's schema migration.
+            environment = {
+              XDG_CONFIG_HOME = configHome;
+              NIX_REMOTE = "daemon";
+            };
 
             serviceConfig = {
               ExecStart = "${lib.getExe pkgs.attic-client} watch-store ${cfg.cacheName}";
