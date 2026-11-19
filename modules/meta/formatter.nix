@@ -16,7 +16,13 @@
         enable = true;
         no-lambda-arg = true;
       };
-      shfmt.enable = true;
+      # Explicit: treefmt-nix dropped these defaults (-i 2 -s), after which
+      # shfmt follows .editorconfig's 4 and reindents every script.
+      shfmt = {
+        enable = true;
+        indent_size = 2;
+        simplify = true;
+      };
     };
 
     settings.global.excludes = [
