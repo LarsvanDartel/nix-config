@@ -70,13 +70,10 @@
 
         vpnNamespaces.${cfg.name} = {
           enable = true;
-          openVPNPorts = optional (cfg.vpnTestService.port != null) {
-            port = cfg.vpnTestService.port;
-            protocol = "tcp";
-          };
+          vpn.allowedTCPPorts = optional (cfg.vpnTestService.port != null) cfg.vpnTestService.port;
           # Sources not listed here get replies via the tunnel, so mesh requests
           # time out silently.
-          accessibleFrom =
+          allowedIngress =
             [
               "192.168.1.0/24"
               "192.168.0.0/24"

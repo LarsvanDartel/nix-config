@@ -153,12 +153,10 @@ in {
               to = cfg.uiPort;
             }
           ];
-          openVPNPorts = [
-            {
-              port = cfg.peerPort;
-              protocol = "both";
-            }
-          ];
+          vpn = {
+            allowedTCPPorts = [cfg.peerPort];
+            allowedUDPPorts = [cfg.peerPort];
+          };
         };
 
         services.nginx.virtualHosts = mkIf cfg.vpn.enable (vpnVhost cfg.uiPort);

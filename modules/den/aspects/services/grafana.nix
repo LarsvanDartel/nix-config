@@ -159,7 +159,7 @@ in {
             # a 501, logged as an error on every visit. Empty: the default
             # limit, nothing enforced.
             unified_storage.overrides_path =
-              lib.warnIf (grafanaVersion != "13.3.0") ''
+              lib.warnIf (grafanaVersion != "13.3.1") ''
                 modules/den/aspects/services/grafana.nix: nixpkgs' grafana is now ${grafanaVersion}.
                 Check whether /dashboards still requests quotas.grafana.app usage without an overrides file; drop overrides_path or bump this guard.
               ''
@@ -170,7 +170,7 @@ in {
             # has no manifests on a single node, warning twice a minute.
             log.filters = lib.concatStringsSep " " [
               "cleanup:warn"
-              (lib.warnIf (grafanaVersion != "13.3.0") ''
+              (lib.warnIf (grafanaVersion != "13.3.1") ''
                   modules/den/aspects/services/grafana.nix: nixpkgs' grafana is now ${grafanaVersion}.
                   Check whether search-manifest-watcher still warns on zero manifests; drop its log filter or bump this guard.
                 ''
