@@ -103,6 +103,7 @@ in {
       services.crowdsec.remote
       services.opencloud
       services.typstnique
+      services.gewisAoc
       services.tino
       services.gewisMinutesWatcher
       services.site

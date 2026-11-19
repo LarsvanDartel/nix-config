@@ -22,6 +22,10 @@
     flake-file.url = "github:denful/flake-file";
     flake-parts.url = "github:hercules-ci/flake-parts";
     genix.url = "github:GEHACK/genix";
+    gewis-aoc = {
+      url = "git+https://knot.lvdar.nl/did:plc:aomkxcjtprbtc6rzsho5rexe?shallow=1";
+      inputs.launchpad.follows = "launchpad";
+    };
     home-manager = {
       url = "github:nix-community/home-manager";
       inputs.nixpkgs.follows = "nixpkgs";
