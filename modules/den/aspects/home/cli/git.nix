@@ -113,15 +113,31 @@ in {
           git remote add agent "ssh://agent@endeavour:2222/home/agent/dev/$(basename "$(git rev-parse --show-toplevel)")"
         fi
         git fetch agent
+        tip=$(git rev-parse "agent/$branch")
+        mark=refs/agent-pull/$branch
 
-        # Commits pulled before are skipped by patch-id, so a re-run only takes new ones.
-        if ! git rebase --exec 'git commit --amend --no-edit --reset-author' "$target" "agent/$branch"; then
-          echo "git agent-pull: after the rebase finishes: git switch $target && git merge --ff-only 'HEAD@{1}'" >&2
+        # The agent's branch keeps every commit it ever made; patch-id misses
+        # ones whose context moved here, so take only what follows the last pull.
+        if last=$(git rev-parse --verify --quiet "$mark") && git merge-base --is-ancestor "$last" "$tip"; then
+          [[ $last == "$tip" ]] && {
+            echo "git agent-pull: nothing new on agent/$branch"
+            exit 0
+          }
+          range=(--onto "$target" "$last")
+        else
+          range=("$target")
+        fi
+
+        if ! git rebase --empty=drop \
+          --exec "git merge-base --is-ancestor HEAD $target || git commit --amend --no-edit --reset-author" \
+          "''${range[@]}" "$tip"; then
+          echo "git agent-pull: after the rebase finishes: git switch $target && git merge --ff-only 'HEAD@{1}' && git update-ref $mark $tip" >&2
           exit 1
         fi
         rewritten=$(git rev-parse HEAD)
         git switch --quiet "$target"
         git merge --ff-only "$rewritten"
+        git update-ref "$mark" "$tip"
       '';
     };
   in {
