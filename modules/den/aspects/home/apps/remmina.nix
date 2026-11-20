@@ -21,7 +21,12 @@
       security.pam.krb5.enable = false;
     };
 
-    homeManager = {lib, ...}: {
+    homeManager = {
+      config,
+      lib,
+      pkgs,
+      ...
+    }: {
       services.remmina = {
         enable = true;
         systemdService.enable = false;
@@ -33,6 +38,18 @@
         ".config/freerdp"
         ".local/share/remmina"
       ];
+
+      # Global RDP prefs live in remmina.pref, which Remmina rewrites, so set
+      # the key in place. Client keymap: printable keys go as the character the
+      # local layout (Programmer Dvorak) produces; Windows would otherwise read
+      # physical keys as US QWERTY. Ctrl/Alt/Super combos still go as physical
+      # keys, i.e. QWERTY positions.
+      home.activation.remminaPrefs = lib.hm.dag.entryAfter ["writeBoundary"] ''
+        run mkdir -p ${lib.escapeShellArg "${config.xdg.configHome}/remmina"}
+        run ${lib.getExe pkgs.crudini} --set \
+          ${lib.escapeShellArg "${config.xdg.configHome}/remmina/remmina.pref"} \
+          remmina_pref rdp_use_client_keymap 1
+      '';
 
       # Remmina rewrites a profile on every connect, replacing the symlink, and
       # renames it to its `remmina_file_name` pattern (%G_%P_%N_%h); this name
@@ -52,6 +69,13 @@
             domain = "GEWISWG.GEWIS.NL";
             # Dynamic resolution: the desktop follows the window size.
             scale = 2;
+            # Remmina's default (0) turns off font smoothing, themes and more.
+            quality = 9;
+            network = "autodetect";
+            # Win key, Alt+Tab and Super+… go to Windows; Right Ctrl toggles.
+            keyboard_grab = 1;
+            # \\tsclient\Downloads in the session.
+            drive = "Downloads,${config.home.homeDirectory}/Downloads";
           };
         };
       };
