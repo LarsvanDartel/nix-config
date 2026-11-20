@@ -10,9 +10,10 @@
         systemdService.enable = false;
       };
 
-      # data/RDP holds FreeRDP's trusted certificate fingerprints.
+      # .config/freerdp holds the trusted RDP certificate fingerprints.
       cosmos.system.impermanence.persist.directories = [
         ".config/remmina"
+        ".config/freerdp"
         ".local/share/remmina"
       ];
 
@@ -26,10 +27,13 @@
             group = "GEWIS";
             protocol = "RDP";
             # Only reachable over netbird-gewis: its split DNS maps this name to
-            # the NetBird peer; public DNS gives an IP with 3389 closed.
+            # the NetBird peer; public DNS gives an IP with 3389 closed. Keep
+            # the AD name, not the NetBird FQDN: Kerberos needs it for the SPN.
             server = "GEWISMGMT.gewiswg.gewis.nl";
             username = "m10243";
-            domain = "GEWISWG";
+            # The DNS realm, not the NetBIOS name: the server blocks NTLM, and
+            # Kerberos finds the KDC through this realm's SRV records.
+            domain = "GEWISWG.GEWIS.NL";
             # Dynamic resolution: the desktop follows the window size.
             scale = 2;
           };
