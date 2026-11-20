@@ -208,6 +208,8 @@
             };
           } (mkSignature "gewis" [address]);
 
+        # Outlook leaves Junk Email unsubscribed, so a subscribed-only listing
+        # hides it. Both Outlook accounts list everything instead.
         # Enterprise office365 tenant: the flavor supplies host/port/TLS/XOAUTH2.
         tue = let
           address = "l.v.dartel@student.tue.nl";
@@ -216,7 +218,12 @@
             flavor = "outlook.office365.com";
             inherit address;
             realName = "Lars van Dartel";
-            thunderbird.enable = true;
+            thunderbird = {
+              enable = true;
+              settings = id: {
+                "mail.server.server_${id}.using_subscription" = false;
+              };
+            };
           } (mkSignature "tue" [address]);
 
         # Consumer Outlook.com: SMTP host differs and no flavor covers it.
@@ -235,7 +242,12 @@
             authentication = "xoauth2";
             tls.useStartTls = true;
           };
-          thunderbird.enable = true;
+          thunderbird = {
+            enable = true;
+            settings = id: {
+              "mail.server.server_${id}.using_subscription" = false;
+            };
+          };
         };
       };
 
