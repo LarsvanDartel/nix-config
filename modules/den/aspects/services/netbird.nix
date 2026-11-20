@@ -430,6 +430,15 @@ in {
       fleetGroup = "${managedPrefix}fleet";
       resolverGroup = "${managedPrefix}resolvers";
       operatorGroup = "${managedPrefix}operators";
+      callbackGroup = name: "${managedPrefix}callback-${name}";
+      callbacks =
+        lib.mapAttrsToList (name: c: {
+          group = callbackGroup name;
+          policy = "${policyPrefix}callback-${name}";
+          inherit (c) protocol;
+          inherit (c.ports) start end;
+        })
+        cfg.mesh.operatorCallbacks;
 
       # Same-host read: the fleet resolvers serve these names (gaia runs one).
       # attrByPath, as this module must not require the unbound aspect.
@@ -854,6 +863,9 @@ in {
               ensure_group ${fleetGroup} "$fleet_ids"
               ensure_group ${resolverGroup} "$resolver_ids"
               ${lib.optionalString (cfg.mesh.operators != []) ''ensure_group ${operatorGroup} "$operator_ids"''}
+              ${lib.concatMapStrings (name: ''
+              ensure_group ${callbackGroup name} "$(peer_ids '${builtins.toJSON cfg.mesh.operatorCallbacks.${name}.peers}')"
+            '') (lib.attrNames cfg.mesh.operatorCallbacks)}
 
               gid() { jq -r --arg n "$1" '.[] | select(.name == $n) | .id' <<<"$groups" | head -n1; }
               fleet_gid="$(gid ${fleetGroup})"
@@ -874,9 +886,14 @@ in {
               # phone resolving nothing at all, which is not a boundary, just an
               # outage. tcp as well as udp, for responses that do not fit in a
               # datagram.
+              #
+              # Callbacks are the one exception to "nothing reaches an
+              # operator": a declared fleet peer back to it on a declared port
+              # range, for apps whose protocol has the far side dial back.
               desired_policies="$(jq -n \
                 --arg fleet "$fleet_gid" --arg resolver "$resolver_gid" --arg all "$all_gid" \
                 --arg operator "${lib.optionalString (cfg.mesh.operators != []) "$operator_gid"}" \
+                --argjson groups "$groups" --argjson callbacks '${builtins.toJSON callbacks}' \
                 '[
                   { name: "${policyPrefix}fleet",
                     description: "The fleet'"'"'s own machines, freely",
@@ -904,6 +921,15 @@ in {
                     rules: [{ name: "${policyPrefix}operators", enabled: true, action: "accept",
                               bidirectional: false, protocol: "all",
                               sources: [$operator], destinations: [$fleet] }] }
+                ] + [$callbacks[] as $c
+                  | ($groups[] | select(.name == $c.group) | .id) as $src
+                  | { name: $c.policy,
+                      description: "Fleet peers back to operator devices, \($c.protocol) \($c.start)-\($c.end)",
+                      enabled: true,
+                      rules: [{ name: $c.policy, enabled: true, action: "accept",
+                                bidirectional: false, protocol: $c.protocol,
+                                port_ranges: [{ start: $c.start, end: $c.end }],
+                                sources: [$src], destinations: [$operator] }] }
                 ] end')"
 
               existing_policies="$(req "$api/policies")"
@@ -925,13 +951,14 @@ in {
                   current="$(jq -c --arg n "$pname" '.[] | select(.name == $n)
                     | {name, description, enabled,
                        rules: [.rules[] | {name, enabled, action, bidirectional,
-                                           protocol, ports,
+                                           protocol, ports, port_ranges,
                                            sources: [.sources[].id],
                                            destinations: [.destinations[].id]}]}' \
                     <<<"$existing_policies")"
                   want="$(jq -cS '{name, description, enabled,
                     rules: [.rules[] | {name, enabled, action, bidirectional,
                                         protocol, ports: (.ports // null),
+                                        port_ranges: (.port_ranges // null),
                                         sources, destinations}]}' <<<"$pol")"
                   if [ "$(jq -cS . <<<"$current")" != "$want" ]; then
                     echo "netbird: updating policy $pname"
@@ -1542,6 +1569,52 @@ in {
 
               A mesh grant only, not a login: sshd still wants a key from
               core/_ssh-keys/authorized.nix.
+            '';
+          };
+
+          operatorCallbacks = mkOption {
+            type = attrsOf (submodule {
+              options = {
+                peers = mkOption {
+                  type = listOf str;
+                  example = ["voyager"];
+                  description = "Fleet peers, by name, that may open connections to the operators.";
+                };
+                protocol = mkOption {
+                  type = enum ["tcp" "udp"];
+                  description = "Protocol the callback uses.";
+                };
+                ports = {
+                  start = mkOption {
+                    type = port;
+                    description = "First port of the range on the operator.";
+                  };
+                  end = mkOption {
+                    type = port;
+                    description = "Last port of the range on the operator.";
+                  };
+                };
+              };
+            });
+            default = {};
+            example = {
+              kde-connect = {
+                peers = ["voyager"];
+                protocol = "tcp";
+                ports = {
+                  start = 1714;
+                  end = 1764;
+                };
+              };
+            };
+            description = ''
+              Narrow exceptions to `operators` being unreachable: each entry
+              lets its fleet peers open connections to every operator on one
+              protocol and port range. For apps whose protocol has the receiving
+              side dial back, such as KDE Connect, where the peer that hears the
+              phone's UDP identity opens the TCP link to it.
+
+              Ignored while `operators` is empty.
             '';
           };
 

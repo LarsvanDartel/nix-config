@@ -189,12 +189,23 @@
       cosmos.services.netbird.dnsPeers = ["endeavour" "gaia"];
 
       # Non-fleet peers get DNS only. panther, the phone, is an operator: it
-      # reaches the fleet (Termux SSH, mesh-only names) and nothing reaches it.
-      # `enforce` retires All -> All; getting it wrong takes out SSH to
-      # everything at once.
+      # reaches the fleet (Termux SSH, mesh-only names) and nothing reaches it
+      # except declared callbacks. `enforce` retires All -> All; getting it
+      # wrong takes out SSH to everything at once.
       cosmos.services.netbird.mesh = {
         fleet = denHosts;
         operators = ["panther"];
+        # KDE Connect off the home LAN: the phone adds voyager by mesh IP and
+        # sends its UDP identity, then voyager dials the phone's TCP port back.
+        # voyager is the only host with home.kde-connect.
+        operatorCallbacks.kde-connect = {
+          peers = ["voyager"];
+          protocol = "tcp";
+          ports = {
+            start = 1714;
+            end = 1764;
+          };
+        };
         resolvers = [
           "endeavour"
           "gaia"
