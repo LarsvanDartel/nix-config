@@ -1,0 +1,16 @@
+--- a/server/lib/src/idm/server.rs	2026-11-20 11:19:14.010230712 +0100
++++ b/server/lib/src/idm/server.rs	2026-11-20 11:19:14.057091496 +0100
+@@ -696,8 +696,11 @@
+                     .and_then(|sessions| sessions.get(&parent_session_id));
+ 
+                 if let Some(uat_session) = uat_session {
+-                    let parent_session_valid =
+-                        !matches!(uat_session.state, SessionState::RevokedAt(_));
++                    let parent_session_valid = match uat_session.state {
++                        SessionState::RevokedAt(_) => false,
++                        SessionState::ExpiresAt(exp) => OffsetDateTime::UNIX_EPOCH + ct < exp,
++                        SessionState::NeverExpires => true,
++                    };
+                     if parent_session_valid {
+                         security_info!(
+                             "A valid parent and oauth2 session value exists for this token"
