@@ -210,7 +210,6 @@ in {
         services.stalwart = {
           enable = true;
           # `stalwart` is a warnAlias for 0.15, fatal under abort-on-warn.
-          # stalwart_1 is pinned ahead of nixpkgs (pkgs/stalwart.nix).
           package = pkgs.stalwart_1;
           stateVersion = "26.11";
           url = "https://${cfg.hostname}";

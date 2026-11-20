@@ -215,7 +215,7 @@ in {
         # Upstream's binary, not nixpkgs' `mongodb`: SSPL is unfree, so Hydra never caches it and it
         # compiles here for hours. Held on 7.0, the data's FCV: majors upgrade one at a time.
         services.mongodb.package = let
-          version = "7.0.45";
+          version = "7.0.48";
         in
           lib.warnIf (lib.versionOlder version pkgs.mongodb.version) ''
             modules/den/aspects/services/ollama.nix: nixpkgs' mongodb is now ${pkgs.mongodb.version}, ahead of the ${version} binary.
@@ -225,7 +225,7 @@ in {
             inherit version;
             src = pkgs.fetchurl {
               url = "https://fastdl.mongodb.org/linux/mongodb-linux-x86_64-ubuntu2204-${version}.tgz";
-              hash = "sha256-wu7B5Krulng4QwrFf8fUbCL1ZscY7aYDPjKt2A1Qb4s=";
+              hash = "sha256-BBLE4frQriu2UDunnFvcvXGwnIpx4E+Rc/KNQNEBkWs=";
             };
           });
 
