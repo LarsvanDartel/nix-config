@@ -63,6 +63,7 @@
         home.xournalpp
         home.rnote
         home.krita
+        home.remmina
       ];
 
       homeManager = {
