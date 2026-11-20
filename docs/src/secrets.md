@@ -30,7 +30,7 @@ Values that aren't secret but should stay out of this public repo, such as the G
 |`keys/netbird/api-token`|`hosts/gaia/secrets.yaml`|netbird-services (publishing) and netbird-token-expiry on gaia. A personal access token of the `lvdar` owner account, so the one exception to the rule below. Expires after at most 365 days; netbird-token-expiry alerts 21 days before. Rotate by minting a new one with the old (`POST /api/users/<id>/tokens`, `{"name": …, "expires_in": 365}` on `127.0.0.1:8011/api` on gaia), `sops set` it, pin nix-secrets, deploy, then delete the old token|
 |YubiKey FIDO2 resident keys|on the YubiKeys (`ssh-keygen -K` recovers the handles)|break-glass root access ([SSH](networking.md#ssh))|
 
-Servers hold no user identity: nothing on endeavour, gaia or pioneer can log in anywhere as lvdar. The one exception is Stalwart's recovery admin on gaia (`keys/stalwart/admin`), which can impersonate any mail account (`<account>%admin`); `services.holiday-calendar` uses that to write its calendar.
+Servers hold no user identity: nothing on endeavour, gaia or pioneer can log in anywhere as lvdar. The one exception is Stalwart's recovery admin on gaia (`keys/stalwart/admin`), which can impersonate any mail account (`<account>%admin`); `services.holiday-calendar` and `services.birthday-calendar` use that to write their calendars (and the latter to read the contacts).
 
 ## Rotating an SSH key
 

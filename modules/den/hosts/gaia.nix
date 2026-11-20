@@ -27,6 +27,7 @@
       services.stalwart
       services.bulwark
       services.holiday-calendar
+      services.birthday-calendar
       services.unbound
       services.gatus
       services.alloy

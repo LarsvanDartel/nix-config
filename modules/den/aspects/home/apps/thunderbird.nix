@@ -281,6 +281,20 @@
         };
       };
 
+      # Written by services.birthday-calendar from the contacts.
+      accounts.calendar.accounts.verjaardagen = {
+        remote = {
+          type = "caldav";
+          url = "https://mail.lvdar.nl/dav/cal/lvdar%40lvdar.nl/verjaardagen/";
+          userName = "lvdar@lvdar.nl";
+        };
+        thunderbird = {
+          enable = true;
+          readOnly = true;
+          color = pastel "base08";
+        };
+      };
+
       # Created by hand (MKCALENDAR): Stalwart calendars are account data.
       accounts.calendar.accounts.sailing = {
         remote = {
