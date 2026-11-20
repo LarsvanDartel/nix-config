@@ -1,6 +1,4 @@
-# services.holiday-calendar — Dutch public holidays, observances and every
-# region's school holidays, mirrored daily from public ICS feeds into one
-# Stalwart calendar, which cannot subscribe to feeds itself.
+# services.holiday-calendar — daily mirror of Dutch holiday ICS feeds into a Stalwart calendar, which cannot subscribe itself.
 {den, ...}: {
   den.aspects.services.holiday-calendar = {
     includes = [den.aspects.services.stalwart];
@@ -15,17 +13,15 @@
       account = "lvdar@${stalwart.domain}";
 
       settings = pkgs.writeText "holiday-calendar.json" (builtins.toJSON {
-        # The recovery admin impersonating the owner (`<account>%<admin>`),
-        # on the loopback management listener: no credential of the owner's
-        # own lands on the server.
+        # The recovery admin impersonates the owner on the loopback listener,
+        # so no credential of the owner's lands on the server.
         user = "${account}%${config.services.stalwart.admin.username}";
         calendar = "http://127.0.0.1:${toString stalwart.adminPort}/dav/cal/${lib.escapeURL account}/feestdagen/";
         name = "Feestdagen & schoolvakanties";
         feeds =
           [
             {
-              # Public holidays and observances; the description's first
-              # line tells them apart ("Officiële feestdag" or "Viering").
+              # The description's first line tells holidays from observances.
               url = "https://calendar.google.com/calendar/ical/nl.dutch%23holiday%40group.v.calendar.google.com/public/basic.ics";
               region = null;
               description = true;
@@ -36,8 +32,7 @@
             inherit region;
             description = false;
           }) ["noord" "midden" "zuid"];
-        # Carnaval is computed. Where this region's advised spring holiday
-        # misses it, the week around carnaval is added as well.
+        # Where this region's advised spring holiday misses carnaval, the week around it is added.
         carnavalRegion = "zuid";
       });
 

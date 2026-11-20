@@ -1,4 +1,4 @@
-# home.krita — raster painting with the stylus.
+# home.krita — raster painting with the stylus
 {...}: {
   den.aspects.home.krita.homeManager = {pkgs, ...}: {
     home.packages = [pkgs.krita];

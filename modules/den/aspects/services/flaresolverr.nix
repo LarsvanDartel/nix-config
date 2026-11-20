@@ -1,12 +1,4 @@
-# services.flaresolverr — solve Cloudflare challenges for other services.
-#
-# Selenium removed `options.headless`, so chromium needs a real display —
-# without one the renderer dies with "Unable to receive message from renderer".
-# Hence ExecStart wrapped in xvfb-run (FlareSolverr's internal Xvfb path is
-# never reached) and SystemCallFilter dropped (Xvfb needs @setuid and more).
-#
-# Loopback only, deliberately absent from netbird exposedPorts: an
-# unauthenticated endpoint that fetches arbitrary URLs is an SSRF primitive.
+# services.flaresolverr — solves Cloudflare challenges for other services, on loopback only.
 {...}: {
   den.aspects.services.flaresolverr.nixos = {
     config,
@@ -37,10 +29,12 @@
       services.flaresolverr = {
         enable = true;
         inherit (cfg) port;
-        # Never — unauthenticated arbitrary-URL fetcher (SSRF); see header.
+        # Never, nor netbird exposedPorts: an unauthenticated arbitrary-URL fetcher is an SSRF primitive.
         openFirewall = false;
       };
 
+      # Selenium dropped headless mode, so chromium needs a display: xvfb-run (FlareSolverr's own Xvfb path
+      # is never reached), and no SystemCallFilter since Xvfb needs @setuid and more.
       systemd.services.flaresolverr.serviceConfig = {
         ExecStart =
           mkForce

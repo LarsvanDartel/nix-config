@@ -1,4 +1,4 @@
-# home.signal
+# home.signal — Signal Desktop.
 {...}: {
   den.aspects.home.signal.homeManager = {pkgs, ...}: {
     cosmos.system.impermanence.persist.directories = [".config/Signal"];

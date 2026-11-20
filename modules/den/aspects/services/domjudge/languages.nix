@@ -1,13 +1,4 @@
-# services.domjudge.languages — the judge's languages beyond the image's, and
-# its C++ compile script with -std=gnu++20 (_files/executables/cpp).
-#
-# The judgehost image's chroot has gcc, OpenJDK 21 and pypy3 3.9. The other
-# toolchains are copied, with their closure, into one tree mounted at the
-# chroot's /nix (so submissions see it and not the host store), and
-# _files/judgehost-start.sh adds that mount to every judging's chroot.
-# Compile scripts in _files/executables call them by store path; the
-# domjudge-languages job uploads any that differ from the DB's and enables
-# exactly the languages below.
+# services.domjudge.languages — the judge's languages and compile scripts, with toolchains from Nix.
 {den, ...}: let
   inherit (import ./_lib.nix) judgehostContainer judgehostIds;
 in {
@@ -25,9 +16,8 @@ in {
       pypy = pkgs.pypy3;
       go = pkgs.go;
       node = pkgs.nodejs-slim;
-      # Official distributions where nixpkgs' build drags in a toolchain the
-      # chroot already has: pkgs.kotlin wraps a 600 MiB OpenJDK and pkgs.rustc
-      # a 1.6 GiB LLVM + cc closure. These run on the chroot's java and cc.
+      # Official distributions: pkgs.kotlin wraps a 600 MiB OpenJDK and pkgs.rustc a 1.6 GiB
+      # LLVM + cc closure, while these run on the chroot's java and cc.
       kotlinc = pkgs.runCommand "kotlinc-${pkgs.kotlin.version}" {nativeBuildInputs = [pkgs.unzip];} ''
         unzip -q ${pkgs.kotlin.src}
         mv kotlinc $out
@@ -46,6 +36,7 @@ in {
         mkdir $out
         cp -r rustc-*/rustc/. rust-std-*/rust-std-x86_64-unknown-linux-gnu/. $out/
       '';
+      # Mounted as the judge chroot's /nix: every toolchain a compile script uses must be in rootPaths.
       chrootStore = pkgs.runCommand "domjudge-chroot-store" {} ''
         mkdir -p $out/store
         cp -a --reflink=auto $(<${pkgs.closureInfo {rootPaths = [pypy kotlinc rust go node];}}/store-paths) $out/store/
@@ -69,10 +60,8 @@ in {
         js = mkExecutable "js" "--replace-fail @node@ ${node}/bin/node";
       };
 
-      # Exactly these languages are enabled: POST /languages disables the rest.
-      # time_factor: the time-limit multipliers that get the most jury
-      # submissions of all ten contests right on the judge cores at judgeKHz
-      # (_lib.nix), each mid-way in its range; re-fit after changing the clock.
+      # Exactly these languages are enabled: POST /languages disables the rest. time_factor is fitted to
+      # the ten contests' jury submissions at _lib.nix's judgeKHz; re-fit after changing the clock.
       languagesJson = pkgs.writeText "domjudge-languages.json" (builtins.toJSON [
         {
           id = "c";

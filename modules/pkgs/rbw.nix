@@ -1,8 +1,4 @@
-# rbw — two local patches (vaultwarden-2026.patch):
-#  - send `encryptedFor` on cipher writes; vaultwarden 2026.6 answers 422 without it.
-#    Drop once rbw ships the field upstream.
-#  - `generate --diceware` emits Capitalised-Words-joined-by-dashes plus a digit pair
-#    instead of lowercase words separated by spaces, which most sites reject.
+# rbw — patched (vaultwarden-2026.patch) to send `encryptedFor` on cipher writes (else 422) and emit lowercase space-separated diceware.
 {...}: {
   nixpkgs.overlays = [
     (_final: prev: {

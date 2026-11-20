@@ -1,8 +1,4 @@
-# breakpad: Makefile.in's micro/minidump_stackwalk LDADD lists omit
-# fast_source_line_resolver.o, so linking fails on its vtable with nixpkgs
-# 2026-10-01 (upstream bug, deterministic; --disable-tools doesn't gate it).
-# Patches Makefile.in, not .am — no autoreconf step. Warns once nixpkgs moves
-# breakpad off 2024.02.16: check whether it links, then delete this or bump.
+# breakpad — links the stackwalk tools with the fast_source_line_resolver.o upstream's Makefile.in omits (patched there, not .am: no autoreconf).
 {...}: {
   nixpkgs.overlays = [
     (_final: prev: {

@@ -6,14 +6,12 @@ local Modes = require("waywork.modes")
 local Keys = require("waywork.keys")
 local Processes = require("waywork.processes")
 
--- === theme and constants ===
 local bg_col, primary_col, secondary_col = "#000000", "#ec6e4e", "#E446C4"
 local ninbot_anchor, ninbot_opacity = "topright", 1
 
 local base_sens = 7.98042104
 local tall_sens = 0.53835443
 
--- === waywall config ===
 local config = {
 	input = {
 		layout = "us",
@@ -27,16 +25,12 @@ local config = {
 	experimental = { debug = false, jit = false, tearing = false, scene_add_text = true },
 }
 
--- === floating controller ===
 local floating = create_floating({
 	show_floating = waywall.show_floating,
 	sleep = waywall.sleep,
 })
 
--- === scene registry ===
 local scene = Scene.SceneManager.new(waywall)
-
--- == thin layout mirrors ==
 
 scene:register("e_counter", {
 	kind = "mirror",
@@ -68,8 +62,6 @@ scene:register("thin_percent_right", {
 	},
 	groups = { "thin" },
 })
-
--- == tall layout mirrors ==
 
 scene:register("tall_e_counter", {
 	kind = "mirror",
@@ -115,7 +107,6 @@ scene:register("eye_overlay", {
 	groups = { "tall" },
 })
 
--- === modes (resolutions + hooks) ===
 local mode_manager = Modes.ModeManager.new(waywall)
 
 mode_manager:define("thin", {
@@ -129,7 +120,7 @@ mode_manager:define("thin", {
 	end,
 })
 
--- Tall mode has a guard to prevent accidental toggles during gamemode switches
+-- Ignore the toggle while F3 is held, so gamemode switches (F3+F4) cannot trigger it.
 mode_manager:define("tall", {
 	width = 384,
 	height = 16384,
@@ -153,7 +144,6 @@ mode_manager:define("wide", {
 
 local ensure_ninjabrain = Processes.ensure_application(waywall, programs.ninjabrain_bot)("ninjabrain.*\\.jar")
 
--- === keybinds ===
 local actions = Keys.actions({
 	["*-Alt_L"] = function()
 		return mode_manager:toggle("thin")

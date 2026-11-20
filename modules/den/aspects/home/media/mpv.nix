@@ -1,4 +1,4 @@
-# home.mpv (+ the defaultApplication option; deployment sets it true)
+# home.mpv — mpv with uosc, optionally the default media player.
 {...}: {
   den.aspects.home.mpv.homeManager = {
     config,

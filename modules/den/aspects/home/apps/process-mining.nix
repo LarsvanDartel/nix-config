@@ -1,5 +1,4 @@
-# home.process-mining — the 2AMI10 course tools. ~/.local/share/prom-lite is
-# persisted: ProM Lite re-downloads ~400 MB whenever it is gone.
+# home.process-mining — ProM Lite and CPN IDE for the 2AMI10 course
 {...}: {
   den.aspects.home.process-mining.homeManager = {pkgs, ...}: {
     home.packages = [pkgs.prom-lite pkgs.cpn-ide];

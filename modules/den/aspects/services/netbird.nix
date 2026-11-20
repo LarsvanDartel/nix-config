@@ -1,6 +1,4 @@
-# NetBird — self-hosted WireGuard mesh + reverse proxy. Replaces Pangolin.
-# :443 on gaia is shared by the control-plane vhost and netbird-proxy (own
-# ACME); nginx ssl_preread splits them by SNI. Upstream docs mandate Traefik.
+# services.netbird — self-hosted NetBird mesh: agent, control plane and reverse proxy on gaia.
 {
   den,
   lib,
@@ -10,14 +8,8 @@
 in {
   den.quirks.netbird-service.description = "Public reverse-proxy services (cosmos.services.netbird.services entries), published by the NetBird server";
 
-  # Payloads are `{host, ...}` functions, never `{config, ...}`: reading the
-  # producer's config would make gaia evaluate that host's whole system. So
-  # a producer keeps its port in a file-level `defaultPort`, shared with the
-  # option default, and an override of that option does not reach here.
-  #
-  # collect, not collectAll: every published app runs on an x86_64 host.
-  # den reads these argument names (host scope, host-entity filter), so
-  # deadnix must not strip them as unused.
+  # Payloads are `{host, ...}:`, never `{config, ...}:`; see docs/src/architecture.md#cross-host-data.
+  # collect, not collectAll: every published app is x86_64. den reads these argument names; keep them.
   # deadnix: skip
   den.policies.netbird-service = {host, ...}: [
     (pipe.from "netbird-service" [
@@ -45,20 +37,12 @@ in {
       text = ''
         chain="netbird-acl-input-rules"
 
-        # If the table is absent entirely the agent is not up yet — starting,
-        # stopped, or mid-restart. That is not the decay this is looking for,
-        # and restarting into it would just fight whatever is already
-        # happening.
         if ! rules="$(nft list chain ip netbird "$chain" 2>/dev/null)"; then
           echo "netbird-acl-watchdog: no $chain yet, nothing to judge"
           exit 0
         fi
 
-        # The chain is legitimately incomplete for a few seconds after the agent
-        # starts, while it re-syncs policy from management. Restarting into that
-        # window would fight the startup it is watching — and because the remedy
-        # here *is* a restart, doing so could loop. Anything under the grace
-        # period is left alone; the timer comes back shortly.
+        # The chain is incomplete while the agent re-syncs at startup; restarting then could loop.
         active_us="$(systemctl show ${config.services.netbird.clients.default.suffixedName}.service \
           -p ActiveEnterTimestampMonotonic --value)"
         if [[ -n "$active_us" && "$active_us" != "0" ]]; then
@@ -69,16 +53,8 @@ in {
           fi
         fi
 
-        # The two rules the management policy contributes. Per-service rules
-        # always carry a dport, so testing for an accept *without* one is what
-        # distinguishes "the Default policy is applied" from "only the reverse
-        # proxy's rules survived". The set name is a management-side hash
-        # whose spelling varies by agent version — 0.77 emitted @nb<digits>,
-        # 0.78 emits @nb-<hex> — so the class matches both spellings. Pinning
-        # it to one was not cosmetic: under 0.78 the watchdog read a healthy
-        # ruleset as decayed and restarted the agent every 2 min, a rolling
-        # mesh blackout that intermittently broke the knot's :22 DNAT and
-        # with it build-gate's fetch (2026-09-15, netbird 0.78.1).
+        # Healthy = established accept plus a dport-less `@nb…` saddr accept (per-service rules carry a dport).
+        # The set name is spelled @nb<digits> or @nb-<hex> by agent version; a narrower match restart-loops the agent.
         if grep -q 'ct state established,related.*accept' <<<"$rules" \
           && grep -qE 'ip saddr @nb[0-9a-f-]+ accept$' <<<"$rules"; then
           exit 0
@@ -284,8 +260,7 @@ in {
         allowedUDPPorts = cfg.client.exposedUdpPorts;
       };
 
-      # `netbird ssh` only tries PKCE (the flow that works) when it detects a desktop
-      # via XDG_CURRENT_DESKTOP; otherwise device flow fails with NotFound.
+      # XDG_CURRENT_DESKTOP makes `netbird ssh` use PKCE; its device flow fails with NotFound.
       # One block: a dynamic attribute path cannot be split across definitions.
       systemd.services.${config.services.netbird.clients.default.suffixedName} = {
         # The resolver address lives in config.json, not the unit; without this
@@ -297,10 +272,8 @@ in {
           {XDG_CURRENT_DESKTOP = "netbird-has-a-browser";};
       };
 
-      # Agent bug (0.74.3, two outages): netbird-acl-input-rules silently loses the
-      # policy rules (established accept, Default saddr set), leaving only per-service
-      # rules; a restart reinstates them. Not a preemptive restart: the journal line
-      # is the only evidence of real frequency.
+      # The agent can silently drop the policy rules from netbird-acl-input-rules, leaving only
+      # per-service rules; a restart reinstates them. Restarts only on detected decay.
       systemd.services.netbird-acl-watchdog = lib.mkIf cfg.client.aclWatchdog {
         description = "Restart the NetBird agent if its mesh ACLs have decayed";
         # No wantedBy: a oneshot failing during activation makes deploy-rs roll back.
@@ -340,9 +313,8 @@ in {
           # The agent rewrites config.json; stated so it is kept.
           config.ServerSSHAllowed = true;
 
-          # Setup key: OIDC needs kanidm, which is published through the mesh.
-          # No systemdDependencies on sops-install-secrets.service: it does not exist
-          # here, and the dangling Requires= left gaia stuck at NeedsLogin.
+          # Setup key: OIDC needs kanidm, which is published through the mesh. No systemdDependencies on
+          # sops-install-secrets.service: that unit does not exist here and the agent stalls at NeedsLogin.
           login = {
             enable = true;
             setupKeyFile = config.sops.secrets."keys/netbird/setup-key".path;
@@ -365,34 +337,28 @@ in {
     # evaluation pull in every other host's config.
     includes = with den.aspects.services; [nginx netbird.client den.policies.netbird-service];
 
-    # Management serves its own metrics on 9090.
     scrape-target = {host, ...}: {
       job = "netbird";
       instance = host.name;
       port = 9090;
     };
 
-    # NetBird replaces auto-groups wholesale with the token's claim, so
-    # omitting netbird-users would strip mesh access on next login. Gated
-    # apps add their own groups the same way (services/_netbird-groups.nix).
+    # NetBird replaces auto-groups with the token's claim, so omitting netbird-users strips mesh access
+    # on next login; gated apps add their groups the same way (_netbird-groups.nix).
     kanidm-provision = lib.recursiveUpdate (import ./_netbird-groups.nix "netbird-users") {
       groups.netbird-admin.members = ["lvdar"];
 
-      # Browser app using PKCE; the client name is the audience NetBird
-      # management expects.
+      # The client name is the audience management expects (cfg.oidc.clientId).
       oauth2.netbird = {
         displayName = "NetBird";
         public = true;
-        # kanidm strips fragments from configured origins (kanidm#3217),
-        # so services/netbird.nix moves the dashboard callbacks to
-        # fragment-free paths; keep these in sync with AUTH_REDIRECT_URI.
+        # Fragment-free (kanidm#3217); keep in sync with AUTH_REDIRECT_URI and AUTH_SILENT_REDIRECT_URI below.
         originUrl = [
           "https://netbird.lvdar.nl/callback"
           "https://netbird.lvdar.nl/silent-callback"
           # netbird-proxy bearer auth (HttpConfig.AuthCallbackURL).
           "https://netbird.lvdar.nl/api/reverse-proxy/callback"
-          # CLI PKCE flow uses the first free of these ports
-          # (PKCEAuthorizationFlow in services/netbird.nix).
+          # CLI PKCE ports; keep in sync with PKCEAuthorizationFlow.RedirectURLs below.
           "http://localhost:53000/"
           "http://localhost:54000/"
         ];
@@ -578,7 +544,6 @@ in {
         };
       });
 
-      # Peer and group *names* here; the reconciler swaps them for ids.
       desiredFile = pkgs.writeText "netbird-services.json" (
         builtins.toJSON (
           lib.mapAttrsToList (name: s: {
@@ -609,8 +574,6 @@ in {
       # Bouncer key is minted by cscli at runtime on this host, so it is not in sops.
       crowdsecKeyFile = "/var/lib/netbird-proxy/crowdsec-bouncer.key";
 
-      # Path of the OIDC discovery URL, for the bootstrap cache below; null if
-      # unparseable, which omits the fallback.
       oidcPath = let
         m = builtins.match "https?://[^/]+(/.*)" cfg.oidc.configEndpoint;
       in
@@ -618,19 +581,14 @@ in {
         then null
         else builtins.head m;
 
-      # nginx's own cert names only what the SNI splitter routes to it. Under
-      # the *.lvdar.nl wildcard, browsers coalesced proxy domains onto an nginx
-      # connection and got the "_" 421, which not every browser retries.
+      # Names only what the SNI splitter routes to nginx, never the wildcard; see docs/src/networking.md#the-mesh-and-publishing.
       edgeCert = "netbird-edge";
 
       reconcile = pkgs.writeShellApplication {
         name = "netbird-reconcile-services";
         runtimeInputs = with pkgs; [curl jq];
         text = ''
-          # Straight to management's own listener. Going out via the public
-          # name would need DNS that may not exist yet, TLS, and the transitional
-          # port — three ways to fail for a request that never has to leave the
-          # host. nginx only proxies /api here anyway.
+          # Management's own listener: the public name would add DNS, TLS and the public port as failure points.
           api="http://127.0.0.1:${toString mgmtPort}/api"
           token="$(cat "$CREDENTIALS_DIRECTORY/api-token")"
 
@@ -641,30 +599,8 @@ in {
               "$@"
           }
 
-          # Readiness gate. On a fresh control plane management is still
-          # coming up and the API token is a placeholder, and while the mesh is
-          # being built peers appear one at a time. None of that is an error,
-          # so this converges quietly and leaves the rest for the next tick.
-          #
-          # But "management is not up yet" and "management is up and refusing
-          # this credential" are different things, and collapsing them into one
-          # tolerated branch cost a day on 2026-08-29. The PAT expired,
-          # management logged `token invalid` every five minutes, and this
-          # script answered each tick with "nothing to do" and exited 0 — so
-          # core.notify-failure, which pushes on any non-zero exit and would
-          # have said so within five minutes, was never handed anything to
-          # report. Nothing new could be published for the whole day while
-          # everything already in the control plane kept working, which is
-          # precisely what made it quiet.
-          #
-          # A refusal is therefore only benign while the token is not yet
-          # shaped like a PAT — which is exactly the fresh-install case this
-          # gate exists for. Once it looks like a real credential, management
-          # rejecting it is a fault and is worth waking someone for.
-          #
-          # Safe to exit non-zero here: this unit is started by its timer and
-          # by hand, never by switch-to-configuration, so a failure cannot turn
-          # into a rolled-back deploy.
+          # A refusal is benign only while the token is not yet a PAT (fresh install); a refused PAT must
+          # exit non-zero so notify-failure alerts. Safe: this unit never runs during activation.
           body="$(mktemp)"
           trap 'rm -f "$body"' EXIT
 
@@ -702,53 +638,23 @@ in {
               ;;
           esac
 
-          # Group membership is only meaningful if NetBird is actually reading
-          # the IdP's claim, and that is an account setting rather than
-          # anything in management.json — off by default, with the claim name
-          # empty. Left alone, every bearer check fails closed for everyone.
-          #
-          # Merged into the current settings rather than PUT wholesale: the
-          # object carries the network ranges and expiry policy too, and a
-          # partial replace would quietly reset them.
+          # JWT group sync is an account setting, off by default; without it every bearer check fails closed.
+          # Merge into the current settings: a wholesale PUT resets network ranges and expiry policy.
           account="$(req "$api/accounts" | jq -r '.[0]')"
           account_id="$(jq -r .id <<<"$account")"
-          # peer_approval_enabled is the setting that separates "may use a
-          # published web page" from "may join the mesh", and without it those
-          # are the same grant.
-          #
-          # A person who authenticates to a gated service gets a NetBird user
-          # record created for them on their first token. user_approval_required
-          # holds that record blocked until an administrator approves it, and a
-          # blocked user cannot reach the service either — so approving them is
-          # unavoidable if they are to use the page at all. The catch is what
-          # else approval carries: handleUserAddedPeer (peer.go:688) refuses a
-          # peer only while the user is pending, so an approved user may run
-          # `netbird up` and enrol a device. With peer approval off that device
-          # is live immediately, and it lands in the All group, which the
-          # default policy pairs with itself for every protocol in both
-          # directions — the whole fleet, every port, from someone who was
-          # given a Minecraft page.
-          #
-          # With this on, their peer is created but stays pending and carries no
-          # access until it is approved here. Approving a person to read a web
-          # page no longer decides anything about the mesh.
+          # peer_approval_enabled keeps approving a user for a gated page from admitting their devices to the mesh.
+          # See docs/src/notes/services-netbird.md#peer-approval.
           groups="$(req "$api/groups")"
 
-          # peer_expose_enabled needs this: the API refuses to enable it with
-          # an empty peer_expose_groups ("peer expose requires at least one
-          # group", accounts_handler.go), so unlike peer_approval_enabled it
-          # cannot just be flipped on. "All" is the built-in group holding
-          # every peer, so gating on it is the same as no restriction.
+          # peer_expose_enabled requires a non-empty peer_expose_groups; gating on All
+          # (every peer) is no restriction.
           all_gid_for_expose="$(jq -r '.[] | select(.name == "All") | .id' <<<"$groups" | head -n1)"
 
           settings="$(jq --arg allid "$all_gid_for_expose" '.settings
             | .jwt_groups_enabled = true
             | .jwt_groups_claim_name = "groups"
             | .extra.peer_approval_enabled = true
-            # Lets netbird expose publish a service straight from a peer CLI,
-            # without a nix-declared entry in cfg.services. Off by default
-            # account-wide, hence turning it on here rather than leaving it
-            # to be found later as a dashboard toggle nobody set.
+            # Lets netbird expose publish straight from a peer CLI, outside cfg.services.
             | if $allid != "" then
                 .peer_expose_enabled = true | .peer_expose_groups = [$allid]
               else . end' <<<"$account")"
@@ -764,27 +670,8 @@ in {
               || echo "netbird: WARNING could not update account settings"
           fi
 
-          # A distribution group MUST have been created by JWT sync — this
-          # reconciler must never create one, however tempting it looks.
-          #
-          # NetBird stamps every group with how it came to exist, and the API
-          # hardcodes `api` on create (groups_handler.go:226) with no way to
-          # change it afterwards (:165 copies the old value on update). JWT
-          # sync then looks a group up by name and, if it finds one, only adds
-          # the user when `Issued == "jwt"` (account.go:169). It does not
-          # duplicate it and it does not complain — it silently declines.
-          #
-          # So a group pre-created here is permanently unfillable, and a
-          # service gated on it is one nobody can ever reach: the group exists,
-          # the service wires up, the reconciler reports success, and every
-          # login is refused. That is exactly what happened to
-          # minecraft-control, whose group sat at `issued=api, peers=0` while
-          # the other seven gated groups were `issued=jwt`.
-          #
-          # The convergence this used to buy was never needed anyway: the name
-          # is already in kanidm's `groups` claim, so the first login by any
-          # member creates the group correctly and the next tick wires the
-          # service. Waiting for that is the whole cost.
+          # Never create a distribution group: API-created groups stay issued=api, which JWT sync never fills,
+          # so the gate admits nobody. A member's first login creates it; the next tick wires the service.
           unfillable="$(jq -r --argjson have "$groups" '
             [$have[] | select(.issued != "jwt") | .name] as $notjwt
             | [.[] | select(.auth.bearer_auth.enabled)
@@ -799,26 +686,8 @@ in {
           fi
 
           ${lib.optionalString (cfg.mesh.fleet != []) ''
-            # Who may talk to whom on the mesh.
-            #
-            # NetBird ships one policy: All -> All, every protocol, both
-            # directions. "All" holds every peer, so that is not a default so
-            # much as an absence of one — and it is what made approving somebody
-            # for a web page equivalent to handing them the fleet. Anything they
-            # enrolled could reach every port on every host, including services
-            # with no authentication of their own: ollama's API, the attic
-            # cache, prometheus, node_exporter.
-            #
-            # Published services do NOT depend on this. netbird-proxy gets its
-            # own per-service ACL rule for each one, which is what the dport in
-            # `ip saddr @nb0000031 tcp dport 8096-8096 accept` is; the broad
-            # policy is the rule with no dport at all. Confirmed on endeavour
-            # before touching any of it, and it is the same distinction the ACL
-            # watchdog above keys on.
-            #
-            # These groups hold *peers*, not users, so unlike a distribution
-            # group they are ours to create — the issued=jwt rule that governs
-            # gate membership does not apply here.
+            # Mesh ACL; see docs/src/networking.md#the-mesh-and-publishing. These hold peers, not users, so creating
+            # them is fine. Published services do not depend on them: netbird-proxy has its own per-service rules.
             ensure_group() {
               local gname="$1" want="$2" gid have
               gid="$(jq -r --arg n "$gname" \
@@ -844,10 +713,7 @@ in {
               fi
             }
 
-            # A name that does not resolve to a peer is dropped rather than
-            # failing the run — the same convergence rule the services use, and
-            # it matters more here: a half-enrolled fleet must not produce a
-            # policy that locks the rest of it out.
+            # Unresolved names are dropped, not fatal: a half-enrolled fleet must not lock out the rest.
             peer_ids() {
               jq -c --argjson peers "$peers" --argjson want "$1" \
                 '[$peers[] | select(.name as $n | $want | index($n)) | .id] | sort' <<<'{}'
@@ -873,23 +739,8 @@ in {
               operator_gid="$(gid ${operatorGroup})"
               all_gid="$(gid All)"
 
-              # One rule per policy. NetBird keeps only the first rule of a
-              # policy it is given — a two-rule DNS policy came back with the
-              # udp half and no tcp half and no error about it — so the split is
-              # forced rather than stylistic.
-              #
-              # Four of them, answering three questions: which machines are
-              # peers of each other, which devices may reach into them without
-              # being reachable back, and what every other peer may still do.
-              # DNS is the whole of that last answer — nix-resolver is the
-              # primary nameserver group for All, so dropping :53 leaves every
-              # phone resolving nothing at all, which is not a boundary, just an
-              # outage. tcp as well as udp, for responses that do not fit in a
-              # datagram.
-              #
-              # Callbacks are the one exception to "nothing reaches an
-              # operator": a declared fleet peer back to it on a declared port
-              # range, for apps whose protocol has the far side dial back.
+              # One rule per policy: NetBird silently keeps only a policy's first rule.
+              # All keeps udp+tcp 53 to the resolvers, or peers outside the fleet resolve no mesh names.
               desired_policies="$(jq -n \
                 --arg fleet "$fleet_gid" --arg resolver "$resolver_gid" --arg all "$all_gid" \
                 --arg operator "${lib.optionalString (cfg.mesh.operators != []) "$operator_gid"}" \
@@ -944,10 +795,7 @@ in {
                   req -X POST -d "$pol" "$api/policies" >/dev/null \
                     || echo "netbird: WARNING policy $pname not created"
                 else
-                  # Compare only what is declared here. The API echoes group
-                  # objects, peer counts and ids back on every read, none of
-                  # which this owns, and diffing those would rewrite the policy
-                  # on every tick.
+                  # Compare only declared fields: the API echoes groups, counts and ids, which would rewrite every tick.
                   current="$(jq -c --arg n "$pname" '.[] | select(.name == $n)
                     | {name, description, enabled,
                        rules: [.rules[] | {name, enabled, action, bidirectional,
@@ -968,11 +816,8 @@ in {
                 fi
               done
 
-              # Prune on the same rule as the services above: anything carrying
-              # the prefix that is no longer declared. Renaming a policy would
-              # otherwise leave the old one enforcing, which for an allow-list
-              # means a grant nobody has written down any more — a two-rule DNS
-              # policy became two one-rule policies here and left exactly that.
+              # Prune prefixed policies no longer declared: a renamed allow-list policy would otherwise
+              # keep enforcing a grant nobody declares.
               jq -r --arg p '${policyPrefix}' --argjson d "$desired_policies" '
                 [$d[].name] as $declared
                 | .[]
@@ -988,17 +833,7 @@ in {
               ${
               if cfg.mesh.enforce
               then ''
-                # The cut-over, deliberately a separate flag from creating the
-                # policies above. Deploy once to put the replacements in
-                # place, confirm they appear in `nft list chain ip netbird
-                # netbird-acl-input-rules` on a couple of hosts, and only then
-                # turn this on — because the mistake this guards against is
-                # losing SSH to the whole fleet at once, and everything here
-                # is reached over the mesh.
-                #
-                # Disabled rather than deleted: flipping `enabled` back in the
-                # dashboard is the fastest way out, and there is no rebuild in
-                # the path.
+                # Disabled, not deleted: re-enabling it in the dashboard is the rebuild-free way back (see mesh.enforce).
                 default_id="$(jq -r '.[] | select(.name == "Default" and .enabled) | .id' \
                   <<<"$existing_policies" | head -n1)"
                 if [ -n "$default_id" ]; then
@@ -1024,15 +859,8 @@ in {
             fi
           ''}
 
-          # NetBird's own SSH server, which is what `netbird ssh <peer>` talks
-          # to — not the OpenSSH on the same port. Its client offers no SSH
-          # auth method at all (it authenticates through the mesh), so against
-          # OpenSSH it can only ever fail with "attempted methods [none]".
-          #
-          # `ssh_enabled` is management's half of the switch and defaults false,
-          # so this stays off until asked for. The PUT carries the expiry and
-          # approval fields as they are: the endpoint replaces the peer rather
-          # than patching it, and omitting them resets them.
+          # Management's half of NetBird's own SSH server (not OpenSSH); see sshPeers. The PUT replaces
+          # the peer, so expiry and approval fields are carried as they are or they reset.
           for peer_name in ${lib.escapeShellArgs cfg.sshPeers}; do
             peer="$(jq -c --arg n "$peer_name" '.[] | select(.name == $n)' <<<"$peers")"
 
@@ -1055,37 +883,8 @@ in {
               || echo "netbird: WARNING could not enable ssh on $peer_name"
           done
 
-          # Point every peer at the fleet resolver for the mesh domain, and
-          # only for it.
-          #
-          # This group used to be `primary: true` with an empty domain list —
-          # NetBird's "use this for all domains" — so that endeavour's oisd
-          # blocklist followed a roaming laptop or phone around instead of
-          # stopping at the front door. That is a real thing to want, and this
-          # is a real loss. It is also what made voyager unusable on TU/e's
-          # tue-wpa2: the fleet resolvers live at 100.68.x.x and are reachable
-          # over the mesh alone, peers only ever connect by direct UDP :51820
-          # (no relay is deployed — the agent logs `do not switch to Relay`),
-          # and campus does not pass that UDP. A mesh that cannot carry packets
-          # therefore took *all* name resolution on the machine down with it:
-          # `2/2 upstreams failed ... timeout after 2.5s` for every domain, for
-          # hours. Primary makes the mesh a hard dependency of DNS itself, on
-          # exactly the machine most likely to be somewhere the mesh does not
-          # work.
-          #
-          # Scoped to the mesh domain, losing the mesh costs mesh names and
-          # nothing else. Ad-blocking comes back the moment there is a relay to
-          # fall back to and this can go primary again.
-          #
-          # The mesh-only names under lvdar.nl (unbound localRecords, fed by
-          # the mesh-dns-record quirk: idrac, firefly-import) ride along. Left
-          # out, peers resolve them through their uplink to the public wildcard,
-          # i.e. netbird-proxy, which has no such service and aborts the TLS
-          # handshake (SSL_ERROR_INTERNAL_ERROR_ALERT, 2026-09-02 → 2026-10-14).
-          #
-          # The address is looked up rather than configured: NetBird assigns it
-          # at enrollment, so a re-enrolled peer would otherwise leave the whole
-          # mesh pointing at an address nothing answers on.
+          # Mesh domain plus mesh-only names, never primary: primary makes all DNS fail wherever the mesh does.
+          # See docs/src/notes/services-netbird.md#mesh-dns-scope.
           ${lib.optionalString (cfg.dnsPeers != []) ''
             want=${lib.escapeShellArg (builtins.toJSON cfg.dnsPeers)}
             dns_ips="$(jq -c --argjson want "$want" \
@@ -1139,16 +938,11 @@ in {
 
           existing="$(req "$api/reverse-proxies/services")"
 
-          # Resolve peer and group names to ids, marking anything that has not
-          # appeared yet rather than failing the whole run.
           annotated="$(jq \
             --argjson peers "$peers" \
             --argjson groups "$groups" '
             def peer_id($n): ([$peers[] | select(.name == $n) | .id] | first);
-            # issued == "jwt" only, for the reason spelled out above the
-            # unfillable check: an api-issued group can never gain a member, so
-            # treating it as resolved wires a service that refuses everyone.
-            # Left unresolved it becomes a "waiting on group" line instead.
+            # jwt-issued only: an api-issued group never gains a member (see the unfillable check).
             def group_id($n):
               ([$groups[] | select(.name == $n and .issued == "jwt") | .id] | first);
 
@@ -1157,11 +951,7 @@ in {
               | .auth.bearer_auth.distribution_groups |= map({name: ., id: group_id(.)})
             )' ${desiredFile})"
 
-          # Unresolved names are reported, not failed — one that never resolves
-          # shows up as a recurring warning here. The two kinds differ in
-          # consequence, so they are worded differently: an absent peer holds
-          # the service back entirely, while an absent group is simply left out
-          # of the gate below.
+          # Unresolved names warn, not fail: a missing peer holds the service back, a missing group is left out of the gate.
           jq -r '
             .[] | select(any(.targets[]; .target_id == null))
             | "netbird: \(.name) waiting on " + (
@@ -1177,21 +967,8 @@ in {
                 | join(", ")
               ) + " — no such jwt-issued group yet"' <<<"$annotated"
 
-          # `any`, not `all`. A group that does not exist yet has no members, so
-          # publishing with the ones that do resolve admits exactly the same
-          # people as waiting would — while waiting freezes the *whole* service,
-          # including changes that have nothing to do with groups.
-          #
-          # That is not hypothetical: adding netbird-minecraft-smp and
-          # -hardcore to the control page's list left the service pinned to its
-          # old domain, because neither group exists until somebody whose claim
-          # carries it logs in, and until then `all` was never satisfied. The
-          # service was already published and gated on a group that worked; the
-          # only effect of holding it back was that the rename never happened.
-          #
-          # None resolving is still a skip. An empty distribution list is not a
-          # narrower gate, and it is not worth finding out which way NetBird
-          # reads it.
+          # `any`, not `all`: an absent group has no members, so publishing with the resolved ones admits the same
+          # people without freezing unrelated changes. None resolving is a skip: an empty list is not a narrower gate.
           desired="$(jq '
             [.[] | select(
               (all(.targets[]; .target_id != null))
@@ -1209,34 +986,17 @@ in {
             id="$(jq -r --arg n "$name" \
               '.[] | select(.name == $n) | .id' <<<"$existing" | head -n1)"
 
-            # One service must not take the run down with it. A 409 means its
-            # domain belongs to a service made outside nix — which the prefix
-            # rule deliberately refuses to touch — and aborting there would
-            # leave every service after it in the list unreconciled, silently.
+            # Warn and continue per service: a 409 (domain owned by a hand-made service) must not stop the rest.
             if [ -n "$id" ]; then
-              # Only PUT on a real difference. Every PUT makes management
-              # re-provision the service — reissuing its certificate and
-              # re-reading the IdP's discovery document — so an unconditional
-              # write here meant ~19 of those every five minutes, forever, for
-              # a config that had not changed. It showed up as kanidm being
-              # hammered on /.well-known/openid-configuration, which is a long
-              # way from the thing that caused it.
-              #
-              # Both sides through the same normaliser. A projection of the
-              # top-level keys alone is not enough: the API also decorates
-              # each *target* with `host` and `options`, and reports an unset
-              # listen_port as 0 rather than null — so a naive compare finds
-              # drift in everything and writes every run anyway.
+              # PUT only on a real difference: each PUT re-provisions the service (certificate, IdP discovery fetch).
+              # Both sides share one normaliser: the API adds per-target fields and reports an unset listen_port as 0.
               norm='def n: {
                   name, domain, mode, enabled,
                   listen_port: (.listen_port // 0),
                   pass_host_header: (.pass_host_header // false),
                   crowdsec: (.access_restrictions.crowdsec_mode // "off"),
                   bearer_enabled: (.auth.bearer_auth.enabled // false),
-                  # Only meaningful when the check is on. With bearer auth off
-                  # the API stores [""] while we send the resolved id, so
-                  # comparing them made every ungated service look changed
-                  # forever — which was eleven of nineteen.
+                  # Only meaningful when gated: with bearer auth off the API stores [""].
                   bearer_groups: (
                     if (.auth.bearer_auth.enabled // false)
                     then ((.auth.bearer_auth.distribution_groups // [])
@@ -1264,11 +1024,8 @@ in {
             fi
           done
 
-          # Prune only what we own: anything carrying the managed prefix that is
-          # no longer declared. Services made by hand are left alone — and so
-          # are declared-but-not-yet-ready ones, hence $annotated rather than
-          # $desired: pruning against the ready set would delete a service the
-          # moment its peer went offline.
+          # Prune only prefixed services no longer declared, against $annotated, not $desired:
+          # a declared service whose peer is offline must not be deleted.
           jq -r --arg p '${managedPrefix}' --argjson d "$annotated" '
             [$d[].name] as $declared
             | .[]
@@ -1297,9 +1054,7 @@ in {
               "$@"
           }
 
-          # Unreachable management, or a token already refused, is not this
-          # unit's job to report — netbird-services runs every five minutes and
-          # says so. Staying quiet here keeps one fault to one alert.
+          # Unreachable management or a refused token is reported by netbird-services; one fault, one alert.
           if ! users="$(req "$api/users" 2>/dev/null)"; then
             echo "netbird: management not reachable or token refused; expiry not checked"
             exit 0
@@ -1313,11 +1068,7 @@ in {
 
           tokens="$(req "$api/users/$uid/tokens")"
 
-          # Which PAT is ours, when the account holds several: the one used
-          # most recently. This script authenticated with it moments ago, so
-          # its last_used is the newest unless something else is calling the
-          # API in the same breath — in which case the worst case is warning
-          # about the wrong token of the same account, not missing one.
+          # Ours is the most recently used PAT (this script just used it); worst case warns about a sibling token.
           latest="$(jq -r 'sort_by(.last_used) | last' <<<"$tokens")"
           exp="$(jq -r '.expiration_date // empty' <<<"$latest")"
           name="$(jq -r '.name // "?"' <<<"$latest")"
@@ -1443,9 +1194,7 @@ in {
             default = "netbird";
           };
 
-          # The IdP cannot go through netbird-proxy: management exits if the
-          # discovery fetch fails and the proxy needs management. gaia's nginx
-          # serves it over the mesh instead.
+          # Not through netbird-proxy: management exits without discovery, and the proxy needs management.
           idp = {
             domain = mkOption {
               type = nullOr str;
@@ -1745,9 +1494,8 @@ in {
                 Audience = cfg.oidc.clientId;
                 ClientID = cfg.oidc.clientId;
 
-                # Loopback only: this is the CLI's flow. A port-less dashboard URL here
-                # was picked first and hijacked the CLI's code. Both ports must be in
-                # the originUrl list in services/kanidm.nix.
+                # Loopback only (the CLI flow): a port-less dashboard URL here hijacks the CLI's code.
+                # Keep in sync with the localhost entries in oauth2.netbird.originUrl above.
                 RedirectURLs = [
                   "http://localhost:53000"
                   "http://localhost:54000"
@@ -1782,9 +1530,8 @@ in {
               AUTH_CLIENT_ID = cfg.oidc.clientId;
               AUTH_AUDIENCE = cfg.oidc.clientId;
 
-              # kanidm strips fragments (kanidm#3217), so the default `/#callback`
-              # never matches. Paths must not be dashboard pages (`/peers` broke
-              # login). Keep in sync with originUrl in services/kanidm.nix.
+              # kanidm strips fragments (kanidm#3217), so `/#callback` never matches; these must not be
+              # dashboard pages. Keep in sync with oauth2.netbird.originUrl above.
               AUTH_REDIRECT_URI = "/callback";
               AUTH_SILENT_REDIRECT_URI = "/silent-callback";
             };
@@ -1858,28 +1605,15 @@ in {
               locations =
                 {"/".proxyPass = cfg.oidc.idp.upstream;}
                 // lib.optionalAttrs (oidcPath != null) {
-                  # Cold-boot deadlock (2026-08-12): management needs this document,
-                  # proxied over the mesh that management brings up. Serve it stale
-                  # from cache.
+                  # Management needs this document over the mesh it brings up; serve it stale from cache.
+                  # See docs/src/restore.md#the-cold-start-deadlock.
                   "= ${oidcPath}" = {
                     proxyPass = "${cfg.oidc.idp.upstream}${oidcPath}";
                     extraConfig = ''
                       proxy_ssl_verify off;
                       proxy_cache oidc_bootstrap;
-                      # kanidm answers this with
-                      #   cache-control: no-store, no-cache, max-age=0
-                      #   pragma: no-cache
-                      # which nginx honours by storing nothing — so without
-                      # this the cache is empty at exactly the moment the
-                      # fallback is needed, and the deadlock is untouched. That
-                      # is not hypothetical: the first version of this fix was
-                      # deployed, looked correct, and cached nothing.
-                      #
-                      # Overriding it is safe *here* and only here: the location
-                      # is an exact match on the discovery document, which is
-                      # public, non-personalised metadata carrying no session or
-                      # token material. The directive does not apply to the rest
-                      # of the IdP, which keeps its no-store semantics.
+                      # kanidm sends no-store, which nginx honours by caching nothing. Ignoring it is safe only
+                      # here: the discovery document is public metadata with no session or token material.
                       proxy_ignore_headers Cache-Control Expires Set-Cookie;
                       proxy_cache_valid 200 10m;
                       proxy_cache_use_stale error timeout
@@ -2036,8 +1770,7 @@ in {
             StateDirectory = "netbird-proxy";
             StateDirectoryMode = "0750";
             WorkingDirectory = "/var/lib/netbird-proxy";
-            # NET_BIND_SERVICE for L4 services below 1024: without it the proxy
-            # silently never binds (the knot's :22 failed this way).
+            # NET_BIND_SERVICE for L4 services below 1024; without it the proxy silently never binds.
             AmbientCapabilities = ["CAP_NET_ADMIN" "CAP_NET_BIND_SERVICE"];
             CapabilityBoundingSet = ["CAP_NET_ADMIN" "CAP_NET_BIND_SERVICE"];
 

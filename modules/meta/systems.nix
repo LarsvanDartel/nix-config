@@ -1,4 +1,4 @@
-# Supported systems for perSystem outputs.
+# systems — supported systems for perSystem outputs.
 {...}: {
   systems = [
     "x86_64-linux"

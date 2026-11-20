@@ -1,4 +1,4 @@
-# home.claude (claude-code)
+# home.claude — Claude Code CLI
 {...}: {
   den.aspects.home.claude.homeManager = {pkgs, ...}: {
     home.packages = [pkgs.claude-code];

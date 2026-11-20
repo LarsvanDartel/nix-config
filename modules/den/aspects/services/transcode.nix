@@ -1,8 +1,4 @@
-# services.transcode — periodically re-encode library video to AV1 on the GPU.
-#
-# Destructive but guarded: every output is probed before replacing anything,
-# files that do not shrink by `minSaving` are restored and marked, and each
-# night is bounded by `maxPerRun`, `parallel` and free pool space.
+# services.transcode — nightly in-place AV1 re-encode of the library on the GPU, guarded by a probe, minSaving and maxPerRun.
 {den, ...}: {
   den.aspects.services.transcode = {
     includes = with den.aspects.services; [
@@ -51,7 +47,6 @@
         }
       ];
 
-      # Underscored so import-tree skips it.
       script = ./_transcode.py;
     in {
       options.cosmos.services.transcode = {

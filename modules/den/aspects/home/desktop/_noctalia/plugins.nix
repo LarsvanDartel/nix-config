@@ -1,10 +1,6 @@
-# Declarative noctalia plugins: read-only `path` sources from the store, never
-# cloned or auto-updated.
+# home.noctalia — declarative noctalia plugins as read-only store `path` sources, never auto-updated.
 {inputs}: {pkgs, ...}: let
   # Pinned: plugins are trusted Luau loaded straight into the shell.
-  # phone-connect's bar widget hardcodes its label (10/11px) and glyph (12/14px)
-  # sizes; left unset, noctalia uses the body and glyph sizes every built-in bar
-  # widget uses.
   community = pkgs.applyPatches {
     name = "noctalia-community-plugins";
     src = pkgs.fetchFromGitHub {
@@ -13,8 +9,8 @@
       rev = "e9dec7443b8a70ab606dc72669fb122a9d668bce";
       hash = "sha256-n1uQOXXjIrPvDe5dXPpcCefNsQVAoEo5lVDkOPy81vU=";
     };
-    # screen-toolkit finds captures by reading [shell.screenshot] directory from
-    # settings.toml only; home-manager writes config.toml.
+    # phone-connect hardcodes font and glyph sizes; unset, it matches the built-in bar widgets.
+    # screen-toolkit reads [shell.screenshot] from settings.toml only; home-manager writes config.toml.
     postPatch = ''
       substituteInPlace phone-connect/widget.luau \
         --replace-fail 'fontSize = 10,' "" \
@@ -27,9 +23,8 @@
     '';
   };
 
-  # Bitwarden search over rbw, which already holds the vault.lvdar.nl session.
-  # Written before plugin_api existed, and with the `/` its prefix must not carry. Its
-  # catalog.toml lacks plugin_api too; without one, a path source is scanned instead.
+  # rbw-launcher predates plugin_api and its prefix must not carry the `/`. Its catalog.toml
+  # lacks plugin_api too; without one, the path source is scanned instead.
   vinnyduke = pkgs.applyPatches {
     name = "noctalia-v5-plugins-vinnyduke";
     src = pkgs.fetchFromGitHub {
@@ -77,7 +72,7 @@ in {
         "icefish/phone-connect"
         "alexander/screen-toolkit"
         "lvdar/netbird"
-        "vinnyduke/rbw-launcher" # launcher prefix /rbw
+        "vinnyduke/rbw-launcher"
       ];
     };
     plugin_settings."lvdar/netbird" = {
@@ -85,9 +80,8 @@ in {
         netbird = "lvdar";
         netbird-gewis = "gewis";
       };
-      # A palette role, so it follows `theme`: a hex here would stay the default
-      # mode's (.config/noctalia/ is outside the farm). There is no green role;
-      # tertiary is base0C, the theme's aqua.
+      # A palette role, not a hex (docs/src/theming.md#pitfalls); tertiary is base0C, the
+      # theme's aqua, as there is no green role.
       connected_color = "tertiary";
     };
   };

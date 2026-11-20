@@ -1,4 +1,4 @@
-# MCSR (Minecraft speedrunning) toolchain — a nested `pkgs.mcsr.*` namespace.
+# mcsr — the MCSR (Minecraft speedrunning) toolchain as a nested `pkgs.mcsr.*` namespace.
 {...}: {
   nixpkgs.overlays = [
     (final: _prev: {
@@ -62,9 +62,8 @@
 
               meta.platforms = lib.platforms.linux;
             }).overrideAttrs {
-              # The installCheck's native-image HelloWorld segfaults on the
-              # 2026-10 nixpkgs toolchain (21.0.12 too; GraalVM 25 is fine). Only
-              # the JVM is used — prismlauncher's runtime — and its checks pass.
+              # The installCheck's native-image HelloWorld segfaults on this toolchain (GraalVM 25 is fine);
+              # only the JVM is used, and its checks pass.
               doInstallCheck = false;
             }
         ) {};

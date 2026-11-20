@@ -1,13 +1,4 @@
-# Fast feedback: everything that does not need a host closure built.
-#
-# Split from check.yml deliberately. Workflows in a pipeline run in parallel,
-# so this lands in a couple of minutes while the full build is still going —
-# and a formatting mistake shouldn't take a forty-minute build to report.
-#
-# `deploy-schema` and `deploy-activate` are NOT here, though they look cheap.
-# Both embed the four `activatable-nixos-system-*` store paths with context, so
-# either one drags in every host including aarch64 pioneer. That is also why
-# this file does not simply run `nix flake check`.
+# lint — fast-feedback CI: every check that needs no host closure.
 when:
   - event: ["push", "pull_request"]
     branch: main
@@ -15,41 +6,12 @@ when:
 engine: microvm
 image: nixos
 
-# No `dependencies:`, deliberately, and not because nothing is needed — git is,
-# for the clone. The base NixOS image already ships gitMinimal, curl, jq and
-# nix (nix/microvm/base.nix), so naming git here installed something that was
-# already present.
-#
-# It was not free. `dependencies`, `services`, `virtualisation` and `registry`
-# are the four keys that make the engine consider the guest config customised
-# (manifestConfig.Enabled, spindle/engines/microvm/models.go:48), and any one
-# of them inserts a "NixOS config activation" step that rebuilds and activates
-# a guest system closure before the first real step runs. That cost 58 seconds
-# of a 175-second run, to install git over git.
-#
-# The giveaway was in the log's own ordering: the clone step ran `git init`,
-# `git fetch` and `git checkout` successfully three seconds *before* the
-# activation step that supposedly provided git.
-#
-# So adding a dependency here is not a small thing — it turns a ~90s run back
-# into a ~150s one. Check base.nix before reaching for it, and if something
-# genuinely is missing, that activation is also the step the config cache would
-# make cheap (see the uploadUrl comment in services/tangled.nix).
+# No `dependencies:`: the base image already ships git, curl, jq and nix, and any such key
+# adds a guest activation step (~60 s); check nix/microvm/base.nix first.
 
 steps:
-  # Two flags carry all the weight here.
-  #
-  # --accept-flake-config is not boilerplate. `abort-on-warn` lives in the
-  # flake's nixConfig, and a fresh CI user is not trusted to apply it, so
-  # without this flag CI is *laxer* than a developer's machine and silently
-  # stops catching the deprecation-warning failures that are the whole reason
-  # this repo builds the way it does.
-  #
-  # --override-input points the private nix-secrets input at an empty in-repo
-  # flake. Every evaluation forces that input into the store, but sops-nix runs
-  # with validateSopsFiles = false, so nothing ever reads it and a stub
-  # satisfies every check and every build. That is what lets CI hold no
-  # credential at all — see .tangled/nix-secrets-stub/flake.nix.
+  # --accept-flake-config makes abort-on-warn apply. No deploy-* checks or `nix flake check`:
+  # they build every host's closure, aarch64 pioneer included.
   - name: lint and format
     command: |
       nix build \

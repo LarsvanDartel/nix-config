@@ -76,9 +76,7 @@ in {
         };
         whitelistRanges = mkOption {
           type = listOf str;
-          # Empty falls back to RFC1918, excluding NetBird's CGNAT range, so
-          # sabnzbd denied the mesh. Setting this *replaces* the fallback, so
-          # the private ranges must be repeated here.
+          # Replaces sabnzbd's RFC1918 fallback, which lacks NetBird's CGNAT range: keep the private ranges listed.
           default = [
             "127.0.0.0/8"
             "10.0.0.0/8"
@@ -120,9 +118,8 @@ in {
           inherit (cfg) package user secretFiles;
           configFile = null;
 
-          # sabnzbd writes its own config constantly; nixpkgs' 0400 breaks
-          # that. Declarative settings still win on merge, but a key nix stops
-          # declaring keeps its last runtime value.
+          # sabnzbd rewrites its config constantly. Declared settings win on merge,
+          # but a key no longer declared keeps its last runtime value.
           allowConfigWrite = true;
           group = "media";
           stateDir = removePrefix "/var/lib/" cfg.stateDir;
@@ -130,9 +127,8 @@ in {
             recursiveUpdate
             {
               misc = {
-                # Must sit inside `misc` (top level is silently ignored). Below 4,
-                # check_access inspects X-Forwarded-For (the visitor's public
-                # address via netbird-proxy) and denies browsers.
+                # Must sit inside `misc` (top level is ignored). Below 4, check_access judges
+                # X-Forwarded-For, the visitor's public address via netbird-proxy, and denies browsers.
                 inet_exposure = 4;
 
                 host =
@@ -149,8 +145,6 @@ in {
                 local_ranges = concatStringsCommaIfExists cfg.whitelistRanges;
                 permissions = "775";
 
-                # Defaults-on, but stated explicitly: unpacking silently not
-                # happening is indistinguishable from a paused download.
                 enable_unrar = 1;
                 enable_7zip = 1;
                 enable_filejoin = 1;
@@ -197,8 +191,8 @@ in {
           ];
         };
 
-        # UHD remux NZBs exceed nixpkgs' 10m client_max_body_size (nginx 413'd
-        # radarr's addfile). Finite since the port is published and nginx spools to disk.
+        # UHD remux NZBs exceed nixpkgs' 10m client_max_body_size, so radarr's addfile gets 413.
+        # Finite since the port is published and nginx spools to disk.
         services.nginx.virtualHosts = mkIf cfg.vpn.enable (lib.mkMerge [
           (vpnVhost cfg.uiPort)
           {

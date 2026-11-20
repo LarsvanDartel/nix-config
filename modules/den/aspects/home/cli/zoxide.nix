@@ -1,4 +1,4 @@
-# home.zoxide (+ its impermanence persist entry)
+# home.zoxide — zoxide as `cd`
 {...}: {
   den.aspects.home.zoxide.homeManager = {config, ...}: {
     cosmos.system.impermanence.persist.directories = [".local/share/zoxide"];

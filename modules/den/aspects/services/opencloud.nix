@@ -1,9 +1,5 @@
-# services.opencloud — file sync and share, with Collabora for editing in the
-# browser. WOPI needs three domains: cloud (OpenCloud), docs (Collabora, framed
-# by the browser), wopi (collaboration service, fetched server to server).
-# Diff the CSP against opencloud-compose's csp.yaml on upgrade.
+# services.opencloud — file sync and share, with Collabora editing over three WOPI domains (cloud, docs, wopi).
 {lib, ...}: let
-  # Option defaults and netbird-service targets (see services/netbird.nix).
   defaultPorts = {
     cloud = 9200;
     wopi = 9300;
@@ -238,6 +234,7 @@ in {
             };
 
             # docs must frame and be framed by cloud, or the editor is blank.
+            # Diff against opencloud-compose's csp.yaml on upgrade.
             csp.directives = {
               child-src = ["'self'"];
               connect-src = [
@@ -273,8 +270,8 @@ in {
               # Without it Firefox falls back to default-src 'none' for worker chunks.
               worker-src = ["'self'" "blob:"];
 
-              # NO form-action: it does not inherit default-src, and WOPI POSTs a
-              # form to Collabora — restricting it to 'self' broke the editor.
+              # NO form-action: it does not inherit default-src, and WOPI POSTs a form to Collabora;
+              # restricting it to 'self' breaks the editor.
               object-src = ["'self'" "blob:"];
               script-src = ["'self'" "'unsafe-inline'" "https://auth.lvdar.nl/"];
               style-src = ["'self'" "'unsafe-inline'"];
@@ -302,9 +299,8 @@ in {
                 insecure = false;
                 licensecheckenable = false;
 
-                # Collabora 25.04 cannot find a proof key with a store config, and
-                # generating one put a private key in the store. Both ends are
-                # on this host behind an authenticating edge.
+                # Collabora cannot find a proof key with a store config, and generating one puts a private
+                # key in the store. Accepted: both ends are on this host behind an authenticating edge.
                 proofkeys.disable = true;
               };
               wopi.wopisrc = "https://${wopiDomain}";
@@ -356,10 +352,8 @@ in {
           script = let
             target = "/etc/opencloud/opencloud.yaml";
           in ''
-            # Impermanence creates the file empty when its source is missing, so
-            # "exists" is not the question — "has anything in it" is. The module's
-            # own init only checks the former, which is how an empty file used to
-            # get it skipped and left the server without a jwt_secret.
+            # Impermanence creates the file empty when its source is missing, and the module's init checks
+            # only existence, leaving the server without a jwt_secret: test for content.
             if [ -s ${target} ]; then
               exit 0
             fi
@@ -367,15 +361,12 @@ in {
             work="$(mktemp -d)"
             trap 'rm -rf "$work"' EXIT
 
-            # Quietly: it prints the generated local admin password, and a
-            # password in the journal outlives every reason it was shown. That
-            # account is unused anyway — logins come from kanidm — and the value
-            # is in the config file if it is ever wanted.
+            # Quietly: it prints the generated local admin password, which must not reach the journal.
+            # That account is unused (logins come from kanidm); the value is in the config file.
             opencloud init --insecure true --config-path "$work" >/dev/null
 
-            # Written into the existing file rather than moved over it: the path
-            # is a bind mount, and replacing it would detach the mount and leave
-            # the real copy on /persist untouched.
+            # Written into the existing file, not moved over it: the path is a bind mount, and replacing
+            # it would leave the real copy on /persist untouched.
             cat "$work/opencloud.yaml" > ${target}
             chown ${config.services.opencloud.user}:${config.services.opencloud.group} ${target}
             chmod 0600 ${target}

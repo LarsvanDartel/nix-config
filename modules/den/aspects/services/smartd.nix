@@ -1,6 +1,4 @@
-# services.smartd — tell me which disk is dying before it dies.
-#
-# Host-local to endeavour: gaia's disk is virtual and pioneer's an SD card.
+# services.smartd — SMART disk alerts over ntfy, on endeavour only (gaia's disk is virtual, pioneer's an SD card).
 {inputs, ...}: {
   den.aspects.services.smartd.nixos = {
     config,
@@ -19,16 +17,11 @@
       name = "smartd-ntfy";
       runtimeInputs = with pkgs; [curl coreutils];
       text = ''
-        # smartd invokes this the way it would invoke a mailer: the body
-        # arrives on stdin and the useful summary is in the environment. The
-        # `-i "$recipient"` argument sendmail would take is accepted and
-        # ignored.
+        # smartd calls this like a mailer: body on stdin, summary in the environment; sendmail's
+        # `-i "$recipient"` is accepted and ignored.
         password="$(cat ${config.sops.secrets."keys/ntfy/password".path})"
 
-        # SMARTD_MESSAGE is the one-line verdict; stdin is that plus the full
-        # `smartctl -a` dump the module appends. Truncated for the same reason
-        # notify-failure trims the journal — ntfy renders a phone notification,
-        # and 200 lines of SMART attributes is not one.
+        # SMARTD_MESSAGE is the verdict; stdin adds the full `smartctl -a` dump. Truncated to fit a phone notification.
         body="$(printf '%s\n\n%s' "''${SMARTD_MESSAGE:-}" "$(cat)" | head -c 3000)"
 
         curl -sS --max-time 20 \

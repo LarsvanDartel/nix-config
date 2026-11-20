@@ -1,6 +1,4 @@
-# desktop.greetd. Sessions are CURATED: each compositor aspect contributes one
-# entry and the greeter gets a linkFarm of just those, never the system-wide
-# wayland-sessions dir.
+# desktop.greetd — greetd login offering only the sessions compositor aspects contribute.
 {den, ...}: {
   den.aspects.desktop.greetd.nixos = {
     config,
@@ -51,8 +49,7 @@
     };
 
     config = {
-      # Not `initial_session`: that is greetd's autologin slot; setting it to
-      # the same value registered the greeter twice.
+      # Not `initial_session`: that is greetd's autologin slot and registers the greeter twice.
       services.greetd = {
         enable = true;
         settings.default_session = {
@@ -60,9 +57,8 @@
         };
       };
 
-      # greetd's PAM stack substacks `login`, so enableGnomeKeyring on
-      # `greetd` itself is a no-op; without this the keyring starts locked
-      # every boot and all secrets look wiped.
+      # greetd's PAM stack substacks `login`; the keyring on `greetd` itself is a no-op and
+      # starts locked every boot.
       security.pam.services.login.enableGnomeKeyring = true;
 
       # System-level gnome-keyring is what registers gcr's prompter D-Bus
@@ -72,16 +68,12 @@
       # `programs.ssh.startAgent` (only one SSH agent may be installed).
       services.gnome.gcr-ssh-agent.enable = false;
 
-      # Stop the user manager as soon as the last session ends. With the 10 s
-      # default, logging back in within 10 s (a YubiKey touch is quick) reuses
-      # the old manager, whose compositor and noctalia units are still running
-      # against the dead session: start-umbriel refuses ("already running") and
-      # niri gets no noctalia.
+      # Stop the user manager when the last session ends: a quick re-login otherwise reuses the old
+      # manager, whose compositor and noctalia units still target the dead session.
       services.logind.settings.Login.UserStopDelaySec = 0;
     };
   };
 
-  # Body in ./_greetd/noctalia.nix, a plain module imported by its aspect.
   den.aspects.desktop.greetd.noctalia = {
     includes = [den.aspects.desktop.greetd];
     nixos = import ./_greetd/noctalia.nix {};

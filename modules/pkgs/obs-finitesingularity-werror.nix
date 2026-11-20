@@ -1,8 +1,4 @@
-# FiniteSingularity's three OBS plugins (obs-advanced-masks,
-# obs-composite-blur, obs-stroke-glow-shadow) share a const-discarding
-# strrchr in src/obs-utils.c that nixpkgs 2026-10-01's GCC makes fatal under
-# their -Werror; demote -Werror=discarded-qualifiers. Each plugin warns once
-# nixpkgs moves it off the version below: check, then drop it or bump.
+# obs-finitesingularity-werror — demotes -Werror=discarded-qualifiers for FiniteSingularity's three OBS plugins (const-discarding strrchr).
 {...}: {
   nixpkgs.overlays = [
     (_final: prev: let

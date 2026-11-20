@@ -1,22 +1,11 @@
-# services.unbound — recursive DNS + oisd blocklist.
-#
-# Blocklists are vendored in ./_unbound: as `flake = false` inputs, oisd's
-# constant regeneration broke the locked narHash within a day. Update with
-# `nix run .#update-blocklists`.
-#
-# Mesh-only names come from the `mesh-dns-record` quirk: an aspect emits
-# { "<name>" = host.meshAddress; } and every mesh resolver answers it, so the
-# resolvers cannot drift apart. Payloads must be static or `{host, ...}:`; a
-# `{config, ...}:` payload would make each resolver evaluate the producer's
-# host.
+# services.unbound — recursive DNS with vendored oisd blocklists (`nix run .#update-blocklists`) and mesh-only records.
 {den, ...}: let
   inherit (den.lib.policy) pipe;
 in {
   den.quirks.mesh-dns-record.description = "Mesh-only DNS records (name -> mesh IPv4), answered by every mesh unbound resolver";
 
-  # collectAll, not collect: pioneer (aarch64) produces the idrac record.
-  # den reads these argument names (host scope, host-entity filter), so
-  # deadnix must not strip them as unused.
+  # collectAll, not collect: pioneer (aarch64) produces the idrac record. Payloads must be static
+  # or `{host, ...}:`; `{config, ...}:` makes each resolver evaluate the producer's host.
   # deadnix: skip
   den.policies.mesh-dns-record = {host, ...}: [
     (pipe.from "mesh-dns-record" [
@@ -91,7 +80,8 @@ in {
         description = "Path to an unbound-format blocklist to include.";
       };
 
-      # Lifted out of hosts/endeavour.nix so a backup resolver blocks the same.
+      # Vendored in ./_unbound, not `flake = false` inputs: oisd regenerates constantly and breaks
+      # the locked narHash.
       oisd = {
         enable = mkEnableOption "the oisd blocklist";
         nsfw = mkOption {
@@ -174,16 +164,10 @@ in {
           optional cfg.mesh.enable
           "${config.services.netbird.clients.default.suffixedName}.service";
 
-        # This host resolves through its own unbound, so every second it is
-        # down is a DNS outage. The default (stop before activation, start
-        # after) held it down for the whole switch — 7.5 min on 2026-11-11
-        # while judgehosts timed out — and services resolving on start
-        # (oauth2-proxy, netbird-management, stalwart-provision) failed,
-        # notify-failure included. Restart in place instead; a reload would
-        # keep the old binary across package bumps.
+        # Restart in place: this host resolves through its own unbound, and stop-before-activation
+        # holds DNS down for the whole switch. A reload would keep the old binary across bumps.
         stopIfChanged = false;
-        # After logging "service stopped" it hung 90s before exiting; nothing
-        # is left to flush by then.
+        # It hangs 90s after "service stopped" with nothing left to flush.
         serviceConfig.TimeoutStopSec = "10s";
       };
 

@@ -1,5 +1,4 @@
-# git-hooks (pre-commit) as a flakeModule: provides `checks.<sys>.pre-commit`
-# and the devshell installation script; the treefmt hook runs formatter.nix.
+# pre-commit — git-hooks flakeModule providing checks.<sys>.pre-commit and the devshell hook installer.
 {inputs, ...}: {
   flake-file.inputs.pre-commit-hooks = {
     url = "github:cachix/git-hooks.nix";
@@ -8,13 +7,16 @@
 
   imports = [inputs.pre-commit-hooks.flakeModule];
 
-  perSystem = {config, ...}: let
+  perSystem = {
+    config,
+    pkgs,
+    ...
+  }: let
     # Vendored oisd blocklists must stay byte-for-byte upstream, and a patch's
     # blank context lines are a single space; keep every rewriting hook off them.
     vendored = ["\\.unbound$" "\\.patch$"];
   in {
     pre-commit.settings.hooks = {
-      # ========== General ==========
       check-added-large-files = {
         enable = true;
         excludes = ["\\.png" "\\.jpg"] ++ vendored;
@@ -50,7 +52,15 @@
         types = ["directory"];
       };
 
-      # ========== shellscripts ==========
+      comment-policy = {
+        enable = true;
+        name = "comment policy";
+        description = "one-line headers, comment blocks of at most two lines, no dates, live docs pointers";
+        entry = "${pkgs.python3.interpreter} ${./_comment-policy.py}";
+        types_or = ["nix" "python" "shell" "yaml"];
+        excludes = ["^flake\\.nix$"];
+      };
+
       shellcheck = {
         enable = true;
         excludes = [
@@ -58,7 +68,6 @@
         ];
       };
 
-      # ========== nix (formatting delegated to treefmt) ==========
       treefmt = {
         enable = true;
         packageOverrides.treefmt = config.treefmt.build.wrapper;

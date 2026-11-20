@@ -1,8 +1,4 @@
-# services.vaultwarden — Bitwarden-compatible password vault; login via kanidm SSO.
-#
-# Ungated: Bitwarden clients can't follow the NetBird gate's redirect. SSO_ONLY
-# makes kanidm the only way in, and its `vaultwarden-users` scope map is the
-# signup gate; the master password still unlocks (and encrypts) the vault.
+# services.vaultwarden — Bitwarden-compatible password vault; login only through kanidm SSO.
 {
   den,
   inputs,
@@ -79,9 +75,8 @@ in {
       };
 
       config = {
-        # Shared with kanidm's host (services/kanidm.nix), hence hosts/common.
-        # Hex only: vaultwarden URL-encodes the secret for HTTP Basic auth and
-        # kanidm compares it undecoded, so `+` or `/` fail the token exchange.
+        # Shared with kanidm's host, hence hosts/common. Hex only: vaultwarden URL-encodes it for
+        # Basic auth and kanidm compares it undecoded, so `+` or `/` fail the token exchange.
         sops.secrets."keys/vaultwarden/oauth-client-secret".sopsFile =
           builtins.toString inputs.nix-secrets + "/hosts/common/secrets.yaml";
         sops.templates."vaultwarden.env" = {
@@ -131,9 +126,7 @@ in {
             SSO_ONLY = true;
             SSO_AUTHORITY = "https://${cfg.authDomain}/oauth2/openid/vaultwarden";
             SSO_CLIENT_ID = "vaultwarden";
-            # Vaultwarden keeps its own session (7-day idle refresh) instead of
-            # following kanidm's tokens, so a kanidm outage doesn't log clients
-            # out; kanidm is only needed to log in.
+            # Vaultwarden keeps its own session rather than kanidm's tokens, so a kanidm outage doesn't log clients out.
             SSO_AUTH_ONLY_NOT_SESSION = true;
 
             # gaia's Stalwart mesh relay (services/stalwart.nix): no auth or

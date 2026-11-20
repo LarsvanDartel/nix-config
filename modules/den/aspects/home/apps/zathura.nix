@@ -1,8 +1,4 @@
-# home.zathura — zathura (pdf + comic books) as a nix-wrapper-modules package
-# (`nix run .#zathura`); the wrapper holds the config, home-manager installs
-# it per mode (cosmosStyling.modal).
-# webp/svg pages need nothing here: nixpkgs' zathura sets its own
-# GDK_PIXBUF_MODULE_FILE (with both), overriding any we pass.
+# home.zathura — zathura (PDF, comic books) as a per-mode nix-wrapper-modules package
 {
   inputs,
   cosmosStyling,
@@ -16,12 +12,12 @@
   in
     inputs.nix-wrapper-modules.wrappers.zathura.wrap {
       inherit pkgs;
+      # webp/svg pages need no GDK_PIXBUF_MODULE_FILE: nixpkgs' zathura sets its own, overriding ours.
       plugins = with pkgs.zathuraPkgs; [zathura_pdf_mupdf zathura_cb];
       settings = {
         window-title-basename = true;
         selection-clipboard = "clipboard";
 
-        # stylix's zathura target (base16-zathura).
         default-bg = rgba "base00" cosmosStyling.opacity.applications;
         default-fg = rgb "base01";
         statusbar-fg = rgb "base04";

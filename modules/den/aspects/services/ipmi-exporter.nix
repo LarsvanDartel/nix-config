@@ -1,8 +1,7 @@
 # services.ipmi-exporter — BMC sensors (temperatures, fans, PSU power), in-band.
 {den, ...}: let
-  # Option-free on purpose: the scrape-target entry must be static (see
-  # services/prometheus.nix). 9500 is node-exporter's; 9501 is spindle's on
-  # endeavour, and opencloud holds 9091-9304.
+  # A plain binding, not an option: the scrape-target entry must be static (see
+  # services/prometheus.nix). Hand-allocated: 9500 node-exporter, 9501 spindle, 9091-9304 opencloud.
   port = 9502;
 in {
   den.aspects.services.ipmi-exporter = {

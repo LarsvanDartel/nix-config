@@ -1,6 +1,5 @@
-# services.immich
+# services.immich — photo library with kanidm login, published on the mesh.
 {...}: let
-  # services.immich.port and the netbird-service target.
   port = 2283;
 in {
   den.aspects.services.immich = {

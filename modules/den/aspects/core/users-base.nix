@@ -1,5 +1,4 @@
-# core.users-base — system-wide user policy + the cosmos.user.extraGroups
-# collector. cosmos.user.name comes from the host's den user entity.
+# core.users-base — system-wide user policy and the cosmos.user.extraGroups collector.
 {lib, ...}: {
   den.aspects.core.users-base = {
     includes = [

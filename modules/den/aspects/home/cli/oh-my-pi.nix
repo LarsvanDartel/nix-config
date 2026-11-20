@@ -1,7 +1,6 @@
-# home.oh-my-pi (https://omp.sh/)
+# home.oh-my-pi — the omp coding agent (https://omp.sh/)
 {inputs, ...}: {
-  # Pinned to a release tag so `nix flake update` cannot move it: every new rev is a
-  # ~45 min uncached Rust+Bun build. Bump by hand when omp reports an update,
+  # Pinned to a release tag: every new rev is a ~45 min uncached build. Bump by hand,
   # then `nix run .#write-flake` and `nix flake update omp`.
   flake-file.inputs.omp.url = "github:can1357/oh-my-pi/v18.19.0";
 

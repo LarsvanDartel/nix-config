@@ -1,13 +1,4 @@
-# services.firefly — Firefly III personal finance manager, plus its
-# Enable Banking-backed data importer for automated bank sync.
-#
-# Enable Banking, not GoCardless (free tier closed to new signups July 2025).
-#
-# No native OIDC: oauth2-proxy + nginx auth_request + remote_user_guard.
-# Published through gaia *ungated* — kanidm SSO is already a full login.
-#
-# The data importer is mesh-only, not published, but still needs real TLS:
-# Enable Banking's pre-registered callback redirect may not tolerate HTTP.
+# services.firefly — Firefly III finance manager with an Enable Banking data importer for bank sync.
 {
   den,
   inputs,
@@ -23,7 +14,7 @@ in {
   den.aspects.services.firefly = {
     includes = with den.aspects.services; [nginx netbird.client];
 
-    # Authenticates via oauth2-proxy + kanidm.
+    # Published ungated: oauth2-proxy + kanidm is already a full login.
     netbird-service = {host, ...}: {
       firefly = {
         bearerAuth.enable = false;
@@ -36,10 +27,8 @@ in {
       };
     };
 
-    # Resolves only inside the mesh, to this host's NetBird address — never
-    # published, but still a real name under the *.lvdar.nl wildcard so nginx
-    # can present a browser-trusted cert for Enable Banking's callback
-    # redirect.
+    # Mesh-only, never published, but a real *.lvdar.nl name so nginx can present a
+    # browser-trusted cert for Enable Banking's callback redirect.
     mesh-dns-record = {host, ...}: {${importerDomain} = host.meshAddress;};
 
     kanidm-provision = {config, ...}: let
@@ -88,9 +77,8 @@ in {
             exit 0
           fi
 
-          # Each of these is consumed by the artisan subprocess below via
-          # `set -a`, not read directly in this script — shellcheck can't see
-          # that, hence a disable per line rather than one at the top.
+          # Consumed by the artisan subprocess via `set -a`; shellcheck can't see that,
+          # hence a disable per line.
           set -a
           # shellcheck disable=SC2034
           APP_ENV=production
@@ -111,17 +99,8 @@ in {
           FIREFLY_III_ACCESS_TOKEN="$(< "$CREDENTIALS_DIRECTORY/access-token")"
           set +a
 
-          # config.json uses a sliding 30-day "range" window (not Firefly's
-          # date-of-last-known-transaction "partial" mode), so every run
-          # re-fetches transactions the previous run(s) already imported.
-          # firefly-iii-data-importer logs each of those as an "error" entry
-          # (app/Console/Commands/Import.php: any non-empty errors[] forces
-          # exit code GENERAL_ERROR) even though `ignore_duplicate_transactions`
-          # already told it to skip re-adding them — duplicate detection
-          # working as intended still reads as a hard failure to systemd. Seen
-          # daily since the config was created on 2026-09-05, paging over
-          # ntfy every night for zero actual problem. Only escalate when some
-          # of the reported errors are *not* duplicate skips.
+          # The sliding 30-day range re-fetches imported transactions, which the importer reports
+          # as errors (nonzero exit). Escalate only when some errors are not duplicate skips.
           set +e
           output="$(${importerCfg.package}/artisan importer:import "$config" 2>&1)"
           status=$?
@@ -129,10 +108,8 @@ in {
           printf '%s\n' "$output"
 
           total_errors="$(printf '%s\n' "$output" | grep -oE 'Array contains [0-9]+ error\(s\)' | grep -oE '[0-9]+' || true)"
-          # "Duplicate of transaction #" also shows up 2-3x per duplicate in
-          # the submission-attempt DEBUG/ERROR lines above — only the final
-          # "Import index N: ..." report line is one-per-array-entry, so
-          # that's what has to line up with the declared error count.
+          # Only the "Import index N:" line is one per error entry; duplicates also show up 2-3x
+          # in the DEBUG/ERROR lines above.
           dup_errors="$(printf '%s\n' "$output" | grep -cE '^Import index [0-9]+: .*Duplicate of transaction #' || true)"
           total_errors="''${total_errors:-0}"
           dup_errors="''${dup_errors:-0}"
@@ -187,10 +164,8 @@ in {
           days_left=$(( ($(date -d "$valid_until" +%s) - now) / 86400 ))
           echo "session $session_id: status=$status, $days_left day(s) left ($valid_until)"
 
-          # 14 days of runway: enough to notice and re-authorise by hand
-          # (the same manual, browser-driven flow that created the session
-          # in the first place — there is no way to renew it headlessly)
-          # before the automatic import above starts silently doing nothing.
+          # 14 days to re-authorise by hand (browser flow, no headless renewal) before the
+          # import silently stops working.
           if [ "$status" != "AUTHORIZED" ] || [ "$days_left" -le 14 ]; then
             password="$(cat "$CREDENTIALS_DIRECTORY/ntfy-password")"
             curl -sS --max-time 20 --retry 3 --retry-all-errors --retry-delay 10 \
@@ -217,13 +192,8 @@ in {
           fastcgi_param modHeadersAvailable true;
           fastcgi_pass unix:${socket};
 
-          # Neither app queues work — QUEUE_CONNECTION=sync in both — so an
-          # import runs to completion inside the one request that started
-          # it. Confirmed directly: a 373-transaction import took 33-37
-          # minutes and *did* finish successfully server-side every time,
-          # well past nginx's 60s default fastcgi_read_timeout — which had
-          # already cut the client off, so the only visible symptom was a
-          # progress bar that looked permanently stuck.
+          # Neither app queues work (QUEUE_CONNECTION=sync): an import runs inside its request for
+          # over 30 minutes, and nginx's 60s default cuts the client off while it continues.
           fastcgi_read_timeout 3600s;
           fastcgi_send_timeout 3600s;
 
@@ -239,7 +209,7 @@ in {
 
         importerPort = mkOption {
           type = port;
-          # Not 8096: jellyfin's port — binding both broke both.
+          # Not 8096: that is jellyfin's port.
           default = 8098;
           description = ''
             Mesh-facing port for the data importer's own nginx vhost. Not
@@ -283,9 +253,7 @@ in {
             AUTHENTICATION_GUARD_EMAIL = "REMOTE_USER_EMAIL";
 
             MAIL_MAILER = "smtp";
-            # gaia's Stalwart mesh relay (services/stalwart.nix): no auth or
-            # STARTTLS offered, so none configured; hand-synced with gaia.nix
-            # relayClients.
+            # gaia's Stalwart mesh relay offers no auth or STARTTLS; hand-synced with gaia.nix relayClients.
             MAIL_HOST = "gaia.nb.lvdar.nl";
             MAIL_PORT = 2525;
             MAIL_FROM = "firefly@lvdar.nl";
@@ -320,10 +288,8 @@ in {
           };
         };
 
-        # PHP2Shell (CVE-2026-109618/-109619): pre-auth RCE in PHP's multipart
-        # upload-progress handling, reached before Firefly runs. Neither app
-        # shows PHP upload-progress bars; strict sessions are PHP's own advice.
-        # Hardening only: a patched PHP is the fix.
+        # PHP2Shell (CVE-2026-109618/-109619) hardening: pre-auth RCE in upload-progress handling,
+        # which neither app uses. A patched PHP is the fix.
         services.phpfpm.pools = lib.genAttrs ["firefly-iii" "firefly-iii-data-importer"] (_: {
           settings = {
             "php_admin_flag[session.upload_progress.enabled]" = "off";
@@ -418,9 +384,8 @@ in {
           "keys/firefly/enable-banking-private-key".owner = "firefly-iii-data-importer";
         };
 
-        # Hand-rolled: services.oauth2-proxy is a singleton already used by
-        # microbin.nix. --whitelist-domain is required: --reverse-proxy rejects
-        # every redirect when the list is empty.
+        # Hand-rolled: services.oauth2-proxy is a singleton used by microbin.nix. --whitelist-domain
+        # is required: with an empty list, --reverse-proxy rejects every redirect.
         systemd.services.oauth2-proxy-firefly = {
           description = "oauth2-proxy for Firefly III";
           after = ["network.target" "kanidm.service"];
@@ -496,15 +461,13 @@ in {
               '';
             };
 
-            # The REST API uses Bearer tokens; the importer got 307-to-login.
-            # Must be its own fastcgi location: tryFiles would re-enter the
-            # gated "~ \.php$" location.
+            # The REST API uses Bearer tokens, so it skips the gate; its own fastcgi location, since
+            # tryFiles would re-enter the gated "~ \.php$" location.
             "/api/" = phpLocation {
               socket = config.services.phpfpm.pools.firefly-iii.socket;
               scriptFilename = "$document_root/index.php";
-              # The one path anonymous requests reach PHP by, and PHP parses
-              # multipart bodies before Firefly sees them (PHP2Shell). The API
-              # never takes multipart: attachment upload reads the raw body.
+              # The one path anonymous requests reach PHP by, and PHP parses multipart first (PHP2Shell).
+              # The API never takes multipart: attachment upload reads the raw body.
               extraConfig = ''
                 auth_request off;
                 if ($http_content_type ~* "multipart/form-data") {

@@ -1,17 +1,11 @@
-/*
- * Detect Java main function for the given list of classes.
- * First argument is the search directory.
- *
- * Part of the DOMjudge Programming Contest Jury System and licensed
- * under the GNU GPL. See README and COPYING for details.
- */
+// DetectMain — prints which of the given classes has a public static void main; args[0] is the class directory.
+// Part of the DOMjudge Programming Contest Jury System, licensed under the GNU GPL.
 
 import java.lang.reflect.*;
 import java.net.*;
 
 public class DetectMain {
 	public static void main ( String[] args ) {
-		// Check arguments
 		if ( args.length < 2 ) {
 			System.err.println("Usage: java DetectMain <dir> <class1> "
 			                   + "[ <class2> ... ]");
@@ -19,7 +13,6 @@ public class DetectMain {
 			return;
 		}
 
-		// Load classes from specific directory
 		URL dir;
 		try {
 			dir = new URL("file://" + args[0] + "/");
@@ -30,12 +23,10 @@ public class DetectMain {
 		}
 		ClassLoader cl = new URLClassLoader( new URL[] { dir } );
 
-		// Go through all classes
 		String result = null;
 		for ( int i = 1; i < args.length; i++) {
 			String arg = args[i];
 
-			// Instantiate class
 			Class<?> c;
 			try {
 				c = Class.forName(arg, false, cl);
@@ -45,16 +36,13 @@ public class DetectMain {
 				return;
 			}
 
-			// Try to find main method
 			Method mainMethod;
 			try {
 				mainMethod = c.getDeclaredMethod("main", args.getClass());
 			} catch ( NoSuchMethodException e ) {
-				// Silently ignore, not every class has main method
 				continue;
 			}
 
-			// Check if it's indeed public static void
 			if ( Modifier.isStatic(mainMethod.getModifiers())
 			   && Modifier.isPublic(mainMethod.getModifiers())
 			   && mainMethod.getReturnType().equals(Void.TYPE) ) {
@@ -69,14 +57,12 @@ public class DetectMain {
 			}
 		}
 
-		// No main found
 		if ( result == null ) {
 			System.err.println("Error: no 'main' found in any class file.");
 			System.exit(1);
 			return;
 		}
 
-		// Success
 		System.out.println(result);
 	}
 }

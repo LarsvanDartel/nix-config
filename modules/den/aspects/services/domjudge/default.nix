@@ -1,16 +1,4 @@
-# services.domjudge — the DOMjudge programming-contest judge: MariaDB, the
-# domserver and four judgehosts as podman containers. The files beside this one
-# add what makes it judge.lvdar.nl: sso.nix (kanidm login and publishing),
-# languages.nix (toolchains beyond the image's) and contests.nix (CHipCie).
-#
-# The domserver trusts REMOTE_USER (_files/start.ro/20-remote-user.py):
-# anything that can reach 127.0.0.1:8093 or the podman network can claim any
-# user. sso.nix's vhost is the only way in that sets it; its /api/ location
-# clears the header and leaves the domserver's own basic auth.
-#
-# The image digests are the PHP2Shell fix: this domserver build carries
-# php8.3-fpm 8.3.6-0ubuntu0.24.04.13; earlier builds of the 9.0.1 tag are
-# vulnerable. Bump domserver and judgehost together.
+# services.domjudge — the DOMjudge contest judge: MariaDB, the domserver and four judgehosts as podman containers.
 {...}: let
   inherit (import ./_lib.nix) containerPort judgehostContainer judgehostIds judgehostSibling otherCpus judgeKHz;
 in {
@@ -35,6 +23,8 @@ in {
       os = "linux";
       arch = "amd64";
     };
+    # Pinned past the PHP2Shell fix (php8.3-fpm 8.3.6-0ubuntu0.24.04.13); older 9.0.1 builds are
+    # vulnerable. Bump domserver and judgehost together.
     domserverImage = pkgs.dockerTools.pullImage {
       imageName = "domjudge/domserver";
       imageDigest = "sha256:ae720873114e8abe09c1d81473c0ed4a287b74f1f9fceaa9be087baaeae309f4";
@@ -91,9 +81,8 @@ in {
       };
     };
 
-    # Privileged + the host cgroup tree is upstream's documented judgehost
-    # setup. runguard unshares the network namespace, so submissions cannot
-    # reach the domserver.
+    # Privileged with the host cgroup tree is upstream's judgehost setup; runguard unshares
+    # the network namespace, so submissions cannot reach the domserver.
     virtualisation.oci-containers.containers =
       lib.genAttrs' judgehostIds (id:
         lib.nameValuePair (judgehostContainer id) {
@@ -111,9 +100,8 @@ in {
             DOMSERVER_BASEURL = "http://10.89.42.3/";
             JUDGEDAEMON_USERNAME = "judgehost";
             DAEMON_ID = toString id;
-            # Upstream's default UID is shared by every container, and
-            # RLIMIT_NPROC counts per UID kernel-wide: one judgehost's threads
-            # then fail another's fork/exec with EAGAIN (spurious run-errors).
+            # One UID per container: RLIMIT_NPROC counts per UID kernel-wide, so a shared UID
+            # fails other judgehosts' fork/exec with EAGAIN.
             RUN_USER_UID_GID = toString (62860 + id);
           };
           environmentFiles = [config.sops.templates."domjudge-judgehost.env".path];
@@ -142,6 +130,8 @@ in {
           dependsOn = ["domjudge-mariadb"];
           networks = ["domjudge"];
           extraOptions = ["--ip=10.89.42.3"];
+          # Trusts REMOTE_USER: anything reaching this port or the podman network can claim any
+          # user. sso.nix's vhost is the only way in that sets it.
           ports = ["127.0.0.1:${toString containerPort}:80"];
           environment = {
             MYSQL_HOST = "10.89.42.2";
@@ -153,9 +143,8 @@ in {
         };
       };
 
-    # Judging speed must match what the contests' time limits assume, so the
-    # judge cores do nothing else: a busy hyperthread sibling slows a run
-    # 2.2x. Runs live in runguard's /domjudge cgroup, outside these slices.
+    # The judge cores do nothing else so judging speed matches the time limits: a busy sibling
+    # slows a run 2.2x. Runs live in runguard's /domjudge cgroup, outside these slices.
     systemd.slices = lib.genAttrs ["system" "user" "machine"] (_: {
       sliceConfig.AllowedCPUs = otherCpus;
     });
@@ -187,7 +176,6 @@ in {
           '';
         };
 
-        # Siblings offline and the clock pinned; stopping undoes both.
         domjudge-judge-cores = {
           description = "Reserve DOMjudge's judge cores at a fixed clock";
           wantedBy = ["multi-user.target"];

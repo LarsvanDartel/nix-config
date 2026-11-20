@@ -73,7 +73,6 @@
         }
       ];
 
-      # After every successful metadata refresh (hourly, upstream's timer).
       systemd.services.fwupd-refresh.onSuccess = ["firmware-updates.service"];
 
       systemd.services.firmware-updates = {

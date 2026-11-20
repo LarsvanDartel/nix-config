@@ -1,9 +1,4 @@
-# spotify-player: ncspot re-registered its Spotify app's redirect URI as
-# http://127.0.0.1:8989/ncspot_login. 0.25.2 uses it for the fallback client,
-# but a login with the default (ncspot) client_id still sends
-# login_redirect_uri's /login and dies on "redirect_uri: Not matching
-# configuration". Use NCSPOT_REDIRECT_URI there too; librespot's login
-# (official client id) keeps /login. Upstream: aome510/spotify-player#1107.
+# spotify-player — default (ncspot) client_id logins use NCSPOT_REDIRECT_URI, matching ncspot's registered redirect (aome510/spotify-player#1107).
 {...}: {
   nixpkgs.overlays = [
     (_final: prev: {

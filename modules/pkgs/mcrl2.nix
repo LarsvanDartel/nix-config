@@ -1,3 +1,4 @@
+# mcrl2 — the mCRL2 process algebra toolset, packaged from source.
 {...}: {
   nixpkgs.overlays = [
     (final: _prev: {

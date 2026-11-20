@@ -1,4 +1,4 @@
-# desktop.fontconfig — bitmap font acceptance workaround.
+# desktop.fontconfig — system fontconfig that accepts bitmap fonts.
 {...}: {
   den.aspects.desktop.fontconfig.nixos = {...}: {
     fonts.fontconfig.localConf = ''

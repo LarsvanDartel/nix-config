@@ -1,22 +1,13 @@
-# desktop.styling — system stylix + every user's home.styling and home.theme
-# (to-users), and the `cosmosStyling` module arg: the theme's dark and light
-# schemes, opacity and fonts as plain data. Wrapped programs read that arg
-# because their config is the source of truth, so no stylix target reaches
-# them; stylix reads the same values, so the two can't drift. Not read from
-# the home user's stylix (that would be a home→nixos cross-eval).
+# desktop.styling — system stylix, every user's home styling, and the `cosmosStyling` theme data.
 {
   den,
   inputs,
   lib,
   ...
 }: let
-  # Each theme names its tinted-theming scheme per mode, its icon theme
-  # (home/desktop/_styling/icons) and its accent: the base16 slot for
-  # noctalia's primary and the focused-window colour in niri and Umbriel.
-  # Switching theme is this one word.
+  # accent: the base16 slot for noctalia's primary and the focused-window colour in niri and Umbriel.
   themes = {
-    # Not everforest-dark-medium: same background, but its base05 is the
-    # grey 859289, too dim for body text.
+    # Not everforest-dark-medium: its base05 (859289) is too dim for body text.
     everforest = {
       dark = "everforest";
       light = "everforest-light-medium";
@@ -44,8 +35,7 @@
   fontsDir = ../home/desktop/_styling/fonts;
   fontFiles = lib.attrNames (lib.filterAttrs (n: t: t == "regular" && n != "default.nix" && lib.hasSuffix ".nix" n) (builtins.readDir fontsDir));
 
-  # The runtime mode lives in this link (relative to $HOME): `current` points
-  # at `dark` or `light`, each a link to that mode's file farm (home.theme).
+  # Relative to $HOME: `current` links to `dark` or `light`, each that mode's file farm (home.theme).
   stateDir = ".local/state/cosmos/theme";
 in {
   flake-file.inputs.stylix = {
@@ -53,22 +43,21 @@ in {
     inputs.nixpkgs.follows = "nixpkgs";
   };
 
+  # Plain data, not read from the home user's stylix (a home→nixos cross-eval).
   _module.args.cosmosStyling = {
     inherit theme defaultMode modes schemeFile stateDir;
     iconTheme = themes.${theme}.icons;
     inherit (themes.${theme}) accent;
-    # Load-bearing: `terminal` also flips btop's/helix's `transparent`, or a
-    # TUI paints an opaque rectangle through the terminal. noctalia reads these
-    # by hand (_noctalia/home.nix). `applications` stays 1.0 deliberately.
+    # Load-bearing: `terminal` also flips btop's/helix's `transparent`, or TUIs paint opaque boxes.
+    # noctalia reads these by hand (_noctalia/home.nix); `applications` stays 1.0 deliberately.
     opacity = {
       terminal = 0.8;
       desktop = 0.8;
       popups = 0.8;
       applications = 1.0;
     };
-    # Family names from home/desktop/_styling/fonts; resolve with `font`.
-    # Atkinson has no serif cut: serif requests (pages without a font) get
-    # the sans too, so no text in any app falls back to a less legible face.
+    # Family names from home/desktop/_styling/fonts; resolve with `font`. Atkinson has no serif
+    # cut, so serif requests get the sans rather than a less legible fallback.
     fonts = {
       serif = "Atkinson Hyperlegible Next";
       sansSerif = "Atkinson Hyperlegible Next";
@@ -78,8 +67,7 @@ in {
       emoji = "Noto Color Emoji";
       interface = "Atkinson Hyperlegible Next";
     };
-    # base16.nix scheme attrs for a mode: the same value as stylix's
-    # config.lib.stylix.colors under that scheme.
+    # base16.nix scheme attrs for a mode, equal to stylix's config.lib.stylix.colors under it.
     colors = pkgs: mode: (inputs.stylix.inputs.base16.lib {inherit pkgs lib;}).mkSchemeAttrs (schemeFile mode);
     # Raw files skip the fontModule submodule: fill in its defaults.
     font = pkgs: name:
@@ -94,10 +82,8 @@ in {
         // import (fontsDir + "/${f}") {inherit pkgs lib;})
       fontFiles);
 
-    # A program whose config bakes in colours, built once per mode: every
-    # bin/ entry execs the variant matching the runtime mode, so a new launch
-    # follows `theme`. Everything else (share/, desktop files) is the default
-    # mode's. `mk` takes the mode.
+    # Built once per mode: each bin/ entry execs the runtime mode's variant, so a new launch
+    # follows `theme`. share/ and desktop files are the default mode's. `mk` takes the mode.
     modal = pkgs: name: mk: let
       variants = lib.genAttrs modes mk;
       default = variants.${defaultMode};

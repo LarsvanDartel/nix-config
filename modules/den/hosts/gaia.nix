@@ -1,7 +1,4 @@
-# gaia (x86_64 server). den-produced.
-#
-# Generate the facter report on gaia and commit:
-#   sudo nixos-facter -o modules/den/hosts/_facter/gaia.facter.json
+# gaia — x86_64 public VPS: the fleet's only ingress and its NetBird control plane.
 {
   den,
   inputs,
@@ -64,8 +61,7 @@
         impermanence.device = "/dev/disk/by-label/nixos";
       };
 
-      # Home IP, so a crowdsec ban can't lock the admin out of both paths.
-      # Dynamic; keep until home.lvdar.nl (services/ddns.nix) resolves.
+      # Home IP (dynamic), so a crowdsec ban can't lock the admin out of both paths.
       cosmos.services.crowdsec.whitelistIps = ["86.86.217.11"];
 
       # endeavour, where firefly/traccar relay through gaia.nb.lvdar.nl:2525;
@@ -121,11 +117,8 @@
         quiesceServices = ["netbird-management.service" "stalwart.service"];
       };
 
-      # Kernel NAT, not an L4 service: the L4 service for this target never
-      # forwarded (cause unknown; traccar-osmand works). Lands on knot2's own
-      # SSH listener (services/tangled.nix sshPort; hand-synced), never sshd.
-      # Masquerade is required, or replies go to the client's public address
-      # and never route back.
+      # Kernel NAT to knot2's own SSH listener (hand-synced with services/tangled.nix sshPort); a NetBird L4 service
+      # never forwarded here. Masquerade is required, or replies go to the client's public address and never route back.
       networking.nat = let
         knotSsh = "2223";
       in {
@@ -164,10 +157,8 @@
       # publishes www). Ungated: a public blog.
       cosmos.services.netbird.localVhosts."lvdar.nl".upstream = "http://${endeavourMesh}:3031";
 
-      # Dotted names probe as written, bare labels as subdomains. Explicit,
-      # not derived from cosmos.services.netbird.services: the order is the
-      # status page's, lvdar.nl and auth are not proxy services, and not
-      # every published service is worth probing.
+      # Dotted names probe as written, bare labels as subdomains. Explicit, not derived from netbird.services:
+      # the order is the status page's, and not every target is a proxy service or worth probing.
       cosmos.services.gatus.endpoints = [
         "lvdar.nl"
         "jellyfin"
@@ -188,16 +179,13 @@
       # Ad-blocking DNS follows roaming devices; gaia is the fallback.
       cosmos.services.netbird.dnsPeers = ["endeavour" "gaia"];
 
-      # Non-fleet peers get DNS only. panther, the phone, is an operator: it
-      # reaches the fleet (Termux SSH, mesh-only names) and nothing reaches it
-      # except declared callbacks. `enforce` retires All -> All; getting it
-      # wrong takes out SSH to everything at once.
+      # Non-fleet peers get DNS only; panther (the phone) is an operator: it reaches the fleet, reached back only
+      # through declared callbacks. `enforce` retires All -> All; getting it wrong cuts SSH to every host at once.
       cosmos.services.netbird.mesh = {
         fleet = denHosts;
         operators = ["panther"];
-        # KDE Connect off the home LAN: the phone adds voyager by mesh IP and
-        # sends its UDP identity, then voyager dials the phone's TCP port back.
-        # voyager is the only host with home.kde-connect.
+        # KDE Connect off the home LAN: the phone sends its UDP identity to voyager's mesh IP, then voyager
+        # dials the phone's TCP port back. voyager is the only host with home.kde-connect.
         operatorCallbacks.kde-connect = {
           peers = ["voyager"];
           protocol = "tcp";

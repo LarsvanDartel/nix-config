@@ -1,6 +1,4 @@
-# home.foot — foot as a nix-wrapper-modules package (`nix run .#foot`); the
-# wrapper holds the config with both palettes, home-manager installs it per
-# mode (cosmosStyling.modal) and sets the terminal defaults.
+# home.foot — foot as a wrapped package holding both palettes, installed per mode.
 {
   den,
   inputs,
@@ -21,7 +19,6 @@
         grid = monospace.pixelGrid;
       in "pixelsize=${toString (grid * lib.max 1 (monospace.recommendedSize * 96 / 72 / grid))}"
       else "size=${toString monospace.recommendedSize}";
-    # stylix's foot target.
     palette = palette: let
       colors = cosmosStyling.colors pkgs palette;
     in {
@@ -100,7 +97,7 @@ in {
         pkill -"$sig" -x foot || true
       '';
 
-      # No foot server runs (it was started by Hyprland's exec-once).
+      # No foot server runs, so both defaults are the standalone binary.
       cosmos.cli.terminals.default = mkDefault "${foot}/bin/foot";
       cosmos.cli.terminals.defaultStandalone = mkDefault "${foot}/bin/foot";
     };

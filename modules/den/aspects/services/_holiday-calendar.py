@@ -1,11 +1,4 @@
-# holiday-calendar — mirror public ICS feeds into one CalDAV calendar,
-# configured by services/holiday-calendar.nix.
-#
-# Each event is stored under a hash of its content (without DTSTAMP, the
-# upload time), so a run deletes what changed or vanished and uploads what
-# is new; unchanged events are never rewritten. Regional feeds' events with
-# the same title and dates become one event naming its regions, or none
-# when every region has it.
+# holiday-calendar — mirrors public ICS feeds into one CalDAV calendar.
 import base64
 import hashlib
 import http.client
@@ -81,8 +74,8 @@ def convert(src, timezones, description, regions=None, uid=None):
     cal.add_component(ev)
 
     name = hashlib.sha256(cal.to_ical()).hexdigest()[:32] + ".ics"
-    # Upload time; agenda-abonnement.nl's stamps are floating and in the
-    # future.
+    # Added after hashing: the upload time must not change the name.
+    # agenda-abonnement.nl's own stamps are floating and in the future.
     ev.add("DTSTAMP", datetime.now(timezone.utc))
     return str(ev["UID"]), name, cal.to_ical()
 
@@ -134,9 +127,7 @@ def desired(feeds, carnaval_region):
     regions = [feed["region"] for feed in feeds if feed["region"]]
     converted = []
     years = set()
-    # carnaval_region's spring holidays as (start, end) dates.
     spring = []
-    # (SUMMARY, DTSTART, DTEND) -> [(region, feed, event, timezones)]
     shared = {}
     for feed in feeds:
         source = fetch(feed["url"])

@@ -1,10 +1,7 @@
-# home.kde-connect — split across nixos and homeManager: the daemon is a user
-# service, but the peer answers discovery by initiating a TCP connection back
-# to this machine, which needs a hole in the host firewall (NixOS level).
+# home.kde-connect — KDE Connect user daemon plus the host firewall ports its peers connect back on.
 {...}: {
   den.aspects.home.kde-connect.provides.to-hosts.nixos = {...}: {
-    # Full range, TCP and UDP: devices claim the first free port and discovery
-    # needs both protocols. Open on every interface; pairing is the boundary.
+    # Open on every interface: pairing is the access boundary.
     networking.firewall = {
       allowedTCPPortRanges = [
         {

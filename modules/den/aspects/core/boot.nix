@@ -111,9 +111,8 @@
             mode = "0700";
           }
         ];
-        # On the switch that enables this, the persist bind mount appears
-        # during activation: keys written before it would be hidden by it and
-        # lost, while the ESP already holds their enrolment files.
+        # The persist bind mount appears during the enabling switch's activation: keys written
+        # before it are hidden and lost while the ESP already holds their enrolment files.
         systemd.services.generate-sb-keys.unitConfig.RequiresMountsFor = ["/var/lib/sbctl"];
         systemd.services.prepare-sb-auto-enroll.unitConfig.RequiresMountsFor = ["/var/lib/sbctl"];
 

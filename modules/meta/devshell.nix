@@ -1,5 +1,4 @@
-# Dev shell via make-shell (replaces shell.nix). Installs the git hooks on
-# entry; launchpad's nvim-nix gives nvim nil + alejandra inside this repo.
+# devshell — the default dev shell (make-shell); installs the git hooks on entry.
 {inputs, ...}: {
   flake-file.inputs.make-shell.url = "github:nicknovitski/make-shell";
 

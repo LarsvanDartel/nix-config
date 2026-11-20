@@ -1,8 +1,7 @@
 # services.loki — one place to grep four hosts' journals from.
-#
-# Data on /tank, deliberately NOT in cosmos.system.impermanence.persist: an
-# entry there bind-mounts /persist over it, putting the logs back on the SSD.
 {den, ...}: {
+  # Data on /tank, deliberately NOT in cosmos.system.impermanence.persist: an
+  # entry there bind-mounts /persist over it, putting the logs back on the SSD.
   den.aspects.services.loki = {
     includes = [den.aspects.services.netbird.client];
 
@@ -26,10 +25,8 @@
           name = "logs";
           rules = [
             {
-              # proxyAddress is hand-synced (hosts/endeavour.nix). When
-              # netbird-proxy moves, nginx stops restoring visitors and the
-              # mesh whitelist hides them all from crowdsec (until 2026-10-21).
-              # Gatus keeps a steady trickle through the proxy, so drift shows.
+              # proxyAddress is hand-synced (hosts/endeavour.nix); if netbird-proxy moves, the mesh whitelist
+              # hides every visitor from crowdsec. Gatus keeps a steady trickle through the proxy, so drift shows.
               alert = "ProxyAddressDrift";
               expr = ''sum(count_over_time({job="nginx", log="access", host="${config.networking.hostName}"} |~ `^100\.(6[4-9]|[7-9][0-9]|1[01][0-9]|12[0-7])\.` !~ `^${lib.escapeRegex proxy} ` [15m])) > 5'';
               for = "15m";

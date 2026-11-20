@@ -1,7 +1,4 @@
-# services.gatus — probe the published surface from outside, and say so.
-#
-# On gaia deliberately: the rest of monitoring lives on endeavour and dies
-# with it. Probes the *public* names, exercising DNS, edge TLS and routing.
+# services.gatus — probes the public names from outside, on gaia so it outlives endeavour.
 {
   den,
   inputs,
@@ -13,9 +10,8 @@ in {
   den.aspects.services.gatus = {
     includes = with den.aspects.services; [ntfy netbird.client];
 
-    # Same port as the page: Gatus has no separate metrics listener, so
-    # /metrics is public through the proxy too. It carries what the public
-    # page already shows (endpoints, results), plus timings.
+    # Accepted: /metrics is public through the proxy (no separate listener), and shows what the
+    # page already shows plus timings.
     scrape-target = {host, ...}: {
       job = "gatus";
       instance = host.name;
@@ -112,9 +108,8 @@ in {
 
         cosmos.services.netbird.client.exposedPorts = [cfg.port];
 
-        # Static user, not DynamicUser: its /var/lib/private symlink would be
-        # persisted instead of the database. When switching a running host,
-        # remove the old /var/lib/gatus symlink first ("not canonical" mount).
+        # Static user, not DynamicUser: its /var/lib/private symlink would be persisted instead of the
+        # database. On a running host, remove the old /var/lib/gatus symlink first.
         users.users.gatus = {
           isSystemUser = true;
           group = "gatus";
@@ -144,7 +139,6 @@ in {
             web.port = cfg.port;
             metrics = true;
 
-            # Was `memory` because of the DynamicUser trap above.
             storage = {
               type = "sqlite";
               path = "${stateDir}/data.db";

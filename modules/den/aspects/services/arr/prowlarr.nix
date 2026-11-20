@@ -1,11 +1,10 @@
-# services.arr.prowlarr — indexer manager, feeding the others their searches.
-# Longhand, not mkSimpleArr: nixpkgs runs prowlarr under DynamicUser with no
-# option for its data dir, so User/ExecStart are overridden by hand.
+# services.arr.prowlarr — indexer manager, feeding the other *arrs their searches.
 {den, ...}: let
   inherit (import ./_lib.nix) vpnVhost gatedService;
   # Option default and netbird-service target (see services/netbird.nix).
   defaultPort = 9696;
 in {
+  # Not mkSimpleArr: nixpkgs runs prowlarr under DynamicUser with no data-dir option, so User/ExecStart are overridden.
   den.aspects.services.arr.prowlarr = {
     includes = [den.aspects.services.arr];
     inherit (gatedService "prowlarr" defaultPort) netbird-service kanidm-provision;

@@ -1,3 +1,4 @@
+# home.styling — the Cozette Vector font family.
 {pkgs, ...}: {
   name = "Cozette Vector";
   package = pkgs.cozette;

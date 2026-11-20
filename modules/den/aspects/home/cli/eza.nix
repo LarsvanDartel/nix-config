@@ -1,4 +1,4 @@
-# home.eza
+# home.eza — eza, the ls replacement
 {...}: {
   den.aspects.home.eza.homeManager = {
     config,

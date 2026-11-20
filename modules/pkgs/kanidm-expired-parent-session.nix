@@ -1,9 +1,4 @@
-# kanidm: an OAuth2 refresh only rejects a revoked parent session, not an
-# expired one still awaiting purge. The refresh then succeeds, its own write
-# purges the parent, and the new tokens are dead on arrival: Thunderbird gets
-# a 200, keeps the token until it expires, and IMAP/SMTP fail for up to
-# 15 minutes without a login prompt. The patch treats an expired parent as
-# revoked, so the refresh answers invalid_grant and Thunderbird prompts.
+# kanidm — patch: an OAuth2 refresh treats an expired parent session as revoked, so clients get invalid_grant and reprompt instead of dead tokens.
 {...}: {
   nixpkgs.overlays = [
     (_final: prev: {

@@ -1,11 +1,4 @@
-# The noctalia greeter, as a plain NixOS module imported by its aspect
-# `den.aspects.desktop.greetd.noctalia`.
-#
-# It hardcodes /usr/share/wayland-sessions (hence the tmpfiles symlink) and
-# calls cage/wlr-randr/dbus-run-session by name with no PATH (hence the
-# re-wrap). Do NOT go back to writing appearance.json: since 1.3.0 it is only
-# migrated once into mutable sync.toml and never re-read (that is how the
-# background went black); theme via `settings`/greeter.toml.
+# desktop.greetd.noctalia — the noctalia greeter on greetd, themed from stylix.
 {}: {
   config,
   lib,
@@ -24,6 +17,7 @@
   # The greeter account has no home and therefore no stylix.
   cursor = config.home-manager.users.${config.cosmos.user.name}.stylix.cursor;
 
+  # The session script calls cage, wlr-randr and dbus-run-session by name with no PATH.
   greeter = pkgs.symlinkJoin {
     name = "noctalia-greeter-wrapped";
     paths = [pkgs.noctalia-greeter];
@@ -36,9 +30,8 @@
 
   sessionDir = pkgs.linkFarm "greetd-wayland-sessions" greetd.sessions;
 
-  # The clock is bare text on the wallpaper (no shadow, no backing), so on a
-  # bright image it vanishes. Blurring and dimming toward `surface` keeps it
-  # legible in either polarity, since `on_surface` contrasts with `surface`.
+  # The clock is bare text on the wallpaper; blurring and dimming toward `surface` keeps it
+  # legible in either polarity.
   backdrop =
     pkgs.runCommand "noctalia-greeter-wallpaper.png" {nativeBuildInputs = [pkgs.imagemagick];}
     ''
@@ -83,9 +76,8 @@ in {
       command = "${greeter}/bin/noctalia-greeter-session";
     };
 
-    # XKB_DEFAULT_*/XCURSOR_* env is ignored by the binary; it reads only
-    # greeter.toml. Layout matters: a qwerty greeter rejects a Dvorak-typed
-    # password. `package` is the wrapped build.
+    # The binary ignores XKB_*/XCURSOR_* env and reads only greeter.toml. Theme via `settings`, never
+    # appearance.json: it is migrated once into mutable sync.toml and never re-read.
     services.displayManager.noctalia-greeter = {
       enable = true;
       package = greeter;
@@ -95,6 +87,7 @@ in {
       };
 
       settings = {
+        # A qwerty greeter rejects a Dvorak-typed password.
         keyboard = {
           inherit (config.services.xserver.xkb) layout variant options;
         };
@@ -144,7 +137,6 @@ in {
     # For noctalia-shell v5's "sync appearance" button.
     security.polkit.enable = true;
 
-    # sync.toml (last session, output layout) is the greeter's mutable state.
     cosmos.system.impermanence.persist.directories = [stateDir];
 
     systemd.tmpfiles.rules = [

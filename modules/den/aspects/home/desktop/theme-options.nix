@@ -1,6 +1,4 @@
-# home.theme-options — the runtime light/dark schema, declared in every home
-# (roles.home-base) so any program can contribute its per-mode files and
-# repaint step; home.theme (desktop.styling) does the switching.
+# home.theme-options — the runtime light/dark switching schema, declared in every home.
 {cosmosStyling, ...}: {
   den.aspects.home.theme-options.homeManager = {
     config,

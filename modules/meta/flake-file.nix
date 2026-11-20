@@ -1,6 +1,4 @@
-# flake-file: flake.nix is generated from `flake-file.*` declarations spread
-# across the modules. Regenerate with `nix run .#write-flake`; the
-# `check-flake-file` flake check enforces it stays in sync.
+# flake-file — generates flake.nix from the modules' `flake-file.*` declarations; regenerate with `nix run .#write-flake`.
 {inputs, ...}: {
   imports = [inputs.flake-file.flakeModules.default];
 

@@ -1,3 +1,4 @@
+# disko — endeavour's disk layout: the btrfs system SSD and the ZFS `tank` pool.
 {
   disko.devices = {
     disk = let
@@ -62,10 +63,7 @@
                       "noatime"
                     ];
                   };
-                  # Own subvolume: / is wiped each boot by core/impermanence.nix,
-                  # so a swapfile under / would be destroyed and recreated per boot.
-                  # No compress= here: btrfs swapfiles must be nodatacow and
-                  # uncompressed.
+                  # Own subvolume, uncompressed: / is wiped each boot, and btrfs swapfiles must be nodatacow and uncompressed.
                   "/swap" = {
                     mountpoint = "/.swapvol";
                     swap.swapfile.size = "32G";
@@ -136,12 +134,8 @@
             };
           };
 
-          # Binary-cache chunk store. recordsize 1M matches attic's chunk size
-          # (services/attic.nix); at the 128K pool default each chunk spanned
-          # several raidz1 records. sync=disabled is safe because every byte is
-          # reproducible (re-push costs nothing) and the pool has no SLOG —
-          # honouring sync capped ingest at ~150 KB/s over the ZIL. No
-          # snapshots: nothing here worth a history.
+          # recordsize 1M matches attic's chunk size (services/attic.nix). sync=disabled: every byte is
+          # reproducible and the pool has no SLOG, so honouring sync caps ingest at the ZIL.
           "atticd" = {
             type = "zfs_fs";
             options = {

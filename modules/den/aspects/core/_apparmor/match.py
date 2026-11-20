@@ -1,11 +1,5 @@
 # apparmor-match — lists the apparmor.d profiles whose attachment matches an executable in collect.sh output.
-#
-# Regenerating the profile lists (core/_apparmor/common.nix, hosts/_apparmor/<host>.nix):
-#   d=$(nix build --no-link --print-out-paths .#nixosConfigurations.endeavour.pkgs.apparmor-d)/etc/apparmor.d
-#   for h in endeavour gaia; do ssh $h 'bash -s' < modules/den/aspects/core/_apparmor/collect.sh > /tmp/$h.tsv; done
-#   python3 modules/den/aspects/core/_apparmor/match.py $d /tmp/{endeavour,gaia}.tsv
-# Prints one block per host: the names matched on every given host belong in common.nix,
-# the rest in that host's file. core/apparmor.nix's `excluded` filters the result again.
+# Regenerating the profile lists: see docs/src/notes/apparmor-match.md#regenerating-the-profile-lists.
 import collections
 import os
 import re

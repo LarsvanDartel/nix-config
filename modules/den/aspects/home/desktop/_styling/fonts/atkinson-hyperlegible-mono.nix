@@ -1,4 +1,4 @@
-# Atkinson Hyperlegible Mono — monospace companion to Atkinson Hyperlegible Next.
+# home.styling — the Atkinson Hyperlegible Mono font family, monospace companion to the Next sans.
 {pkgs, ...}: {
   name = "Atkinson Hyperlegible Mono";
   package = pkgs.atkinson-hyperlegible-mono;

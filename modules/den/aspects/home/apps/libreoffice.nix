@@ -1,4 +1,4 @@
-# home.libreoffice
+# home.libreoffice — LibreOffice (Qt) with extra hunspell dictionaries
 {...}: {
   den.aspects.home.libreoffice.homeManager = {pkgs, ...}: {
     cosmos.system.impermanence.persist.directories = [".config/libreoffice/"];

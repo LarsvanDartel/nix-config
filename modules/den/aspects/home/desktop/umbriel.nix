@@ -1,4 +1,4 @@
-# home.umbriel — user-side companion to desktop.umbriel: config.toml and the session's rotation, gesture and tablet-mode units, body in ./_umbriel/home.nix.
+# home.umbriel — user-side companion to desktop.umbriel; body in ./_umbriel/home.nix.
 {
   den,
   cosmosStyling,

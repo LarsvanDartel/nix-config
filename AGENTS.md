@@ -15,11 +15,12 @@ The handbook is the mdBook in `docs/` (`nix build .#docs`). Read the relevant pa
 |[`networking.md`](docs/src/networking.md)|NetBird mesh, publishing and gating services, `localVhosts`, `edgeTerminated`, SSH|
 |[`secrets.md`](docs/src/secrets.md)|sops-nix, adding a secret, the nix-secrets stub|
 |[`apparmor.md`](docs/src/apparmor.md)|AppArmor with apparmor.d, complain/enforce state, per-host coverage lists, hand-written service profiles, log review, disabling a profile|
-|[`conventions.md`](docs/src/conventions.md)|code conventions, aspect and option shapes, priority discipline, wrapped programs, nvim/launchpad, tooling, important files|
+|[`conventions.md`](docs/src/conventions.md)|comment policy, code conventions, aspect and option shapes, priority discipline, wrapped programs, nvim/launchpad, tooling, important files|
 |[`theming.md`](docs/src/theming.md)|the theme and its light/dark modes, the `theme` command, what switches live, adding a themed program|
 |[`commands.md`](docs/src/commands.md)|development commands, testing & QA, the configurationRevision pinning trick|
 |[`install.md`](docs/src/install.md)|installing a host|
 |[`restore.md`](docs/src/restore.md)|restoring a host from backup|
+|[`notes/`](docs/src/notes.md)|per-file rationale moved out of comments|
 
 ## Keeping docs in sync
 
@@ -39,7 +40,7 @@ The handbook is the mdBook in `docs/` (`nix build .#docs`). Read the relevant pa
 - Never read config in a host aspect's top level ([conventions](docs/src/conventions.md#code)).
 - Never `hasAspect` in an `includes` list ([conventions](docs/src/conventions.md#code)).
 - `homeManager` on a host-scope aspect is dropped; use `provides.to-users` ([architecture](docs/src/architecture.md#composition-model)).
-- Every file opens with a `# <name> — <what it is>` comment; other comments only to prevent mistakes ([conventions](docs/src/conventions.md#code)).
+- Every file opens with one `# <name> — <what it is>` line; other comments are at most two lines and only stop a mistake; longer rationale goes to `docs/src/notes/` ([conventions](docs/src/conventions.md#comments)).
 - Temporary fixes carry a `lib.warnIf` guard on the condition that obsoletes them ([conventions](docs/src/conventions.md#code)).
 - Pangolin is decommissioned; do not reintroduce it ([hosts](docs/src/hosts.md)).
 - Verification = `nix build .#nixosConfigurations.<host>.config.system.build.toplevel` ([commands](docs/src/commands.md#testing--qa)).

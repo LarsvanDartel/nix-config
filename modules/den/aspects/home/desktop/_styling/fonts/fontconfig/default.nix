@@ -1,3 +1,4 @@
+# home.styling — fontconfig family fallbacks and pixel-font size snapping.
 {
   lib,
   config,
@@ -24,12 +25,8 @@
 
   configContent = concatStrings (map aliasConfig installedFonts);
 
-  # A pixel font is only crisp at multiples of its grid: round every requested pixel
-  # size down to one (at least one grid). Pango sizes the layout from the edited
-  # pattern, so measurement and rendering both see the snapped size. The file must
-  # sort after home-manager's 52-hm-default-fonts.conf: a request for `monospace`
-  # only names the pixel font once that alias has run. The bold family snaps too:
-  # foot asks for it by name, and off the grid it is drawn larger than regular.
+  # Snaps the bold family too: foot requests it by name. The file must sort after home-manager's
+  # 52-hm-default-fonts.conf, or a `monospace` request doesn't name the pixel font yet.
   pixelGridConfig = font: let
     grid = "<double>${toString font.pixelGrid}</double>";
     snap = family: ''

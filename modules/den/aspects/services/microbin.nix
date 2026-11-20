@@ -1,18 +1,9 @@
-# services.microbin — pastebin and small-file drop, public to read and OIDC to write.
-#
-# MicroBin has no auth hooks, so oauth2-proxy (kanidm) + nginx gate writes.
-# MicroBin binds loopback; its netbird-service must target nginx's
-# `proxyPort`, never MicroBin's own port, or mesh peers bypass the gate.
-#
-# Routes below are an allow-list (unlisted = authenticated). Traps found by
-# probing: `POST /upload/` also creates a pasta (hence `limit_except GET HEAD`
-# on public locations), and MicroBin redirects new pastas to `/upload/{id}`,
-# so `/upload/` must be readable.
+# services.microbin — pastebin and small-file drop, public to read; oauth2-proxy (kanidm) gates writes.
 {inputs, ...}: let
-  # Option default and netbird-service target (see services/netbird.nix).
   defaultProxyPort = 8087;
 in {
-  # Creating a pasta needs MICROBIN_UPLOADER_PASSWORD.
+  # Ungated: reads are public and oauth2-proxy gates writes. Target nginx's proxyPort,
+  # never MicroBin's own port, or mesh peers bypass that gate.
   den.aspects.services.microbin.netbird-service = {host, ...}: {
     bin = {
       bearerAuth.enable = false;
@@ -57,7 +48,7 @@ in {
 
     backend = "http://127.0.0.1:${toString cfg.port}";
 
-    # limit_except turns the trailing-slash write path into a 403.
+    # `POST /upload/` also creates a pasta; limit_except makes public paths read-only.
     publicRead = {
       proxyPass = backend;
       extraConfig = ''
@@ -135,7 +126,7 @@ in {
           MICROBIN_PORT = cfg.port;
           MICROBIN_PUBLIC_PATH = "https://${cfg.domain}";
 
-          # Overrides the module's "0.0.0.0"; see header.
+          # Overrides the module's "0.0.0.0": a reachable MicroBin bypasses the write gate.
           MICROBIN_BIND = "127.0.0.1";
 
           MICROBIN_MAX_FILE_SIZE_UNENCRYPTED_MB = cfg.maxFileSizeMiB;
@@ -219,9 +210,8 @@ in {
         };
       };
 
-      # Discovery happens once at startup against the public issuer (via the
-      # mesh and gaia), which fails early in boot; default restart settings
-      # exhausted the start limit in <1s and left microbin down (2026-08-30).
+      # Discovery runs once at startup against the public issuer (via the mesh and gaia), which
+      # fails early in boot; the default start limit is exhausted in under a second.
       systemd.services.oauth2-proxy = {
         after = ["kanidm.service"];
         serviceConfig.RestartSec = "10s";
@@ -239,6 +229,7 @@ in {
           }
         ];
 
+        # An allow-list: unlisted routes need kanidm. New pastas redirect to `/upload/{id}`, so it stays public.
         locations = {
           "/".proxyPass = backend;
 
@@ -271,10 +262,8 @@ in {
           ${config.cosmos.services.netbird.client.proxyRealIp}
           proxy_set_header X-Forwarded-Proto https;
 
-          # nginx builds absolute redirects from its own listen address — a
-          # mesh port behind the edge — naming http://bin.lvdar.nl:8087/: a
-          # dead link and a needless disclosure. Relative redirects resolve
-          # against the public URL.
+          # nginx builds absolute redirects from its listen address, a mesh port behind the edge:
+          # a dead link and a needless disclosure.
           absolute_redirect off;
         '';
       };

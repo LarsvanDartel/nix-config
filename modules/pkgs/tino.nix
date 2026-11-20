@@ -1,8 +1,4 @@
-# tino — the `tino` Python package (github:confirm/tino), registered into
-# python3Packages: no console script; services/tino.nix builds the run env.
-# colours.css and codemirror.js are vendored by upstream's `make build`, not
-# in git — without colours.css the login button is invisible — so both are
-# spliced in pre-build here.
+# tino — the `tino` Python package (github:confirm/tino) in python3Packages, with the untracked colours.css and codemirror.js spliced in.
 {...}: {
   nixpkgs.overlays = [
     (final: prev: let
@@ -90,77 +86,27 @@
                 substituteInPlace pyproject.toml \
                   --replace-fail "'setuptools>=84.2.1'" "'setuptools'"
 
-                # GEWIS's own crest (github.com/gewis/aurora's
-                # infoscherm/public_html/images/gewislogo.svg), recoloured
-                # from white — meant to sit on their brand-red background —
-                # to that same red, so it reads on TINO's light login card
-                # instead of vanishing into it. Wrapped as a <symbol id="logo">
-                # because that's what login.html/index.html's
-                # <use xlink:href="/img/logo.svg#logo"/> expects; the source
-                # file is just the crest's <g>, not a symbol.
+                # GEWIS's crest (gewis/aurora gewislogo.svg), recoloured to its brand red for the light login
+                # card and wrapped as <symbol id="logo"> for the templates' <use xlink:href="/img/logo.svg#logo"/>.
                 install -Dm444 ${./_tino/logo.svg} tino/static/img/logo.svg
 
-                # login.html/index.html both wrap that <use> in an <svg
-                # viewBox="0 0 407 200"> sized only by CSS height (.logo,
-                # .login-logo) — sized for upstream's own wide wordmark
-                # logo. GEWIS's crest is close to square (its own symbol
-                # viewBox is 580x580), so under the default
-                # preserveAspectRatio="xMidYMid meet" it was being scaled
-                # to fit the *height* of that wide box and centered with a
-                # lot of wasted width either side — visibly tiny at the
-                # CSS height it was actually given. Squaring off the
-                # wrapper viewBox to match removes the wasted space so the
-                # crest fills the full height/width CSS gives it.
+                # Square the templates' 407x200 wrapper viewBox: the near-square crest otherwise renders tiny.
                 substituteInPlace tino/static/index.html tino/static/login.html \
                   --replace-fail 'viewBox="0 0 407 200"' 'viewBox="0 0 200 200"'
 
-                # .login-logo's 64px height was sized for upstream's own
-                # compact wordmark, which reads fine that small; GEWIS's
-                # crest carries a full ring of circular text around the
-                # emblem that needs real size to stay legible. The login
-                # card has the room — its mascot image sits at 250px next
-                # to it — so this only affects the one clearly-branded
-                # moment, not the toolbar's small icon-height logo (left
-                # at 22px; that's app chrome, not a place to grow into).
+                # The crest's ring of text needs more than upstream's 64px login logo; the toolbar logo stays.
                 substituteInPlace tino/static/login.html \
                   --replace-fail 'height: 64px;' 'height: 110px;'
 
-                # tino stores the whole raw OIDC id_token in its
-                # (client-side, single signed-cookie) session purely to pass
-                # as id_token_hint on RP-initiated logout — a UX nicety that
-                # skips kanidm's own re-confirmation, nothing auth-relevant
-                # depends on it. kanidm bakes the identity's full group
-                # membership into every id_token it issues once the "groups"
-                # scope is granted (unavoidable — see services/kanidm.nix —
-                # independent of claimMaps), and for a broad admin identity
-                # that JWT alone is 4KB+, over the ~4KB browsers cap a single
-                # cookie at: login completed server-side every time but the
-                # session cookie was silently dropped client-side. Never
-                # storing it removes the ceiling entirely rather than
-                # picking a size threshold that just moves where this breaks
-                # again as group counts grow.
+                # Never keep the id_token in the cookie session: with the groups scope it exceeds the ~4KB
+                # browser cap and the cookie is silently dropped. It only fed id_token_hint on logout.
                 substituteInPlace tino/auth.py \
                   --replace-fail \
                     "    if token.get('id_token'):" \
                     "    if False:  # id_token intentionally never kept in the session"
 
-                # Upstream's text-extension allowlist (everything else
-                # falls through to the `* filter=lfs` catch-all below it)
-                # has no Nix entries. GEWIS buckets increasingly carry a
-                # personal-convenience flake.nix/flake.lock alongside
-                # documents (e.g. abc-meetings' typst devShell) — without
-                # this, git's LFS-aware diff machinery perpetually shows
-                # them "modified" in TINO's UI, comparing the real
-                # working-tree file against what git-lfs-clean *would*
-                # produce if staged. Cosmetic (commits land real content
-                # either way, verified by inspecting the actual git
-                # objects: `repo.index.add()` never goes through the
-                # clean filter, only `git diff`'s display does), but
-                # confusing enough to fix at the source once rather than
-                # per-bucket — a bucket-local .gitattributes override
-                # would also work but TINO's own file listing hides
-                # dotfiles, so git-remote-tino clones would never
-                # materialize it.
+                # Nix files are text, not LFS, or TINO's UI shows them perpetually modified. Fixed here because
+                # a bucket-local .gitattributes is hidden from TINO's listing and git-remote-tino clones.
                 cat >> tino/gitattributes <<'EOF'
                 *.nix text !filter !diff !merge text
                 *.lock text !filter !diff !merge text
@@ -173,15 +119,13 @@
                 install -Dm444 tino/gitattributes $out/share/tino/gitattributes
               '';
 
-              # setuptools_scm derives the version from git metadata, which
-              # fetchFromGitHub does not provide. Under `env`: with structured
-              # attrs a top-level attribute is a shell variable, not exported.
+              # setuptools_scm needs git metadata fetchFromGitHub lacks. Under `env`: with structured attrs
+              # a top-level attribute is a shell variable, not exported.
               env.SETUPTOOLS_SCM_PRETEND_VERSION = version;
 
               pythonImportsCheck = ["tino"];
 
-              # Deps are relaxed (above), so upstream's suite is what proves a
-              # nixpkgs bump left them API-compatible (mcp 2.x broke 1.20.1).
+              # Deps are relaxed, so upstream's suite proves a nixpkgs bump left them API-compatible.
               nativeCheckInputs = [pyFinal.pytestCheckHook final.gitMinimal final.typst];
               # Asserts the id_token_hint the auth.py patch above removes.
               disabledTests = ["test_logout_includes_id_token_hint"];

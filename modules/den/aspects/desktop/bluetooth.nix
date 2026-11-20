@@ -1,4 +1,4 @@
-# desktop.bluetooth
+# desktop.bluetooth — bluez with blueman, powered and unblocked at boot.
 {...}: {
   den.aspects.desktop.bluetooth.nixos = {pkgs, ...}: {
     cosmos.system.impermanence.persist.directories = ["/var/lib/bluetooth"];
@@ -9,10 +9,8 @@
       powerOnBoot = true;
     };
 
-    # powerOnBoot alone is not enough: a soft-blocked rfkill keeps hci0 from
-    # appearing at all. The `+` matters —
-    # bluetoothd's sandbox lacks CAP_NET_ADMIN, so without it ExecStartPre
-    # fails EPERM and takes the unit down.
+    # A soft-blocked rfkill hides hci0 despite powerOnBoot. Keep the `+`: bluetoothd's sandbox
+    # lacks CAP_NET_ADMIN, so an unprivileged ExecStartPre fails EPERM and takes the unit down.
     systemd.services.bluetooth.serviceConfig.ExecStartPre = [
       "+${pkgs.util-linux}/bin/rfkill unblock bluetooth"
     ];

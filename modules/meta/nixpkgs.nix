@@ -1,13 +1,11 @@
-# nixpkgs instance + the `nixpkgs.overlays` aggregation option. The pkgs set
-# here is perSystem's (packages, checks, devshells) only; hosts build their
-# own in core.nixpkgs, receiving local packages via flake.overlays.default
-# (den/overlays.nix). Local packages self-register from modules/pkgs/*.nix.
+# nixpkgs — perSystem's nixpkgs instance and the `nixpkgs.overlays` aggregation option.
 {
   inputs,
   lib,
   config,
   ...
 }: {
+  # Only perSystem uses this pkgs; hosts build theirs in core.nixpkgs and get local packages via flake.overlays.default.
   options.nixpkgs.overlays = lib.mkOption {
     type = lib.types.listOf lib.types.raw;
     default = [];

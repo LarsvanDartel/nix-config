@@ -1,4 +1,4 @@
-# home.thunderbird (+ the defaultApplication option; deployment sets it true)
+# home.thunderbird — Thunderbird with mail, calendar and contact accounts and a generated theme
 {
   inputs,
   cosmosStyling,
@@ -17,33 +17,22 @@
     inherit (lib.strings) concatMapStringsSep replaceStrings;
 
     cfg = config.cosmos.programs.thunderbird;
-    # Thunderbird stays light whatever the desktop mode
-    # (ui.systemUsesDarkTheme below), so everything here uses the light
-    # palette.
+    # Light in both desktop modes; see docs/src/theming.md#switching.
     light = cosmosStyling.colors pkgs "light";
     colors = light.withHashtag;
-    # pct percent of raw colour a, the rest b, as "#rrggbb".
     mix = pct: a: b: let
       channel = c: i: lib.fromHexString (builtins.substring i 2 c);
       blend = i:
         lib.fixedWidthString 2 "0" (lib.toLower (lib.toHexString
             ((channel a i * pct + channel b i * (100 - pct)) / 100)));
     in "#${blend 0}${blend 2}${blend 4}";
-    # Calendar colours fill whole events: the accent faded two thirds into
-    # the background, so text stays dark on them and category stripes (full
-    # accents) stand out.
     pastel = slot: mix 33 light.${slot} light.base00;
-    # The chrome: Everforest's sage (its dark mode's green), deepened towards
-    # the dark background for the frame, borders and highlights, lightened
-    # towards the light one for toolbars, panes and fields.
     dark = cosmosStyling.colors pkgs "dark";
     sage = pct: mix pct dark.base0B light.base00;
     deep = pct: mix pct dark.base0B dark.base00;
 
-    # The header is a band of the default wallpaper, faded towards the sage
-    # so the tab titles on it stay readable. Gecko installs every
-    # dropped-in theme disabled and ignores extensions.activeThemeID for it:
-    # enable it once under Add-ons → Themes; the stable id keeps it enabled.
+    # Gecko ignores extensions.activeThemeID for dropped-in themes: enable it once under
+    # Add-ons → Themes, and keep the id stable so it stays enabled.
     themeId = "cosmos@lvdar.nl";
     themeAddon = let
       header = pkgs.runCommand "thunderbird-header.jpg" {nativeBuildInputs = [pkgs.imagemagick];} ''
@@ -108,12 +97,8 @@
         (cd src && zip -qX $out manifest.json header.jpg)
       '';
 
-    # recursiveUpdate, not `//`: a shallow merge silently drops thunderbird.enable.
-    # No font-family: Calibri/Segoe UI fall back to a mismatched sans on Linux.
-    # Logos are PNGs behind a file:// URL, never inline <svg>: Gmail and
-    # Outlook strip svg. Thunderbird turns file:// in htmlSigText into data:
-    # on insert and sends data: images as cid: parts.
-    # The signature files mark their contact line with @addresses@.
+    # Signatures set no font-family (Calibri/Segoe UI fall back badly on Linux) and use PNG logos
+    # via file://, never inline <svg> (Gmail/Outlook strip it); Thunderbird embeds them as cid:.
     logos = pkgs.runCommand "thunderbird-signature-logos" {nativeBuildInputs = [pkgs.resvg];} ''
       mkdir $out
       for name in tue gewis; do
@@ -129,6 +114,7 @@
     };
     mailto = address: ''<a href="mailto:${address}" style="color:#1a1a1a;text-decoration:none;">${address}</a>'';
 
+    # Merge with recursiveUpdate, not `//`: a shallow merge silently drops thunderbird.enable.
     mkSignature = name: addresses: {
       signature = signature name addresses;
 
@@ -144,8 +130,7 @@
     };
 
     config = {
-      # Keyed by attribute name, not Thunderbird's order-of-creation id1, id2,
-      # so accounts survive a profile rebuild.
+      # Keyed by attribute name, not Thunderbird's id1, id2…, so accounts survive a profile rebuild.
       accounts.email.accounts = {
         lvdar = recursiveUpdate {
           primary = true;
@@ -165,10 +150,8 @@
           };
           thunderbird = {
             enable = true;
-            # Thunderbird's custom OAuth (155+) against kanidm's `stalwart`
-            # client (services/stalwart.nix). Same issuer for IMAP and SMTP, so
-            # both share one refresh token. No issuerIdentifier: kanidm sends
-            # no RFC 9207 `iss`, and setting it rejects every response.
+            # Custom OAuth against kanidm's `stalwart` client (services/stalwart.nix); one issuer, one token.
+            # No issuerIdentifier: kanidm sends no RFC 9207 `iss`, so setting it rejects every response.
             settings = id: let
               oauth = prefix: {
                 "${prefix}.oauth2.useCustomDetails" = true;
@@ -195,8 +178,7 @@
             imap.port = 993;
             smtp.host = "smtp.gewis.nl";
             smtp.port = 465;
-            # Send-as addresses over this login. Plaintext in nix-secrets only to
-            # keep them out of this public repo.
+            # Plaintext in nix-secrets only to keep the addresses out of this public repo.
             aliases =
               map (alias: {
                 address = alias;
@@ -206,18 +188,14 @@
               inputs.nix-secrets.gewis-aliases;
             thunderbird = {
               enable = true;
-              # Mailboxes shared with this account (SOGo's "Other Users", Dovecot's
-              # `Shared/` namespace) are unsubscribed, so a subscribed-only listing
-              # hides them. List everything, as SOGo does.
+              # Shared mailboxes (SOGo's "Other Users") are unsubscribed: list everything, as SOGo does.
               settings = id: {
                 "mail.server.server_${id}.using_subscription" = false;
               };
             };
           } (mkSignature "gewis" [address]);
 
-        # Outlook leaves Junk Email unsubscribed, so a subscribed-only listing
-        # hides it. Both Outlook accounts list everything instead.
-        # Enterprise office365 tenant: the flavor supplies host/port/TLS/XOAUTH2.
+        # Outlook leaves Junk Email unsubscribed, so both Outlook accounts list everything.
         tue = let
           address = "l.v.dartel@student.tue.nl";
         in
@@ -258,9 +236,8 @@
         };
       };
 
-      # Thunderbird's calendar has no custom OAuth: DAV takes a Stalwart app
-      # password. Stalwart 1.0 logs in and addresses accounts by full name
-      # (`lvdar@lvdar.nl`); a bare `lvdar` fails both.
+      # Calendar DAV has no custom OAuth: it takes a Stalwart app password, and Stalwart needs the
+      # full name (`lvdar@lvdar.nl`) for login and URLs; a bare `lvdar` fails.
       accounts.calendar.accounts.lvdar = {
         primary = true;
         remote = {
@@ -326,11 +303,8 @@
             thunderbird.enable = true;
           };
         }
-        # SOGo's global (directory) address books: read-only, and SOGo shows no
-        # CardDAV link for them; the URL is built from the id in the web UI's URL.
-        # Host mail.gewis.nl, not webmail.gewis.nl: webmail sits behind TU/e's
-        # WAF, which rejects REPORT, so cards never download. Plaintext in
-        # nix-secrets, like the aliases.
+        # SOGo directory books: read-only, no CardDAV link (URL built from the web UI's id).
+        # Host mail.gewis.nl: webmail.gewis.nl sits behind TU/e's WAF, which rejects REPORT.
         // mapAttrs (_: url: {
           remote = {
             type = "carddav";
@@ -360,21 +334,17 @@
               # Store-dropped extensions start disabled otherwise.
               "extensions.autoDisableScopes" = 0;
 
-              # paperless-ngx-uploader and the theme are unsigned (GitHub,
-              # see thunderbird-addons.nix; built here); the rest arrive via
-              # nix.
+              # paperless-ngx-uploader and the theme are unsigned builds (see thunderbird-addons.nix).
               "xpinstall.signatures.required" = false;
 
               "ui.systemUsesDarkTheme" = 0;
 
-              # Identity-pref fallbacks, so they cover every account. With the
-              # reply on top, sig_bottom = false puts the signature between the
-              # reply and the quote instead of under the quote.
+              # Identity-pref fallbacks cover every account; with reply on top, sig_bottom = false
+              # puts the signature between the reply and the quote.
               "mail.identity.default.reply_on_top" = 1;
               "mail.identity.default.sig_bottom" = false;
             }
-            # Calendars added by hand in Thunderbird, keyed by registry id:
-            # their feed URLs carry tokens.
+            # Calendars added by hand, keyed by registry id: their feed URLs carry tokens.
             // lib.mapAttrs' (id: color: lib.nameValuePair "calendar.registry.${id}.color" color) {
               "49aedaac-e948-44dd-9c56-01cf9aff81e9" = pastel "base0C"; # Canvas
               "d2c40193-0ebf-4bae-9bf9-9c5a29e84b4a" = pastel "base0D"; # TU/e
@@ -392,8 +362,7 @@
         };
       };
 
-      # A copy, not home-manager's store link: Gecko notices a changed add-on
-      # only by its file's mtime, which the store pins at 1.
+      # Copied, not linked: Gecko notices a changed add-on only by mtime, which the store pins.
       home.activation.thunderbirdTheme = lib.hm.dag.entryAfter ["linkGeneration"] ''
         dest=${lib.escapeShellArg "${config.home.homeDirectory}/.thunderbird/default/extensions/${themeId}.xpi"}
         if ! cmp -s ${themeAddon} "$dest"; then

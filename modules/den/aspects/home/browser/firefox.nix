@@ -1,4 +1,4 @@
-# home.firefox — included by no role (roles.desktop-home uses home.zen).
+# home.firefox — Firefox; included by no role (roles.desktop-home uses home.zen)
 {...}: {
   den.aspects.home.firefox.homeManager = {
     config,

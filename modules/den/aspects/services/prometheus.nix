@@ -1,15 +1,4 @@
-# services.prometheus — the metrics store, its alert rules, and the bridge
-#
-# On endeavour, the only host with room. Data stays on the SSD: the nixpkgs
-# module hardcodes --storage.tsdb.path under its StateDirectory.
-#
-# Complements core.notify-failure: that reports unit transitions and survives
-# this host dying; this reports states and thresholds no per-host hook sees.
-#
-# Scrape targets arrive on the `scrape-target` quirk: each exporter's aspect
-# emits { job; instance; port; } and this groups them by job. Payloads must be
-# static or `{host, ...}:`; a `{config, ...}:` payload would make this host
-# evaluate every other host's configuration.
+# services.prometheus — the fleet's metrics store on endeavour, its alert rules and the alertmanager-ntfy bridge.
 {
   den,
   inputs,
@@ -25,9 +14,8 @@
 in {
   den.quirks.scrape-target.description = "Prometheus scrape targets ({job, instance, port}), collected by services.prometheus";
 
-  # collectAll, not collect: pioneer is aarch64 and exports node metrics.
-  # den reads these argument names (host scope, host-entity filter), so
-  # deadnix must not strip them as unused.
+  # collectAll, not collect: pioneer is aarch64. Payloads must be static or `{host, ...}:`;
+  # a `{config, ...}:` payload makes this host evaluate every other host.
   # deadnix: skip
   den.policies.scrape-target = {host, ...}: [
     (pipe.from "scrape-target" [
@@ -116,14 +104,8 @@ in {
             evaluation_interval = "30s";
           };
 
-          # One static_config per instance so `instance` is the bare peer name.
-          #
-          # Names work here only because services/unbound.nix forwards the mesh
-          # domain to the NetBird agent's resolver. Before that, unbound
-          # answered *.lvdar.nl from public DNS and every one of these resolved
-          # to the edge's public address — the scrapes left the mesh and timed
-          # out. If these ever start timing out again, check mesh DNS on this
-          # host before suspecting the exporters.
+          # One static_config per instance so `instance` is the bare peer name. Names resolve in the
+          # mesh only through services/unbound.nix's forward; if scrapes time out, check mesh DNS first.
           scrapeConfigs =
             mapAttrsToList (job: entries: {
               job_name = job;
@@ -226,11 +208,8 @@ in {
                       };
                     }
                     {
-                      # One alert for the fleet, not one per host: a push
-                      # leaves every server behind at once. Deploys are manual
-                      # (`deploy` on voyager), so this is the reminder. Silent
-                      # while main's head is unknown, rather than calling every
-                      # host behind; HostDown covers endeavour's exporter.
+                      # One fleet-wide alert: a push leaves every server behind at once. Silent while main's head
+                      # is unknown; HostDown covers endeavour's exporter.
                       alert = "DeployBehind";
                       expr = ''
                         count(${behind})

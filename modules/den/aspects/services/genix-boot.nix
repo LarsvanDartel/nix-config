@@ -1,16 +1,7 @@
-# services.genix-boot — the GEHACK contest workstation (genix) as a boot entry (GRUB, or a signed UKI under lanzaboote).
-#
-# genix's live system, booted natively: its kernel and initrd sit on the ESP,
-# its stage 1 unlocks the host's LUKS (FIDO2 or passphrase) and uses the
-# host's /nix subvolume, read-only, as the lower layer of its tmpfs store
-# overlay. No ISO and no squashfs, so nothing to fit on the ESP; still a live
-# system, so every boot is a fresh machine, like a contest morning. Of the
-# host it mounts only /nix and the /persist/genix subvolume, which is
-# ~/shared in genix and ~/genix on the host.
+# services.genix-boot — the GEHACK contest live system (genix) booted natively over the host's /nix, as a GRUB entry or a signed UKI.
 {inputs, ...}: let
-  # The self-hosted judge (services.domjudge.sso on endeavour). Trailing
-  # slash: submit concatenates it with "api/..." verbatim. Upstream points
-  # the live system at the public DOMjudge demo instead.
+  # The self-hosted judge (services.domjudge.sso on endeavour). Trailing slash: submit
+  # concatenates "api/..." to it verbatim.
   djUrl = "https://judge.lvdar.nl/";
 in {
   flake-file.inputs.genix.url = "github:GEHACK/genix";
@@ -36,10 +27,8 @@ in {
       lib.warnIf (lib.versionAtLeast upstream.config.home-manager.users.team.home.stateVersion "26.05")
       "services/genix-boot.nix: genix's team user is on HM stateVersion >= 26.05, so the zsh dotDir warning no longer fires; delete the dotDir pin"
       (upstream.extendModules {
-        # dj_url is a specialArg of genix's flake, not an option; extendModules
-        # merges specialArgs, ours winning. The NixOS-level value only reaches
-        # the greeter module; the HM tools (submit, Firefox) read the same
-        # specialArg through home-manager.extraSpecialArgs, so override both.
+        # dj_url is a specialArg, not an option: the NixOS value reaches only the greeter, and the
+        # HM tools read it through home-manager.extraSpecialArgs, so override both.
         specialArgs.dj_url = djUrl;
         modules = [
           {home-manager.extraSpecialArgs.dj_url = djUrl;}
@@ -51,12 +40,8 @@ in {
             }: {
               programs.zsh.dotDir = lib.mkDefault config.home.homeDirectory;
 
-              # The user's contest layout, baked in: the live system starts
-              # fresh every time, so the TRD's gsettings step would be
-              # per-session. genix's own users/team/gnome.nix already sets
-              # this key (us+nl); dconf.settings is freeform and merges same-
-              # priority list values by concatenation, so mkForce is required
-              # to replace rather than append.
+              # genix's users/team/gnome.nix sets this key too, and freeform dconf lists concatenate at
+              # equal priority, so mkForce replaces rather than appends.
               dconf.settings."org/gnome/desktop/input-sources" = lib.mkForce {
                 sources = [(lib.hm.gvariant.mkTuple ["xkb" "us+dvp"])];
                 xkb-options = ["caps:escape"];
@@ -69,9 +54,7 @@ in {
             teammachine.users.team.ides.enable = lib.mkForce false;
             home-manager.users.team.programs.vscode.enable = lib.mkForce false;
 
-            # genix runs sshd with password login, and the team password is
-            # the documented "password": with wifi, anyone on the network
-            # could log in and read ~/shared.
+            # Security: genix's sshd allows password login with the documented team password.
             services.openssh.enable = lib.mkForce false;
 
             # Practice toolset: C++ and Python only; drops the Java/Kotlin
@@ -94,16 +77,14 @@ in {
               }
             ];
 
-            # The ISO ships GEHACK's staff account: password "password", wheel
-            # and passwordless sudo, i.e. root over the host's unlocked disk
-            # from the login screen. Locked; there is no root in genix.
+            # Security: the ISO's staff account has password "password" and passwordless sudo, i.e. root
+            # over the host's unlocked disk. Locked; there is no root in genix.
             users.users.gehack = {
               hashedPassword = lib.mkForce "!";
               extraGroups = lib.mkForce [];
             };
 
-            # genix denies every NetworkManager action to non-root users
-            # (contest machines are wired); allow the team user to join wifi.
+            # genix denies NetworkManager actions to non-root users; let the team user join wifi.
             # polkit takes the first rule that answers, so this one goes first.
             security.polkit.extraConfig = lib.mkBefore ''
               polkit.addRule(function(action, subject) {
@@ -118,9 +99,7 @@ in {
             # files in the shared subvolume belong to the same uid on both sides.
             users.users.team.uid = lib.mkForce 1000;
 
-            # The host's layout (us dvp) from the first prompt on: the LUKS
-            # passphrase in the initrd (earlySetup), the console and GDM's
-            # login screen. The session already gets it through dconf above.
+            # The host's layout (us dvp) from the first prompt on: LUKS passphrase, console and GDM.
             services.xserver.xkb = lib.mapAttrs (_: lib.mkForce) {
               inherit (config.services.xserver.xkb) layout variant options;
             };
@@ -155,10 +134,8 @@ in {
               options = ["subvol=${subvol config.fileSystems."/persist"}/genix" "compress=zstd" "noatime" "nofail"];
             };
 
-            # A hibernated host resumes onto the filesystem as it left it, so
-            # any write from here (the shared subvolume, or the log replay a
-            # mount does) corrupts it. systemd records the hibernation image in
-            # this EFI variable until the host resumes.
+            # Any write to a hibernated host's filesystem corrupts it on resume; systemd keeps the
+            # hibernation image in this EFI variable until the host resumes.
             boot.initrd.systemd.services.genix-hibernation-guard = {
               description = "Refuse to boot while the host is hibernated";
               requiredBy = ["sysroot-iso.mount"];
@@ -187,10 +164,8 @@ in {
             lib,
             ...
           }: {
-            # The ISO registers its paths from the squashfs's
-            # nix-path-registration; the host's store has none, so the
-            # GRUB entry passes the closure's registration instead. Without
-            # it the store is empty to Nix and home-manager-team fails.
+            # The host's store has no nix-path-registration, so the GRUB entry passes the closure's;
+            # without it the store is empty to Nix and home-manager-team fails.
             systemd.services.register-nix-paths.script = lib.mkForce ''
               for o in $(</proc/cmdline); do
                 case $o in genix.registration=*) registration=''${o#*=} ;; esac
@@ -240,9 +215,7 @@ in {
           "L+ /home/${user}/genix - - - - /persist/genix"
         ];
 
-        # One-time boot into genix. GRUB: install-grub's grub.cfg boots
-        # next_entry once (the grub-reboot mechanism). systemd-boot: the
-        # LoaderEntryOneShot EFI variable.
+        # One-time boot into genix: GRUB's next_entry (grub-reboot), or systemd-boot's LoaderEntryOneShot.
         environment.systemPackages = [
           (pkgs.writeShellApplication {
             name = "genix";
@@ -275,10 +248,8 @@ in {
         };
       })
       (lib.mkIf secureBoot {
-        # lzbt signs only NixOS's own entries, and garbage-collects only the
-        # nixos-* files in EFI/Linux. Runs on every boot and on each switch
-        # that changes the image; after generate-sb-keys, and before the
-        # auto-enroll unit, whose autoReboot would cut this short.
+        # lzbt signs only NixOS's own entries and GCs only nixos-* in EFI/Linux. Runs after
+        # generate-sb-keys and before auto-enroll, whose autoReboot would cut it short.
         systemd.services.genix-uki = {
           description = "Sign genix's boot image onto the ESP";
           wantedBy = ["multi-user.target"];

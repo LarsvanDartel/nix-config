@@ -1,7 +1,5 @@
 #!/bin/sh
-# py3 — DOMjudge's Python 3 compile script on nixpkgs' PyPy from the Nix
-# closure mounted at /nix in the judge chroot, instead of the image's pypy3 3.9.
-# Writes $DEST as a wrapper that runs the source.
+# py3 — DOMjudge Python 3 compile script on nixpkgs' PyPy from the Nix closure, not the image's pypy3.
 DEST="$1"
 shift 2 # DEST, MEMLIMIT
 MAINSOURCE="${ENTRY_POINT:-$1}"

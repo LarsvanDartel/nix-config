@@ -60,9 +60,8 @@
       "xdg-open"
     ];
 
-    # nixpkgs runs one apparmor_parser per policy, serially: ~45 s on the boot critical path.
-    # One parallel call per mode loads the same policies. Uncached: store mtimes never change,
-    # and the parser refuses to cache --Complain anyway.
+    # One parallel apparmor_parser call per mode instead of nixpkgs' one per policy; uncached on purpose.
+    # See docs/src/apparmor.md#traps.
     enabledPolicies = lib.filterAttrs (_: p: p.state != "disable") config.security.apparmor.policies;
     policyDir = config.environment.etc."apparmor.d".source;
     loadPolicies = pkgs.writeShellScript "apparmor-load" (lib.concatStrings (lib.mapAttrsToList (state: names: ''
@@ -128,9 +127,8 @@
             ${openssh}/libexec/sshd-auth px -> sshd-auth,
             ${openssh}/libexec/sftp-server px -> sftp-server,
           '';
-          # podman includes <tunables/global> only if /etc/apparmor.d/tunables/global exists;
-          # without it containers-default fails to parse and the container won't start.
-          # apparmor.d ships no global: this is the file the search path resolved to before.
+          # podman's containers-default parses only if tunables/global exists, and apparmor.d ships none.
+          # See docs/src/apparmor.md#pieces.
           "tunables/global" = ''
             include "${pkgs.apparmor-profiles}/etc/apparmor.d/tunables/global"
           '';

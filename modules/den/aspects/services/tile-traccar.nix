@@ -1,8 +1,4 @@
-# services.tile-traccar — feed Tile tracker locations into Traccar.
-#
-# Tile tags have no GPS, so this polls Tile and forwards to Traccar's OsmAnd
-# decoder. The client UUID is kept on disk so Tile does not see a new device
-# sign-in every restart.
+# services.tile-traccar — forwards Tile tracker fixes to Traccar's OsmAnd decoder; the client UUID persists so Tile sees no new sign-ins.
 {den, ...}: {
   den.aspects.services.tile-traccar = {
     includes = [den.aspects.services.traccar];
@@ -75,9 +71,7 @@
 
         async def report(session: ClientSession, tile) -> None:
             """POST one Tile's last known fix to Traccar."""
-            # pytile hands back a naive datetime that is UTC; Traccar wants epoch
-            # seconds, which sidesteps the question of how it would parse anything
-            # else.
+            # pytile returns a naive UTC datetime; Traccar gets epoch seconds.
             timestamp = tile.last_timestamp.replace(tzinfo=timezone.utc)
             params = {
                 "id": tile.uuid,
@@ -92,9 +86,8 @@
 
             async with session.post(f"{ENDPOINT}/?{urlencode(params)}") as resp:
                 if resp.status != 200:
-                    # Traccar answers 400 for an id it has no device for, which is
-                    # the expected state until one is created with the tag's uuid
-                    # as its identifier. Worth saying out loud, with the uuid.
+                    # Traccar answers 400 for an id without a device until one is created with the tag's uuid
+                    # as its identifier; say so, with the uuid.
                     LOGGER.warning(
                         "Traccar refused %s (%s) with HTTP %s: %s",
                         tile.name,
@@ -127,9 +120,7 @@
                         since_discovery = 0.0
                         LOGGER.debug("Discovered %d tile(s)", len(tiles))
                     else:
-                        # Cheaper than re-listing: one request per tag, no account
-                        # enumeration. New or removed tags are picked up by the
-                        # discovery pass above.
+                        # One request per tag, no account enumeration; the discovery pass picks up new tags.
                         await asyncio.gather(
                             *(tile.async_update() for tile in tiles.values()),
                             return_exceptions=True,
@@ -142,14 +133,8 @@
                             continue
                         stamp = int(tile.last_timestamp.replace(tzinfo=timezone.utc).timestamp())
 
-                        # A tag has no clock and no radio of its own: the fix
-                        # stands until some phone running the Tile app walks
-                        # past it again. So an old timestamp does not mean the
-                        # tag moved away — it means nobody has looked. Past
-                        # MAX_AGE, take the position as no longer evidence of
-                        # where the thing is now and stop restating it; Traccar
-                        # keeps the last one it was given, so the map still
-                        # shows where it was last actually seen.
+                        # A tag's fix stands until a phone with the Tile app passes again; past MAX_AGE it is no longer
+                        # evidence of where the tag is, so stop restating it (Traccar keeps showing the last one).
                         age = time.time() - stamp
                         if MAX_AGE and age > MAX_AGE:
                             if not stale.get(uuid):
@@ -297,8 +282,7 @@
             Restart = "always";
             RestartSec = 30;
 
-            # No DynamicUser: /var/lib/private + impermanence bind mount is the
-            # EBUSY that broke crowdsec.
+            # No DynamicUser: a /var/lib/private state dir under an impermanence bind mount fails with EBUSY.
             StateDirectory = baseNameOf stateDir;
             WorkingDirectory = stateDir;
 

@@ -1,3 +1,4 @@
+# home.minecraft — waywall options and the generated waywall config for MCSR.
 {
   lib,
   pkgs,

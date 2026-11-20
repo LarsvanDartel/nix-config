@@ -1,5 +1,4 @@
-# prom-lite — ProM Lite 1.4, the process mining framework used in 2AMI10.
-# jdk8 deliberately: importing an XES log needs javax.xml.bind, removed after 8.
+# prom-lite — ProM Lite 1.4, the process mining framework.
 {...}: {
   nixpkgs.overlays = [
     (final: _prev: {
@@ -14,6 +13,7 @@
           coreutils,
           util-linux,
           graphviz,
+          # jdk8: importing an XES log needs javax.xml.bind, removed after 8.
           jdk8,
           libGL,
           libx11,

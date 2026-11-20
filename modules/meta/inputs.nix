@@ -1,5 +1,4 @@
-# Core infrastructure inputs (feature-specific inputs are declared in their own
-# feature modules via `flake-file.inputs.*`).
+# inputs — core infrastructure inputs; feature inputs are declared in their own modules.
 {...}: {
   flake-file.inputs = {
     nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable";

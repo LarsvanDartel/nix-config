@@ -1,11 +1,11 @@
-# services.arr.jellyseerr — the request front-end people other than the admin
-# actually use. Its own unit, because nixpkgs' runs it under DynamicUser.
+# services.arr.jellyseerr — seerr, the media request front-end for users other than the admin.
 {den, ...}: let
   inherit (import ./_lib.nix) vpnVhost;
   # Option default and netbird-service target (see services/netbird.nix).
   # Not upstream's 5055: traccar's osmand protocol holds that.
   defaultPort = 4055;
 in {
+  # Own unit: nixpkgs' runs it under DynamicUser.
   den.aspects.services.arr.jellyseerr = {
     includes = [den.aspects.services.arr];
     netbird-service = {host, ...}: {

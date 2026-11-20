@@ -1,9 +1,4 @@
-# zotero pinned to the last nixpkgs it built on: against nixpkgs 2026-10-01
-# its vendored Gecko build script fails patching AboutTranslations out of
-# ActorManagerParent.sys.mjs. nixpkgs' 10.0.6 and 10.0.9 run on
-# firefox-esr-140-bin, marked insecure (EOL), so they refuse to evaluate
-# without permitting that. Warns once nixpkgs moves zotero off 10.0.9: check
-# whether it builds, then drop the pin (and its input) or bump.
+# zotero — pinned to the last nixpkgs it built on: newer ones fail its Gecko build or need the insecure firefox-esr-140-bin.
 {inputs, ...}: {
   flake-file.inputs.nixpkgs-zotero-pin.url = "github:nixos/nixpkgs/4533d9293756b63904b7238acb84ac8fe4c8c2c4";
 

@@ -6,9 +6,8 @@
     pkgs,
     ...
   }: let
-    # `runuser -l` resets the environment and udev has none to begin with; lift
-    # the session's display, runtime dir and bus from a user process with a
-    # Wayland display open (noctalia's IPC socket is named after WAYLAND_DISPLAY).
+    # udev and `runuser -l` give no environment: lift display, runtime dir and bus from a user process
+    # with WAYLAND_DISPLAY set (noctalia's IPC socket is named after it).
     lockScript = pkgs.writeShellScript "yubikey-lock" ''
       # Swapping a Framework expansion card drops the key for about a second;
       # lock only if no YubiKey has come back.
@@ -77,10 +76,8 @@
         udev.packages = with pkgs; [yubikey-personalization];
         dbus.packages = [pkgs.gcr_4];
 
-        # Removal runs lockCommand through a unit: the script waits, and udev kills
-        # slow RUN programs. Insertion starts yubikey-unlock in the user's manager
-        # (SYSTEMD_USER_WANTS) for the seat user's hidraw ACL; `add` only, as
-        # `change` events (e.g. on logout) would start it too.
+        # Removal goes through a unit because udev kills slow RUN programs. Insertion uses SYSTEMD_USER_WANTS
+        # (for the seat user's hidraw ACL) and matches only `add`: `change` events (e.g. logout) would start it too.
         udev.extraRules = lib.mkIf locking ''
           ACTION=="remove",\
            ENV{ID_BUS}=="usb",\
@@ -114,9 +111,7 @@
         };
       };
 
-      # A notification while any FIDO request waits for a touch (sudo, ssh,
-      # WebAuthn), closed once touched. None at login or on the lock screen:
-      # noctalia is not up yet, or the lock covers it.
+      # No touch notification at login or on the lock screen: noctalia is not up yet, or the lock covers it.
       programs.yubikey-touch-detector.enable = locking;
 
       security.pam.services = {

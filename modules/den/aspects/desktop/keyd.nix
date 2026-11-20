@@ -1,7 +1,4 @@
-# desktop.keyd — tap/hold on the Mod key, and Mod + the digit row sent as
-# layout-independent keys. niri cannot bind a bare modifier tap, and neither
-# compositor binds keycodes; keyd works at evdev level below xkb.
-# keyd grabs every keyboard; escape hatch is backspace+escape+enter.
+# desktop.keyd — keyd below xkb: Mod tap/hold and layout-independent Mod + digit-row keys.
 {...}: {
   den.aspects.desktop.keyd.nixos = {
     config,
@@ -13,10 +10,8 @@
 
     cfg = config.cosmos.desktops.input.modTap;
 
-    # Mod + digit key N is sent as key N here: keyd's name, and the XKB keysym it
-    # arrives as in every layout. keyd's names are its own, not the kernel's:
-    # its prog1..4 are F21..F24 (touchpad keysyms), and it spends KEY_PROG1..4
-    # (XF86Launch1..4) on scroll events, so those cannot be sent at all.
+    # Mod + digit N is sent as key N: keyd's name, and the keysym it arrives as in every layout.
+    # keyd's names are its own: its prog1..4 are F21..F24, and KEY_PROG1..4 cannot be sent at all.
     workspaceKeys = [
       {
         keyd = "scale";
@@ -107,11 +102,12 @@
       '';
     };
 
+    # keyd grabs every keyboard; the escape hatch is backspace+escape+enter.
     config.services.keyd = {
       enable = true;
       keyboards.default.settings = {
         main = {
-          # `overload` emits the tap key only if no other key was pressed meanwhile.
+          # niri cannot bind a bare modifier tap, so keyd turns a lone Mod tap into `key`.
           leftmeta = "overload(meta, ${cfg.key})";
         };
         # A modifier layer's bindings drop its modifier, so name it again.

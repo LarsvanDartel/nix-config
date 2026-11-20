@@ -1,5 +1,4 @@
-# Root-on-btrfs impermanence: rolls the root subvolume back to a blank snapshot
-# each boot and bind-mounts cosmos.system.impermanence.persist.* from /persist.
+# core.impermanence — root-on-btrfs impermanence: rolls root back to a blank snapshot each boot and bind-mounts persist paths from /persist.
 {inputs, ...}: let
   homeImpermanence = {config, ...}: {
     cosmos.system.impermanence.active = true;
@@ -39,8 +38,7 @@ in {
       boot.initrd.systemd.services.rollback = {
         description = "Roll back BTRFS root subvolume to a blank snapshot";
         wantedBy = ["initrd.target"];
-        # Wait for the .device unit, not cryptsetup: on gaia (no LUKS) the
-        # cryptsetup unit doesn't exist and the script raced udev.
+        # Wait for the .device unit, not cryptsetup: hosts without LUKS (gaia) have no cryptsetup unit.
         after = [
           "systemd-cryptsetup@${builtins.baseNameOf cfg.device}.service"
           rootDeviceUnit
@@ -55,13 +53,8 @@ in {
         };
         script = ''
           mkdir -p /btrfs_tmp
-          # -t btrfs is load-bearing. Without it the initrd cannot probe the
-          # type (no blkid in this environment), the mount fails, and because
-          # DefaultDependencies=no means nothing orders itself after this unit,
-          # the boot carries on happily *without* wiping the root subvolume.
-          # This silently disabled impermanence on every host in the fleet
-          # between March and August 2026: a machine that fails to wipe itself
-          # looks exactly like one that works.
+          # -t btrfs is load-bearing: the initrd has no blkid, and a failed mount here boots on without
+          # wiping root (nothing orders after this unit), which looks exactly like a working rollback.
           mount -t btrfs -o subvol=/ ${cfg.device} /btrfs_tmp
           if [[ -e /btrfs_tmp/root ]]; then
               mkdir -p /btrfs_tmp/old_roots
@@ -75,33 +68,15 @@ in {
               done
               btrfs subvolume delete "$1"
           }
-          # -mindepth 1 is equally load-bearing: find reports its own starting
-          # point at depth 0, so without it a stale old_roots/ matches itself
-          # once its own mtime passes 30 days. The recursion would then delete
-          # every old root and finally call `btrfs subvolume delete` on
-          # old_roots/, which is a plain directory — that fails, and it fails
-          # *after* root has been moved aside and *before* the replacement is
-          # created, leaving nothing for sysroot.mount to find.
-          #
-          # Harmless while this ran every boot, because each boot refreshed
-          # old_roots' mtime. Repairing the mount above without also fixing
-          # this would have turned the first successful rollback into an
-          # unbootable machine on precisely the hosts that needed it most.
+          # -mindepth 1 is load-bearing: without it old_roots/ matches itself after 30 days, and deleting it
+          # fails after root was moved aside and before the new one exists, leaving nothing to boot.
           for i in $(find /btrfs_tmp/old_roots/ -mindepth 1 -maxdepth 1 -mtime +30); do
               delete_subvolumes_recursively "$i"
           done
           btrfs subvolume create /btrfs_tmp/root
 
-          # Carry the machine identity across the wipe. systemd generates a
-          # fresh machine-id when /etc/machine-id is missing, and journald keys
-          # its storage on it — so without this every boot would start a new
-          # /var/log/journal/<id>/, leaving the previous logs on the persisted
-          # disk but invisible to journalctl, forever.
-          #
-          # Seeded here rather than through impermanence's `files`, which
-          # refuses to bind-mount over the machine-id systemd has already
-          # created and fails activation outright. persist is a top-level
-          # subvolume, so it is readable from here without a second mount.
+          # Carry machine-id across the wipe: journald keys its storage on it, so a fresh one hides old logs.
+          # Seeded here because impermanence `files` refuses to bind over the machine-id systemd created.
           if [[ -f /btrfs_tmp/persist/etc/machine-id ]]; then
               mkdir -p /btrfs_tmp/root/etc
               cp /btrfs_tmp/persist/etc/machine-id /btrfs_tmp/root/etc/machine-id
@@ -119,9 +94,7 @@ in {
 
         inherit (cfg.persist) files;
 
-        # /etc/machine-id is deliberately NOT in `files`: impermanence refuses
-        # to bind over the existing one and fails activation. Seeded in the
-        # rollback script instead.
+        # Never add /etc/machine-id to `files`: impermanence fails activation; the rollback script seeds it.
 
         directories =
           cfg.persist.directories
@@ -134,12 +107,8 @@ in {
           ];
       };
 
-      # Re-create tmpfiles entries once the persist bind mounts are up: on the
-      # switch that first persists a directory, activation's tmpfiles run
-      # before the mount, which then hides the subdirs (killed kavita and
-      # paperless, 2026-08-30).
-      # Do NOT order this wantedBy + before local-fs.target: services get an
-      # implicit After=sysinit.target — a cycle systemd refuses.
+      # The switch that first persists a directory mounts it over the subdirs tmpfiles just made; this recreates them.
+      # Not wantedBy/before local-fs.target: services' implicit After=sysinit.target makes that a cycle.
       systemd.services.impermanence-tmpfiles = {
         description = "Re-create tmpfiles entries under the persisted mounts";
         wantedBy = ["sysinit.target"];

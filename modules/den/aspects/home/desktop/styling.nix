@@ -1,8 +1,4 @@
-# home.styling — stylix theming (the _styling tree) in the default mode, plus
-# profile font/wallpaper values. Delivered by desktop.styling (to-users),
-# which also auto-imports the stylix HM module (homeManagerIntegration).
-# Scheme, fonts and opacity come from cosmosStyling, which wrapped programs
-# read too; home.theme renders the other mode and switches at runtime.
+# home.styling — stylix theming in the default mode, from cosmosStyling; see docs/src/theming.md.
 {cosmosStyling, ...}: {
   den.aspects.home.styling.homeManager = {
     config,
@@ -19,21 +15,18 @@
       opacity = {inherit (cosmosStyling.opacity) terminal desktop popups;};
 
       targets = {
-        # No rofi in the fleet, and its target still sets the renamed
-        # programs.rofi.font, which abort-on-warn turns into a build failure.
+        # Its target sets the renamed programs.rofi.font, which abort-on-warn fails.
         rofi.enable = false;
-        # GNOME/Plasma integration: on niri they only rewrite dconf's
-        # color-scheme (and kdeglobals) at every activation, fighting `theme`.
+        # They undo the mode at every activation; see docs/src/theming.md#pitfalls.
         gnome.enable = false;
         kde.enable = false;
-        # No flatpaks; its ~/.themes copy would be named per mode.
+        # Its ~/.themes copy is named per mode, which a link can't switch.
         gtk.flatpakSupport.enable = false;
       };
     };
 
-    # stylix keeps adw-gtk3 (light) and paints dark through gtk.css. Naming
-    # the variant per mode lets `theme` flip running GTK3 apps live through
-    # gtk-theme; the colours follow on their next start.
+    # stylix keeps adw-gtk3 for both modes; naming the variant per mode lets `theme`
+    # flip running GTK3 apps live through gtk-theme.
     gtk.theme.name = lib.mkForce (
       if dark
       then "adw-gtk3-dark"
@@ -53,8 +46,7 @@
         }
         // builtins.mapAttrs (_: name: fontpkgs.${name}) cosmosStyling.fonts;
 
-      # Same top-ranked file as the picker's default, so scheme and picture
-      # can't drift apart.
+      # Same file as the picker's default, so scheme and picture can't drift apart.
       wallpaper = {
         src = config.cosmos.desktops.wallpapers.favourite;
         themed = false;

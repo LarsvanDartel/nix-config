@@ -1,4 +1,4 @@
-# services.containers — podman (docker-compat).
+# services.containers — podman with docker compatibility.
 {...}: {
   den.aspects.services.containers.nixos = {...}: {
     cosmos.user.extraGroups = ["podman" "kvm"];

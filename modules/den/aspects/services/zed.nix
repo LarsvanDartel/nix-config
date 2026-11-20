@@ -1,8 +1,4 @@
-# services.zed — make the ZFS event daemon actually say something.
-#
-# Upstream zfs-zed is silent without ZED_EMAIL_ADDR. Routed to ntfy via
-# ZED_EMAIL_PROG; `services.zfs.zed.enableMail` stays OFF: it asserts a setuid
-# sendmail wrapper exists, the thing being avoided.
+# services.zed — ZFS event mail to ntfy via ZED_EMAIL_PROG; enableMail stays off (it asserts a setuid sendmail).
 {inputs, ...}: {
   den.aspects.services.zed.nixos = {
     config,
@@ -75,9 +71,8 @@
         ZED_SPARE_ON_CHECKSUM_ERRORS = 10;
         ZED_SPARE_ON_IO_ERRORS = 1;
 
-        # No ZED_USE_ENCLOSURE_LEDS: the enclosure LED path is unwired for
-        # these SAS disks behind the HBA; setting it errors in the journal on
-        # every event.
+        # No ZED_USE_ENCLOSURE_LEDS: the LED path is unwired for these SAS disks behind the HBA
+        # and errors on every event.
       };
     };
   };

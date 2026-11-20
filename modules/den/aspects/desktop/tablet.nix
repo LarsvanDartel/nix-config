@@ -1,4 +1,4 @@
-# desktop.tablet — convertible support: accelerometer auto-rotation (iio-niri), wvkbd (patched: Dvorak letters, a ▾ hide key) kept running hidden for niri's tablet-mode switch events, touchscreen edge-swipe gestures (lisgd) driving niri, and the noctalia dock settings for tablet mode.
+# desktop.tablet — convertible support: auto-rotation, hidden wvkbd, lisgd edge gestures, tablet dock.
 {...}: {
   den.aspects.desktop.tablet = {
     nixos = {pkgs, ...}: {
@@ -8,9 +8,8 @@
         extraArgs = ["--monitor" "eDP-1"];
       };
 
-      # lisgd reads the touchscreen itself. uaccess grants only the active seat
-      # user, and must be tagged before 73-seat-late.rules: extraRules lands in
-      # 99-local.rules, too late.
+      # lisgd reads the touchscreen itself. uaccess must be tagged before 73-seat-late.rules;
+      # extraRules lands in 99-local.rules, too late.
       services.udev.packages = [
         (pkgs.writeTextDir "lib/udev/rules.d/70-touchscreen.rules" ''
           SUBSYSTEM=="input", KERNEL=="event*", ENV{ID_INPUT_TOUCHSCREEN}=="1", TAG+="uaccess", SYMLINK+="input/touchscreen"
@@ -29,10 +28,8 @@
       action = a: "${niri} msg action ${a}";
       noctalia = cmd: "${config.programs.noctalia.package}/bin/noctalia msg ${cmd}";
 
-      # nfingers,swipe,edge,distance,actmode,command. Edges are in screen
-      # orientation (lisgd -o). One-finger swipes count only from an edge, so
-      # scrolling in apps doesn't trigger them. lisgd runs the first match, so
-      # an edge-bound gesture must come before the same gesture on `*`.
+      # nfingers,swipe,edge,distance,actmode,command; edges follow screen orientation (lisgd -o).
+      # lisgd runs the first match: an edge-bound gesture must precede the same gesture on `*`.
       gestures = [
         "1,DU,B,*,R,${action "toggle-overview"}"
         "1,LR,L,*,R,${action "focus-column-left"}"
@@ -41,8 +38,7 @@
         # 34 is SIGRTMIN (glibc), wvkbd's visibility toggle; procps rejects the name.
         "2,DU,B,*,R,${pkgs.procps}/bin/pkill --signal 34 -x wvkbd-mobintl"
         "3,UD,T,*,R,${action "close-window"}"
-        # niri's touchpad gestures, with content following the fingers as on
-        # the touchpad's natural scrolling.
+        # Content follows the fingers, as with the touchpad's natural scrolling.
         "3,DU,*,*,R,${action "focus-workspace-down"}"
         "3,UD,*,*,R,${action "focus-workspace-up"}"
         "3,RL,*,*,R,${action "focus-column-right"}"
@@ -144,7 +140,6 @@
       programs.noctalia.settings.dock = {
         launcher_position = "start";
         pinned = ["zen-twilight" "foot" "thunderbird"];
-        # Touch has no hover to magnify on.
         magnification = false;
       };
     };

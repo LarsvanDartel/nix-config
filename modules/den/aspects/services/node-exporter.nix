@@ -1,15 +1,13 @@
 # services.node-exporter — host metrics, scraped over the mesh.
-#
-# Not on voyager: a sleeping laptop would sit permanently "target down".
 {
   den,
   inputs,
   ...
 }: let
-  # Shared by the option default and the scrape-target entry, which must be
-  # static (see services/prometheus.nix).
+  # The scrape-target entry must be static (see services/prometheus.nix).
   defaultPort = 9500;
 in {
+  # Not on voyager: a sleeping laptop would sit permanently "target down".
   den.aspects.services.node-exporter = {
     includes = [den.aspects.services.netbird.client];
 
@@ -30,9 +28,8 @@ in {
 
       cfg = config.cosmos.services.node-exporter;
 
-      # What this generation was built from, for DeployBehind and
-      # NixpkgsStale (services/prometheus.nix). A store path, so the exporter
-      # restarts with every deploy and never reports a stale revision.
+      # Feeds DeployBehind and NixpkgsStale (services/prometheus.nix). A store path, so the
+      # exporter restarts with every deploy and never reports a stale revision.
       buildInfo = pkgs.writeTextDir "build.prom" ''
         # HELP nixos_configuration_info The nix-config revision this generation was built from.
         # TYPE nixos_configuration_info gauge

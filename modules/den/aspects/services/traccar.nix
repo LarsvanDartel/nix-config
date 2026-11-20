@@ -142,9 +142,7 @@ in {
           showUnknownDevices = "true";
         };
         notificator.types = "traccar,web,mail,command";
-        # gaia's Stalwart mesh relay (services/stalwart.nix): no auth or
-        # STARTTLS offered, so none configured; hand-synced with gaia.nix
-        # relayClients.
+        # gaia's Stalwart mesh relay offers no auth or STARTTLS; hand-synced with gaia.nix relayClients.
         mail.smtp = {
           host = "gaia.nb.lvdar.nl";
           port = "2525";
@@ -157,9 +155,8 @@ in {
           groupsClaimName = "traccar_groups";
           allowGroup = "traccar";
           adminGroup = "traccar_admin";
-          # Else a first OpenID login fails "Registration disabled". allowGroup
-          # still gates it; the server-wide registration toggle would instead
-          # open anonymous sign-up.
+          # Else a first OpenID login fails "Registration disabled". allowGroup still gates it; the
+          # server-wide registration toggle would open anonymous sign-up.
           allowRegistration = "true";
         };
       };

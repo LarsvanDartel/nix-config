@@ -1,4 +1,4 @@
-# home.ripgrep
+# home.ripgrep — ripgrep with default flags
 {...}: {
   den.aspects.home.ripgrep.homeManager = {...}: {
     programs.ripgrep = {

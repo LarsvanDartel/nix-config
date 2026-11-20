@@ -1,5 +1,4 @@
-# home.steam — impermanence persist dirs for steam. Delivered to every user by
-# roles.gaming, which enables the program at the nixos level.
+# home.steam — per-user Steam state; roles.gaming enables the program system-wide.
 {...}: {
   den.aspects.home.steam.homeManager = {...}: {
     cosmos.system.impermanence.persist.directories = [

@@ -1,8 +1,4 @@
-# suwayomi-server pinned ahead of nixpkgs — a version floor: keiyoushi's
-# extension store needs Suwayomi >= 2.3.2223 (nixpkgs had 2.1.1867). Inert,
-# and warns, once nixpkgs reaches the pinned version (never a downgrade).
-# One-way upgrade: 2.3 rewrites the H2 database; restic backs up
-# /persist/var/lib/suwayomi-server as the undo.
+# suwayomi-server — version floor ahead of nixpkgs for keiyoushi's store (>= 2.3.2223); 2.3 rewrites the H2 database one way, restic is the undo.
 {...}: {
   nixpkgs.overlays = [
     (_final: prev: let

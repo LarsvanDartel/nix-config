@@ -1,10 +1,10 @@
 # services.arr.lingarr — machine-translates subtitles via OpenRouter.
-# Settings below are written into lingarr's database on every start; UI edits revert on restart.
 {den, ...}: let
   inherit (import ./_lib.nix) gatedService;
   # Option default and netbird-service target (see services/netbird.nix).
   defaultPort = 9876;
 in {
+  # Settings below are written into lingarr's database on every start; UI edits revert on restart.
   den.aspects.services.arr.lingarr = {
     includes = [den.aspects.services.arr];
     inherit (gatedService "lingarr" defaultPort) netbird-service kanidm-provision;

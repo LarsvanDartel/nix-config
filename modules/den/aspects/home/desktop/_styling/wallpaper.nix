@@ -1,3 +1,4 @@
+# home.styling — wallpaper options: the stylix scheme source image and its themed variants.
 {
   config,
   inputs,

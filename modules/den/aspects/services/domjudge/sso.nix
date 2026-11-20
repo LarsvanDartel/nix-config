@@ -1,8 +1,4 @@
-# services.domjudge.sso — judge.lvdar.nl behind kanidm. DOMjudge has no OIDC,
-# so oauth2-proxy + nginx auth_request set Remote-User for the domserver's
-# remote_user authenticator (see default.nix). Published through gaia
-# *ungated*: kanidm SSO is already a full login. /api/ is the exception:
-# basic auth against the domserver itself, for the submit CLI.
+# services.domjudge.sso — judge.lvdar.nl behind kanidm via oauth2-proxy, nginx auth_request and Remote-User.
 {
   den,
   inputs,
@@ -11,7 +7,6 @@
   inherit (import ./_lib.nix) containerPort;
 
   domain = "judge.lvdar.nl";
-  # Option default and netbird-service target (see services/netbird.nix).
   defaultPort = 8092;
   # firefly's oauth2-proxy holds 4181.
   oauthPort = 4182;
@@ -21,6 +16,7 @@ in {
 
     netbird-service = {host, ...}: {
       judge = {
+        # Ungated: kanidm SSO is a full login, and /api/ falls back to the domserver's basic auth.
         bearerAuth.enable = false;
         targets = [
           {
@@ -74,7 +70,7 @@ in {
             builtins.toString inputs.nix-secrets + "/hosts/common/secrets.yaml";
         };
 
-        # See firefly.nix: hand-rolled, services.oauth2-proxy is a singleton.
+        # Hand-rolled like firefly.nix's: services.oauth2-proxy is a singleton.
         systemd.services.oauth2-proxy-domjudge = {
           description = "oauth2-proxy for DOMjudge";
           after = ["network.target" "kanidm.service"];
@@ -86,8 +82,7 @@ in {
               "cookie-secret:${config.sops.secrets."keys/domjudge/cookie-secret".path}"
             ];
             # --oidc-email-claim: kanidm persons without a mail address
-            # otherwise fail the callback with a 500 ("neither the id_token
-            # nor the profileURL set an email").
+            # otherwise fail the callback with a 500.
             ExecStart = ''
               ${lib.getExe pkgs.oauth2-proxy} \
                 --http-address=127.0.0.1:${toString oauthPort} \
@@ -150,11 +145,8 @@ in {
               '';
             };
 
-            # DOMjudge's API authenticates with HTTP basic auth (submit CLI,
-            # judgehost); the SSO cookie can't reach it. Skip auth_request and
-            # clear Remote-User so the domserver falls back to basic auth,
-            # like it does for the judgehost on the podman network. 401s pass
-            # through instead of redirecting to the oauth2 login.
+            # The API uses HTTP basic auth (submit CLI): clear Remote-User so the domserver falls
+            # back to it, and pass 401s through instead of redirecting to the oauth2 login.
             "^~ /api/" = {
               proxyPass = "http://127.0.0.1:${toString containerPort}";
               recommendedProxySettings = false;

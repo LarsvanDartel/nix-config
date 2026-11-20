@@ -1,19 +1,14 @@
-# services.stalwart — Stalwart 1.x mail/CalDAV/CardDAV/JMAP server; logins
-# via kanidm OIDC, outbound via the JetEmail relay. All settings live in
-# Stalwart's database and are applied by services.stalwart.provision.
+# services.stalwart — Stalwart 1.x mail/CalDAV/CardDAV/JMAP server with kanidm logins and the JetEmail relay.
 {den, ...}: let
-  # Option default and netbird-service target (see services/netbird.nix).
   defaultDavPort = 8089;
-  # Mesh-only name for the TLS relay; a constant so mesh-dns-record stays
-  # static (see services/unbound.nix). Inside *.lvdar.nl so the cert verifies.
+  # A constant so mesh-dns-record stays static; inside *.lvdar.nl so the cert verifies.
   relayDomain = "mail-relay.lvdar.nl";
 in {
   den.aspects.services.stalwart = {
     includes = [den.aspects.services.netbird.client];
 
-    # Ungated: CalDAV/CardDAV clients carry their own credentials and can't
-    # follow a redirect, and Bulwark's browser side calls JMAP here directly.
-    # Stalwart 404s everything but /dav, /jmap and /.well-known here.
+    # Ungated: DAV clients carry their own credentials and can't follow a redirect, and Bulwark's
+    # browser side calls JMAP here. Http.allowedEndpoints 404s all but /dav, /jmap and /.well-known.
     netbird-service = {host, ...}: {
       mail = {
         bearerAuth.enable = false;
@@ -28,10 +23,8 @@ in {
 
     mesh-dns-record = {host, ...}: {${relayDomain} = host.meshAddress;};
 
-    # Thunderbird's custom OAuth for IMAP/SMTP (home/apps/thunderbird.nix) and
-    # Bulwark (services/bulwark.nix). Stalwart accepts only tokens whose `aud`
-    # is this client (acceptedAudiences below), so every OAuth mail client
-    # must use this one.
+    # Every OAuth mail client (Thunderbird, Bulwark) must use this client: Stalwart accepts only
+    # tokens whose `aud` is `stalwart` (acceptedAudiences below).
     kanidm-provision = {config, ...}: let
       cfg = config.cosmos.services.stalwart;
     in {
@@ -237,8 +230,7 @@ in {
             tls-key = "/var/lib/acme/lvdar.nl/key.pem";
           };
 
-          # Applied over the management API after every start. Listener
-          # changes only take effect on the next stalwart restart.
+          # Listener and role changes take effect only on the next stalwart restart.
           provision = {
             enable = true;
             urls = ["http://127.0.0.1:${toString cfg.adminPort}"];
@@ -251,25 +243,19 @@ in {
                 defaultDomainId = "#domain";
               };
 
-              # Accounts appear on first OAuth login (inbound mail bounces
-              # until then). Password logins accept only app passwords: kanidm
-              # holds no password Stalwart can check.
+              # Accounts appear on first OAuth login (inbound mail bounces until then). Password
+              # logins accept only app passwords: kanidm holds no password Stalwart can check.
               Authentication = {
                 directoryId = "#kanidm";
-                # Empty after the 0.15 → 0.16 → 1.0 migration, which leaves
-                # accounts without the permission to receive mail ("not
-                # authorized to receive email"). Picked up on restart.
+                # Must be set: empty default roles leave accounts unable to receive mail. Picked up on restart.
                 defaultUserRoleIds = ["#role-user"];
                 defaultGroupRoleIds = ["#role-group"];
                 defaultAdminRoleIds = ["#role-admin"];
               };
 
               Http = {
-                # The dav port is reachable only from netbird-proxy (mesh
-                # firewall), admin only from loopback. Without this, auto-ban
-                # would ban the proxy. Safe only because netbird-proxy replaces
-                # client-sent forwarding headers (NB_PROXY_TRUSTED_PROXIES is
-                # loopback only).
+                # Safe only because dav is reachable only from netbird-proxy, which replaces client-sent
+                # forwarding headers, and admin only from loopback. Without it, auto-ban bans the proxy.
                 clientIpSource = "xForwardedFor";
                 forwardedHops = 1;
                 # Bulwark (webmail.lvdar.nl) calls JMAP cross-origin with
@@ -300,10 +286,8 @@ in {
                   ];
                   "else" = "false";
                 };
-                # Only the owner (the catch-all target) may send as any
-                # address; any other account kanidm lets in (mail-users) is
-                # held to its own. `authenticated_as` is `<name>@<domain>`.
-                # JetEmail still refuses non-lvdar.nl senders.
+                # Only the owner (the catch-all target) may send as any address; other mail-users are
+                # held to their own. `authenticated_as` is `<name>@<domain>`.
                 mustMatchSender = {
                   match = [(when "authenticated_as == 'lvdar@${cfg.domain}'" "false")];
                   "else" = "true";
@@ -311,17 +295,8 @@ in {
               };
 
               MtaStageRcpt = {
-                # Blocked addresses are MemoryLookupKey objects in namespace
-                # `blocked`, kept out of this public repo. The catch-all
-                # (Domain below) would take them, so they are rewritten to a
-                # non-local address first and fail with 550 "Relay not allowed"
-                # (relaying to it is still allowed for authenticated senders and
-                # relayClients; those bounce). Only blocked addresses: this
-                # rewrite replaces the envelope recipient outright, and the spam
-                # filter then scores mail whose To: lacks it FORGED_RECIPIENTS.
-                # A new key needs
-                # `stalwart-cli create Action --json '{"@type":"ReloadLookupStores"}'`
-                # (ReloadSettings does not reload lookups).
+                # Blocked addresses (docs/src/hosts.md#gaia) go non-local to fail with 550. Rewrite only those:
+                # it replaces the envelope recipient, and the spam filter scores the rest FORGED_RECIPIENTS.
                 rewrite = {
                   match = [(when "key_exists('blocked', rcpt)" "'blocked@blocked.invalid'")];
                   "else" = "false";
@@ -337,15 +312,13 @@ in {
               };
 
               MtaStageData = {
-                # The relay's clients are our own services; unsigned and
-                # unaligned, their notifications to the local mailbox
-                # otherwise land in Junk.
+                # The relay's clients are our own unsigned, unaligned services: filtered, their
+                # notifications to the local mailbox land in Junk.
                 enableSpamFilter = {
                   match = [(when meshRelay "false")];
                   "else" = "true";
                 };
-                # JetEmail signs via the jetemail._domainkey CNAME. Stalwart
-                # holds no keys.
+                # JetEmail signs via the jetemail._domainkey CNAME; Stalwart holds no keys.
                 dkimSignDomain."else" = "false";
               };
 
@@ -356,9 +329,8 @@ in {
             };
 
             objects = {
-              # Tracers have no name, hence the match on the variant. The
-              # migration left a file tracer under /var/log, which the
-              # unit's ProtectSystem makes unwritable.
+              # Tracers have no name, hence the match on the variant. reconcile drops file tracers:
+              # ProtectSystem makes /var/log unwritable.
               Tracer = {
                 reconcile = true;
                 match = ["@type"];
@@ -400,10 +372,8 @@ in {
                 match = ["name"];
                 objects.domain = {
                   name = cfg.domain;
-                  # Unknown addresses go to the account's kanidm mail address.
-                  # Unlike an MtaStageRcpt rewrite, this keeps the original
-                  # recipient for the spam filter, so per-service aliases are
-                  # not scored FORGED_RECIPIENTS.
+                  # Unlike an MtaStageRcpt rewrite, the catch-all keeps the original recipient,
+                  # so per-service aliases are not scored FORGED_RECIPIENTS.
                   catchAllAddress = "lars@${cfg.domain}";
                   certificateManagement."@type" = "Manual";
                   dkimManagement."@type" = "Manual";
@@ -411,10 +381,8 @@ in {
                 };
               };
 
-              # Every service gets its own catch-all alias (steam@, discord@),
-              # and its mail names the service in the subject, so this +2.0
-              # rule hits most legitimate mail. Upstream rule updates keep local
-              # SpamTag scores.
+              # Every service gets its own alias (steam@) and its mail names the service in the subject,
+              # so this +2.0 rule hits most legitimate mail. Upstream rule updates keep local scores.
               SpamTag = {
                 match = ["tag"];
                 objects.rcpt-local-in-subject = {
@@ -424,12 +392,8 @@ in {
                 };
               };
 
-              # The built-in roles, matched only to reference them above.
-              # Stalwart creates them, with their permissions, only on a
-              # normal-mode start with no roles at all. Provisioning a store
-              # that has none yet (recovery mode) makes empty roles instead,
-              # and every login fails "Unauthorized access: authenticate";
-              # delete those and restart.
+              # Built-in roles, matched only to reference them. Provisioning before Stalwart created them makes
+              # empty roles where every login fails "Unauthorized access"; delete those and restart.
               Role = {
                 match = ["description"];
                 objects = {
@@ -452,10 +416,8 @@ in {
                   claimName = "name";
                   # kanidm's `aud` is the client id, not Stalwart's URL.
                   acceptedAudiences = ["stalwart"];
-                  # kanidm grants only `openid profile email`. "interoperable"
-                  # would allow mail/contacts/calendars/files but not the x:
-                  # methods, and app passwords can only be created through
-                  # those (the admin cannot set them on an account).
+                  # kanidm grants only `openid profile email`; "interoperable" would block the x: methods,
+                  # the only way to create app passwords.
                   unscopedTokens = "full";
                 };
               };
@@ -483,18 +445,14 @@ in {
         systemd.services.stalwart = {
           wants = ["acme-lvdar.nl.service"];
           after = ["acme-lvdar.nl.service"];
-          # Releases add permissions only to the default roles of new
-          # installs. This adds the missing ones at each start; it touches
-          # only the default role sets (Authentication above), never re-adds
-          # a permission 1.0.0 already had, and respects disabledPermissions.
+          # Adds newer releases' permissions to the default role sets at each start; it never re-adds
+          # a permission 1.0.0 already had and respects disabledPermissions.
           environment.STALWART_UPDATE_ROLE_PERMISSIONS = "true";
         };
         security.acme.certs."lvdar.nl".reloadServices = ["stalwart.service"];
 
-        # Cold boot: the reload validates the OIDC directory against kanidm, which
-        # is reached over the mesh that netbird-management brings up ~1.5 min in;
-        # the 30 s fetch timed out on every boot since 2026-11-06. Retries ride
-        # that out; RestartMode=direct keeps notify-failure to real outages.
+        # The reload validates the OIDC directory against kanidm over the mesh, up ~1.5 min after boot:
+        # retries ride that out, and RestartMode=direct keeps notify-failure to real outages.
         systemd.services.stalwart-provision = {
           startLimitBurst = 5;
           startLimitIntervalSec = 600;

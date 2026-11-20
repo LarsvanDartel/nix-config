@@ -1,5 +1,4 @@
-# home.minecraft — PrismLauncher + the MCSR toolchain (reuses the _waywall.nix
-# part file and the local pkgs.mcsr.* packages).
+# home.minecraft — PrismLauncher with the MCSR toolchain and waywall.
 {...}: {
   den.aspects.home.minecraft.homeManager = {
     config,

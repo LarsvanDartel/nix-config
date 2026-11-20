@@ -1,5 +1,4 @@
-# services.tino — TINO (github:confirm/tino), a git+Typst-backed
-# collaborative document editor. Published ungated: TINO does its own OIDC.
+# services.tino — TINO (github:confirm/tino), a git+Typst collaborative editor; published ungated, it does its own OIDC.
 {
   den,
   inputs,
@@ -31,9 +30,6 @@ in {
         };
         tino-admin.members = ["lvdar"];
       };
-      # Use tino_groups, not kanidm's raw "groups" claim as
-      # TINO_OIDC_GROUPS_CLAIM: TINO stores userinfo in its cookie and
-      # the raw list pushed it past 9KB, silently dropped by browsers.
       oauth2.tino = {
         displayName = "TINO";
         originUrl = ["https://tino.lvdar.nl/oidc/callback"];
@@ -186,8 +182,8 @@ in {
             TINO_BASE_URL = "https://${cfg.domain}";
             TINO_OIDC_DISCOVERY_URL = "https://auth.lvdar.nl/oauth2/openid/tino/.well-known/openid-configuration";
             TINO_OIDC_CLIENT_ID = "tino";
-            # Not "groups": that claim is fleet-wide and pushed the session
-            # cookie past the ~4KB browser cap, so logins never stuck.
+            # Not "groups": that claim is fleet-wide and pushes TINO's userinfo cookie past the ~4KB
+            # browser cap, so logins never stick.
             TINO_OIDC_GROUPS_CLAIM = "tino_groups";
             TINO_ACCENT_COLOUR = cfg.accentColour;
             GIT_CONFIG_SYSTEM = toString gitConfig;

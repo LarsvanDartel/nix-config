@@ -1,6 +1,4 @@
-# services.arr.vpn — the network namespace the download clients are confined
-# to, so that transmission and sabnzbd can only ever reach the internet through
-# WireGuard. Owns the VPN-Confinement input, since nothing else uses it.
+# services.arr.vpn — WireGuard network namespace confining the download clients' internet access.
 {
   den,
   inputs,
@@ -71,8 +69,7 @@
         vpnNamespaces.${cfg.name} = {
           enable = true;
           vpn.allowedTCPPorts = optional (cfg.vpnTestService.port != null) cfg.vpnTestService.port;
-          # Sources not listed here get replies via the tunnel, so mesh requests
-          # time out silently.
+          # Sources not listed here get replies via the tunnel, so their requests time out silently.
           allowedIngress =
             [
               "192.168.1.0/24"
@@ -86,9 +83,8 @@
 
         systemd.services.arr.postStart = cfg.postUp;
 
-        # VPN-Confinement's 5×1s endpoint ping is too short at boot and arr-up
-        # failing takes sabnzbd/transmission down (BindsTo); Type=oneshot
-        # forbids Restart=, so wait for the endpoint first.
+        # VPN-Confinement's 5×1s endpoint ping is too short at boot, and a failed arr-up takes the clients down
+        # (BindsTo); Type=oneshot forbids Restart=, so wait for the endpoint first.
         systemd.services.arr.serviceConfig.ExecStartPre = [
           (getExe (pkgs.writeShellApplication {
             name = "arr-wait-for-endpoint";
@@ -114,9 +110,7 @@
                 sleep 1
               done
 
-              # Not fatal on its own: the network may be up while ICMP is
-              # dropped, and vpn-up's own check is still to come. Failing here
-              # would turn a slow boot into the very outage this prevents.
+              # Not fatal: ICMP may be dropped while the network is up, and vpn-up still checks.
               echo
               echo "arr: endpoint '$host' still unreachable after 120s; continuing anyway" >&2
             '';

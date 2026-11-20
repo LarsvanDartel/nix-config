@@ -66,9 +66,8 @@ in {
       };
       extensionStores = mkOption {
         type = listOf str;
-        # index.pb, not index.min.json: the old URL serves an "Outdated App"
-        # stub. Needs suwayomi-server >= 2.3.2223, hence the pin in
-        # modules/pkgs/suwayomi-server.nix.
+        # index.pb, not index.min.json (an "Outdated App" stub); needs suwayomi-server >= 2.3.2223,
+        # hence the pin in modules/pkgs/suwayomi-server.nix.
         default = ["https://raw.githubusercontent.com/keiyoushi/extensions/repo/index.pb"];
       };
       expose = mkOption {
@@ -164,9 +163,8 @@ in {
         optional (cfg.homeLink != null)
         "L+ ${cfg.homeLink} - - - - ${cfg.downloadsDir}";
 
-      # Comick's CDN 429s page bursts and the downloader parks chapters as
-      # ERROR after three tries; only a dequeue resets the counter, so this
-      # sweeps ERROR entries out and re-enqueues them.
+      # Comick's CDN 429s bursts and the downloader parks chapters as ERROR after three tries;
+      # only a dequeue resets the counter, so sweep ERROR entries out and re-enqueue them.
       systemd.services.suwayomi-download-retry = mkIf cfg.downloadRetry.enable {
         description = "Re-queue suwayomi chapter downloads that failed on HTTP 429";
         after = ["suwayomi-server.service"];

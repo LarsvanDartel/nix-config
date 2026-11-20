@@ -1,5 +1,4 @@
-# roles.desktop-home — the desktop home environment for the primary user on
-# desktop hosts.
+# roles.desktop-home — the desktop home environment for the primary user on desktop hosts.
 {den, ...}: {
   den.aspects.roles.desktop-home = {
     includes = with den.aspects.home; [

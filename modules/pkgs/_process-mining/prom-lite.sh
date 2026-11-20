@@ -1,4 +1,5 @@
 #!@shell@
+# prom-lite — launcher for ProM Lite with a writable home and NixOS-compatible natives.
 # shellcheck shell=bash
 set -eu
 
@@ -33,12 +34,8 @@ ln -sfn "$share/lib" "$data/lib"
 [ -e "$data/ProM.ini" ] || install -m 644 "$share/ProM.ini" "$data/ProM.ini"
 cd "$data"
 
-# ProM's GraphViz package unpacks a generic-linux dot under java.io.tmpdir and
-# runs it; NixOS cannot exec that, so every graphviz view (Inductive visual
-# Miner, ...) fails with "invalid dot given". Unpack the set ourselves -- ProM
-# re-unpacks all of it as soon as one file is missing -- and swap linux64/dot
-# for a wrapper around nixpkgs' dot. A fresh install only gets this on the
-# launch after ProM has downloaded the package.
+# ProM's GraphViz package runs a generic-linux dot NixOS can't exec; unpack the whole set
+# ourselves (one missing file re-unpacks it all) and swap linux64/dot for nixpkgs' dot.
 tmp="$data/tmp"
 for gv in "$data"/packages/graphviz-*/GraphViz.jar; do
   [ -e "$gv" ] || continue

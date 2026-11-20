@@ -1,5 +1,4 @@
-# Shared by the *arr aspects. Underscored so the import-tree leaves it alone:
-# a plain expression to `import`, not a flake-parts module.
+# arr-lib — helpers shared by the *arr aspects; a plain `import`ed expression, kept from import-tree by its `_`.
 rec {
   # Confined services bind the namespace side of the bridge (192.168.15.1),
   # unroutable from outside; this proxies the same port in the root namespace.
@@ -19,9 +18,8 @@ rec {
     };
   };
 
-  # A gated netbird-service entry plus the kanidm group that opens its gate.
-  # The *arrs have API keys only, no login: the identity check is the only
-  # gate. Takes the default port, not config (see services/netbird.nix).
+  # The *arrs have API keys only, no login: this identity gate is their only auth.
+  # Takes the default port, not config (see services/netbird.nix).
   gatedService = name: port: {
     netbird-service = {host, ...}: {
       ${name}.targets = [
@@ -34,7 +32,6 @@ rec {
     kanidm-provision = import ../_netbird-groups.nix "netbird-${name}";
   };
 
-  # radarr/sonarr/lidarr: only name, port and library dir differ.
   mkSimpleArr = {
     name,
     defaultPort,

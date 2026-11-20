@@ -1,3 +1,4 @@
+# home.styling — stylix base config: cursor, plus the font, icon and wallpaper modules.
 {
   config,
   lib,
@@ -34,7 +35,6 @@ in {
       enable = true;
       autoEnable = true;
 
-      # TODO: Move to cursor module
       cursor = {
         package = pkgs.bibata-cursors;
         name = "Bibata-Modern-Ice";

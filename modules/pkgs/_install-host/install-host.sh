@@ -89,7 +89,6 @@ install_host() {
     excludeFrom=$(realpath "$excludeFrom")
   fi
 
-  # 1. Checkout and target.
   local root
   root=$(git rev-parse --show-toplevel 2>/dev/null) || die "run inside the nix-config checkout"
   # The installer's host keys are random per boot.
@@ -98,7 +97,7 @@ install_host() {
   "${sshT[@]}" test -e /etc/cosmos-installer ||
     die "root@$target:$port is not the cosmos installer (or ssh failed); boot the target from \`nix build .#installer-iso\`"
 
-  # 2. A new host needs a facter report before it evaluates.
+  # A new host needs a facter report before it evaluates.
   local facter="$root/modules/den/hosts/_facter/$host.facter.json"
   if [ ! -e "$facter" ]; then
     "${sshT[@]}" nixos-facter >"$facter" || {
@@ -108,7 +107,6 @@ install_host() {
     git -C "$root" add --intent-to-add --force -- "$facter"
   fi
 
-  # 3. Evaluate.
   cfg() {
     nix eval --json "$root#nixosConfigurations.$host.config.$1" ${2:+--apply "$2"}
   }
@@ -124,7 +122,7 @@ install_host() {
   resumeDevice=$(cfg boot.resumeDevice) || die "evaluating $host failed"
   resumeDevice=$(jq -r . <<<"$resumeDevice")
 
-  # 4. The installed host must be able to decrypt its secrets on first boot.
+  # The installed host must be able to decrypt its secrets on first boot.
   local secrets age recipient f
   secrets=$(nix flake archive --json "$root" | jq -r '.inputs."nix-secrets".path // empty')
   [ -n "$secrets" ] || secrets=$(nix eval --raw --impure --expr "(builtins.getFlake \"git+file://$root\").inputs.nix-secrets.outPath")
@@ -144,12 +142,11 @@ install_host() {
     fi
   done
 
-  # 5.
   if [ "$copyPersist" = 1 ] && [ "$(cat /proc/sys/kernel/hostname)" != "$host" ]; then
     die "--copy-persist streams THIS machine's /persist; run it on the machine being replaced"
   fi
 
-  # 6. Disko layouts read the passphrase from /tmp/secret.key.
+  # Disko layouts read the passphrase from /tmp/secret.key.
   local luksArgs=()
   if [ "$(jq length <<<"$luks")" -gt 0 ]; then
     local pw pw2
@@ -166,12 +163,12 @@ install_host() {
     luksArgs=(--disk-encryption-keys /tmp/secret.key "$tmp/luks.key")
   fi
 
-  # 7. Always the target's own hardware.
+  # Always the target's own hardware.
   "${sshT[@]}" nixos-facter >"$facter.tmp" || die "nixos-facter failed on the target"
   mv "$facter.tmp" "$facter"
   git -C "$root" add --intent-to-add --force -- "$facter"
 
-  # 8. The host key (sops identity) and, on impermanent hosts, a machine-id
+  # The host key (sops identity) and, on impermanent hosts, a machine-id
   # for the rollback unit to seed /etc from.
   local extra="$tmp/extra"
   install -D -m 0600 "$hostKey" "$extra$keyPath"
@@ -186,13 +183,13 @@ install_host() {
     install -D -m 0444 "$tmp/machine-id" "$extra/persist/etc/machine-id"
   fi
 
-  # 9. Built here: only this machine can fetch the private nix-secrets.
+  # Built here: only this machine can fetch the private nix-secrets.
   nixos-anywhere --flake "$root#$host" --target-host "root@$target" --ssh-port "$port" \
     --build-on local --phases disko,install \
     --ssh-option StrictHostKeyChecking=no --ssh-option UserKnownHostsFile=/dev/null \
     --extra-files "$extra" "${luksArgs[@]}"
 
-  # 9b. FIDO2, while the passphrase file is still on the installer.
+  # FIDO2, while the passphrase file is still on the installer.
   local fidoDevs=() enrolled=() dev ans
   # Touch only: a PIN needs a keyboard, which a folded convertible has not.
   local enroll=(systemd-cryptenroll --fido2-device=auto --fido2-with-client-pin=no)
@@ -212,7 +209,6 @@ install_host() {
     done
   fi
 
-  # 10.
   if [ "$copyPersist" = 1 ]; then
     local excludeArgs=() st tarBin
     [ -n "$excludeFrom" ] && excludeArgs=(--exclude-from="$excludeFrom")
@@ -229,14 +225,12 @@ install_host() {
     fi
   fi
 
-  # 11.
   if [ "$copyPersist" = 1 ] || [ "$reboot" = 0 ]; then
     echo "target left in the installer with /mnt mounted. Power off THIS machine first if the target takes over its identity, then on the target run: swapoff -a; umount -R /mnt; reboot"
   else
     "${sshT[@]}" 'swapoff -a; umount -R /mnt; systemctl reboot' || true
   fi
 
-  # 12.
   echo
   echo "post-install checklist:"
   echo "  - commit modules/den/hosts/_facter/$host.facter.json"

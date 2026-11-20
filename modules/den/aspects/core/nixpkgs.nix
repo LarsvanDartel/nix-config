@@ -1,6 +1,4 @@
-# core.nixpkgs — overlays + allowUnfree for den-produced hosts. Overlays come
-# from inputs only — reading the flake-parts `config` here would create a
-# flake→host→flake recursion.
+# core.nixpkgs — overlays and allowUnfree for den-produced hosts.
 {inputs, ...}: let
   stable = final: _prev: {
     stable = import inputs.nixpkgs-stable {
@@ -16,6 +14,7 @@
     };
   };
 
+  # Overlays come from inputs only: reading the flake-parts `config` here recurses flake→host→flake.
   overlays = [
     stable
     unstable

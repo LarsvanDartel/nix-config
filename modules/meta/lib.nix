@@ -1,5 +1,4 @@
-# Custom helpers, injected as the `cosmosLib` module arg (via _module.args) so
-# any flake-parts module can take {cosmosLib, ...}.
+# lib — custom helpers, injected as the `cosmosLib` module arg.
 {lib, ...}: let
   inherit (lib.attrsets) filterAttrs attrNames;
   inherit (lib.lists) init length;

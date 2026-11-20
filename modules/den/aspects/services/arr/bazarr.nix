@@ -1,11 +1,10 @@
 # services.arr.bazarr — subtitles for whatever radarr and sonarr fetched.
-# Hand-rolled unit: the nixpkgs module cannot place the config directory,
-# and bazarr keeps its database there.
 {den, ...}: let
   inherit (import ./_lib.nix) vpnVhost gatedService;
   # Option default and netbird-service target (see services/netbird.nix).
   defaultPort = 6767;
 in {
+  # Hand-rolled unit: the nixpkgs module cannot place the config directory, where bazarr keeps its database.
   den.aspects.services.arr.bazarr = {
     includes = [den.aspects.services.arr];
     inherit (gatedService "bazarr" defaultPort) netbird-service kanidm-provision;

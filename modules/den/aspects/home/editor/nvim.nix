@@ -1,8 +1,4 @@
-# home.nvim — neovim from launchpad (lvdar's nvim + devshell flake) with the
-# fleet's theme, wayland clipboard and minuet layered on. Language support is
-# not installed here: a project's devshell brings launchpad's matching
-# `nvim-<lang>` variant, which shadows this one on PATH; the palette file below
-# themes it too.
+# home.nvim — neovim from launchpad with the fleet theme, wayland clipboard and minuet.
 {
   inputs,
   cosmosStyling,
@@ -63,12 +59,12 @@ in {
   in {
     options.cosmos.cli.programs.nvim = {
       wayland = mkEnableOption "wayland clipboard support in nvim";
-      # Needs endeavour's ollama on the mesh.
       minuet.enable = mkEnableOption "LLM completion via minuet against endeavour's ollama";
     };
 
     config = {
       home = {
+        # No language support here: a devshell's launchpad `nvim-<lang>` shadows this on PATH.
         packages = [nvim];
         sessionVariables = {
           EDITOR = "nvim";
@@ -76,9 +72,6 @@ in {
         };
       };
 
-      # launchpad reads ~/.config/launchpad/palette.lua at startup in every
-      # variant; `theme` repoints it and repaints running instances over their
-      # default server sockets.
       cosmos.desktops.common.styling.modes = {
         files."nvim-palette.lua" = palette;
         onSwitch = ''

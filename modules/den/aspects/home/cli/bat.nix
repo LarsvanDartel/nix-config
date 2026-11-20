@@ -1,4 +1,4 @@
-# home.bat (+ its shell glue: batpipe/batman init, delta integration).
+# home.bat — bat with bat-extras and its shell glue
 {...}: {
   den.aspects.home.bat.homeManager = {
     config,

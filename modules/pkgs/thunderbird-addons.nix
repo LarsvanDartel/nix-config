@@ -1,6 +1,4 @@
-# thunderbird-addons — extensions from addons.thunderbird.net and GitHub,
-# repackaged for programs.thunderbird.profiles.<p>.extensions. Pinned to
-# exact attachment URLs, never "latest".
+# thunderbird-addons — Thunderbird extensions from ATN and GitHub, pinned to exact attachment URLs, never "latest".
 {...}: {
   nixpkgs.overlays = [
     (final: _prev: let
@@ -27,9 +25,8 @@
         };
     in {
       thunderbird-addons = {
-        # From GitHub, not ATN: ATN's 0.9.1 settings form can never save
-        # (loses user activation before permissions.request()). Unsigned as a
-        # result — see xpinstall.signatures.required in thunderbird.nix.
+        # From GitHub, not ATN: ATN's 0.9.1 settings form can never save. Unsigned as a result;
+        # see xpinstall.signatures.required in thunderbird.nix.
         paperless-ngx-uploader = mkThunderbirdXpi {
           pname = "thunderbird-paperless-ngx-uploader";
           version = "1.1.0";

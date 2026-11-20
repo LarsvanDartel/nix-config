@@ -1,25 +1,11 @@
-# services.minecraft.control — a web page for running the Minecraft servers,
-#
-# Only start/stop need root, via path units that never see input; everything
-# else uses group `minecraft` (console FIFO, log). Keep it that way.
-#
-# Not cockpit (a root terminal with extra steps). The console lets anyone
-# reaching this page `op`/`ban`/`stop` — the gating kanidm group is server
-# administration by design.
-#
-# Not sudo: roles/server.nix sets execWheelOnly, so non-wheel users are
-# refused at exec; polkit is disabled on headless hosts.
-#
-# Authentication lives in gaia's gated netbird-proxy + kanidm. The gate's
-# groups come from the host, which owns the per-server access lists.
+# services.minecraft.control — web page to run the Minecraft servers, gated by kanidm through netbird-proxy.
 {den, ...}: let
-  # Option default and netbird-service target (see services/netbird.nix).
   defaultPort = 8086;
 in {
   den.aspects.services.minecraft.control = {
     includes = [den.aspects.services.minecraft den.aspects.services.nginx];
 
-    # GATED: hands out a console.
+    # Gated: the console grants `op`/`ban`/`stop`, so the kanidm group is server administration by design.
     netbird-service = {host, ...}: {
       minecraft-control = {
         domain = "minecraft.lvdar.nl";
@@ -60,16 +46,14 @@ in {
       flagDir = "/run/minecraft-control";
       flag = server: verb: "${flagDir}/${verb}-${server}";
 
-      # Desired state, not on tmpfs: present = "meant to be down". Without it
-      # switch-to-configuration restarted stopped servers on every deploy
-      # (`systemctl disable` doesn't help; .wants are regenerated).
+      # Desired state, not on tmpfs: present = "meant to be down". Otherwise switch-to-configuration
+      # restarts stopped servers on every deploy; `systemctl disable` does not help.
       stateDir = "/var/lib/minecraft-control";
       stopped = server: "${stateDir}/${server}.stopped";
 
       script = name: text: pkgs.writeShellApplication {inherit name text;};
 
-      # Status ping only. Not `mcstatus <addr> json`: it also runs a query,
-      # which is disabled, so every call waited out a UDP timeout (3.24s).
+      # Status ping only: `mcstatus <addr> json` also runs the disabled query and waits out a UDP timeout.
       players =
         pkgs.writers.writePython3Bin "mc-players" {
           libraries = [pkgs.python3Packages.mcstatus];
@@ -93,7 +77,8 @@ in {
               print("null")
         '';
 
-      # No request data reaches these; the URL selects a fixed filename.
+      # Root acts only on start/stop, via fixed flag files: no request data reaches these. Everything
+      # else runs as group `minecraft` (console FIFO, log); keep it that way.
       lifecycle = server: verb:
         script "mc-${verb}-${server}" ''
           ${pkgs.coreutils}/bin/touch ${flag server verb}
@@ -110,9 +95,7 @@ in {
             case "$v" in ''' | "[not set]" | infinity) echo null ;; *) echo "$v" ;; esac
           }
 
-          # Prints "null" rather than failing for a server that is not answering
-          # yet, so there is no case where this turns a loading world into an
-          # HTTP error.
+          # Prints "null" rather than failing, so a loading world never becomes an HTTP error.
           players=null
           if [ "$state" = active ]; then
             players="$(${lib.getExe players} ${toString minecraft.servers.${server}.port})"
@@ -140,9 +123,7 @@ in {
       # input is only ever passed to printf as quoted data.
       command = server:
         script "mc-cmd-${server}" ''
-          # First line only. A body with embedded newlines would otherwise be
-          # several console commands from one request, which is surprising in a
-          # way nothing here needs.
+          # First line only: embedded newlines would be several console commands from one request.
           cmd="$(printf '%s' "''${1-}" | ${pkgs.coreutils}/bin/head -n1 | ${pkgs.coreutils}/bin/tr -d '\r')"
 
           if [ -z "$cmd" ]; then
@@ -155,9 +136,8 @@ in {
             exit 0
           fi
 
-          # Opening a FIFO for writing blocks until something is reading it, so
-          # a server that died between the check above and here would hang this
-          # request until webhook's own timeout. tee lets timeout own that.
+          # Opening a FIFO for writing blocks until a reader exists; a server that died since the check
+          # would hang the request until webhook's own timeout. tee lets timeout own that.
           if printf '%s\n' "$cmd" \
             | ${pkgs.coreutils}/bin/timeout 5 ${pkgs.coreutils}/bin/tee ${fifo server} >/dev/null; then
             echo "sent"
@@ -192,6 +172,7 @@ in {
         })
       scripts;
 
+      # Path units, not sudo (execWheelOnly refuses non-wheel users at exec) or polkit (off on headless hosts).
       privilegedActions =
         lib.concatMap (server: map (verb: {inherit server verb;}) ["start" "stop"])
         cfg.servers;
@@ -199,9 +180,8 @@ in {
       # Dashes are not legal in nginx variable names.
       mayVar = server: "mc_may_${lib.replaceStrings ["-"] ["_"] server}";
 
-      # netbird drops labels containing commas (reverseproxy.go:934), so the
-      # comma-or-end anchor is an exact membership test. `default 0` is the
-      # safety property: anything unmatched is refused.
+      # netbird drops group labels containing commas, so the comma-or-end anchor is an exact
+      # membership test. `default 0` is the safety property: anything unmatched is refused.
       groupMaps =
         lib.concatMapStringsSep "\n" (server: ''
           map $http_x_netbird_groups ${"$" + mayVar server} {
@@ -403,9 +383,8 @@ in {
             }
           ];
 
-          # NOT gated by the wt0 firewall: the NetBird policy is All -> All, so
-          # any peer could bypass gaia's kanidm gate and spoof identity headers.
-          # That is also why this vhost must never get proxyRealIp.
+          # NOT gated by the wt0 firewall: the NetBird policy is All -> All, so any peer could bypass
+          # gaia's kanidm gate and spoof identity headers. Hence this vhost must never get proxyRealIp.
           extraConfig = ''
             allow ${config.cosmos.services.netbird.client.proxyAddress};
             deny all;

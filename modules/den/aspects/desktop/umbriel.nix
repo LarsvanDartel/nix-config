@@ -1,4 +1,4 @@
-# desktop.umbriel — the Umbriel compositor as a second greeter session beside niri, body in ./_umbriel/system.nix; its home half (home.umbriel + noctalia) goes to every user via to-users.
+# desktop.umbriel — the Umbriel compositor as a second greeter session; its home half goes to every user.
 {den, ...}: {
   den.aspects.desktop.umbriel = {
     includes = with den.aspects.desktop; [greetd keyd];

@@ -1,4 +1,4 @@
-# home.obs-studio (+ plugins/virtualAudio options)
+# home.obs-studio — OBS Studio with plugins and a virtual audio sink for the virtual camera
 {...}: {
   den.aspects.home.obs-studio.homeManager = {
     config,
@@ -12,7 +12,6 @@
 
     cfg = config.cosmos.programs.obs-studio;
 
-    # A null sink whose monitor records whatever is played into it.
     createSink = pkgs.writeShellScript "obs-virtual-audio" ''
       exec ${pkgs.pipewire}/bin/pw-cli -m create-node adapter '{
         factory.name = support.null-audio-sink
@@ -62,11 +61,8 @@
       };
       cosmos.system.impermanence.persist.directories = [".config/obs-studio"];
 
-      # A pipewire client, not a pipewire.conf.d module: loopback with
-      # Audio/Source/Virtual segfaulted pipewire 1.6.8 into a restart loop (no
-      # sound at all). Hence a sink monitor rather than a virtual source.
-      # OBS-side (not settable here): Monitoring Device = this sink, and per
-      # source Audio Monitoring → "Monitor and Output".
+      # A sink monitor, not a loopback Audio/Source/Virtual: that crash-loops pipewire.
+      # Set in OBS by hand: Monitoring Device = this sink; per source "Monitor and Output".
       systemd.user.services.obs-virtual-audio = mkIf cfg.virtualAudio.enable {
         Unit = {
           Description = "Virtual audio sink to accompany OBS's virtual camera";

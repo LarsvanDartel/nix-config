@@ -1,5 +1,4 @@
-# roles.gaming — steam/gamemode/piper on top of the desktop, plus home.steam for
-# every user. Gaming hosts include it.
+# roles.gaming — steam, gamemode and piper, plus home.steam for every user.
 {den, ...}: {
   den.aspects.roles.gaming.provides.to-users.includes = [den.aspects.home.steam];
 

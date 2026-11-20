@@ -1,5 +1,4 @@
-# den defaults: baseline batteries + HM-by-default. Validates that the `den`
-# module arg and batteries are available from den.flakeModule.
+# defaults — den baseline: batteries, roles and home-manager by default.
 {
   den,
   lib,

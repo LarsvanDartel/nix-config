@@ -1,3 +1,4 @@
+# disko — gaia's disk layout: BIOS+ESP and a btrfs root for impermanence.
 {
   disko.devices = {
     disk.main = {

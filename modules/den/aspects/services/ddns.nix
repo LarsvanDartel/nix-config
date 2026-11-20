@@ -1,10 +1,7 @@
-# services.ddns — publish this host's public address as a name.
-#
-# For gaia's crowdsec whitelist (services/crowdsec.nix), which resolves this
-# name; a checked-in literal of the dynamic home address would drift into
-# whitelisting a stranger. Runs on endeavour, the host behind that address.
-# A crowdsec ban black-holes WireGuard too — losing the mesh from home.
+# services.ddns — publishes this host's public IPv4 as a DNS name.
 {...}: {
+  # Feeds gaia's crowdsec FQDN whitelist: a checked-in home address would drift into whitelisting
+  # a stranger, and a ban on home black-holes WireGuard too.
   den.aspects.services.ddns.nixos = {
     config,
     lib,
@@ -56,13 +53,8 @@
     config = mkIf cfg.enable {
       sops.secrets.${cfg.secret} = {};
 
-      # Upstream orders this After=network.target only; it ran before DNS
-      # answered and (Restart=no oneshot) wasn't retried until the timer.
-      # Every switch starts it (WantedBy=multi-user.target), so a switch that
-      # restarts unbound, this host's resolver, catches it without DNS and
-      # fails the deploy (2026-11-03). Retries ride that out. RestartMode=direct
-      # keeps OnFailure (notify-failure) off each retry, so only the start
-      # limit — a real outage — alerts.
+      # Every switch starts this, and one that restarts unbound leaves it without DNS: retry rather than
+      # fail the deploy. RestartMode=direct keeps OnFailure off each retry; only the start limit alerts.
       systemd.services.cloudflare-dyndns = {
         wants = ["network-online.target"];
         after = ["network-online.target" "nss-lookup.target"];

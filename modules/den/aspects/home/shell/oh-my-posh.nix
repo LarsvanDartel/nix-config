@@ -1,6 +1,4 @@
-# home.oh-my-posh — the oh-my-posh prompt as a nix-wrapper-modules package
-# (`nix run .#oh-my-posh`); the wrapper bakes in the prompt config,
-# home-manager only installs it and hooks it into zsh.
+# home.oh-my-posh — the oh-my-posh prompt as a wrapped package, hooked into zsh.
 {inputs, ...}: let
   mkOhMyPosh = pkgs:
     inputs.nix-wrapper-modules.wrappers.oh-my-posh.wrap {

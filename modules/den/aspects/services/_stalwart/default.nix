@@ -1,6 +1,4 @@
-# services.stalwart — vendored 0.16+ module from nixpkgs PR #552103 (head
-# cf92dec); delete with ./provision.nix once nixpkgs ships it (guard in
-# ../stalwart.nix). Changed: meta dropped (doc/maintainers absent upstream).
+# _stalwart — the 0.16+ stalwart module from nixpkgs PR #552103 (head cf92dec), vendored; changed: meta dropped.
 {
   config,
   lib,
@@ -25,8 +23,6 @@
   stalwartIdentifierText = ''if lib.versionOlder config.services.stalwart.stateVersion "26.05" then "stalwart-mail" else "stalwart"'';
 in {
   imports = [
-    # since 0.12.0 (2025-05-26) release, upstream re-branded project to 'stalwart' due to inclusion of collaboration features (CalDAV, CardDAV, and WebDAV)
-    #  https://github.com/stalwartlabs/stalwart/releases/tag/v0.12.0
     (lib.mkRenamedOptionModule ["services" "stalwart-mail"] ["services" "stalwart"])
   ];
   options.services.stalwart = {
@@ -55,8 +51,7 @@ in {
     };
 
     settings = lib.mkOption {
-      # previously this was `inherit (configFormat) type;`, however now the config format is dependent on the package version,
-      # choosing toml <0.16 and json >=0.16. thankfully, the `type` of the `json` format is identical to `toml` except the base value type is nullable
+      # The file is TOML before 0.16 and JSON from 0.16; the JSON type matches TOML's but allows null.
       type = (pkgs.formats.json {}).type;
       default = {};
       description = ''
@@ -222,7 +217,6 @@ in {
       }
     ];
 
-    # Default config: all local
     services.stalwart.settings =
       if since0_16
       then {
@@ -250,14 +244,12 @@ in {
         store =
           if useLegacyStorage
           then {
-            # structured data in SQLite, blobs on filesystem
             db.type = lib.mkDefault "sqlite";
             db.path = lib.mkDefault "${cfg.dataDir}/data/index.sqlite3";
             fs.type = lib.mkDefault "fs";
             fs.path = lib.mkDefault "${cfg.dataDir}/data/blobs";
           }
           else {
-            # everything in RocksDB
             db.type = lib.mkDefault "rocksdb";
             db.path = lib.mkDefault "${cfg.dataDir}/db";
             db.compression = lib.mkDefault "lz4";
@@ -288,10 +280,7 @@ in {
         };
       };
 
-    # This service stores a potentially large amount of data.
-    # Running it as a dynamic user would force chown to be run everytime the
-    # service is restarted on a potentially large number of files.
-    # That would cause unnecessary and unwanted delays.
+    # Not a DynamicUser: that would chown the potentially large data dir on every restart.
     users = {
       groups = lib.mkIf (cfg.group == stalwartIdentifier) {
         ${cfg.group} = {};
@@ -317,9 +306,7 @@ in {
           "network.target"
         ];
 
-        # Upstream service config
         serviceConfig = {
-          # 0.16.26 added sd-notify support, and we can make the service expect notifications
           Type =
             if lib.versionAtLeast cfg.package.version "0.16.26"
             then "notify"
@@ -357,7 +344,7 @@ in {
             ];
           EnvironmentFile = lib.optional (cfg.environmentFile != null) cfg.environmentFile;
           LoadCredential = let
-            # default credentials for the admin user, might be overridden by an explicitly configured cred in cfg.credentials
+            # An explicit cfg.credentials entry overrides this default.
             adminCreds = lib.optionalAttrs cfg.admin.enable {"${cfg.admin.username}" = cfg.admin.username;};
           in
             lib.mapAttrsToList (key: value: "${key}:${value}") (adminCreds // cfg.credentials);
@@ -368,15 +355,12 @@ in {
           CacheDirectory = stalwartIdentifier;
           StateDirectory = stalwartIdentifier;
 
-          # Upstream uses "stalwart" as the username since 0.12.0
           User = cfg.user;
           Group = cfg.group;
 
-          # Bind standard privileged ports
           AmbientCapabilities = ["CAP_NET_BIND_SERVICE"];
           CapabilityBoundingSet = ["CAP_NET_BIND_SERVICE"];
 
-          # Hardening
           DeviceAllow = [""];
           LockPersonality = true;
           MemoryDenyWriteExecute = true;
@@ -414,7 +398,6 @@ in {
       };
     };
 
-    # Make admin commands available in the shell
     environment.systemPackages = [cfg.package] ++ (lib.optional since0_16 pkgs.stalwart-cli);
 
     networking.firewall = lib.mkIf cfg.openFirewall {

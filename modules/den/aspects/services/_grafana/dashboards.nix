@@ -1,8 +1,4 @@
-# Provisioned dashboards, as data: attrset of file name -> dashboard JSON value.
-# Hand-written, not imported from grafana.com: id-pulled dashboards are
-# unreviewable blobs that break silently when metric names change.
-#
-# Panels state only their size; `layout` places them on the 24-column grid.
+# dashboards — provisioned Grafana dashboards, hand-written (never grafana.com id pulls): file name -> JSON value.
 {lib}: let
   inherit (lib) foldl' imap0 length max optionalAttrs;
 
@@ -15,7 +11,7 @@
     uid = "loki";
   };
 
-  # Left to right, wrapping when a row is full; rows (w = 24) always wrap.
+  # Panels state only their size: left to right on the 24-column grid; rows (w = 24) always wrap.
   layout = panels:
     (foldl' (acc: p: let
         w = p.w or 12;

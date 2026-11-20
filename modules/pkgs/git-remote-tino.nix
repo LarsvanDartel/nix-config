@@ -1,7 +1,4 @@
-# git-remote-tino — git remote helper bridging git to a TINO bucket's REST
-# API (TINO speaks no git protocol), for machines with no mesh path to the
-# host. Usage/design doc is the script's header (_tino/git-remote-tino.py).
-# gitMinimal goes on PATH: push shells out to git in the caller's repo.
+# git-remote-tino — packages the TINO git remote helper (docs/src/notes/git-remote-tino.md#usage); push shells out to git, hence gitMinimal.
 {...}: {
   nixpkgs.overlays = [
     (final: _prev: {

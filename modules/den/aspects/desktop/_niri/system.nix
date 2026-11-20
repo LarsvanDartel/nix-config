@@ -1,5 +1,4 @@
-# The niri system config, as a plain NixOS module factory imported by its
-# aspect `den.aspects.desktop.niri`.
+# desktop.niri — NixOS body of the niri aspect: the wrapped compositor and its config.
 {
   inputs,
   cosmosStyling,
@@ -9,7 +8,7 @@
   pkgs,
   ...
 }: let
-  # The default mode's; the session's mode comes from the include at the end.
+  # Default-mode colours; the include at the end overrides them with the session's mode.
   colors = config.lib.stylix.colors.withHashtag;
 
   # Resolved from PATH so the compositor isn't coupled to user-scoped noctalia.
@@ -26,10 +25,8 @@
     content = action;
   };
 
-  # By index (an integer, not a name): the Nth workspace of the focused monitor,
-  # so each monitor numbers its own, as Umbriel does. Past the last one, niri
-  # lands on the empty workspace at the end. The keys are what keyd sends for
-  # Mod + the physical digit row (desktop.keyd).
+  # By index: the Nth workspace of the focused monitor, so each monitor numbers its own.
+  # The keys are what keyd sends for Mod + the physical digit row (desktop.keyd).
   workspaceBinds = lib.listToAttrs (
     lib.flatten (
       lib.imap1 (i: key: [
@@ -77,10 +74,8 @@
         tablet.map-to-output = "eDP-1";
       };
 
-      # niri would pick 1.5 on the Framework 12. The pixel font is only crisp at
-      # whole multiples of its grid, so fontconfig snaps text down to 13px while
-      # everything else grows: keep every output at 1. The desk monitor matches
-      # Umbriel's (home/desktop/_umbriel/home.nix): left, bottoms aligned.
+      # Keep every output at scale 1: the pixel font is only crisp at whole multiples of its grid.
+      # The desk monitor's position matches Umbriel's (home/desktop/_umbriel/home.nix).
       outputs = {
         "eDP-1" = {
           scale = 1;
@@ -102,8 +97,7 @@
         };
       };
 
-      # wvkbd runs hidden (desktop.tablet); SIGUSR2 shows, SIGUSR1 hides. The
-      # noctalia dock (configured in desktop.tablet) follows it.
+      # wvkbd runs hidden (desktop.tablet): SIGUSR2 shows, SIGUSR1 hides; the dock follows it.
       # switch-events only take argv `spawn`.
       switch-events = {
         tablet-mode-on.spawn = ["sh" "-c" "pkill -USR2 -x wvkbd-mobintl; ${noctalia "dock-show"}"];
@@ -144,8 +138,7 @@
         };
       };
 
-      # foot can't request blur (see window rule); other surfaces ask via
-      # ext-background-effect.
+      # foot can't request blur (see window rule); other surfaces ask via ext-background-effect.
       blur = {
         passes = 4;
         noise = 0.01;
@@ -166,8 +159,6 @@
           "Mod+Shift+C".close-window = _: {};
           "Mod+T".toggle-window-floating = _: {};
 
-          # Mod+M maximizes the window (told it is maximized); Mod+Shift+M the
-          # column.
           "Mod+F".fullscreen-window = _: {};
           "Mod+M".maximize-window-to-edges = _: {};
           "Mod+Shift+M".maximize-column = _: {};
@@ -184,7 +175,6 @@
           "Mod+Shift+K".move-window-up = _: {};
           "Mod+Shift+J".move-window-down = _: {};
 
-          # Monitors: Mod+Alt is "the screen in that direction".
           "Mod+Alt+H".focus-monitor-left = _: {};
           "Mod+Alt+J".focus-monitor-down = _: {};
           "Mod+Alt+K".focus-monitor-up = _: {};
@@ -199,12 +189,10 @@
           "Mod+Ctrl+K".set-window-height = "-10%";
           "Mod+Ctrl+J".set-window-height = "+10%";
 
-          # Only way to build a multi-window column. Not upstream's brackets:
-          # on dvp they sit on the workspace row.
+          # Not upstream's brackets: on dvp they sit on the workspace row.
           "Mod+Comma".consume-or-expel-window-left = _: {};
           "Mod+Period".consume-or-expel-window-right = _: {};
 
-          # default-column-display is "tabbed"; this is how a column gets split.
           "Mod+W".toggle-column-tabbed-display = _: {};
 
           "Mod+Escape".spawn-sh = noctalia "panel-toggle session";
@@ -217,7 +205,7 @@
           "Mod+Tab".spawn-sh = noctalia "panel-toggle launcher";
           "Alt+Tab".toggle-overview = _: {};
           "Mod+V".spawn-sh = noctalia "panel-toggle clipboard";
-          # Launcher pre-filled with rbw-launcher's prefix; the space leaves the cursor at the search term.
+          # The trailing space leaves the cursor after rbw-launcher's prefix.
           "Mod+B".spawn-sh = noctalia "panel-toggle launcher '/rbw '";
           "Mod+S".screenshot = _: {};
           "Mod+Shift+S".screenshot-window = _: {};
@@ -236,7 +224,6 @@
           "Mod+O".toggle-overview = _: {};
           "Mod+Shift+Slash".show-hotkey-overlay = _: {};
 
-          # Plugin panels are addressed `<author>/<plugin>:<entry>`.
           "Mod+Slash".spawn-sh = noctalia "panel-toggle kenn/keybind-cheatsheet:cheatsheet";
           "Mod+P".spawn-sh = noctalia "panel-toggle raycursive/niri-displays:panel";
           "Mod+Shift+P".spawn-sh = noctalia "plugin alexander/screen-toolkit:service all colorPicker";
@@ -265,7 +252,7 @@
           clip-to-geometry = true;
           shadow.on = _: {};
         }
-        # foot cannot request blur itself. `xray false` is still experimental.
+        # foot cannot request blur itself; `xray false` is still experimental.
         {
           matches = [{app-id = "^foot$";}];
           background-effect.blur = true;
@@ -283,7 +270,6 @@
           ];
           block-out-from = "screencast";
         }
-        # Red ring on whatever window is being cast.
         {
           matches = [{is-window-cast-target = true;}];
           focus-ring = {
@@ -295,7 +281,6 @@
             inactive-color = "${colors.base08}80";
           };
         }
-        # noctalia's settings window.
         {
           matches = [{app-id = "^dev\\.noctalia\\.Noctalia$";}];
           open-floating = true;
@@ -312,8 +297,7 @@
       ];
     };
 
-    # Last, so it overrides the colours above: home.niri's file for the
-    # session's light/dark mode (home.theme), watched and live-reloaded.
+    # Last, so it overrides the colours above: home.niri's live-reloaded file for the session's mode.
     extraSettings = [
       {include = [{optional = true;} "~/${cosmosStyling.stateDir}/current/niri.kdl"];}
     ];

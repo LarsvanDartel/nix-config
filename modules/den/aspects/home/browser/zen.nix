@@ -22,10 +22,8 @@
 
     cosmos.system.impermanence.persist.directories = [".config/zen"];
 
-    # Zen looks up native messaging hosts in ~/.mozilla. Linked by hand, not via
-    # `mozilla.firefoxNativeMessagingHosts`: its ignorelinks symlinks make
-    # activation abort with "would be clobbered" on every host rebuild.
-    # force: leftover unmanaged files there would otherwise abort activation.
+    # Linked by hand into ~/.mozilla, where Zen looks: firefoxNativeMessagingHosts' ignorelinks
+    # abort activation ("would be clobbered"). force clears leftover unmanaged files.
     home.file.".mozilla/native-messaging-hosts/webbluetooth_host.json" = {
       source = "${pkgs.web-bluetooth-firefox-host}/lib/mozilla/native-messaging-hosts/webbluetooth_host.json";
       force = true;
@@ -37,8 +35,7 @@
     programs.zen-browser = {
       enable = true;
 
-      # Web Bluetooth (Firefox lacks it) host; pairs with the extension below.
-      # Not sufficient alone — Zen looks it up in ~/.mozilla (see link above).
+      # Web Bluetooth host for the extension below; Zen only finds it via the ~/.mozilla link above.
       nativeMessagingHosts = [pkgs.web-bluetooth-firefox-host];
 
       # Everything it writes is mkDefault — thunderbird reclaims mailto.
@@ -60,8 +57,7 @@
         DisplayMenuBar = "never";
         DNSOverHTTPS.Enabled = false;
         DontCheckDefaultBrowser = true;
-        # Any policies.json enables the Enterprise Policy Engine, which blocks
-        # Web Serial from 151 on (needed to flash ESP boards). 3 = allow.
+        # Any policies.json engages the policy engine, which blocks Web Serial (ESP flashing); 3 = allow.
         DefaultSerialGuardSetting = 3;
         PasswordManagerEnabled = false;
         TranslateEnabled = true;

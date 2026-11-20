@@ -1,19 +1,9 @@
-# services.attic — a binary cache the whole fleet pulls from.
-#
-# Mesh-only: Nix clients cannot complete gaia's browser OIDC redirect.
-#
-#   * `services.atticd`'s DynamicUser+StateDirectory hits the /var/lib/private
-#     EBUSY trap (as ntfy/gatus did); forced to a static user.
-#   * Cache contents on /tank are deliberately NOT in impermanence.persist —
-#     an entry would bind-mount /persist over it onto the system SSD. The
-#     index lives in the host's PostgreSQL (persisted and dumped by restic).
+# services.attic — the binary cache the whole fleet pulls from.
 {
   den,
   inputs,
   ...
 }: {
-  # Inert until `publicKey` is set: the keypair is minted at runtime when the
-  # cache is created (`atticd-atticadm`), then pasted into the default below.
   den.aspects.services.attic.client = {
     includes = [den.aspects.core.sops];
 
@@ -107,9 +97,7 @@
       config = lib.mkMerge [
         (lib.mkIf (cfg.publicKey != null) {
           nix.settings = {
-            # Precedence comes from the server-side cache priority
-            # (`attic cache configure lvdar --priority 39`, below upstream's
-            # 40): attic is a LAN hop, cache.nixos.org an internet one.
+            # Precedence is the server-side cache priority: `attic cache configure lvdar --priority 39`, below upstream's 40.
             substituters = [cfg.endpoint];
             trusted-public-keys = [cfg.publicKey];
 
@@ -126,7 +114,6 @@
               mode = "0400";
             };
 
-            # The CLI reads endpoint and token only from config.toml.
             templates."attic-client.toml".content = ''
               default-server = "${cfg.cacheName}"
 
@@ -152,9 +139,8 @@
             wants = ["network-online.target"];
             requires = ["nix-daemon.socket"];
 
-            # Through the daemon, not the local store: attic links its own Nix
-            # (nixpkgs pins one), and opening the DB directly holds big-lock for
-            # the unit's lifetime, deadlocking a newer Nix's schema migration.
+            # Through the daemon: attic links its own Nix, and opening the DB directly holds big-lock
+            # for the unit's lifetime, deadlocking a newer Nix's schema migration.
             environment = {
               XDG_CONFIG_HOME = configHome;
               NIX_REMOTE = "daemon";
@@ -176,6 +162,7 @@
     };
   };
 
+  # Mesh-only: Nix clients cannot complete gaia's browser OIDC redirect.
   den.aspects.services.attic = {
     includes = [den.aspects.services.netbird.client];
 
@@ -257,6 +244,7 @@
           groups.${user} = {};
         };
 
+        # dataDir is deliberately not persisted: a persist entry would bind-mount /persist over it onto the SSD.
         systemd.tmpfiles.rules = [
           "d ${cfg.dataDir} 0750 ${user} ${user} - -"
         ];
@@ -283,10 +271,7 @@
             # Client-facing URLs are built from this; must be the mesh name.
             api-endpoint = "http://${config.networking.hostName}.${dnsDomain}:${toString cfg.port}/";
 
-            # Not sqlite: its single writer timed out the connection pool
-            # under concurrent uploads during big builds (500s, after which
-            # `attic watch-store` panics and drops paths). Peer auth over the
-            # socket, as the atticd system user.
+            # Not sqlite: its single writer times out the pool under concurrent uploads and watch-store then drops paths.
             database.url = "postgresql://${user}@localhost/${user}?host=/run/postgresql";
 
             storage = {
@@ -294,11 +279,8 @@
               path = cfg.dataDir;
             };
 
-            # Sizes are 16x upstream's: every chunk costs a DB transaction and
-            # a sync write, and /tank (raidz1 HDDs, no SLOG) managed ~2.3
-            # chunks/s — a 2 GB closure took four hours. Most paths now skip
-            # chunking via nar-size-threshold; cross-host closure reuse is
-            # where the dedup wins are anyway.
+            # 16x upstream's sizes: every chunk costs a DB transaction and a sync write,
+            # and /tank (raidz1 HDDs, no SLOG) manages only ~2.3 chunks/s.
             chunking = {
               nar-size-threshold = 33554432; # 32 MiB
               min-size = 262144; # 256 KiB
@@ -334,14 +316,14 @@
         # Nested inside serviceConfig on purpose: a top-level mkForce recurses
         # infinitely in den alongside facter (see hosts/pioneer.nix).
         systemd.services.atticd.serviceConfig = {
+          # DynamicUser+StateDirectory hits the /var/lib/private EBUSY trap under impermanence.
           DynamicUser = lib.mkForce false;
 
           # PrivateUsers hides the static UID from the files it owns on /tank.
           PrivateUsers = lib.mkForce false;
 
-          # dataDir must be its own dataset (hosts/_hw/endeavour/disko.nix);
-          # unmounted, atticd would silently write to the pool root with the
-          # wrong recordsize/sync settings.
+          # dataDir must be its own dataset (hosts/_hw/endeavour/disko.nix); unmounted,
+          # atticd would silently write to the pool root with the wrong recordsize/sync.
           ExecStartPre = [
             (lib.getExe (pkgs.writeShellApplication {
               name = "atticd-datadir-guard";

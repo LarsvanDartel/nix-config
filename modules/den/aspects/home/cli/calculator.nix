@@ -1,8 +1,6 @@
-# home.calculator — qalculate, the engine rofi-calc is built on.
-#
-# noctalia's `noctalia-calculator` plugin was rejected: no unit, currency or
-# number-base conversion.
+# home.calculator — qalc in a terminal window, the engine rofi-calc is built on
 {...}: {
+  # Not noctalia's calculator plugin: it lacks unit, currency and number-base conversion.
   den.aspects.home.calculator.homeManager = {
     config,
     lib,

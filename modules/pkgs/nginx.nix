@@ -1,7 +1,4 @@
-# nginx pinned ahead of nixpkgs — a version floor: 1.30.7 fixes NGINX2Root
-# (CVE-2026-123007, -123633, -123634, -121810, -113425). HTTP/2 can't be turned
-# off instead: gaia's netbird.lvdar.nl carries management/signal gRPC. Inert,
-# and warns, once nixpkgs reaches the pinned version (never a downgrade).
+# nginx — pinned ahead of nixpkgs as a version floor for NGINX2Root (CVE-2026-123007 et al.); HTTP/2 must stay on for gaia's gRPC.
 {...}: {
   nixpkgs.overlays = [
     (_final: prev: let

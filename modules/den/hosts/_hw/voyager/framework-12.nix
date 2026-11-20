@@ -1,12 +1,10 @@
-# voyager on the Framework Laptop 12 (Intel Core 3 304 / Wildcat Lake) — hardware module; imported by hosts/voyager.nix.
+# framework-12 — voyager's Framework Laptop 12 (Intel Core 3 304 / Wildcat Lake) hardware module; imported by hosts/voyager.nix.
 {inputs}: {
   config,
   lib,
   pkgs,
   ...
 }: let
-  # Re-probing the PixArt touchpad through i2c_hid_acpi clears both of its
-  # failure modes (below).
   touchpadRebind = pkgs.writeShellScript "touchpad-rebind" ''
     dev=i2c-PIXA3854:00
     drv=/sys/bus/i2c/drivers/i2c_hid_acpi
@@ -15,7 +13,7 @@
     echo $dev > $drv/bind
   '';
 in {
-  # Not framework-12-13th-gen-intel: it loads pinctrl_tigerlake. common/ brings laptop+ssd profiles, the Framework kmod, framework-tool, iio and fwupd.
+  # Not framework-12-13th-gen-intel: it loads pinctrl_tigerlake.
   imports = ["${inputs.nixos-hardware}/framework/12-inch/common"];
 
   # Wildcat Lake (platform + BE213 Wi-Fi) needs >= 7.1.
@@ -37,12 +35,8 @@ in {
   # browsers and mpv decode on the CPU (GeForce NOW stutters).
   hardware.graphics.extraPackages = [pkgs.intel-media-driver];
 
-  # The PixArt touchpad (PIXA3854) fails two ways, neither leaving a cursor:
-  # - after hibernation it can come back silent, no interrupts at all;
-  # - on some boots and resumes it never enters precision-touchpad mode and
-  #   reports through its legacy Mouse collection, whose unsigned relative
-  #   motion only runs down/right, so the cursor lands off-screen. In touchpad
-  #   mode that collection sends nothing, so any motion from it means this mode.
+  # The PixArt touchpad loses its cursor after hibernation or when it falls back to legacy mouse mode.
+  # See docs/src/hosts.md#hardware.
   systemd.services =
     lib.warnIf (lib.versions.majorMinor config.boot.kernelPackages.kernel.version != "7.3")
     "hosts/_hw/voyager/framework-12.nix: the kernel is no longer 7.3; mask touchpad-resume-rebind and touchpad-mode-watch, then hibernate and cold-boot voyager several times; if the touchpad always moves the cursor delete both units, else bump this guard"

@@ -1,21 +1,4 @@
-# services.crowdsec — behavioural detection and IP reputation for the edge.
-#
-# Three aspects:
-#   * services.crowdsec.agent  — the log processor, wherever logs are read.
-#   * services.crowdsec        — gaia's local API (LAPI): it decides, and its
-#     bouncers (the firewall, netbird-proxy) enforce.
-#   * services.crowdsec.remote — an agent on another host, reporting to the
-#     LAPI. Its alerts become decisions there, so a visitor caught behind the
-#     proxy is refused at the edge for every published service.
-#
-# Neither side names the other: the LAPI publishes its address on the
-# `crowdsec-lapi` quirk, remote agents publish themselves on
-# `crowdsec-machine`, and the LAPI registers each with a per-machine password
-# from hosts/common.
-#
-# netbird-proxy's own access logs never reach disk, so published services are
-# covered by reputation (the community blocklist — enabled by the capi enroll
-# key, which is not optional) plus whatever a remote agent reads behind it.
+# services.crowdsec — behavioural detection and IP reputation: agents report to gaia's local API, whose bouncers enforce.
 {
   den,
   inputs,
@@ -36,9 +19,8 @@ in {
   den.quirks.crowdsec-lapi.description = "URL of the crowdsec local API, for remote agents";
   den.quirks.crowdsec-machine.description = "Remote crowdsec agents (host names), registered by the local API";
 
-  # collect, not collectAll: LAPI and agents are all x86_64 so far.
-  # den reads these argument names (host scope, host-entity filter), so
-  # deadnix must not strip them as unused.
+  # collect, not collectAll: LAPI and agents are all x86_64. den reads these
+  # argument names (host scope, host-entity filter), so deadnix must not strip them.
   # deadnix: skip
   den.policies.crowdsec-lapi = {host, ...}: [
     (pipe.from "crowdsec-lapi" [
@@ -166,9 +148,7 @@ in {
           };
 
           config = {
-            # The pre-2026-10 module's layout. Upstream's new default
-            # (/var/lib/crowdsec/data) would orphan gaia's decision DB, the hub
-            # and every bouncer registration, netbird-proxy's included.
+            # Upstream's default (/var/lib/crowdsec/data) would orphan gaia's decision DB, the hub and every bouncer registration.
             config_paths.data_dir = "/var/lib/crowdsec/state";
             db_config.use_wal = true;
 
@@ -176,9 +156,8 @@ in {
             # the engine's heartbeat, ~20k lines a day. Errors still log.
             api.server.log_level = "warning";
 
-            # Every address, both families: mesh names resolve to IPv6 first,
-            # and the mesh address is unknown at eval time. The firewall
-            # admits it on the mesh interface alone.
+            # Every address, both families: mesh names resolve to IPv6 first and the mesh address
+            # is unknown at eval time. The firewall admits it on the mesh interface alone.
             prometheus = {
               enabled = true;
               level = "full";
@@ -191,16 +170,14 @@ in {
 
       cosmos.services.netbird.client.exposedPorts = [metricsPort];
 
-      # Upstream hands crowdsec its configuration as tmpfiles symlinks, so a
-      # changed setting leaves the unit untouched and the running engine on the
-      # old config: metrics stayed on loopback after the 2026-10-21 deploy.
+      # Upstream hands crowdsec its configuration as tmpfiles symlinks, so without this
+      # a changed setting leaves the running engine on the old config.
       systemd.services.crowdsec.restartTriggers = [
         (builtins.hashString "sha256" (builtins.unsafeDiscardStringContext (builtins.toJSON config.services.crowdsec.settings)))
       ];
 
-      # `cscli hub update` needs DNS. netbird-proxy fails closed on a dead
-      # LAPI, so every published service 403'd for six hours (2026-08-29)
-      # after the hub update lost a race with unbound.
+      # `cscli hub update` needs DNS, and netbird-proxy fails closed on a dead LAPI:
+      # losing this race with unbound 403s every published service.
       systemd.services.crowdsec-setup = {
         after = ["nss-lookup.target"];
         wants = ["nss-lookup.target"];
@@ -326,6 +303,8 @@ in {
               server.online_client.credentials_path = "/var/lib/crowdsec/online_api_credentials.yaml";
             };
 
+            # The enroll key is not optional: netbird-proxy's access logs never reach disk, so published
+            # services rely on the community blocklist it enables plus remote agents.
             console = {
               enrollKeyFile = config.sops.secrets."keys/crowdsec/enroll_key".path;
               configuration = {
@@ -352,9 +331,8 @@ in {
         # ProtectSystem=strict the credentials above could not be (re)written.
         systemd.services.crowdsec-setup.serviceConfig.ReadWritePaths = ["/var/lib/crowdsec"];
 
-        # --force upserts, so a rotated password takes effect. `-f /dev/null`
-        # is load-bearing: without it, --force writes the new machine's
-        # credentials over this host's own local_api_credentials.yaml.
+        # --force upserts, so a rotated password takes effect. `-f /dev/null` is load-bearing:
+        # without it, --force writes the new machine's credentials over this host's own.
         systemd.services.crowdsec-machines = mkIf remote {
           description = "Register remote crowdsec agents with the local API";
           after = ["crowdsec.service"];

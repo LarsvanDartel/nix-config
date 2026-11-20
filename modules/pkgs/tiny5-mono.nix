@@ -1,9 +1,4 @@
-# tiny5-mono — Tiny5 Mono, a 5-pixel monospace font (github:Gissio/font_Tiny5Mono),
-# as square-pixel Regular and Italic cut from the variable fonts. Upstream's static
-# TTFs keep its tall pixels (89 x 128 units), whose columns fall between screen pixels
-# at any size; at wdth 143.82 and wght 400 every outline sits on a 128-unit grid, so
-# the font is pixel-exact at multiples of 8px. Any other weight grows each pixel by a
-# fraction, so there is no bold. Upstream has no tags or releases: pinned by commit.
+# tiny5-mono — Tiny5 Mono pixel font, square-pixel Regular and Italic cut from the variable fonts (pixel-exact at multiples of 8px).
 {...}: {
   nixpkgs.overlays = [
     (final: _prev: {

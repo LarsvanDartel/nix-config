@@ -1,6 +1,4 @@
-# update-blocklists — refresh the vendored oisd snapshots
-# (`nix run .#update-blocklists`). Commits nothing deliberately: a change to
-# what the fleet's resolver blocks needs human review.
+# update-blocklists — refreshes the vendored oisd snapshots; commits nothing, since a blocklist change needs human review.
 {...}: {
   nixpkgs.overlays = [
     (final: _prev: {
@@ -18,10 +16,8 @@
             echo "fetching $url"
             curl -fsSL --retry 3 -o "$tmp" "$url"
 
-            # A truncated download or an error page would otherwise be
-            # committed as a blocklist that silently blocks nothing. These
-            # files are megabytes of local-zone lines; anything small is a
-            # failure wearing a 200.
+            # A truncated download or error page would commit a blocklist that blocks nothing;
+            # these files are megabytes, so anything small is a failure.
             size=$(stat -c %s "$tmp")
             if [ "$size" -lt 1000000 ]; then
               echo "refusing $url: only $size bytes, expected megabytes" >&2

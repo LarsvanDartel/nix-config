@@ -1,7 +1,4 @@
-# flake.overlays.default — local packages (modules/pkgs/*), composed from the
-# flake-parts nixpkgs.overlays aggregator. den hosts consume it via
-# inputs.self.overlays.default (core.nixpkgs) — a plain flake output computed
-# independently of any host evaluation.
+# overlays — flake.overlays.default, the local packages composed from the nixpkgs.overlays aggregator.
 {
   lib,
   config,

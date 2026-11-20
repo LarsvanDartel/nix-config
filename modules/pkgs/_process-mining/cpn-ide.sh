@@ -1,4 +1,5 @@
 #!@shell@
+# cpn-ide — launcher: starts the CPN IDE backend and opens its Electron window.
 # shellcheck shell=bash
 set -eu
 

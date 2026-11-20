@@ -1,7 +1,4 @@
-# home.catt — throw a video at a Chromecast-capable device from the shell.
-#
-# Traps: discovery is mDNS, so the device must be on the same LAN (not the
-# mesh). Casting a local file serves it from here, so playback stops on sleep.
+# home.catt — cast a video to a Chromecast device from the shell
 {...}: {
   den.aspects.home.catt = {
     homeManager = {pkgs, ...}: {
@@ -10,8 +7,8 @@
       cosmos.system.impermanence.persist.directories = [".config/catt"];
     };
 
-    # 5353: mDNS replies (dropped = empty scan). 45114: the local-file cast
-    # server (without it the video never starts).
+    # 5353: mDNS replies (dropped = empty scan; same LAN only, not the mesh). 45114: the local-file
+    # cast server, so a cast local file plays only while this machine is awake.
     provides.to-hosts.nixos = {...}: {
       networking.firewall.allowedUDPPorts = [5353];
       networking.firewall.allowedTCPPorts = [45114];

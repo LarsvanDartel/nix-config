@@ -1,9 +1,4 @@
-# traccar: gt06 modular (0x70) event blocks carry their own big-endian
-# timestamp, which 6.17.0 reads little-endian and discards. Alarms then take
-# the last GNSS fix's time, and a stationary Jimi asset tracker (GNSS off)
-# reports removal with a fix older than notificator.timeThreshold, so the
-# push is skipped as an "old event". The patch uses the event time as device
-# time and maps event 0x13 (Jimi "tamper alert") to tampering.
+# traccar — patch: gt06 modular event blocks use their own big-endian time as device time, and Jimi event 0x13 maps to tampering.
 {...}: {
   nixpkgs.overlays = [
     (_final: prev: {

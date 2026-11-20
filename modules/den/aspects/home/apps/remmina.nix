@@ -4,10 +4,8 @@
     # Saved passwords go to the Secret Service, not the profile.
     includes = [den.aspects.home.keyring];
 
-    # netbird-gewis's DNS CNAMEs gewismgmt to its NetBird name, and its search
-    # domain is net.nb.gewis.nl; MIT krb5 applies both by default, so FreeRDP
-    # asked AD for TERMSRV/gewismgmt.net.nb.gewis.nl ("Server not found in
-    # Kerberos database"). These keep the name as typed: TERMSRV/gewismgmt.
+    # Keeps the SPN as typed (TERMSRV/gewismgmt): netbird-gewis's CNAME and search domain
+    # would otherwise make krb5 ask AD for a principal it does not have.
     provides.to-hosts.nixos = {
       security.krb5 = {
         enable = true;
@@ -32,18 +30,14 @@
         systemdService.enable = false;
       };
 
-      # .config/freerdp holds the trusted RDP certificate fingerprints.
       cosmos.system.impermanence.persist.directories = [
         ".config/remmina"
         ".config/freerdp"
         ".local/share/remmina"
       ];
 
-      # Global RDP prefs live in remmina.pref, which Remmina rewrites, so set
-      # the key in place. Client keymap: printable keys go as the character the
-      # local layout (Programmer Dvorak) produces; Windows would otherwise read
-      # physical keys as US QWERTY. Ctrl/Alt/Super combos still go as physical
-      # keys, i.e. QWERTY positions.
+      # Remmina rewrites remmina.pref, so set the key in place. Client keymap: printable keys
+      # follow the local Dvorak layout; Ctrl/Alt/Super combos stay physical (QWERTY).
       home.activation.remminaPrefs = lib.hm.dag.entryAfter ["writeBoundary"] ''
         run mkdir -p ${lib.escapeShellArg "${config.xdg.configHome}/remmina"}
         run ${lib.getExe pkgs.crudini} --set \
@@ -51,9 +45,8 @@
           remmina_pref rdp_use_client_keymap 1
       '';
 
-      # Remmina rewrites a profile on every connect, replacing the symlink, and
-      # renames it to its `remmina_file_name` pattern (%G_%P_%N_%h); this name
-      # already matches, and force puts the link back on the next activation.
+      # Remmina replaces the symlink on connect and renames it to %G_%P_%N_%h; this name
+      # matches, and force restores the link on the next activation.
       xdg.dataFile."remmina/gewis_rdp_gewismgmt_gewismgmt.remmina" = {
         force = true;
         text = lib.generators.toINI {} {
@@ -74,7 +67,6 @@
             network = "autodetect";
             # Win key, Alt+Tab and Super+… go to Windows; Right Ctrl toggles.
             keyboard_grab = 1;
-            # \\tsclient\Downloads in the session.
             drive = "Downloads,${config.home.homeDirectory}/Downloads";
           };
         };

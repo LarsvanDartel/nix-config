@@ -1,4 +1,4 @@
-# home.rbw — Bitwarden CLI against the vaultwarden on endeavour (services/vaultwarden.nix).
+# home.rbw — Bitwarden CLI against the vaultwarden on endeavour (services/vaultwarden.nix)
 {den, ...}: {
   den.aspects.home.rbw = {
     # gnome-keyring's prompter is what makes pinentry-gnome3 work outside GNOME.
@@ -17,8 +17,6 @@
         };
       };
 
-      # device_id (so every login isn't a "new device") and the encrypted
-      # vault cache with the refresh token.
       cosmos.system.impermanence.persist.directories = [
         ".local/share/rbw"
         ".cache/rbw"

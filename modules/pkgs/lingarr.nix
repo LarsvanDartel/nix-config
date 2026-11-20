@@ -1,8 +1,8 @@
 # lingarr — subtitle translation service, built natively (Vue client spliced into the ASP.NET wwwroot).
-# Bump: update `version`/`hash`/`npmDepsHash`, then regenerate _lingarr/deps.json via `.fetch-deps`.
 {...}: {
   nixpkgs.overlays = [
     (final: _prev: let
+      # Bump: update version, hash and npmDepsHash, then regenerate _lingarr/deps.json via `.fetch-deps`.
       version = "1.4.0";
 
       src = final.fetchFromGitHub {

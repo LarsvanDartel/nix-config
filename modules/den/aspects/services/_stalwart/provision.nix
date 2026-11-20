@@ -1,7 +1,4 @@
-# services.stalwart.provision — vendored from nixpkgs PR #552103 (see
-# ./default.nix). Changed: meta dropped; `scope` defaults to null (upstream
-# throws when it is unset); `secretFiles` added; `timeout` unset omits
-# TimeoutSec (upstream writes an empty one); the script fails on any error.
+# provision — services.stalwart.provision from nixpkgs PR #552103, vendored with the changes noted below.
 {
   config,
   lib,
@@ -11,6 +8,8 @@
   cfg = config.services.stalwart.provision;
   stalwart = config.services.stalwart;
 in {
+  # Changed from upstream (port before deleting): meta dropped, `scope` defaults to null, `secretFiles`
+  # added, an unset `timeout` omits TimeoutSec, and the script fails on any error.
   options.services.stalwart.provision = {
     enable = lib.mkEnableOption "Stalwart Configuration Provisioning";
     enterprise = lib.mkOption {

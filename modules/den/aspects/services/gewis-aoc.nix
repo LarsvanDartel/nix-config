@@ -1,6 +1,5 @@
 # services.gewisAoc — aoc.lvdar.nl, the live puzzle for the GEWIS Advent of Code talk.
 {inputs, ...}: let
-  # The netbird-service target.
   publicPort = 3032;
   # Who solved first. Mesh-only on purpose: opened on the netbird interface, never a netbird-service.
   adminPort = 3033;

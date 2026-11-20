@@ -1,4 +1,4 @@
-# home.terminals — the default-terminal option namespace (consumed by foot etc).
+# home.terminals — the default-terminal options, set by the terminal aspects.
 {...}: {
   den.aspects.home.terminals.homeManager = {
     config,

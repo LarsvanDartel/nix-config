@@ -1,4 +1,4 @@
-# Tiny5 Mono — 5-pixel monospace font; 128 of its 1024 units per pixel, so the grid is 8px.
+# home.styling — the Tiny5 Mono font family; 128 of its 1024 units per pixel, so the grid is 8px.
 {pkgs, ...}: {
   name = "Tiny5 Mono";
   package = pkgs.tiny5-mono;

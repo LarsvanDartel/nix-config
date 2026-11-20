@@ -1,5 +1,4 @@
-# core.journald — bound the journal by size and time; the nixpkgs default
-# (10% of the filesystem, capped 4G) was costing pioneer a third of its SD card.
+# core.journald — journal size and retention limits.
 {...}: {
   den.aspects.core.journald.nixos = {
     config,
@@ -54,7 +53,7 @@
       MaxFileSec = cfg.maxFileSec;
     };
 
-    # Rate limiting deliberately left at the default: a limit that ever engages
+    # Rate limiting stays at the default: a limit that ever engages
     # drops exactly the burst a crash produces.
   };
 }

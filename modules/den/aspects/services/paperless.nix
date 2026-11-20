@@ -170,8 +170,7 @@ in {
 
               PAPERLESS_SOCIAL_AUTO_SIGNUP = true;
 
-              # Auto-signup grants no permissions; without this the first
-              # OIDC login got a bare 403 (2026-08-30).
+              # Auto-signup grants no permissions; without this the first OIDC login gets a bare 403.
               PAPERLESS_SOCIAL_ACCOUNT_DEFAULT_GROUPS = "Users";
             }
             // lib.optionalAttrs cfg.ai.enable ({
@@ -224,10 +223,7 @@ in {
                       provider_id = providerId;
                       name = "Kanidm";
                       client_id = "paperless";
-                      # The placeholder goes through builtins.toJSON intact —
-                      # it carries no quotes or backslashes to escape — and
-                      # sops-nix substitutes the real value when it renders the
-                      # file at activation.
+                      # The placeholder has no quotes or backslashes, so it survives builtins.toJSON intact.
                       secret = config.sops.placeholder."keys/paperless/oauth-client-secret";
                       settings.server_url = "https://auth.lvdar.nl/oauth2/openid/paperless/.well-known/openid-configuration";
                     }

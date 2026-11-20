@@ -1,4 +1,4 @@
-# desktop.niri — the niri compositor as a WRAPPED package (config baked in by nix-wrapper-modules), body in ./_niri/system.nix; its home half (home.niri + noctalia) goes to every user via to-users.
+# desktop.niri — the niri compositor as a wrapped package; its home half goes to every user.
 {
   den,
   inputs,

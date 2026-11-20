@@ -1,5 +1,4 @@
-# services.gewis-minutes-watcher — regenerates a TINO meeting bucket's
-# minutes.typ outline from agenda.typ; design in _gewis/minutes-watcher.py.
+# services.gewisMinutesWatcher — regenerates TINO meetings' minutes.typ outlines from agenda.typ.
 {...}: {
   den.aspects.services.gewisMinutesWatcher.nixos = {
     config,
@@ -25,9 +24,8 @@
     };
 
     config = {
-      # Mint the key once via TINO's UI (or /var/lib/tino/api_keys.yml) with
-      # *editor* access only — the watcher must not commit; committing stays a
-      # human action. New committee buckets must be added to the key's access map.
+      # Mint via TINO's UI with *editor* access only (docs/src/notes/gewis-minutes-watcher.md#writes);
+      # add each new committee bucket to the key's access map.
       sops.secrets."keys/gewis-minutes-watcher/tino-api-key".owner = "tino";
 
       systemd.services.gewis-minutes-watcher = {

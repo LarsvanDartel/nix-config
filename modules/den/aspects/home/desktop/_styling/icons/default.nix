@@ -1,3 +1,4 @@
+# home.styling — icon theme options feeding stylix.icons.
 {
   config,
   lib,

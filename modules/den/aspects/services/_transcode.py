@@ -1,9 +1,4 @@
-"""Re-encode library video files to AV1 on the GPU, in place.
-
-Configured entirely via environment (see services/transcode.nix); run with the
-unit's environment to debug outside systemd. Underscore prefix keeps
-import-tree away.
-"""
+# transcode — re-encodes library video to AV1 on the GPU in place; configured via environment by services/transcode.nix.
 
 import json
 import logging
@@ -321,9 +316,8 @@ def notify_arr(path):
                 api(entry["url"], key, "episode/monitor", "PUT",
                     {"episodeIds": ids, "monitored": False})
             else:
-                # Loud, because the file is already replaced: the episode is
-                # still monitored and sonarr may now read the AV1 copy as a
-                # downgrade and re-download the original.
+                # Loud: the file is already replaced, and sonarr may read the AV1 copy as a downgrade
+                # and re-download the original.
                 LOGGER.warning("%s: sonarr has no episode for this file, "
                                "left monitored", path.name)
             cmd = api(entry["url"], key, "command", "POST",

@@ -1,10 +1,4 @@
-# services.tangled — a self-hosted Tangled knot: git repositories addressed by
-# ATProto identity rather than by an account on someone else's forge.
-#
-# knot2 (the Rust knot, `knot-rs`): git over SSH is served in-process on
-# sshPort, which gaia DNATs public :22 to (hosts/gaia.nix); sshd is not
-# involved. Users' SSH keys are read live from their PDS
-# (`org.tangled.key.sshKey`, cached for an hour).
+# services.tangled — a self-hosted Tangled knot (knot2) and its spindle CI runner.
 {
   den,
   inputs,
@@ -12,7 +6,8 @@
 }: let
   # Option defaults and netbird-service targets (see services/netbird.nix).
   defaultPort = 5555;
-  # Not 2222: that is sshd's port on every host (core.ssh).
+  # Not 2222 (sshd's port, core.ssh). knot2 serves git over SSH here in-process, without sshd;
+  # gaia DNATs public :22 to it.
   defaultSshPort = 2223;
   defaultSpindlePort = 6555;
 in {
@@ -105,9 +100,8 @@ in {
         # The master key unseals the per-repo signing keys; sops is its
         # off-server backup, and the sealed store is useless without it.
         sops.secrets."keys/knot/env" = {};
-        # knot-migrate's archive of the old knot's per-repo keys, which the
-        # repos' did:plc documents rotate on. Sealed at every start (idempotent);
-        # without it the plc reconciler gives up on every migrated repo.
+        # knot-migrate's archive of the old knot's per-repo keys, which the repos' did:plc documents
+        # rotate on; without it the plc reconciler gives up on every migrated repo.
         sops.secrets."keys/knot/repo-signing-keys" = {
           owner = config.services.tangled.knot-rs.user;
           restartUnits = ["knot-rs.service"];
@@ -132,7 +126,7 @@ in {
             };
             # Public: served by org.tangled.knot.describeKnot.
             contact.email = "lars@lvdar.nl";
-            # Required since v1.20.0 even without LFS in use.
+            # Required even without LFS in use.
             lfs.store_path = "${cfg.stateDir}/lfs";
             # The migrated repositories are SHA-1; the module defaults to sha256.
             git.object_format = "sha1";
@@ -183,10 +177,8 @@ in {
       cfg = config.cosmos.services.tangled;
       sCfg = cfg.spindle;
 
-      # Upstream's guest (4 GiB, 2 vCPUs, 24 GiB disk) OOMs and runs out of disk
-      # on a NixOS closure. Only spec.json is rewritten; the rest is symlinked.
-      # The disk volume is the build's whole writable surface; limits.total.diskMiB
-      # is only a scheduler budget and never resizes a guest.
+      # Upstream's guest (4 GiB, 2 vCPUs, 24 GiB disk) is too small for a NixOS closure. The disk
+      # volume is the build's whole writable surface; limits.total.diskMiB never resizes a guest.
       guestImage =
         pkgs.runCommand "spindle-nixos-image-${toString sCfg.guestMemoryMiB}mib" {
           nativeBuildInputs = [pkgs.jq];
@@ -334,9 +326,7 @@ in {
         systemd.tmpfiles.rules = [
           "d ${sCfg.stateDir} 0750 root root - -"
 
-          # Nothing populates imageDir by default, and an empty one fails every
-          # workflow silently (visible only in the pipeline status record).
-          # Interpolating the derivation keeps the image a GC root.
+          # An empty imageDir fails every workflow silently; interpolating the derivation keeps the image a GC root.
           "L+ ${sCfg.imageDir}/nixos - - - - ${guestImage}"
         ];
 
@@ -368,9 +358,8 @@ in {
             # On the SSD, not the raidz array: VM boots and overlays are random I/O.
             inherit (sCfg) imageDir;
 
-            # overlayDir stays at the /tmp default: SSD, wiped at boot.
-            # Totals are two guests' worth, matching maxJobCount, so a third
-            # workflow queues instead of overcommitting the host.
+            # overlayDir stays at the /tmp default (SSD, wiped at boot). Totals are two guests' worth,
+            # matching maxJobCount, so a third workflow queues instead of overcommitting.
             limits.total = {
               memoryMiB = 2 * sCfg.guestMemoryMiB;
               vcpus = 2 * sCfg.guestVcpus;
@@ -380,15 +369,12 @@ in {
 
           pipelines.workflowTimeout = sCfg.workflowTimeout;
 
-          # Any non-empty bucket registers the S3 store (artifactstore.go:173)
-          # without checking credentials, adding ~19 s of EC2 IMDS timeouts per run.
+          # Any non-empty bucket registers the S3 store without checking credentials, adding ~19 s
+          # of EC2 IMDS timeouts per run.
           artifactStores.s3.bucket = "";
 
-          # Works despite the sandbox blackholing 100.64.0.0/10: the spindle
-          # proxies substituter reads host-side over vsock. The guest's nix.conf
-          # sets `substituters` to that proxy alone (core a48f86056), so without
-          # cache.nixos.org here every pipeline builds nixpkgs from stage0. Attic
-          # comes from the attic client options; do not add a third copy of it.
+          # The guest's only substituter is the spindle's host-side proxy, so without cache.nixos.org
+          # every pipeline builds nixpkgs from stage0. Attic comes from the attic client options.
           pipelines.nixCache = {
             readUrls = [
               "https://cache.nixos.org"

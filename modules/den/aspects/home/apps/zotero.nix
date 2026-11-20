@@ -1,4 +1,4 @@
-# home.zotero
+# home.zotero — Zotero reference manager
 {...}: {
   den.aspects.home.zotero.homeManager = {pkgs, ...}: {
     home.packages = [pkgs.zotero];

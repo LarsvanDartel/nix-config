@@ -1,4 +1,4 @@
-# home.direnv (+ its impermanence persist entry)
+# home.direnv — direnv with nix-direnv
 {...}: {
   den.aspects.home.direnv.homeManager = {pkgs, ...}: {
     cosmos.system.impermanence.persist.directories = [".local/share/direnv"];

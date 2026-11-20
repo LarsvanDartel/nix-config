@@ -1,4 +1,4 @@
-# home.bluetuith
+# home.bluetuith — bluetuith Bluetooth TUI with a desktop entry
 {...}: {
   den.aspects.home.bluetuith.homeManager = {pkgs, ...}: {
     home.packages = with pkgs; [bluetuith];

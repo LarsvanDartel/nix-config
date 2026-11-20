@@ -1,6 +1,4 @@
-# obs-move-transition: OBS 32.2 deprecated APIs the plugin still uses under
-# -Werror=deprecated-declarations; demote the error. Warns once nixpkgs moves
-# the plugin off the version below: check, then delete this or bump.
+# obs-move-transition — demotes -Werror=deprecated-declarations: the plugin still uses APIs OBS 32.2 deprecated.
 {...}: {
   nixpkgs.overlays = [
     (_final: prev: {

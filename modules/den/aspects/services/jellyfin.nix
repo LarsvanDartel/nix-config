@@ -1,15 +1,11 @@
-# services.jellyfin (jellarr).
+# services.jellyfin — media server, configured declaratively through jellarr.
 {inputs, ...}: let
-  # Option default and netbird-service target (see services/netbird.nix).
   defaultPort = 8096;
 in {
   flake-file.inputs.jellarr.url = "github:venkyr77/jellarr";
 
-  # jellarr's pinned pnpmDeps.hash was computed with an older pnpm; pnpm's
-  # store format changes the hash across versions (broke twice, surfacing as
-  # ERR_PNPM_NO_OFFLINE_TARBALL). Warns once upstream changes the hash; delete
-  # this then. To regenerate: set the replacement hash to "", build jellarr,
-  # copy "got:".
+  # Pins jellarr's pnpmDeps hash, which shifts with pnpm's store format; warns once upstream changes it.
+  # To regenerate: set the replacement hash to "", build jellarr, copy "got:".
   nixpkgs.overlays = [
     (final: prev: {
       fetchPnpmDeps = args:
@@ -84,10 +80,8 @@ in {
     cfg = config.cosmos.services.jellyfin;
     proxy = config.cosmos.services.netbird.client.proxyAddress;
 
-    # jellarr sends only the legacy X-Emby-Token header, which our Jellyfin
-    # ignores (EnableLegacyAuthorization=false); the silent 401 surfaces as
-    # "Cannot set properties of undefined (setting '$root')". Add the modern
-    # Authorization header; warns once jellarr's client sends one itself.
+    # jellarr sends only X-Emby-Token, which EnableLegacyAuthorization=false ignores (a silent 401);
+    # the patch adds the Authorization header.
     jellarrPkg = pkgs.callPackage "${inputs.jellarr}/nix/package.nix" {};
     jellarrClient = "${inputs.jellarr}/src/api/client.ts";
     jellarrPatched =
@@ -164,9 +158,8 @@ in {
       users.users.jellyfin.extraGroups = ["video" "render"];
       networking.firewall.allowedTCPPorts = optional cfg.openFirewall cfg.port;
 
-      # jellarr has no network section. Without KnownProxies every visitor is
-      # netbird-proxy's mesh address: jellyfin counts them all as LAN, and the
-      # crowdsec mesh whitelist drops every failed login below.
+      # jellarr has no network section. Without KnownProxies every visitor is netbird-proxy's address:
+      # jellyfin counts all as LAN, and the crowdsec mesh whitelist drops every failed login.
       systemd.services.jellyfin.preStart = mkIf (proxy != null) ''
         f=${config.services.jellyfin.configDir}/network.xml
         if [ -f "$f" ]; then
@@ -175,8 +168,7 @@ in {
         fi
       '';
 
-      # Password logins (lvdar, sven) go from the proxy straight to jellyfin,
-      # past nginx; jellyfin-bf bans their brute force at the edge.
+      # Password logins reach jellyfin from the proxy, past nginx; jellyfin-bf bans brute force at the edge.
       services.crowdsec = mkIf config.services.crowdsec.enable {
         hub.collections = ["LePresidente/jellyfin"];
         settings.acquisitions = [

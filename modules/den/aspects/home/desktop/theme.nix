@@ -1,7 +1,4 @@
-# home.theme — light/dark switching at runtime, without a rebuild. Every file
-# whose content depends on the mode is rendered for both modes and linked
-# through ~/.local/state/cosmos/theme/current; `theme dark|light|toggle` flips
-# that link and pokes running programs. See docs/src/theming.md.
+# home.theme — runtime light/dark switching through per-mode file farms; see docs/src/theming.md.
 {cosmosStyling, ...}: {
   den.aspects.home.theme.homeManager = {
     config,
@@ -16,8 +13,7 @@
     cfg = config.cosmos.desktops.common.styling.modes;
     state = "${config.home.homeDirectory}/${cosmosStyling.stateDir}";
 
-    # This home again in one mode, with the switching itself off. Only what
-    # the farm reads gets evaluated.
+    # This home again in one mode, with the switching itself off.
     render = mode:
       (extendModules {
         modules = [
@@ -32,8 +28,6 @@
     files = lib.mapAttrs (_: c: lib.filterAttrs (_: f: f.enable) c.home.file) rendered;
 
     excluded = target: lib.any (prefix: lib.hasPrefix prefix target) cfg.exclude;
-    # Mode-dependent home files: what stylix (GTK, Qt, btop, bat, zen CSS…)
-    # renders differently per mode.
     modal =
       lib.filterAttrs (
         name: f:
@@ -77,9 +71,7 @@
           cfg.files)}
       '';
 
-    # The desktop-wide preference (portal color-scheme, read live by GTK4,
-    # browsers and Electron) plus GTK3's theme and the icon theme, which
-    # running GTK apps also pick up live.
+    # Read live: color-scheme by GTK4, browsers and Electron; gtk-theme and icon-theme by GTK apps.
     dconfFor = mode: let
       c = rendered.${mode};
     in {
@@ -118,7 +110,7 @@
           fi
           ln -sfn "$mode" "$state/.current"
           mv -T "$state/.current" "$state/current"
-          # Read by the pokes below.
+          # Read by onSwitch.
           farm="$state/$mode"
           export mode farm
 

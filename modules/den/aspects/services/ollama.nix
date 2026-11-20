@@ -4,7 +4,6 @@
   inputs,
   ...
 }: let
-  # Option default and netbird-service target (see services/netbird.nix).
   defaultChatPort = 8084;
 in {
   den.aspects.services.ollama.nixos = {
@@ -93,9 +92,8 @@ in {
       services.ollama = {
         enable = true;
 
-        # nixpkgs builds CUDA for Turing+; the P100 (sm_60) gets no kernel and
-        # ollama silently falls back to CPU. Per-package, not global
-        # cudaCapabilities (shared nixpkgs). CUDA 13 drops Pascal: keep _12.
+        # nixpkgs builds CUDA for Turing+, so the P100 (sm_60) silently falls back to CPU. Per-package,
+        # not global cudaCapabilities (shared nixpkgs); CUDA 13 drops Pascal, so keep _12.
         package = pkgs.ollama-cuda.override {
           cudaArches = ["sm_60"];
           cudaPackages = pkgs.cudaPackages_12;
@@ -138,8 +136,7 @@ in {
     };
   };
 
-  # services.ollama.librechat — LibreChat, browser front end for ollama and OpenRouter.
-  # The first OIDC login becomes the ADMIN account.
+  # LibreChat front end; the first OIDC login becomes its ADMIN account.
   den.aspects.services.ollama.librechat = {
     includes = [den.aspects.services.ollama den.aspects.core.sops];
 
@@ -215,9 +212,8 @@ in {
       config = {
         cosmos.services.netbird.client.exposedPorts = [cfg.port];
 
-        # Upstream's binary, not nixpkgs' `mongodb`: SSPL is unfree, so Hydra
-        # never caches it, and every staging merge meant hours of compiling
-        # it here. Held on 7.0, the data's FCV: majors upgrade one at a time.
+        # Upstream's binary, not nixpkgs' `mongodb`: SSPL is unfree, so Hydra never caches it and it
+        # compiles here for hours. Held on 7.0, the data's FCV: majors upgrade one at a time.
         services.mongodb.package = let
           version = "7.0.45";
         in
@@ -311,8 +307,8 @@ in {
           };
         };
 
-        # Upstream doesn't order after network: OIDC discovery can race the
-        # resolver and silently disable login until restart (observed).
+        # Upstream doesn't order after network: OIDC discovery can race the resolver and silently
+        # disable login until restart.
         systemd.services.librechat = {
           after = ["network-online.target"];
           wants = ["network-online.target"];

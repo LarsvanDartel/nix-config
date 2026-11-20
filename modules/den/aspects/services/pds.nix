@@ -1,7 +1,4 @@
-# services.pds — a self-hosted ATProto Personal Data Server.
-#
-# Single-user: hosting others' handles needs *.pds.lvdar.nl — a non-goal.
-# Ungated at the edge: ATProto clients cannot follow a NetBird 302 to kanidm.
+# services.pds — single-user self-hosted ATProto Personal Data Server.
 {den, ...}: let
   # Option default and netbird-service target (see services/netbird.nix).
   defaultPort = 3001;
@@ -9,7 +6,7 @@ in {
   den.aspects.services.pds = {
     includes = [den.aspects.services.netbird.client];
 
-    # XRPC clients carry their own tokens.
+    # Ungated: XRPC clients carry their own tokens and can't follow a NetBird 302 to kanidm.
     netbird-service = {host, ...}: {
       pds = {
         bearerAuth.enable = false;
@@ -57,9 +54,8 @@ in {
       };
 
       config = {
-        # PDS_JWT_SECRET, PDS_ADMIN_PASSWORD, PLC rotation key. The rotation
-        # key proves control of the DID and cannot be regenerated — losing it
-        # loses the identity; it belongs in a password manager too.
+        # PDS_JWT_SECRET, PDS_ADMIN_PASSWORD and the PLC rotation key, which proves control of the
+        # DID and cannot be regenerated: keep it in a password manager too.
         sops.secrets."keys/pds/env" = {};
 
         services.bluesky-pds = {

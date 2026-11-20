@@ -1,8 +1,4 @@
 # core.notify-failure — push a notification when any systemd service fails.
-#
-# One type-wide drop-in covers every .service — mapping over
-# config.systemd.services instead recurses infinitely. The notifier needs a
-# unit-specific drop-in clearing OnFailure, else it retriggers itself forever.
 {inputs, ...}: {
   den.aspects.core.notify-failure.nixos = {
     config,
@@ -22,20 +18,7 @@
       text = ''
         unit="''${1:?usage: notify-failure <unit>}"
 
-        # Wait, then ask again whether the unit is still down.
-        #
-        # systemd runs OnFailure= the moment a unit enters the failed state,
-        # which is *before* its own Restart= brings it back. attic-watch-store
-        # panics on an upstream bug and is healthy again 30 seconds later;
-        # opencloud loses a subservice at boot and recovers on the next
-        # restart. Both pushed a high-priority alert about a machine that was
-        # fine by the time the phone buzzed, and an alert that is usually
-        # wrong is one you learn to swipe away — including the night it is
-        # right.
-        #
-        # The default covers the restart delays actually configured here
-        # (RestartSec is 30s at the longest) with room to spare. A unit that is
-        # still failed after that is failed in the sense worth waking up for.
+        # OnFailure= fires before the unit's own Restart= brings it back; alert only if still failed after the settle.
         sleep ${toString cfg.settleSeconds}
         if ! systemctl is-failed --quiet "$unit"; then
           echo "$unit recovered on its own; not notifying"
@@ -44,25 +27,11 @@
 
         password="$(cat "$CREDENTIALS_DIRECTORY/ntfy-password")"
 
-        # The last few lines are what makes the notification actionable rather
-        # than just alarming. Trimmed hard: ntfy renders a message, not a log
-        # viewer, and the full journal of a crash loop is unreadable on a phone.
-        #
-        # `|| true` is load-bearing. `systemctl status` exits 3 for a unit that
-        # is dead or failed — which is every unit this will ever be called for
-        # — and writeShellApplication runs under `set -euo pipefail`, so
-        # without it the notifier aborts before sending and the alert is lost.
-        # It passed a hand test only because the unit under test was running.
+        # `|| true` is load-bearing: systemctl status exits 3 for every failed unit, and the script runs under set -e.
         body="$( { systemctl status --no-pager --lines=15 "$unit" || true; } 2>&1 | head -c 3000 )"
 
-        # Retry, bounded. The failures worth reporting correlate with the
-        # network being unwell, so the first POST is exactly when delivery is
-        # least likely to work: two alerts were lost that way, one to a
-        # two-minute uplink outage and one to DNS not being up yet after a
-        # reboot. --retry-max-time caps the whole thing at five minutes so a
-        # dead edge still cannot wedge the unit, and --retry-all-errors is
-        # needed because curl otherwise treats a connect failure or a timeout
-        # as not worth retrying.
+        # Retry: failures correlate with network trouble, so the first POST is the likeliest to fail.
+        # --retry-all-errors makes curl retry connect failures and timeouts; --retry-max-time bounds it.
         curl -sS --max-time 20 \
           --retry 5 --retry-all-errors --retry-delay 20 --retry-max-time 300 \
           -u "${cfg.user}:$password" \
@@ -100,18 +69,14 @@
 
       systemd.services."notify-failure@" = {
         description = "Report that %i failed";
-        # Not wantedBy anything: it exists only to be triggered by OnFailure.
         serviceConfig = {
           Type = "oneshot";
           ExecStart = "${lib.getExe notify} %i";
           LoadCredential = "ntfy-password:${config.sops.secrets."keys/ntfy/password".path}";
 
-          # A bound where Type=oneshot has none: without it a notifier wedged
-          # on a half-open socket waits forever, holding a job slot. Sized to
-          # the settle wait plus retry budget, with headroom.
+          # Oneshot has no start timeout otherwise; sized to the settle wait plus the retry budget.
           TimeoutStartSec = "10min";
 
-          # It reaches the internet and reads one credential; nothing else.
           DynamicUser = true;
           CapabilityBoundingSet = [""];
           LockPersonality = true;
@@ -135,27 +100,19 @@
         };
       };
 
-      # Delivered as a systemd package, not environment.etc: /etc/systemd/system
-      # is a symlink to a store-built units directory, and generateUnits lndirs
-      # any lib/systemd/system dir in a package — which is what a `.d` dir is.
+      # One type-wide drop-in shipped as a package (generateUnits lndirs it into /etc/systemd/system);
+      # mapping over config.systemd.services instead recurses infinitely.
       systemd.packages = [
         (pkgs.runCommand "notify-failure-dropins" {} ''
           d=$out/lib/systemd/system
 
-          # Applies to every *.service on the host, present and future. %n is
-          # the full unit name, which is what the notifier hands back to
-          # `systemctl status`.
           mkdir -p $d/service.d
           cat > $d/service.d/50-notify-failure.conf <<'EOF'
           [Unit]
           OnFailure=notify-failure@%n.service
           EOF
 
-          # The recursion guard, and the reason this is two files. The
-          # type-wide drop-in above is applied *after* each unit file, so a
-          # plain OnFailure= in the notifier's own unit would just be
-          # overridden again. Only a unit-specific drop-in lands later still.
-          # An empty assignment resets the list.
+          # Recursion guard: only a unit-specific drop-in lands after the type-wide one; an empty OnFailure= resets it.
           # Verify: systemctl show notify-failure@x.service -p OnFailure
           mkdir -p "$d/notify-failure@.service.d"
           cat > "$d/notify-failure@.service.d/10-no-recursion.conf" <<'EOF'
@@ -163,7 +120,6 @@
           OnFailure=
           EOF
 
-          # The heredocs above are indented for readability; strip it.
           sed -i 's/^ *//' $d/service.d/*.conf "$d/notify-failure@.service.d"/*.conf
         '')
       ];

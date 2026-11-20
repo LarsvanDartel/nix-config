@@ -1,33 +1,4 @@
-'''gewis-minutes-watcher — regenerate a meeting's minutes.typ outline from
-its agenda.typ headings whenever a commit touches agenda.typ, and carry a
-previous meeting's open action items forward once.
-
-- A meeting is any directory under a TINO bucket (except `packages`) holding
-  both agenda.typ and minutes.typ; buckets may nest many meetings sharing a
-  committee-info.typ at the bucket root.
-- Every `typst` call passes `--root <bucket>`: without it Typst roots at the
-  input file's directory and a nested meeting's `"../../committee-info.typ"`
-  import fails with "path would escape the project root".
-- Writes are PUT-only through TINO's API, never committed: committing stays a
-  human action in TINO's UI (machine-authored commits polluted history).
-- The outline merge is by heading *title*: renamed points start empty,
-  removed points drop their notes.
-- Point titles must be plain text: agenda titles are read rendered but
-  minutes titles from raw source, so interpolated titles never match and
-  orphan their prose.
-- Previous meeting = highest lower meeting-number in the *same bucket*.
-- `typst eval` serializes a datetime as its constructing Typst source
-  (`datetime(year: ..., ...)`), reused verbatim. Reconstructed person()
-  values compare structurally equal, so short-name() collision detection
-  still works.
-- Carrying runs once per meeting (state key "<key>:carried") so hand-deleted
-  items never reappear; if the previous minutes have no action points yet
-  it's retried later rather than settled.
-- Only marker-delimited regions are rewritten. minutes.typ's CARRIED pair
-  sits inside the OUTLINE region under "Action points", whose body the
-  outline merge preserves as opaque prose.
-'''
-
+# gewis-minutes-watcher — regenerates minutes.typ outlines from agenda.typ.
 import json
 import logging
 import os
@@ -74,7 +45,6 @@ class Meeting:
 
     @property
     def key(self) -> str:
-        '''State-file key and log label.'''
         if self.rel == Path('.'):
             return self.bucket.name
         return f'{self.bucket.name}/{self.rel.as_posix()}'
@@ -89,9 +59,7 @@ class Meeting:
 
 
 def flatten(node) -> str:
-    '''Turn a Typst content JSON node back into plain text. Headings with
-    special characters (e.g. "&") become a `sequence`, not a `text` leaf.
-    '''
+    '''Special-character headings (e.g. "&") are a `sequence`, not `text`.'''
     if isinstance(node, str):
         return node
     func = node.get('func')
@@ -105,7 +73,7 @@ def flatten(node) -> str:
 
 
 def typst_eval_json(meeting: Meeting, filename: str, expression: str):
-    '''`typst eval` with `--root` at the bucket — see module docstring.'''
+    '''Always `--root <bucket>`: notes/gewis-minutes-watcher.md#typst-root.'''
     proc = subprocess.run(
         [
             'typst', 'eval', expression,
@@ -120,7 +88,6 @@ def typst_eval_json(meeting: Meeting, filename: str, expression: str):
 
 
 def agenda_headings(meeting: Meeting) -> list[dict]:
-    '''Query agenda.typ's heading structure.'''
     raw = typst_eval_json(meeting, 'agenda.typ', 'query(heading)')
     return [{'level': h['level'], 'title': flatten(h['body'])} for h in raw]
 
@@ -216,7 +183,7 @@ def typst_person(value) -> str:
 
 def typst_deadline(value) -> str:
     if isinstance(value, str) and value.startswith('datetime('):
-        return value  # already valid Typst source, see module docstring
+        return value  # already valid Typst source, reused verbatim
     return typst_string(value)
 
 
@@ -290,9 +257,7 @@ def all_meetings() -> list[Meeting]:
 
 def find_previous_meeting(meeting: Meeting,
                           siblings: list[Meeting]) -> Meeting | None:
-    '''Highest lower meeting-number in the *same bucket* only — committees
-    each number from 1. Directory names/ctimes are not trusted for order.
-    '''
+    '''Same bucket only; names and ctimes are not trusted for order.'''
     current = meeting_info(meeting)
     if current is None:
         return None
@@ -312,10 +277,7 @@ def find_previous_meeting(meeting: Meeting,
 
 def carry_forward_action_items(
         meeting: Meeting, siblings: list[Meeting]) -> str:
-    '''Fill this meeting's carried regions from the previous meeting's open
-    items. Returns 'done' (settled) or 'pending' (previous meeting has no
-    action points yet; retry later).
-    '''
+    '''Returns 'pending' while the previous meeting has no action points.'''
     prev = find_previous_meeting(meeting, siblings)
     if prev is None:
         return 'done'  # no earlier meeting, and numbering is fixed

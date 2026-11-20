@@ -1,6 +1,4 @@
-# bulwark pinned ahead of nixpkgs — a version floor: Stalwart 1.0 needs
-# Bulwark >= 1.18.0 (nixpkgs had 1.14.2). Inert, and warns, once nixpkgs
-# reaches the pinned version (never a downgrade).
+# bulwark — pinned ahead of nixpkgs as a version floor: Stalwart 1.0 needs Bulwark >= 1.18.0.
 {...}: {
   nixpkgs.overlays = [
     (_final: prev: let

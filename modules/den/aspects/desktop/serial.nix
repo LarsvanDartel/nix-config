@@ -1,5 +1,4 @@
-# desktop.serial — USB-serial access for flashing tools; the dialout group also
-# covers browser Web Serial, which hits the same permission check.
+# desktop.serial — dialout access for USB-serial flashing tools and browser Web Serial.
 {...}: {
   den.aspects.desktop.serial.nixos = {...}: {
     cosmos.user.extraGroups = ["dialout"];

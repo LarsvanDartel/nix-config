@@ -1,14 +1,4 @@
-# services.kanidm — identity provider.
-#
-# Apps declare their own groups and OAuth2 clients on the `kanidm-provision`
-# quirk, in their own aspect; this collects them from every host. Moving an
-# app (or kanidm) to another host therefore only changes host files.
-#
-# Entry shape: { groups.<name> = …; oauth2.<name> = …; } with the values of
-# services.kanidm.provision.{groups,systems.oauth2}, except that a
-# confidential client names its secret as `basicSecret = "<sops key>"`
-# instead of a basicSecretFile path. That key must be in hosts/common, the
-# one file both the app's host and kanidm's host can decrypt.
+# services.kanidm — identity provider, provisioning the groups and OAuth2 clients every app declares.
 {
   den,
   inputs,
@@ -20,10 +10,11 @@
   # (cosmos.services.netbird.oidc.idp).
   port = 8443;
 in {
+  # Entries take services.kanidm.provision.{groups,systems.oauth2} values, except a confidential client names
+  # a sops key as `basicSecret`; that key must be in hosts/common, the one file both hosts can decrypt.
   den.quirks.kanidm-provision.description = "kanidm groups and OAuth2 clients, provisioned wherever kanidm runs";
 
-  # den reads these argument names (host scope, host-entity filter), so
-  # deadnix must not strip them as unused.
+  # den reads these argument names; deadnix must not strip them.
   # deadnix: skip
   den.policies.kanidm-provision = {host, ...}: [
     (pipe.from "kanidm-provision" [
@@ -102,18 +93,15 @@ in {
             {
               "keys/kanidm/admin-password".owner = "kanidm";
               "keys/kanidm/idm-admin-password".owner = "kanidm";
-              # API token of the `mail-sender` service account (member of
-              # idm_message_senders only), created by hand: provisioning
-              # cannot make service accounts or tokens.
+              # Token of the hand-created `mail-sender` service account (idm_message_senders
+              # only): provisioning cannot make service accounts or tokens.
               "keys/kanidm/mail-sender-token" = {};
             }
           ]
           ++ map toSecrets kanidm-provision);
 
-        # kanidmd only queues mail (`kanidm system message-queue list`);
-        # this sends it. It insists on TLS to the relay, hence gaia's
-        # mesh-relay-tls rather than the plaintext :2525 the other services
-        # use; hand-synced with services/stalwart.nix and gaia.nix relayClients.
+        # kanidmd only queues mail; this sends it. It requires TLS to the relay, hence mesh-relay-tls,
+        # hand-synced with services/stalwart.nix and gaia.nix relayClients.
         sops.templates."kanidm-mail-sender.toml" = {
           content = ''
             token = "${config.sops.placeholder."keys/kanidm/mail-sender-token"}"
@@ -194,10 +182,8 @@ in {
                 then ["100.64.0.0/10"]
                 else ["127.0.0.1"];
 
-              # Upstream defaults this to a derivation; kanidm.nix's null filter
-              # recurses into its .stdenv and trips deprecated-attr warnings,
-              # fatal under abort-on-warn (broke at nixpkgs 494ce7f). Revisit if
-              # server.entryManagement.migrations is ever used.
+              # Upstream's default is a derivation the null filter recurses into, tripping deprecated-attr
+              # warnings fatal under abort-on-warn. Revisit if server.entryManagement.migrations is used.
               migration_path = mkForce (toString (pkgs.linkFarm "kanidm-entry-management" []));
             };
           };

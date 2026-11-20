@@ -1,6 +1,4 @@
-# home.geforce-now — GeForce NOW in a Chromium app window. The web client is
-# the only Linux client nixpkgs has: gfn-electron was dropped as abandoned, and
-# NVIDIA's native app ships only as a Flatpak. Firefox-based browsers are refused.
+# home.geforce-now — GeForce NOW's web client in a Chromium app window (it refuses Firefox).
 {...}: {
   den.aspects.home.geforce-now.homeManager = {
     config,
@@ -19,7 +17,6 @@
     };
 
     config = {
-      # Its own profile keeps the NVIDIA login and is the only Chromium state.
       cosmos.system.impermanence.persist.directories = [".config/geforce-now"];
 
       xdg.desktopEntries."geforce-now" = {

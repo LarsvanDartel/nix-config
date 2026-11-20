@@ -1,4 +1,4 @@
-# desktop.networkmanager
+# desktop.networkmanager — NetworkManager with OpenVPN, DNS handed to resolved when it runs.
 {...}: {
   den.aspects.desktop.networkmanager.nixos = {
     config,

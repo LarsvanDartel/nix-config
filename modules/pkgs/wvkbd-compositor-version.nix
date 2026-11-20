@@ -1,8 +1,4 @@
-# wvkbd: binds wl_compositor at version 6 whatever the compositor offers, a
-# protocol error that kills it under Umbriel (which offers 5). Bind at most
-# what is advertised; v6 only adds the preferred_buffer_scale event. Upstream
-# master still binds 6. Warns once nixpkgs moves wvkbd off 0.21: check main.c,
-# then delete this or bump.
+# wvkbd — binds wl_compositor at most at the advertised version, not always 6 (a protocol error under Umbriel, which offers 5).
 {...}: {
   nixpkgs.overlays = [
     (_final: prev: {

@@ -1,8 +1,6 @@
-# services.deploy-drift — export the head of nix-config's main from the knot's
-# own repository, so prometheus can name the hosts running anything else
-# (DeployBehind in services/prometheus.nix). Only on the knot host: it reads
-# the bare repository on disk rather than fetching over the published path.
+# services.deploy-drift — exports the knot's nix-config main head for prometheus's DeployBehind alert.
 {den, ...}: {
+  # Knot host only: it reads the bare repository on disk rather than fetching over the published path.
   den.aspects.services.deploy-drift = {
     includes = [den.aspects.services.node-exporter];
 
@@ -75,9 +73,8 @@
         systemd.paths.deploy-drift = {
           wantedBy = ["multi-user.target"];
           pathConfig = {
-            # A push leaves a loose ref; the knot's repack later moves it into
-            # packed-refs and deletes the loose one. PathChanged, not
-            # PathModified: git renames a lock file over either.
+            # A push leaves a loose ref that the knot's repack later moves into packed-refs.
+            # PathChanged, not PathModified: git renames a lock file over either.
             PathChanged = [
               "${cfg.repository}/refs/heads/${cfg.branch}"
               "${cfg.repository}/packed-refs"

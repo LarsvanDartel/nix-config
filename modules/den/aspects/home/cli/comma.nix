@@ -1,8 +1,4 @@
-# home.comma — run a program from nixpkgs without installing it: `, cowsay hi`.
-# Delivered to every user by the `comma` policy below, on every host but pioneer.
-#
-# NixOS's programs.command-not-found stays off so nothing fights over
-# command_not_found_handler.
+# home.comma — run a nixpkgs program without installing it (`, cowsay hi`)
 {
   den,
   lib,
@@ -13,9 +9,8 @@
     inputs.nixpkgs.follows = "nixpkgs";
   };
 
-  # Not pioneer: no room for the ~100 MiB index on its nearly-full SD card.
-  # Fires once per user (den.schema.user.includes), so the include lands in
-  # that user's home.
+  # Not pioneer: no room for the ~100 MiB index on its SD card.
+  # Fires once per user (den.schema.user.includes), so the include lands in that user's home.
   den.policies.comma = {host, ...}:
     lib.optional (host.name != "pioneer") (den.lib.policy.include den.aspects.home.comma);
 
@@ -26,6 +21,7 @@
 
     programs.nix-index-database.comma.enable = true;
 
+    # Keep NixOS's programs.command-not-found off: it would also claim command_not_found_handler.
     programs.nix-index = {
       enable = true;
       symlinkToCacheHome = true;

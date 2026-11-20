@@ -1,4 +1,4 @@
-# home.orca-slicer
+# home.orca-slicer — OrcaSlicer 3D-printing slicer
 {...}: {
   den.aspects.home.orca-slicer.homeManager = {pkgs, ...}: {
     cosmos.system.impermanence.persist.directories = [

@@ -1,6 +1,4 @@
-# services.domjudge.contests — recent CHipCie contests as open practice
-# contests (started at import, ten years long, no freeze), the admin account,
-# and none of DOMjudge's example data.
+# services.domjudge.contests — recent CHipCie contests as open practice contests, the admin account, no example data.
 {den, ...}: {
   den.aspects.services.domjudge.contests = {
     includes = [den.aspects.services.domjudge];
@@ -106,16 +104,14 @@
           unzip -q "$dir/archive.zip" -d "$dir/x" -x samples.zip
           rm "$dir/archive.zip"
 
-          # From BAPC 2026 the archives follow problem package format 2025-09:
-          # contest.en.pdf, and per-language name maps in problems.yaml,
-          # which add-data stores verbatim as the name.
+          # Newer archives ship contest.en.pdf and per-language name maps in problems.yaml,
+          # which add-data would store verbatim as the name.
           pdf="$dir/x/contest.pdf"
           [ -e "$pdf" ] || pdf="$dir/x/contest.en.pdf"
           yq -i '(.[] | select(.name | tag == "!!map") | .name) |= (.en // ([.[]] | .[0]))' "$dir/x/problems.yaml"
 
-          # add-data is not idempotent (it always inserts), so it only runs
-          # while the contest has no problems; a run that died before this
-          # point resumes here.
+          # add-data always inserts, so it runs only while the contest has no problems;
+          # an interrupted run resumes here.
           if [ "$(dj "$api/contests/$id/problems" | jq length)" = 0 ]; then
             dj -F "problemset=@$pdf;type=application/pdf" "$api/contests/$id/problemset" >/dev/null
             if ! dj -F "data=@$dir/x/problems.yaml" "$api/contests/$id/problems/add-data" >/dev/null; then
@@ -132,21 +128,19 @@
             pkg="$dir/pkg"
             rm -rf "$pkg"
             unzip -q "$dir/x/$problem.zip" -d "$pkg"
-            # 2025-09 archives wrap each package in a <problem>/ directory;
+            # Newer archives wrap each package in a <problem>/ directory;
             # DOMjudge only finds problem.yaml and data/ at the zip root.
             root="$pkg"
             [ -e "$pkg/$problem/problem.yaml" ] && root="$pkg/$problem"
-            # 2025-09 moved the default validator's flags (float tolerances)
-            # out of problem.yaml into data/test_group.yaml, which the
-            # archives only carry as generators.yaml's test_group.yaml key.
-            # DOMjudge 9 reads neither, so floats would be compared exactly.
+            # Newer packages keep validator flags (float tolerances) only in data/test_group.yaml or
+            # generators.yaml, which DOMjudge 9 ignores: without this, floats compare exactly.
             args() { yq -r "$1"' | select(.) | [.] | flatten | join(" ")' "$2" 2>/dev/null || true; }
             flags=$(args '.output_validator_args' "$root/data/test_group.yaml")
             [ -n "$flags" ] || flags=$(args '."test_group.yaml".output_validator_args' "$root/generators/generators.yaml")
             if [ -n "$flags" ] && ! yq -e '.validator_flags' "$root/problem.yaml" >/dev/null 2>&1; then
               FLAGS=$flags yq -i '.validator_flags = strenv(FLAGS)' "$root/problem.yaml"
             fi
-            # 2025-09 moved the statement to statement/problem.<lang>.pdf;
+            # Newer packages keep the statement at statement/problem.<lang>.pdf;
             # DOMjudge 9 only reads problem.pdf (root or problem_statement/).
             if [ ! -e "$root/problem.pdf" ] && [ -e "$root/statement/problem.en.pdf" ]; then
               cp "$root/statement/problem.en.pdf" "$root/problem.pdf"

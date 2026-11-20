@@ -1,7 +1,6 @@
-# core.reboot-required — say so when the running kernel is not the built one.
-# Deliberately does NOT reboot: there is no automatic rollback, so a kernel
-# that does not come back needs the console.
+# core.reboot-required — notifies when the running kernel is not the built one.
 {den, ...}: {
+  # Notifies, never reboots: there is no automatic rollback, so a kernel that does not come back needs the console.
   den.aspects.core.reboot-required = {
     includes = [den.aspects.core.notify-failure];
 
@@ -22,9 +21,7 @@
         name = "reboot-required-check";
         runtimeInputs = with pkgs; [curl coreutils];
         text = ''
-          # The three things a reboot actually changes. Comparing the whole
-          # system path would fire on every activation, which says nothing
-          # about the kernel.
+          # Only what a reboot changes: comparing the whole system path fires on every activation.
           changed=""
           for part in kernel initrd kernel-modules; do
             booted="$(readlink -f "/run/booted-system/$part" 2>/dev/null || true)"
@@ -41,9 +38,7 @@
 
           echo "reboot required, differs in:$changed"
 
-          # Read out of the store path, not /run/*/kernel-version: that file
-          # does not exist on these hosts (checked), and reading it would have
-          # made both versions "unknown" in every notification this ever sends.
+          # Version from the store path (/run/*/kernel-version does not exist on these hosts):
           # `.../<hash>-linux-6.18.44/bzImage` -> `6.18.44`.
           kver() {
             basename "$(dirname "$(readlink -f "$1" 2>/dev/null)")" |

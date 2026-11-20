@@ -1,17 +1,10 @@
-# endeavour (x86_64 media/services server, intel+nvidia, ZFS). den-produced.
-#
-# Generate the facter report on it:
-#   sudo nix run nixpkgs#nixos-facter -- -o modules/den/hosts/_facter/endeavour.facter.json
-#
-# Dell Precision R7910: Xeon + Tesla P100 (compute only), Intel Arc A310 for
-# transcoding, the BMC's Matrox for the console.
+# endeavour — x86_64 media and services server (Dell Precision R7910: Xeon, Tesla P100 compute, Arc A310 transcode).
 {
   den,
   inputs,
   lib,
   ...
 }: let
-  # Shared by the server config below and the netbird-service entries.
   createPort = 25565;
   # Simple Voice Chat (in the create pack).
   voicePort = 24454;
@@ -35,8 +28,7 @@ in {
       cosmos.system.impermanence.persist.directories = ["dev"];
     };
 
-    # minecraft-control's gate and its in-app per-server groups. Its own
-    # gate, not an *arr one: shared with people who administer nothing else.
+    # Own gate, not an *arr one: shared with people who administer nothing else.
     kanidm-provision =
       lib.foldl' lib.recursiveUpdate {}
       (map (import ../aspects/services/_netbird-groups.nix) minecraftGroups);
@@ -53,9 +45,7 @@ in {
       # server from the stamped groups.
       minecraft-control.bearerAuth.groups = minecraftGroups;
 
-      # A game client can't follow an IdP redirect; the whitelist is the
-      # access control. If it connects but never handshakes, try target
-      # protocol = "tcp", or a DNAT like the knot's :22.
+      # A game client can't follow an IdP redirect; the whitelist is the access control.
       minecraft-create = {
         domain = "create.lvdar.nl";
         mode = "tcp";
@@ -64,9 +54,8 @@ in {
         targets = targets createPort;
       };
 
-      # Simple Voice Chat. A broken voice port is silent ("voice chat
-      # unavailable") while the game still works. L4 routes by listen port,
-      # so the client's default (game address, this port) lands here too.
+      # A broken voice port is silent while the game still works. L4 routes by listen port,
+      # so the client's default (game address, this port) lands here.
       minecraft-create-voice = {
         domain = "create-voice.lvdar.nl";
         mode = "udp";
@@ -153,17 +142,15 @@ in {
       pkgs,
       ...
     }: let
-      # By PCI slot, not renderD12x: probe order once (2026-08-28) handed
-      # renderD128 to the Tesla, silently breaking VAAPI. by-path fails loudly.
+      # By PCI slot, not renderD12x: probe order can hand renderD128 to the Tesla and silently break VAAPI.
       arcRenderNode = "/dev/dri/by-path/pci-0000:07:00.0-render";
     in {
       imports = [
         inputs.nixos-facter-modules.nixosModules.facter
         {
           facter.reportPath = ./_facter/endeavour.facter.json;
-          # Pinned off: otherwise a monitor present at the next facter run
-          # puts every GPU driver (~100 MB nvidia firmware) in the initrd.
-          # hardware.graphics.enable is set explicitly below.
+          # Pinned off, else a monitor at the next facter run puts every GPU driver in the initrd;
+          # hardware.graphics.enable is set below.
           facter.detected.graphics.enable = false;
         }
         inputs.nixos-hardware.nixosModules.common-cpu-intel
@@ -174,16 +161,13 @@ in {
 
       cosmos.security.apparmor.profiles = import ./_apparmor/endeavour.nix;
 
-      # Boot defaults (UEFI, device "nodev") are correct; don't copy gaia's
-      # legacy settings: there's no bios_grub partition, and /dev/sda is a
-      # tank SAS member, not the system M.2.
+      # Keep the UEFI boot defaults; gaia's legacy settings don't apply here
+      # (no bios_grub partition, and /dev/sda is a tank SAS member).
 
       # DID of @lvdar.nl on this host's own PDS.
       cosmos.services.tangled.owner = "did:plc:wj6rsizbzc7fruoopsxg2k2a";
 
-      # Generations churned fast enough that the fleet default 30d retention
-      # outgrew the system disk (98% full, 5.4G free). A week still covers
-      # noticing a bad deploy.
+      # Generations churn fast here; the fleet's 30d retention outgrows the system disk.
       cosmos.system.nix.gcOlderThan = "7d";
 
       # Push what builds here (voyager's remote builds included), or CI rebuilds it.
@@ -204,9 +188,8 @@ in {
           "qwen2.5-coder:3b"
         ];
 
-        # ollama has no auth: every mesh peer gets free GPU use. Accepted:
-        # the mesh is all enrolled devices; gaia publishes nothing on 11434
-        # and the port opens on the NetBird interface only.
+        # Accepted risk: ollama has no auth, so every mesh peer gets GPU use. gaia publishes
+        # nothing on 11434 and the port opens on the NetBird interface only.
         meshExposed = true;
       };
 
@@ -234,9 +217,8 @@ in {
         operators = {};
       };
 
-      # `netbird-minecraft-control` is the gate on gaia; the per-server
-      # groups in minecraftAccess decide which servers a user gets. Gate
-      # group alone shows an empty page.
+      # Gate group alone shows an empty page; the per-server groups in minecraftAccess
+      # decide which servers a user gets.
       cosmos.services.minecraft.control = {
         enable = true;
         access = minecraftAccess;
@@ -248,9 +230,8 @@ in {
 
       networking.hostId = "b8433556";
 
-      # The iDRAC NIC self-assigns 169.254 instantly and dhcpcd counted it as
-      # "online"; loki/alertmanager then died needing a real address and hit
-      # start-limit. Deny it and wait for a real IPv4 lease.
+      # Deny the iDRAC NIC: its instant 169.254 address counts as online, and units that
+      # need a real IPv4 then hit start-limit.
       networking.dhcpcd = {
         wait = "ipv4";
         denyInterfaces = [
@@ -323,12 +304,10 @@ in {
         "/tank/minecraft"
       ];
 
-      # roles/server.nix's 20s reset the box mid-build on 2026-08-28 (SEL:
-      # Watchdog2 Hard reset). Same as pioneer. max-jobs below fixes the hang.
+      # 60s, not roles/server.nix's 20s: the watchdog hard-resets the host mid-build. Same as pioneer.
       systemd.settings.Manager.RuntimeWatchdogSec = lib.mkForce "60s";
 
-      # max-jobs=auto (72) x cores=0 livelocked the host on memory (no swap,
-      # uncapped ARC, no OOM entry). 8 x 8 bounds it to 64 compilers.
+      # max-jobs=auto (72) x cores=0 livelocks the host on memory; 8 x 8 bounds it to 64 compilers.
       nix.settings = {
         max-jobs = 8;
         cores = 8;
@@ -368,9 +347,8 @@ in {
           };
         };
         intelgpu = {
-          # i915, not xe: xe declines DG2 without force_probe, leaving the Arc
-          # to a udev race it lost on 2026-08-28 (transcode broke). i915 here
-          # loads in stage 1 and claims the card.
+          # i915, not xe: xe declines DG2 without force_probe and leaves the Arc to a udev race.
+          # i915 loads in stage 1 and claims the card.
           driver = "i915";
           vaapiDriver = "intel-media-driver";
           enableHybridCodec = true;
@@ -381,8 +359,7 @@ in {
       boot = {
         kernelParams = ["nohibernate"];
 
-        # Cap ARC at 16 GiB: fast builds outran ARC eviction and the watchdog
-        # reset the host on 2026-08-28.
+        # Cap ARC at 16 GiB: fast builds outrun ARC eviction and the watchdog resets the host.
         extraModprobeConfig = ''
           options zfs zfs_arc_max=17179869184
         '';
@@ -446,15 +423,12 @@ in {
 
         ddns.enable = true;
 
-        # Library/downloads were not migrated from voyager with the config.
         suwayomi = {
           basicAuth.enable = true;
           # Not cosmos.user.name: "nixos" is the deploy account here.
           basicAuth.username = "lvdar";
-          # Off since 2.3: libcef SIGTRAPs inside the FHS wrapper (exit 133)
-          # and takes the whole server down. Not a missing lib nor the host;
-          # likely chromium's sandbox nested in bubblewrap, with no knob for
-          # --no-sandbox.
+          # libcef SIGTRAPs inside the FHS wrapper (exit 133) and takes the server down;
+          # there is no --no-sandbox knob.
           webview.enable = false;
 
           # Loopback: flaresolverr is unauthenticated.
@@ -469,8 +443,7 @@ in {
           downloadRetry.enable = true;
         };
 
-        # Backlog grows (155 files / 140 GiB on 2026-08-30) faster than 8/night;
-        # runs were CPU-bound, not encoder-bound, so 24 files, two at a time.
+        # The backlog outgrows 8 files a night and runs are CPU-bound: 24 files, two at a time.
         transcode = {
           dryRun = false;
           maxPerRun = 24;

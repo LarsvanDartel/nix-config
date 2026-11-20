@@ -1,7 +1,4 @@
-# voyager (x86_64 laptop, Framework Laptop 12; hardware module in _hw/voyager/). den-produced.
-#
-# Hardware from a nixos-facter report; filesystems from disko. Generate on voyager:
-#   sudo nix run nixpkgs#nixos-facter -- -o modules/den/hosts/_facter/voyager.facter.json
+# voyager — x86_64 Framework Laptop 12, the only workstation (hardware module in _hw/voyager/).
 {
   den,
   inputs,
@@ -11,8 +8,7 @@
     users.lvdar = {};
     meshAddress = "100.68.60.163";
     sshHostKey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIDVfDaFhgvfE2K47EGx8P+eL6od9H/oFKQZNeXvfr6Uh";
-    # Reboots daily, so the profile load lands on every boot; the protection pays off on the
-    # servers, not here (zen and the session would stay unconfined anyway).
+    # AppArmor's load cost lands on every daily boot here; see docs/src/apparmor.md#apparmor.
     excludes = with den.aspects; [core.apparmor];
   };
 
@@ -72,9 +68,7 @@
         ...
       }: {
         cosmos = {
-          # iDRAC's OpenSSH 6.6 can't parse ed25519 — hence an RSA identity.
-          # 2048 bits: iDRAC 7/8 rejects 4096-bit keys (Dell KB 000142481).
-          # Merges with lvdar.nix's device key.
+          # RSA 2048: iDRAC's OpenSSH 6.6 can't parse ed25519, and iDRAC 7/8 rejects 4096-bit keys (Dell KB 000142481).
           cli.programs.ssh.identities = ["idrac"];
 
           cli.programs.yazi.defaultApplication = true;
@@ -168,7 +162,6 @@
 
         cli.programs.nh.flake-dir = "/home/lvdar/nix-config";
 
-        # Direct over the mesh rather than through gaia; creds from sops.
         programs.taskwarrior.sync.serverUrl = "http://endeavour.nb.lvdar.nl:10222";
       };
 
@@ -182,20 +175,16 @@
           options iwlwifi power_save=0 uapsd_disable=1
           options iwlmvm power_scheme=1
 
-          # NuPhy Air75 registers as an Apple keyboard; fnmode=0 makes the top row
-          # act as plain F1-F12 without needing Fn, fixing Fn key combos.
+          # NuPhy Air75 registers as an Apple keyboard; fnmode=0 makes its top row plain F1-F12 without Fn.
           options hid_apple fnmode=0
         '';
 
-        # Plymouth gives the LUKS FIDO2 prompt a real UI.
         plymouth.enable = true;
 
         loader.timeout = 0;
       };
 
-      # Disk swap was thrashing at 15.8/16G before RAM was exhausted. zram's
-      # priority (5) beats the swapfile's (-2), so it fills first; the
-      # swapfile stays the hibernation target.
+      # zram (priority 5) fills before the swapfile (-2), which stays the hibernation target.
       zramSwap.enable = true;
       boot.kernel.sysctl."vm.swappiness" = 100;
 
@@ -219,7 +208,6 @@
         bgscan=""
       '';
 
-      # Minecraft.
       networking.firewall.allowedUDPPorts = [25565];
       networking.firewall.allowedTCPPorts = [25565];
 

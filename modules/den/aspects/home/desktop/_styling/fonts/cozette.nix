@@ -1,3 +1,4 @@
+# home.styling — the Cozette font family.
 {pkgs, ...}: {
   name = "Cozette";
   package = pkgs.cozette;

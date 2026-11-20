@@ -1,7 +1,5 @@
 #!/bin/sh
-# kt — DOMjudge's Kotlin compile script with kotlinc from the Nix closure
-# mounted at /nix in the judge chroot; it runs on the chroot's OpenJDK.
-# Writes $DEST as a wrapper that runs the detected main class.
+# kt — DOMjudge Kotlin compile script; kotlinc comes from the Nix closure and runs on the chroot's OpenJDK.
 DEST="$1"
 MEMLIMIT="$2"
 shift 2
@@ -9,7 +7,7 @@ COMPILESCRIPTDIR="$(dirname "$0")"
 KOTLIN_DIR=@kotlinc@/bin
 KOTLIN_STDLIB=@kotlinc@/lib/kotlin-stdlib.jar
 
-# KiB, deducted from MEMLIMIT for the JVM itself and the stack.
+# KiB reserved out of MEMLIMIT for the JVM and its stack.
 MEMSTACK=65536
 MEMJVM=65536
 MEMLIMITJAVA=$((MEMLIMIT - MEMSTACK - MEMJVM))

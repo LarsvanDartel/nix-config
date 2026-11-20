@@ -1,3 +1,4 @@
+# simplelogin-cli — CLI for the SimpleLogin.io API (github:KennethWussmann/simplelogin-cli).
 {...}: {
   nixpkgs.overlays = [
     (final: _prev: {

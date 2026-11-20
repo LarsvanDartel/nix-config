@@ -1,21 +1,12 @@
-// A window for CPN IDE.
-//
-// The upstream Windows build ships its own Electron shell, but that one is
-// written against Electron 4: it drives file dialogs through the `remote`
-// module, which no longer exists. So this is a plain frame around the same
-// frontend, served by the backend the launcher starts.
-//
-// The frontend decides which code path to take by looking for "Electron" in
-// the user agent, and the Electron path is the one that needs `remote`. We
-// strip the token so it takes the browser path instead: HTML file inputs for
-// opening, downloads for saving. Electron shows a native save dialog for a
-// download, so saving still ends up feeling like a desktop app.
+// cpn-ide-app — a plain Electron window around the CPN IDE frontend, served by the backend the launcher starts.
 
 const { app, BrowserWindow, shell } = require("electron");
 
 const url = process.env.CPN_IDE_URL || "http://localhost:8080/";
 
 app.setName("CPN IDE");
+// No "Electron" token: the frontend's Electron path needs the `remote` module, which current
+// Electron lacks; the browser path uses file inputs and downloads.
 app.userAgentFallback =
   "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) " +
   `Chrome/${process.versions.chrome} Safari/537.36`;

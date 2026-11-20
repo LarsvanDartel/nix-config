@@ -1,5 +1,4 @@
-# The niri home config, as a plain home-manager module factory imported by its
-# aspect `den.aspects.home.niri`.
+# home.niri — home-manager body of the niri aspect: readable config.kdl and per-mode colours.
 {cosmosStyling}: {
   config,
   lib,
@@ -9,9 +8,8 @@
 }: let
   niri = osConfig.programs.niri.package;
 
-  # nix-wrapper-modules quotes every KDL name/key, which breaks naive parsers
-  # (noctalia's keybind-cheatsheet never loads). Unquote, then `niri validate`
-  # so the build fails rather than publishing a wrong config.
+  # nix-wrapper-modules quotes every KDL name, which breaks naive parsers (keybind-cheatsheet).
+  # Unquote, then `niri validate` so a wrong config fails the build.
   readableConfig = pkgs.runCommand "niri-config.kdl" {} ''
     sed -E \
       -e 's/^([[:space:]]*)"([^"]+)"/\1\2/' \
@@ -20,8 +18,7 @@
     ${lib.getExe niri} validate --config $out
   '';
 
-  # The colours of desktop/_niri/system.nix in one mode; its config includes
-  # the current mode's copy last. The shadow stays the darkest shade.
+  # desktop/_niri/system.nix's colours in one mode; its config includes the current mode's copy last.
   colorsFor = mode: let
     c = config.cosmos.desktops.common.styling.modes.rendered.${mode}.lib.stylix.colors.withHashtag;
     shade =
@@ -67,7 +64,5 @@ in {
 
   cosmos.system.impermanence.persist.directories = ["Pictures/screenshots"];
 
-  # The wrapped niri reads its config from the store; publish it at the
-  # conventional path for tooling.
   xdg.configFile."niri/config.kdl".source = readableConfig;
 }

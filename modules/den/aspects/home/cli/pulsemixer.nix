@@ -1,4 +1,4 @@
-# home.pulsemixer
+# home.pulsemixer — pulsemixer audio mixer TUI with a desktop entry
 {...}: {
   den.aspects.home.pulsemixer.homeManager = {pkgs, ...}: {
     home.packages = with pkgs; [pulsemixer];

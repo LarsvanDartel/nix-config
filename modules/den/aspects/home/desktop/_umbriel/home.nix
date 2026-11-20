@@ -1,4 +1,4 @@
-# Umbriel's home config (config.toml, accelerometer rotation, touch gestures, tablet-mode keyboard and dock), as a plain home-manager module imported by its aspect `den.aspects.home.umbriel`.
+# home.umbriel — Umbriel's config.toml plus its rotation, gesture and tablet-mode user units.
 {cosmosStyling}: {
   config,
   lib,
@@ -15,8 +15,7 @@
   noctaliaMsg = "${config.programs.noctalia.package}/bin/noctalia msg";
   modes = config.cosmos.desktops.common.styling.modes;
 
-  # Umbriel's colours in one mode, from that mode's stylix palette; the
-  # config includes the session's mode (home.theme). Same roles as niri.
+  # Same colour roles as niri's; the config includes the session mode's file (home.theme).
   colorsFor = mode: let
     c = lib.mapAttrs (_: v: "${v}FF") modes.rendered.${mode}.lib.stylix.colors.withHashtag;
     accent = c.${cosmosStyling.accent};
@@ -49,10 +48,8 @@
       };
     };
 
-  # The gestures of desktop/tablet.nix (format and ordering rules there), with
-  # Umbriel's actions; keep in step by hand. Touching the open overview closes
-  # it on touch-down, so the bottom swipe only opens: a toggle firing on
-  # release would reopen it.
+  # desktop/tablet.nix's gestures (format and ordering rules there); keep in step by hand. The bottom
+  # swipe only opens: touch-down closes the overview, so a toggle on release would reopen it.
   gestures = [
     "1,DU,B,*,R,${umbriel} msg overview-open"
     "1,LR,L,*,R,${umbriel} msg window-focus-left"
@@ -106,9 +103,7 @@
     '';
   };
 
-  # Applies /run/tablet-mode (written by desktop/_umbriel/system.nix): wvkbd
-  # shows on SIGUSR2 and hides on SIGUSR1, and the noctalia dock follows it,
-  # as niri's switch-events do.
+  # Applies /run/tablet-mode (desktop/_umbriel/system.nix) as niri's switch-events do; keep in step.
   tablet-mode = pkgs.writeShellApplication {
     name = "tablet-mode";
     runtimeInputs = [pkgs.procps];
@@ -130,11 +125,8 @@
     '';
   };
 
-  # Positions on the focused output: the named workspaces 1..9 (`workspace`
-  # below) persist and sort before dynamic ones, and a bare-digit argument
-  # selects a position, not a name. The keys are what keyd sends for Mod + the
-  # physical digit row (desktop.keyd): Umbriel matches a bind on the shifted
-  # symbol too, so the printed symbols collide across layouts.
+  # A bare digit selects a position; named workspaces 1..9 persist and sort first. Keys are keyd's
+  # digit-row keysyms (desktop.keyd): Umbriel also matches shifted symbols, which collide across layouts.
   workspaceBinds = lib.listToAttrs (
     lib.flatten (
       lib.imap1 (i: key: [
@@ -157,7 +149,6 @@
 
     general = {
       mod_key = "Super";
-      # Startup only; Mod+Slash still toggles it.
       show_cheatsheet = false;
     };
 
@@ -179,9 +170,7 @@
       tablet.map_to_output = "eDP-1";
     };
 
-    # As niri (desktop/_niri/system.nix): the pixel font needs an integer scale,
-    # on the desk monitor too (at 0.8 its text is mangled). That monitor sits
-    # left of the laptop, bottom edges aligned.
+    # Integer scales only, as in niri (desktop/_niri/system.nix): the pixel font mangles at 0.8.
     output = {
       "eDP-1" = {
         scale = 1.0;
@@ -208,9 +197,8 @@
     # Every output gets its own persistent 1..9 (no `output` key).
     workspace = map (i: {name = toString i;}) (lib.range 1 9);
 
-    # As Noctalia's Umbriel compositor-settings page, except corners and
-    # shadows, which follow niri's: square tiles, and only floating windows
-    # rounded (6 px) with a shadow (window_rule below).
+    # As noctalia's Umbriel settings page, except corners and shadows, which follow niri's:
+    # square tiles; only floating windows rounded with a shadow (window_rule below).
     appearance = {
       prefer_no_csd = true;
       border_width = 2;
@@ -267,9 +255,8 @@
       }
     ];
 
-    # Same combos as niri's binds (desktop/_niri/system.nix); keep in step by hand.
-    # Not ported: Mod+Ctrl+F (no windowed fullscreen), Mod+Shift+S and
-    # Alt+Print (no window screenshot), Mod+P (niri-displays is niri-only).
+    # Same combos as niri's binds (desktop/_niri/system.nix); keep in step by hand. Not ported:
+    # Mod+Ctrl+F, Mod+Shift+S, Alt+Print, Mod+P (no Umbriel equivalent).
     keybinds =
       {
         "Mod+Shift+Return" = "spawn foot";
@@ -310,7 +297,6 @@
         "Mod+Shift+J" = "window-move-down";
         "Mod+Shift+K" = "window-move-up";
         "Mod+Shift+L" = "column-move-right";
-        # Monitors: Mod+Alt is "the screen in that direction".
         "Mod+Alt+H" = "output-focus-left";
         "Mod+Alt+J" = "output-focus-down";
         "Mod+Alt+K" = "output-focus-up";

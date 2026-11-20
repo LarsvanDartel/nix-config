@@ -1,6 +1,4 @@
-# core.impermanence-options — persist option schema, declared on every host so
-# any aspect can contribute persist paths. Also declares cosmos.user.name (set
-# by core.users-base from the host's den user).
+# core.impermanence-options — persist option schema and cosmos.user.name, declared on every host.
 {...}: {
   den.aspects.core.impermanence-options.nixos = {lib, ...}: let
     inherit (lib.types) listOf str coercedTo attrsOf bool;

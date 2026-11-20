@@ -1,5 +1,4 @@
-# roles.home-base — the home baseline every user gets, via
-# den.schema.user.includes (defaults.nix).
+# roles.home-base — the home baseline every user gets via den.schema.user.includes.
 {den, ...}: {
   den.aspects.roles.home-base.includes =
     (with den.aspects.home; [

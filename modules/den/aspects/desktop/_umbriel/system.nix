@@ -1,4 +1,4 @@
-# Umbriel system config (compositor, greeter entry, tablet-mode switch), as a plain NixOS module imported by its aspect `den.aspects.desktop.umbriel`.
+# desktop.umbriel — NixOS body of the umbriel aspect: compositor, greeter entry, tablet-mode switch.
 {}: {
   config,
   lib,
@@ -16,9 +16,8 @@
 
   environment.systemPackages = [pkgs.wlr-randr];
 
-  # Umbriel has no tablet-mode events, and libinput needs /dev/input, hence
-  # root. It only records the state; the session's tablet-mode.path acts on it
-  # (home/desktop/_umbriel/home.nix).
+  # Umbriel has no tablet-mode events and libinput needs /dev/input, hence root.
+  # It only records the state; tablet-mode.path in home/desktop/_umbriel/home.nix acts on it.
   systemd.services.tablet-mode-switch = {
     description = "Record the tablet-mode switch in /run/tablet-mode (Umbriel has no switch events)";
     wantedBy = ["multi-user.target"];

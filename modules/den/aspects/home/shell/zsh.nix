@@ -1,4 +1,4 @@
-# home.zsh (was the zsh contribution to homeManager.common).
+# home.zsh — zsh with persisted history and the alias/init option hooks.
 {...}: {
   den.aspects.home.zsh.homeManager = {
     config,

@@ -1,4 +1,4 @@
-# home.btop
+# home.btop — btop system monitor
 {...}: {
   den.aspects.home.btop.homeManager = {...}: {
     programs.btop = {
@@ -11,7 +11,6 @@
       };
     };
 
-    # stylix's theme file is switched by home.theme; SIGUSR2 rereads it.
     cosmos.desktops.common.styling.modes.onSwitch = ''
       pkill -USR2 -x btop || true
     '';

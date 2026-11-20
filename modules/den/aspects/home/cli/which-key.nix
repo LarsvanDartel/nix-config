@@ -1,4 +1,4 @@
-# home.which-key — tmux which-key plugin, layered onto this host's tmux wrapper.
+# home.which-key — tmux which-key plugin, layered onto this host's tmux wrapper
 {...}: {
   den.aspects.home.which-key.homeManager = {
     config,

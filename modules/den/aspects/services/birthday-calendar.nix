@@ -1,5 +1,4 @@
-# services.birthday-calendar — the birthdays in lvdar's Stalwart address
-# books, mirrored hourly into one Stalwart calendar as yearly events.
+# services.birthday-calendar — mirrors lvdar's Stalwart contact birthdays hourly into one Stalwart calendar.
 {den, ...}: {
   den.aspects.services.birthday-calendar = {
     includes = [den.aspects.services.stalwart];
@@ -18,7 +17,6 @@
         # As in services.holiday-calendar: the recovery admin impersonating
         # the owner, on the loopback management listener.
         user = "${account}%${config.services.stalwart.admin.username}";
-        # Every address book under this home is read.
         addressBooks = "${dav}/card/${lib.escapeURL account}/";
         calendar = "${dav}/cal/${lib.escapeURL account}/verjaardagen/";
         name = "Verjaardagen";

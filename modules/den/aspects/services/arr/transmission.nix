@@ -1,5 +1,4 @@
-# services.arr.transmission — the torrent client, normally confined to the VPN
-# namespace (cosmos.services.arr.transmission.vpn.enable).
+# services.arr.transmission — the torrent client, normally confined to the VPN namespace.
 {den, ...}: let
   inherit (import ./_lib.nix) vpnVhost;
 in {

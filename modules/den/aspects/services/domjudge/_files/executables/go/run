@@ -1,16 +1,11 @@
 #!/bin/sh
-# go — Go compile script (DOMjudge has no default) with Go from the Nix closure
-# mounted at /nix in the judge chroot. CGO is off, so binaries are static.
-#
-# Go sizes its thread pools by CPU count, but runguard caps the judge user at
-# 64 tasks on a 72-CPU host: GOMAXPROCS keeps the compiler and the
-# submission under it.
+# go — DOMjudge Go compile script; Go comes from the Nix closure mounted at /nix in the judge chroot.
 DEST="$1"
 BIN="$(basename "$DEST").bin"
 shift 2 # DEST, MEMLIMIT
 
-# A fresh cache per compile: the std packages are rebuilt each time. Go also
-# needs a writable work dir, and the judging chroot has no /tmp.
+# Go needs writable cache and work dirs (the judging chroot has no /tmp). runguard caps the
+# judge user at 64 tasks on a 72-CPU host: GOMAXPROCS keeps compiler and submission under it.
 mkdir go_tmp
 GOCACHE="$PWD/go_cache" GOPATH="$PWD/go_path" GOTMPDIR="$PWD/go_tmp" \
 	HOME=/does/not/exist GOTOOLCHAIN=local CGO_ENABLED=0 GOMAXPROCS=4 \

@@ -1,4 +1,4 @@
-# typstnique service.
+# services.typstnique — the typstnique app, served behind gaia's netbird-proxy.
 {inputs, ...}: let
   # services.typstnique.port and the netbird-service target.
   port = 3030;

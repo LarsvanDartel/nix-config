@@ -1,7 +1,4 @@
-# home.yazi — yazi as a nix-wrapper-modules package (`nix run .#yazi`); the
-# wrapper holds the theme (a port of stylix's yazi target), home-manager
-# installs it per mode (cosmosStyling.modal) plus the `y` cd-on-exit function
-# and the defaultApplication option.
+# home.yazi — yazi as a per-mode nix-wrapper-modules package, plus the `y` cd-on-exit function
 {
   inputs,
   cosmosStyling,

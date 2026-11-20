@@ -1,11 +1,9 @@
-# services.bulwark — Bulwark JMAP webmail for Stalwart at webmail.lvdar.nl;
-# signs in through kanidm's `stalwart` client.
+# services.bulwark — Bulwark JMAP webmail for Stalwart at webmail.lvdar.nl.
 {den, ...}: let
   # Option default and netbird-service target (see services/netbird.nix).
   defaultPort = 3002;
   domain = "webmail.lvdar.nl";
-  # i18n/routing.ts SUPPORTED_LOCALES: the OAuth callback is
-  # /<locale>/auth/callback, the locale coming from the browser.
+  # Hand-synced with upstream's i18n/routing.ts SUPPORTED_LOCALES: the OAuth callback is /<locale>/auth/callback.
   locales = ["ar" "ca" "cs" "da" "de" "en" "es" "et" "fa" "fr" "he" "hu" "it" "ja" "ko" "lv" "mn" "nb" "nl" "pl" "pt" "ro" "ru" "sk" "th" "tr" "uk" "vi" "zh" "zh-TW"];
 in {
   den.aspects.services.bulwark = {
@@ -66,9 +64,8 @@ in {
           };
         };
 
-        # Static user, not DynamicUser: impermanence would persist the
-        # /var/lib/private symlink and lose the generated session secret
-        # (everyone signed out on every boot).
+        # Static user, not DynamicUser: impermanence would persist the /var/lib/private symlink
+        # and lose the generated session secret, signing everyone out on every boot.
         users.users.bulwark.home = "/var/lib/bulwark";
         systemd.services.bulwark.serviceConfig = {
           DynamicUser = lib.mkForce false;

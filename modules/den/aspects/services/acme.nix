@@ -1,5 +1,4 @@
-# services.acme — ACME wildcard cert for *.lvdar.nl via Cloudflare DNS. Split
-# from nginx so services that only need the cert can pull it in.
+# services.acme — ACME wildcard cert for *.lvdar.nl via Cloudflare DNS.
 {...}: {
   den.aspects.services.acme.nixos = {config, ...}: {
     cosmos.system.impermanence.persist.directories = [

@@ -1,10 +1,5 @@
 <!doctype html>
-<!--
-  The Minecraft control page served by services/minecraft-control.nix.
-
-  Deliberately free of nix interpolation; the server list comes from
-  servers.json.
--->
+<!-- minecraft-control — the control page; free of nix interpolation, the server list comes from servers.json. -->
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Minecraft</title>
@@ -136,7 +131,7 @@
         : cores.toFixed(2) + " of " + info.cpus + " cores (" +
           ((cores / info.cpus) * 100).toFixed(1) + "% of the machine)";
 
-    // `ms` exposes slow hooks, the symptom of both past bugs on this page.
+    // `ms` exposes slow hooks.
     console.debug("info-" + name, {
       ...info,
       cpuCores: cores,
@@ -156,7 +151,6 @@
     const atBottom =
       v.log.scrollHeight - v.log.scrollTop - v.log.clientHeight < 40;
     v.log.textContent = (await hook("logs-" + name)) || "(no log yet)";
-    // Only follow the bottom if the reader was already there.
     if (atBottom) v.log.scrollTop = v.log.scrollHeight;
   }
 
@@ -268,9 +262,8 @@
 
     const declared = await (await fetch("servers.json")).json();
 
-    // The 403 comes from the same nginx rule guarding every hook, so what is
-    // shown is exactly what this person may act on. Parallel, or later cards
-    // look like failures to load.
+    // The 403 comes from the nginx rule guarding every hook, so what is shown is exactly what
+    // this person may act on. Parallel, or later cards look like failures to load.
     const allowed = await Promise.all(
       declared.map(s => hook("info-" + s).then(r => r !== null).catch(() => false))
     );

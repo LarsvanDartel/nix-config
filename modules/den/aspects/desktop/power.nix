@@ -1,5 +1,4 @@
-# desktop.power — upower (noctalia's Battery widget hides itself without it),
-# power-profiles-daemon, and user write access to the battery charge limit.
+# desktop.power — upower, power-profiles-daemon and user write access to the battery charge limit.
 {...}: {
   den.aspects.desktop.power.nixos = {
     lib,
@@ -14,9 +13,8 @@
     services.upower.enable = true;
     services.power-profiles-daemon.enable = true;
 
-    # noctalia's battery-threshold plugin writes charge_control_end_threshold as the user; cros_charge-control exposes it.
-    # udev re-applies this on every battery hotplug/resume; a one-off chmod
-    # does not stick.
+    # noctalia's battery-threshold plugin writes the limit as the user. udev re-applies the
+    # permissions on every battery hotplug/resume; a one-off chmod does not stick.
     users.groups.battery_ctl = {};
     cosmos.user.extraGroups = ["battery_ctl"];
     services.udev.extraRules = ''

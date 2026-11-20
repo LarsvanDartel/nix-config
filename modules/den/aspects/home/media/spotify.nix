@@ -1,4 +1,4 @@
-# home.spotify (spotify-player)
+# home.spotify — spotify-player, a terminal Spotify client.
 {...}: {
   den.aspects.home.spotify.homeManager = {
     pkgs,

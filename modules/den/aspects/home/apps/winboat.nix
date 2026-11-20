@@ -1,4 +1,4 @@
-# home.winboat
+# home.winboat — WinBoat Windows apps in a container, over FreeRDP
 {...}: {
   den.aspects.home.winboat.homeManager = {pkgs, ...}: {
     home.packages = [pkgs.freerdp pkgs.winboat];

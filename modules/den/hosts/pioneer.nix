@@ -1,7 +1,4 @@
-# pioneer (Raspberry Pi 3, aarch64 server). den-produced.
-#
-# Hardware from a nixos-facter report. Generate on pioneer:
-#   sudo nix run nixpkgs#nixos-facter -- -o modules/den/hosts/_facter/pioneer.facter.json
+# pioneer — Raspberry Pi 3 (aarch64) server publishing endeavour's iDRAC.
 {
   den,
   inputs,
@@ -18,9 +15,7 @@ in {
     # fleet's deploy: `deploy .#pioneer` on its own, and out of DeployBehind.
     deployByDefault = false;
 
-    # A 16G SD card that only proxies the iDRAC: no YubiKey is ever plugged
-    # in, and the home baseline's editor and CLI tools only cost card space
-    # and emulated aarch64 builds. Kept: home.core, zsh, ssh, theme-options.
+    # The 16G SD card has no room for these, and each is an emulated aarch64 build; see docs/src/hosts.md#pioneer.
     excludes = with den.aspects; [
       core.yubikey
       home.nvim
@@ -43,8 +38,7 @@ in {
   den.aspects.pioneer = {
     includes = with den.aspects; [
       services.netbird.client
-      # Not on endeavour: management proxied by the machine it recovers is
-      # not out-of-band (2026-08-28: seven-hour outage).
+      # Not on endeavour: management proxied by the machine it recovers is not out-of-band.
       services.idrac
     ];
 
@@ -69,14 +63,13 @@ in {
           # can stall long enough under IO for the watchdog to reset the board.
           systemd.settings.Manager.RuntimeWatchdogSec = lib.mkForce "60s";
 
-          # Served to mesh peers; see mesh-dns-record above.
           cosmos.services.idrac = {
             address = "192.168.2.111";
             domain = idracDomain;
             certificate = "lvdar.nl";
           };
 
-          # 16G SD card, ~89% full; every write shortens its life.
+          # 16G SD card: every write shortens its life.
           cosmos.system.journald.maxUse = "128M";
 
           # Fleet defaults exceed this card's free space: GC would run
@@ -87,10 +80,8 @@ in {
             maxFree = 1024 * 1024 * 1024;
           };
 
-          # The SD card again. facter turns on all of linux-firmware (825M);
-          # the only firmware this board loads is the Broadcom wireless one,
-          # which nixos-hardware's raspberry-pi-3 adds on its own. Ethernet is
-          # the USB smsc95xx, which needs none.
+          # facter enables all of linux-firmware (825M); this board needs only the Broadcom wireless
+          # firmware, which nixos-hardware's raspberry-pi-3 adds (Ethernet is the firmware-free smsc95xx).
           hardware.enableRedistributableFirmware = lib.mkForce false;
 
           # Deployed with deploy-rs, never rebuilt in place: nixos-rebuild-ng
@@ -102,20 +93,18 @@ in {
           nixpkgs.flake.setFlakeRegistry = false;
           nixpkgs.flake.setNixPath = false;
 
-          # Vendor kernel isn't cached (every deploy compiled one); mainline
-          # is, and supports bcm2837 headless.
+          # The vendor kernel is not in the binary cache; mainline is, and supports bcm2837 headless.
           boot.kernelPackages = lib.mkForce pkgs.linuxPackages;
 
-          # Don't pin hardware.deviceTree.name: the board boots on the
-          # firmware's runtime-patched DTB (memory, MAC, overlays); a static
-          # store DTB would lose those fixups.
+          # Don't pin hardware.deviceTree.name: the board boots on the firmware's runtime-patched DTB
+          # (memory, MAC, overlays), which a static store DTB would lose.
         })
       ];
 
       # Pi 3: parsing ~250 profiles each boot is too slow.
       cosmos.security.apparmor.coverage = "daemons";
 
-      # Predates disko: partitioned by the aarch64 SD-image installer.
+      # Not disko: partitioned by the aarch64 SD-image installer.
       fileSystems."/" = {
         device = "/dev/disk/by-uuid/44444444-4444-4444-8888-888888888888";
         fsType = "ext4";

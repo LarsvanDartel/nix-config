@@ -1,16 +1,12 @@
 # services.remote-builder — endeavour builds (and emulates aarch64) over ssh-ng on the mesh for every host that includes .client.
-#
-# Clients arrive on the `nix-builder-client` quirk ({address, key} from host facts). Payloads must stay
-# `{host, ...}:`; a `{config, ...}:` payload would make endeavour evaluate each client's configuration.
 {den, ...}: let
   inherit (den.lib.policy) pipe;
   builder = den.hosts.x86_64-linux.endeavour;
 in {
   den.quirks.nix-builder-client.description = "Hosts allowed to build on the remote builder ({address, key}: mesh IP and SSH host key)";
 
-  # collect, not collectAll: every client is x86_64.
-  # den reads these argument names (host scope, host-entity filter), so
-  # deadnix must not strip them as unused.
+  # collect, not collectAll: every client is x86_64. Payloads must stay `{host, ...}:`;
+  # a `{config, ...}:` payload makes endeavour evaluate each client's configuration.
   # deadnix: skip
   den.policies.nix-builder-client = {host, ...}: [
     (pipe.from "nix-builder-client" [

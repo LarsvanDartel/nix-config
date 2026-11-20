@@ -1,3 +1,4 @@
+# home.styling — font registry: one file per family, assigned to roles for stylix and fontconfig.
 {
   config,
   lib,

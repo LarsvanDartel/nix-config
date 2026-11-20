@@ -1,25 +1,12 @@
-# desktop.printing — cups with a driverless IPP queue for the home LAN
-# printer (Canon TS5100, AirPrint/IPP Everywhere; pinned by IP because the
-# printer's mDNS name does not resolve without the nss module, see below).
+# desktop.printing — CUPS with a static driverless IPP queue for the home LAN Canon TS5100.
 {...}: {
   den.aspects.desktop.printing.nixos = {
     pkgs,
     lib,
     ...
   }: let
-    # The PPD cups generated from the printer's IPP attributes (`-m
-    # everywhere`), vendored so registering the queue never needs the printer:
-    # `-m everywhere` queries it on every cups start, and while it was off that
-    # failed cups-post-start and Restart=on-failure looped cups every ~3.5s
-    # (2649 restarts on 2026-11-12).
-    #
-    # Edited from what the printer asks for: it reports
-    # `document-format-preferred: image/urf` although it also supports PWG
-    # Raster, and its URF duplex path prints the front side, turns the sheet,
-    # then ends the job (same bug class as OpenPrinting/cups-filters#660 and
-    # #490 on other Canon models). The `image/urf` cupsFilter2 line is
-    # therefore `image/pwg-raster`. Registered as a static model, cupsd loads
-    # exactly this file, so no post-start patching is needed.
+    # Vendored: `-m everywhere` queries the printer on every cups start and loops cups while it is off.
+    # cupsFilter2 is image/pwg-raster: URF duplex skips back sides (OpenPrinting/cups-filters#660).
     ts5100Ppd =
       lib.warnIf (pkgs.cups.version != "2.4.19") ''
         modules/den/aspects/desktop/printing.nix: nixpkgs' cups moved off 2.4.19,
@@ -31,9 +18,8 @@
         install -Dm444 ${./_printing/ts5100.ppd} $out/share/cups/model/ts5100.ppd
       '');
   in {
-    # .local names resolve through resolved's mDNS responder, which is already
-    # on for netbird-gewis's split DNS. Not nssmdns4: it races resolved's
-    # responder, and avahi would only duplicate that responder.
+    # .local names resolve via resolved's mDNS responder, also needed for netbird-gewis split DNS.
+    # Not nssmdns4: it races resolved's responder, and avahi would only duplicate it.
     services.resolved.enable = true;
     services.resolved.settings.Resolve.MulticastDNS = true;
 
@@ -53,6 +39,7 @@
         {
           name = "ts5100";
           description = "Canon TS5100 series";
+          # Pinned by IP: the printer's mDNS name does not resolve without the nss module.
           deviceUri = "ipp://192.168.2.84/ipp/print";
           model = "ts5100.ppd";
         }

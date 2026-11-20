@@ -1,7 +1,4 @@
-# home.tmux — tmux as a nix-wrapper-modules package (`nix run .#tmux`); the
-# wrapper holds the config and the base16 theme, home-manager installs it per
-# mode (cosmosStyling.modal). Host-specific additions go through
-# `cosmos.cli.programs.tmux.wrapperModule`.
+# home.tmux — tmux as a per-mode nix-wrapper-modules package
 {
   inputs,
   cosmosStyling,
@@ -17,7 +14,7 @@
     inputs.nix-wrapper-modules.wrappers.tmux.wrap {
       inherit pkgs;
 
-      # The wrapper's defaults differ from tmux's; pinned to the old home-manager config.
+      # Set explicitly: the wrapper's defaults differ from tmux's.
       terminal = "screen";
       baseIndex = 0;
       paneBaseIndex = 0;

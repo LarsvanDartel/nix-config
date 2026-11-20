@@ -1,8 +1,6 @@
-# services.alloy — ship this host's journal to loki.
-#
-# Opt-in per host, not in roles.server: pioneer must not run a shipper — SD-card
-# IO already stalls its watchdog.
+# services.alloy — ships this host's journal (and nginx logs) to loki.
 {den, ...}: {
+  # Opt-in per host, not in roles.server: pioneer's SD-card IO already stalls its watchdog.
   den.aspects.services.alloy = {
     includes = [den.aspects.services.netbird.client];
 
@@ -25,24 +23,8 @@
             }
           }
 
-          // kdeconnectd probes for peers over mDNS on every interface it can
-          // see, twice a second. One of those is wt0, NetBird's WireGuard
-          // interface, where no peer's AllowedIPs cover the mDNS multicast group
-          // 224.0.0.251 — so the kernel refuses the send with ENOKEY and
-          // kdeconnect logs "Failed to send mDNS query: Required key not
-          // available". Verified by hand: the same send succeeds on the LAN
-          // interface and returns ENOKEY on wt0.
-          //
-          // Nothing is broken. Discovery works over the LAN, which is the only
-          // place it could ever work, and a mesh peer is not a thing mDNS is
-          // meant to find. It is ~50k identical lines a day that bury everything
-          // else this host says.
-          //
-          // Dropped here because there is nowhere else to drop it: kdeconnect
-          // offers no way to restrict which interfaces it probes. If it ever
-          // gains one, this goes. The count survives as
-          // `loki_process_dropped_lines_total{reason=...}`, so the noise stays
-          // measurable even though the lines are gone.
+          // kdeconnect's mDNS probes fail on wt0 with ENOKEY (no AllowedIPs cover 224.0.0.251), ~50k lines a day,
+          // and it cannot restrict interfaces. Dropped lines stay counted in loki_process_dropped_lines_total.
           loki.process "denoise" {
             forward_to = [loki.write.default.receiver]
 
@@ -52,10 +34,7 @@
             }
           }
 
-          // Kept to a small fixed set on purpose: labels are what loki indexes,
-          // and a high-cardinality one (a pid, a request id) is how a loki
-          // install becomes unusably slow. `unit` answers the first question
-          // anyone asks, which is which service said this.
+          // Keep labels few and low-cardinality: loki indexes them, and a pid or request id makes it unusably slow.
           loki.relabel "journal" {
             forward_to = []
 
@@ -82,7 +61,6 @@
         ''
         + lib.optionalString nginx ''
 
-          // nginx logs to files, not the journal. `log` tells access from error.
           local.file_match "nginx" {
             path_targets = [
               {"__path__" = "/var/log/nginx/access.log", "log" = "access"},
@@ -98,8 +76,7 @@
             tail_from_end = true
           }
 
-          // The *arr clients put their API keys in query strings; loki is not
-          // where those should live.
+          // The *arr clients put their API keys in query strings; keep them out of loki.
           loki.process "nginx" {
             forward_to = [loki.write.default.receiver]
 

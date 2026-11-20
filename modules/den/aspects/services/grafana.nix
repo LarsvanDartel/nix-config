@@ -1,9 +1,4 @@
-# services.grafana — dashboards over the prometheus on this host.
-#
-# NetBird identity gate deliberately OFF, own kanidm OIDC client instead:
-# the gate's 302 on a lapsed session kills SPA XHR with a bare NetworkError
-# (what took traccar down). Local admin login kept: kanidm sits behind the
-# same edge, so OIDC-only would lock you out exactly when you need to look.
+# services.grafana — dashboards over this host's prometheus, behind its own kanidm OIDC client.
 {
   den,
   inputs,
@@ -15,8 +10,7 @@ in {
   den.aspects.services.grafana = {
     includes = with den.aspects.services; [netbird.client prometheus loki];
 
-    # Ungated: own OIDC, and its XHR can't follow the gate's 302
-    # (the NetworkError that took traccar down).
+    # Ungated: own OIDC, and its XHR can't follow the gate's 302 (bare NetworkError).
     netbird-service = {host, ...}: {
       grafana = {
         bearerAuth.enable = false;
@@ -115,9 +109,8 @@ in {
           # Encrypts datasource credentials in grafana's DB; losing it loses
           # them, so it is generated once and kept, not derived.
           "keys/grafana/secret-key".owner = "grafana";
-          # Grafana ships admin/admin and this is published. Only read when the
-          # admin account is *created*; to change later, remove
-          # /var/lib/grafana/data/grafana.db or `grafana cli admin reset-admin-password`.
+          # Grafana ships admin/admin and this is published. Read only when the admin is created;
+          # change it later with `grafana cli admin reset-admin-password`.
           "keys/grafana/admin-password".owner = "grafana";
         };
 
@@ -155,9 +148,8 @@ in {
             # gauges, and every run rebuilds the search indexes to count them.
             metrics.disable_total_stats = true;
 
-            # Without an overrides file the dashboards page's quota banner gets
-            # a 501, logged as an error on every visit. Empty: the default
-            # limit, nothing enforced.
+            # Without an overrides file the dashboards page's quota banner 501s and logs an error
+            # per visit. Empty means the default limit.
             unified_storage.overrides_path =
               lib.warnIf (grafanaVersion != "13.3.1") ''
                 modules/den/aspects/services/grafana.nix: nixpkgs' grafana is now ${grafanaVersion}.
@@ -165,9 +157,8 @@ in {
               ''
               "${pkgs.writeText "grafana-overrides.yaml" (builtins.toJSON {overrides = {};})}";
 
-            # No setting stops either loop: the cleanup ticker reports every
-            # 10 min, and the manifest watcher polls a discovery source that
-            # has no manifests on a single node, warning twice a minute.
+            # No setting stops either loop (cleanup ticker every 10 min; the manifest watcher polls an
+            # empty discovery source), so filter their logs.
             log.filters = lib.concatStringsSep " " [
               "cleanup:warn"
               (lib.warnIf (grafanaVersion != "13.3.1") ''
@@ -196,13 +187,12 @@ in {
               allow_sign_up = true;
               login_attribute_path = "preferred_username";
 
-              # kanidm emits grafana_role from its claim map; no role means
-              # Viewer. Admin is not the default — the OIDC group grants it,
-              # so revoking in kanidm actually revokes.
+              # No grafana_role means Viewer; Admin comes only from the OIDC group, so revoking in kanidm revokes.
               role_attribute_path = "contains(grafana_role[*], 'Admin') && 'Admin' || 'Viewer'";
             };
 
-            # See header. Defensible only because the admin password is real.
+            # Local login stays: kanidm sits behind the same edge, so OIDC-only locks you out when you
+            # need to look. Defensible only because the admin password is real.
             auth.disable_login_form = false;
           };
 
@@ -224,10 +214,8 @@ in {
                 type = "loki";
                 access = "proxy";
                 url = "http://127.0.0.1:${toString loki.port}";
-                # Loki's drilldown-limits route skips the auth_enabled = false
-                # middleware that assigns the "fake" tenant, so it 401s "no org
-                # id" unless the tenant is sent. A tenant name, not a secret: via
-                # $__file only because the NixOS module warns on inline secureJsonData.
+                # Loki's drilldown-limits route 401s "no org id" unless the tenant is sent. A tenant name, not
+                # a secret: via $__file only because the module warns on inline secureJsonData.
                 jsonData.httpHeaderName1 = "X-Scope-OrgID";
                 secureJsonData.httpHeaderValue1 = lib.warnIf (config.services.loki.package.version != "3.7.9") ''
                   modules/den/aspects/services/grafana.nix: nixpkgs' loki is now ${config.services.loki.package.version}.

@@ -1,10 +1,7 @@
-# services.idrac — the BMC, reachable over the mesh.
-#
-# Published from pioneer, not endeavour (the host the BMC exists to
-# recover): that circular dependency turned a 56s watchdog reset into a
-# seven-hour outage on 2026-08-28. Mesh only, no NetBird identity gate: it
-# authenticates against kanidm on endeavour, down exactly when this is needed.
+# services.idrac — reverse proxy publishing the BMC on the mesh.
 {den, ...}: {
+  # Never serve this from endeavour, the host the BMC exists to recover. Mesh-only,
+  # no NetBird identity gate: kanidm runs on endeavour, down exactly when this is needed.
   den.aspects.services.idrac = {
     includes = with den.aspects.services; [nginx netbird.client];
 
@@ -68,11 +65,9 @@
       };
 
       config = {
-        # LAN machines reach the BMC directly.
         cosmos.services.netbird.client.exposedPorts = [cfg.port];
 
-        # A fresh TLS handshake to the BMC per request cost 0.5-0.7s TTFB
-        # across ~80 files; the keepalive pool makes it once.
+        # A fresh TLS handshake to the BMC costs ~0.6s per request; the pool reuses connections.
         services.nginx.upstreams.idrac = {
           servers."${cfg.address}:443" = {};
           extraConfig = ''
@@ -82,9 +77,8 @@
           '';
         };
 
-        # Keepalive needs `Connection:` empty, a websocket needs `upgrade`;
-        # the stock $connection_upgrade map sends `close` for ordinary
-        # requests and defeats the pool. This keeps both working.
+        # Keepalive needs `Connection:` empty, a websocket needs `upgrade`; the stock
+        # $connection_upgrade map sends `close` on ordinary requests and defeats the pool.
         services.nginx.appendHttpConfig = ''
           map $http_upgrade $idrac_connection {
             default upgrade;
@@ -105,83 +99,41 @@
 
           locations."/" = {
             proxyPass = "https://idrac";
-            # Not proxyWebsockets: its map closes the upstream connection on
-            # every ordinary request; the headers below use one that does not.
+            # Not proxyWebsockets: its map closes the upstream connection on every request.
             proxyWebsockets = false;
             extraConfig = ''
-              # The BMC's certificate is self-signed and names a service tag,
-              # so there is nothing here that could verify. The hop is one
-              # switch on the LAN, and the alternative is not a better
-              # certificate but plaintext.
+              # Accepted risk: the BMC's self-signed certificate names a service tag and
+              # cannot be verified; the hop is one switch on the LAN.
               proxy_ssl_verify off;
               proxy_ssl_server_name on;
 
-              # The BMC negotiates a Diffie-Hellman key smaller than modern
-              # OpenSSL will accept, and nginx refuses the handshake outright:
-              #
-              #   SSL_do_handshake() failed (SSL: error:0A00018A:
-              #   SSL routines::dh key too small) while SSL handshaking to
-              #   upstream
-              #
-              # curl on this host fails against it the same way, so it is the
-              # firmware and not nginx. Dell will not be fixing an iDRAC of this
-              # vintage, and the alternative to lowering the level is no access
-              # to the BMC at all.
-              #
-              # Scoped to this proxy hop only — it does not touch the TLS this
-              # server presents, which is the real wildcard and unaffected — and
-              # that hop is one switch away on the LAN, to a device whose
-              # certificate could never be verified anyway.
-              # This firmware ships its web UI as pre-gzipped files only, and
-              # serves them solely to a client that says it accepts gzip:
-              #
-              #   plain                  /start.html -> 404
-              #   Accept-Encoding: gzip  /start.html -> 200
-              #
-              # NixOS's recommendedProxySettings sets `Accept-Encoding ""` so
-              # that nginx can transform responses, which here meant the BMC
-              # 404'd every page and the UI looked broken rather than
-              # unreachable. `gunzip on` lets nginx decompress again for any
-              # client that would not have asked for gzip itself.
+              # The firmware serves its UI only pre-gzipped, to clients accepting gzip;
+              # recommendedProxySettings blanks Accept-Encoding, which 404s every page.
               proxy_set_header Accept-Encoding gzip;
 
-              # The console and the telemetry the dashboard polls are
-              # websockets, so an upgrade still has to pass through.
+              # The console and dashboard telemetry are websockets.
               proxy_http_version 1.1;
               proxy_set_header Upgrade $http_upgrade;
               proxy_set_header Connection $idrac_connection;
 
-              # gunzip is deliberately absent: it would have this Pi decompress
-              # every response for the benefit of a client that did not ask for
-              # gzip, and every browser does.
+              # No `gunzip`: every browser accepts gzip, and it would make this Pi decompress everything.
 
-              # The original Host is forwarded unchanged, which matters: the
-              # BMC builds its redirects and its CSRF checks from it. Overriding
-              # it to the BMC's own address made it see two host values — the
-              # override plus X-Forwarded-Host from the recommended settings —
-              # and emit a redirect with both joined by a comma:
-              #
-              #   location: https://192.168.2.111, idrac.lvdar.nl/login.html
-              #
-              # which the browser cannot follow, so a successful login bounced
-              # straight back to the login page.
+              # Keep the original Host: the BMC builds redirects and CSRF checks from it,
+              # and overriding it yields a comma-joined redirect that breaks login.
 
-              # The BMC also emits absolute URLs naming its own LAN address in
-              # some responses; rewrite those back to this vhost so a client
-              # that cannot route to the LAN still follows them.
+              # The BMC emits absolute URLs naming its LAN address; map them to this vhost.
               proxy_redirect https://${cfg.address}/ /;
               proxy_redirect http://${cfg.address}/ /;
 
+              # The BMC's DH key is below modern OpenSSL's minimum ("dh key too small");
+              # lowering the level on this LAN hop only is the sole way in.
               proxy_ssl_ciphers "DEFAULT:@SECLEVEL=0";
               proxy_ssl_protocols TLSv1 TLSv1.1 TLSv1.2;
 
-              # Dell's web UI uploads firmware images and virtual media, and
-              # the default 1m body limit truncates both with a 413 that the
-              # interface reports as a generic failure.
+              # The default 1m body limit 413s firmware and virtual-media uploads.
               client_max_body_size 2048m;
 
-              # A BMC is slow. The default 60s read timeout is enough to cut
-              # off a firmware update or a console session mid-way.
+              # Firmware updates and console sessions outlast the default 60s read timeout.
               proxy_read_timeout 1800s;
               proxy_send_timeout 1800s;
             '';

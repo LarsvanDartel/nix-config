@@ -1,4 +1,4 @@
-# home.ssh
+# home.ssh — ssh client config, device identities and server Host blocks
 {
   cosmosLib,
   den,
@@ -52,9 +52,8 @@ in {
         enable = true;
         enableDefaultConfig = false;
 
-        # Servers' account (else a misleading "Permission denied
-        # (publickey)"). Must precede the catch-all (ssh keeps the first value).
-        # Port 2222: sshd's only port, NetBird owns :22 on mesh addresses. See core/ssh.nix.
+        # Must precede the catch-all (ssh keeps the first value), else a misleading "Permission denied
+        # (publickey)". Port 2222: NetBird owns :22 on mesh addresses (core/ssh.nix).
         settings."*.nb.lvdar.nl" = entryBefore ["*"] {
           User = serverUser;
           Port = 2222;

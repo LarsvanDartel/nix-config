@@ -1,5 +1,4 @@
 # home.xournalpp — handwritten notes and PDF annotation with the stylus
-# (+ the defaultApplication option: owns its note formats, offered for PDFs).
 {...}: {
   den.aspects.home.xournalpp.homeManager = {
     config,

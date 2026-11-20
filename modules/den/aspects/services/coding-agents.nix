@@ -1,4 +1,4 @@
-# services.coding-agents — an unprivileged `agent` user that runs omp in tmux, reached as agent@endeavour over ssh or mosh (`mosh agent` from Termux); omp is sandboxed per clone in ~/dev (Landlock) and the uid's egress is public-internet only; see docs/src/networking.md.
+# services.coding-agents — an unprivileged, sandboxed `agent` user running omp in tmux, reached over ssh or mosh.
 {
   cosmosLib,
   den,
@@ -9,14 +9,14 @@
   keysDir = cosmosLib.get-flake-path "modules/den/aspects/core/_ssh-keys";
   authorizedKeys = map (f: builtins.readFile (keysDir + "/${f}")) (import (keysDir + "/authorized.nix"));
 in {
+  # See docs/src/networking.md#coding-agents-on-endeavour.
   den.aspects.services.coding-agents.nixos = {
     config,
     pkgs,
     ...
   }: let
-    # AppArmor attaches by resolved path: a copy keeps root's and nixos' bash
-    # out of agent-session. A symlink resolves to the shared bash; a wrapper
-    # script loses the login -argv0.
+    # AppArmor attaches by resolved path: a copy keeps other users' bash out of agent-session.
+    # A symlink resolves to the shared bash; a wrapper script loses the login -argv0.
     agentShell = pkgs.runCommand "agent-shell" {} ''
       install -Dm755 ${pkgs.bashInteractive}/bin/bash $out/bin/agent-shell
     '';
@@ -227,13 +227,10 @@ in {
       '';
     };
 
-    # The agent uid reaches the public internet, host DNS and two loopback
-    # port ranges. ESTABLISHED first: sshd-session and mosh-server run as
-    # agent and must answer the mesh.
+    # ESTABLISHED first: sshd-session and mosh-server run as agent and must answer the mesh.
     networking.firewall = {
-      # Loopback 32768-60999 stays open: omp's Python eval bridge binds
-      # 127.0.0.1:0. A service on a random port there (immich's worker today)
-      # stays reachable; fixed service ports do not.
+      # Loopback 32768-60999 stays open for omp's eval bridge (binds 127.0.0.1:0), so a service on a
+      # random port there stays reachable; fixed service ports do not.
       extraCommands = ''
         ip46tables -N agent-egress 2>/dev/null || true
         ip46tables -F agent-egress
@@ -263,9 +260,7 @@ in {
     };
     cosmos.services.netbird.client.exposedUdpPorts = lib.range 60001 60010;
 
-    # A mosh-server whose client vanished (Termux killed, phone off) never
-    # exits on its own and keeps its port; ten of those lock mosh out.
-    # tmux keeps the agent running regardless.
+    # A mosh-server whose client vanished never exits and keeps its port; ten of those lock mosh out.
     services.openssh.extraConfig = ''
       Match User agent
         SetEnv MOSH_SERVER_NETWORK_TMOUT=86400

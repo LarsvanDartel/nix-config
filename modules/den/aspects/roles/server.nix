@@ -1,10 +1,8 @@
 # roles.server — headless baseline. Included by server hosts.
 {den, ...}: {
-  # Server-only: on laptops suspend/resume churn makes failure notifications
-  # noise.
+  # notify-failure is server-only: on laptops, suspend/resume churn makes it noise.
   den.aspects.roles.server.includes = [
     den.aspects.core.notify-failure
-    # Notifies rather than reboots — see the aspect for why.
     den.aspects.core.reboot-required
     den.aspects.services.node-exporter
   ];

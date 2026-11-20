@@ -1,9 +1,4 @@
-# _netbird-groups — the kanidm-provision fragment for one `netbird-*` group.
-#
-# A plain function to `import` (underscored, so import-tree skips it). Each
-# group is a kanidm group AND a `groups` claim value NetBird matches against
-# distribution lists. Fragments merge into services/netbird.nix's
-# oauth2.netbird client: scopeMaps and valuesByGroup are attrsOf.
+# _netbird-groups — kanidm-provision fragment for one `netbird-*` group, merged into oauth2.netbird.
 group: {
   # overwriteMembers off so hand-added members survive a redeploy.
   groups.${group} = {
@@ -12,9 +7,7 @@ group: {
   };
 
   oauth2.netbird = {
-    # Every netbird-* group, not just netbird-users: otherwise a member of
-    # only one service group is refused a token with a misleading scopes
-    # error. Services' distribution lists still decide access.
+    # Every netbird-* group needs these scopes, or a member of only this group is refused a token.
     scopeMaps.${group} = ["openid" "profile" "email"];
 
     # One-to-one on purpose: NetBird sets auto-groups to exactly this.

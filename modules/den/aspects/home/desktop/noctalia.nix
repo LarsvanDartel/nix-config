@@ -1,5 +1,4 @@
-# home.noctalia — the noctalia v5 shell through home-manager's `programs.noctalia`.
-# Body in ./_noctalia/home.nix, a plain module imported by this aspect.
+# home.noctalia — the noctalia v5 shell; body in ./_noctalia/home.nix.
 {
   inputs,
   cosmosStyling,

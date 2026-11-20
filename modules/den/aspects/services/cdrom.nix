@@ -1,4 +1,4 @@
-# services.cdrom
+# services.cdrom — optical drive access for the user (sg/sr modules, cdrom group).
 {...}: {
   den.aspects.services.cdrom.nixos = {...}: {
     cosmos.user.extraGroups = ["cdrom"];

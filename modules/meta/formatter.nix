@@ -1,4 +1,4 @@
-# Formatting via treefmt-nix: provides `nix fmt` and a `checks.<sys>.treefmt`.
+# formatter — treefmt-nix: `nix fmt` and `checks.<system>.treefmt`.
 {inputs, ...}: {
   flake-file.inputs.treefmt-nix = {
     url = "github:numtide/treefmt-nix";
@@ -16,8 +16,7 @@
         enable = true;
         no-lambda-arg = true;
       };
-      # Explicit: treefmt-nix dropped these defaults (-i 2 -s), after which
-      # shfmt follows .editorconfig's 4 and reindents every script.
+      # Keep -i 2 -s explicit: without them shfmt follows .editorconfig's 4 and reindents every script.
       shfmt = {
         enable = true;
         indent_size = 2;
@@ -26,8 +25,7 @@
     };
 
     settings.global.excludes = [
-      # flake.nix is formatted by flake-file (write-flake); treefmt off it so
-      # the two don't fight.
+      # flake-file (write-flake) formats flake.nix; treefmt stays off it so the two don't fight.
       "flake.nix"
       "*.facter.json"
       "*.png"

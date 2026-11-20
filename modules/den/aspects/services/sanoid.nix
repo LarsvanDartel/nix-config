@@ -1,11 +1,4 @@
-# services.sanoid — automatic ZFS snapshots on the array.
-#
-# sanoid ignores com.sun:auto-snapshot (set in disko.nix), hence its own list.
-# Root is btrfs, so the SSD databases are outside this pool: restic is their
-# only copy.
-#
-# `zfs allow tank` printing nothing after a run is normal: the DynamicUser is
-# granted permissions in ExecStartPre and revoked in ExecStopPost.
+# services.sanoid — ZFS snapshots of the array; its own dataset list, since sanoid ignores com.sun:auto-snapshot.
 {...}: {
   den.aspects.services.sanoid = {
     nixos = {

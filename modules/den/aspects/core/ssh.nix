@@ -37,7 +37,7 @@ in {
     services.openssh = {
       enable = true;
 
-      # NetBird's SSH server owns <mesh-ip>:22; nothing used :22 elsewhere.
+      # NetBird's SSH server owns <mesh-ip>:22.
       ports = [2222];
       hostKeys = [
         {
@@ -47,8 +47,7 @@ in {
           type = "ed25519";
         }
       ];
-      # Only the declared keys: a hand-placed ~/.ssh/authorized_keys (pioneer's
-      # SD-image bootstrap left one) would outlive every key rotation.
+      # Only the declared keys: a hand-placed ~/.ssh/authorized_keys would outlive every key rotation.
       authorizedKeysInHomedir = false;
       settings = {
         PasswordAuthentication = false;

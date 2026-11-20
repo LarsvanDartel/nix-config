@@ -1,11 +1,4 @@
-# birthday-calendar — mirror the birthdays in an account's CardDAV address
-# books into one CalDAV calendar, configured by
-# services/birthday-calendar.nix.
-#
-# One yearly all-day event per contact with a BDAY. Each is stored under a
-# hash of its content (without DTSTAMP, the upload time), so a run deletes
-# what changed or vanished and uploads what is new; unchanged events are
-# never rewritten.
+# birthday-calendar — mirrors CardDAV birthdays into a CalDAV calendar.
 import base64
 import hashlib
 import http.client
@@ -44,7 +37,6 @@ def split_unescaped(value, sep):
 
 
 def properties(card):
-    # (NAME, {PARAM: value}, value) per content line, group prefix dropped.
     for line in re.sub(r"\r?\n[ \t]", "", card).splitlines():
         quoted = False
         for i, char in enumerate(line):
@@ -67,7 +59,6 @@ def properties(card):
 
 
 def birthday(params, value):
-    # (year or None, month, day), or None when it is no full date.
     if params.get("VALUE", "").lower() == "text":
         return None
     m = DATE.fullmatch(value.split("T", 1)[0].strip())
@@ -88,7 +79,6 @@ def birthday(params, value):
 
 
 def contact(card):
-    # (name, (year, month, day)) or None without a name or birthday.
     fn = n = bday = None
     for name, params, value in properties(card):
         if name == "FN" and fn is None:
@@ -130,6 +120,7 @@ def event(key, name, bday):
     cal.add("PRODID", PRODID)
     cal.add_component(ev)
 
+    # Hashed before DTSTAMP is added: an unchanged event is never rewritten.
     resource = hashlib.sha256(cal.to_ical()).hexdigest()[:32] + ".ics"
     ev.add("DTSTAMP", datetime.now(timezone.utc))
     return resource, cal.to_ical()
@@ -155,7 +146,6 @@ class Dav:
         return resp.status, data
 
     def children(self, path, ok=(207,)):
-        # None on 404, else {href: resourcetype tags} below path.
         status, data = self.request(
             "PROPFIND",
             path,
@@ -178,7 +168,6 @@ class Dav:
         return out
 
     def cards(self, home):
-        # {(book href, card href): vCard text} across every address book.
         out = {}
         for book, kinds in self.children(home).items():
             if CARD + "addressbook" not in kinds:

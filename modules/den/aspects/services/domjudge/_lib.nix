@@ -1,28 +1,21 @@
-# domjudge/_lib — shared by the services.domjudge aspect files.
+# _lib — constants and the API-job helper shared by the services.domjudge files.
 rec {
-  # The domserver, published on 127.0.0.1 only (default.nix).
   containerPort = 8093;
   api = "http://127.0.0.1:${toString containerPort}/api/v4";
 
-  # One judgehost container per id. The id is the judgedaemon's -n: it pins
-  # every compile and run to CPU <id> and names the judgehost judgehost-<id>,
-  # so ids must stay distinct. CPUs 0-3 are separate physical cores; CPU
-  # n + 36 is CPU n's hyperthread sibling (72 CPUs: 2 sockets x 18 cores x 2).
+  # Ids must stay distinct: the id is the judgedaemon's -n, pinning its runs to CPU <id>.
+  # CPU n + 36 is CPU n's hyperthread sibling (2 sockets x 18 cores x 2).
   judgehostIds = [0 1 2 3];
   judgehostContainer = id: "domjudge-judgehost-${toString id}";
   judgehostSibling = id: id + 36;
-  # Every CPU but the judge cores and their siblings (default.nix).
+  # Every CPU but judgehostIds and their siblings; update together with judgehostIds.
   otherCpus = "4-35,40-71";
-  # The judge cores' fixed clock: the base clock, which holds at ±1.5% under
-  # any host load, where turbo varies ±8%. languages.nix's time factors are
-  # fitted at this clock.
+  # The base clock holds ±1.5% under any load where turbo varies ±8%;
+  # languages.nix's time factors are fitted at this clock.
   judgeKHz = 2100000;
 
-  # A oneshot that drives the domserver API as admin. It waits for the API
-  # (the first start installs the DB first), runs `rootSql` as root inside
-  # the MariaDB container if given, then `text` with $api, a curlrc in its
-  # cache dir, and `dj` (curl that fails on HTTP errors).
-  # RemainAfterExit: a changed script restarts it on switch.
+  # Oneshot driving the domserver API as admin: `rootSql` runs as MariaDB root, then `text` with
+  # $api and `dj` (curl failing on HTTP errors). RemainAfterExit makes a changed script rerun on switch.
   mkApiJob = {
     config,
     lib,

@@ -1,9 +1,9 @@
 #!/data/data/com.termux/files/usr/bin/sh
-# install.sh — run inside Termux from the pushed termux-ssh bundle; installs the SSH config and creates the Keystore key tergent serves.
+# install — run inside Termux from the pushed termux-ssh bundle; installs the SSH config and creates the Keystore key tergent serves.
 set -eu
 src="$(cd "$(dirname "$0")" && pwd)"
 
-# Termux does not support partial upgrades: mosh linked against a newer libc++ than the bootstrap had.
+# Upgrade first: Termux does not support partial upgrades (new packages need the newer libc++).
 pkg upgrade -y
 pkg install -y openssh mosh termux-api tergent
 mkdir -p ~/.ssh

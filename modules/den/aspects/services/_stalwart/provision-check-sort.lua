@@ -1,16 +1,5 @@
--- provision-check-sort.lua — vendored from nixpkgs PR #552103 (see ./default.nix);
--- typechecks and orders the services.stalwart.provision plan.
---[[--
-- open the `stalwart-cli apply` .ndjson input (arg #1) and stalwart json schema (path in arg #3)
-- recursively walk through all entries in the `stalwart-cli apply` plan and
-	- note down definitions of and references to IDs, resolving them when possible, building a dependency graph
-	- report any type errors
-	- report any ID references without a corresponding definition
-- if checking was successful, do a topological sort of the entries, ensuring definitions come before references
-- write to the output file (path in arg #2)
---]]--
+-- provision-check-sort — typechecks and topologically orders the stalwart provision plan (vendored, nixpkgs PR #552103).
 
--- startup
 local input, output_path, schema_path, should_reload = ...
 assert(input and output_path and schema_path, "missing args")
 should_reload = should_reload == "--reload"
@@ -18,7 +7,6 @@ should_reload = should_reload == "--reload"
 local json = require("dkjson")
 local json_object_mt = { __jsontype = "object" }
 
--- friendly name for a given type
 local function nameof(ty)
 	if type(ty) == "string" then return ty
 	elseif ty == nil then return "(nil type)"
@@ -49,7 +37,7 @@ local function nameof(ty)
 	elseif ty.kind == "enum" then return "enum<" .. ty.name .. ">" end
 end
 
--- `type` specialized for json, since json.decode always sets metatables for tables so __jsontype is `array` or `object`
+-- json.decode sets a metatable on every table, so __jsontype is `array` or `object`.
 local function jty(val)
 	if val == json.null then return "null" end
 	local meta = getmetatable(val)
@@ -63,7 +51,6 @@ do
 	assert(io.close(fi), "failed to close schema file")
 end
 
--- take the schema and convert it into a more understandable form
 local behavior_map = {}
 do
 	local seen = {}
@@ -78,7 +65,6 @@ do
 	local function var(name, variants) return { kind = "var", name = name, variants = variants } end
 	local function enum(name, variants) return { kind = "enum", name = name, variants = variants } end
 
-	-- remove the x: prefix
 	local function dex(name)
 		if name:sub(1, 2) == "x:" then return name:sub(3)
 		else return name end
@@ -144,7 +130,6 @@ do
 	end
 end
 
--- recursively search through all the objects and find references
 local entries = {}
 do
 	local issues = 0
@@ -152,18 +137,16 @@ do
 	local defined = {}
 	local awaiting_definition = {}
 
-	-- ~fancy~ error printer
 	local ansi_red, ansi_grey, ansi_reset = "\27[0m\27[1;31m", "\27[0m\27[2;37m", "\27[0m"
 	local function err(parent, msg, ...)
 		print(("%s[error]%s %s %s// %s%s"):format(ansi_red, ansi_reset, msg:format(...), ansi_grey, parent, ansi_reset))
 		issues = issues + 1
 	end
 
-	-- helper to check for id referent type mismatches
 	local function check_id_ty_match(parent, id, got, expected)
 		local expected_variant
 		do
-			-- sometimes id referent types are like "Account/Group", which means they expect to get a group account, so we split that here
+			-- Referent types like "Account/Group" expect a specific variant.
 			local pos = expected:find("/")
 			if pos then
 				expected_variant = expected:sub(pos + 1)
@@ -182,7 +165,6 @@ do
 		end
 	end
 
-	-- main recursive walker, doing typechecking and finding id dependencies
 	local function recursearch(deps, ty, val, parent)
 		local beh = ty
 		while type(beh) == "string" do beh = behavior_map[beh] end
@@ -219,7 +201,7 @@ do
 		elseif beh.kind == "list" then
 			if jty(val) ~= "array" then return err(parent, "expected `%s` to be an array of `%s` (got `%s`)", nameof(beh), beh.of, jty(val)) end
 			if beh.min and #val < beh.min then err(parent, "expected at least `%d` items", beh.min) end
-			-- if we don't do this, empty tables are encoded as arrays, which aren't valid
+			-- Without the object metatable, empty tables encode as arrays, which are invalid.
 			local new = setmetatable({}, json_object_mt)
 			for i, elem in ipairs(val) do
 				new[tostring(i - 1)] = recursearch(deps, beh.of, elem, parent .. "[" .. i .. "]") or elem
@@ -228,7 +210,7 @@ do
 		elseif beh.kind == "set" then
 			if jty(val) ~= "array" then return err(parent, "expected `%s` to be a unique array of `%s` (got `%s`)", nameof(beh), nameof(beh.of), jty(val)) end
 			if beh.min and #val < beh.min then err(parent, "expected at least `%d` items", beh.min) end
-			-- see above
+			-- Same empty-table trap as above.
 			local new = setmetatable({}, json_object_mt)
 			for i, elem in ipairs(val) do
 				local current = parent .. "[" .. i .. "]"
@@ -266,7 +248,6 @@ do
 	print(input)
 	print("--- input json above ---")
 
-	-- go through each ndjson entry and start walking
 	local ln = 0
 	for line in input:gmatch("([^\n]+)") do
 		ln = ln + 1
@@ -285,13 +266,12 @@ do
 				if jty(op.matchOn) == "array" then
 					match_fields = op.matchOn
 					for _, field in ipairs(match_fields) do
-						-- quick and dirty way to trigger the condition
 						if type(field) ~= "string" then match_fields = nil end
 					end
 				end
 				if op.matchOn ~= nil and op.matchOn ~= json.null and op.matchOn ~= "*" and not match_fields then err("<operation: " .. op["@type"] .. " " .. op.object .. ">", "expected `matchOn` field to be null, \"*\", or an array of strings (got `%s`)", jty(op.matchOn)) end
 
-				-- ignore empty object sets, so stalwart-cli doesn't complain about them
+				-- stalwart-cli rejects empty object sets.
 				if not next(op.value) then goto continue end
 				for id, val in pairs(op.value) do
 					local parent = "<" .. op.object .. " #" .. id .. ">"
@@ -330,7 +310,6 @@ do
 		::continue::
 	end
 
-	-- report any ids that went undefined
 	for id, waiters in pairs(awaiting_definition) do
 		for _, waiter in ipairs(waiters) do err(waiter.parent, "undefined id: %s", id) end
 	end
@@ -338,7 +317,6 @@ do
 	if issues > 0 then error(issues .. " issues were detected!") end
 end
 
--- topo-sort the results, so dependencies come before their dependents
 local result = {}
 do
 	local seen = {}
@@ -367,8 +345,7 @@ if should_reload then
 	print("plan will reload stalwart")
 else print("plan will not reload stalwart") end
 
--- collect every seen field and then sort them so we produce a consistent field ordering every time
--- lua `pairs` returns keys in an implementation-defined (read: nondeterministic) order, so we're explicitly sorting them
+-- `pairs` order is nondeterministic: sorted field order keeps the plan stable.
 local field_order = {}
 do
 	local field_order_seen = {}
@@ -393,7 +370,6 @@ do
 	table.sort(field_order)
 end
 
--- write output to file
 local output = assert(io.open(output_path, "w"), "failed to open output file")
 for _, op in ipairs(result) do
 	assert(output:write(json.encode(op, { keyorder = field_order })), "failed to write output")

@@ -1,11 +1,4 @@
-# services.restic — the offsite copy, on a Hetzner Storage Box named stardust.
-#
-# Excludes the re-acquirable media library and regenerable caches, which keeps
-# it ~42 GB. gaia overrides repository, paths, exclude and quiesceServices.
-#
-# Hetzner Storage Box traps: SSH keys must be registered through Hetzner's
-# interface (authorized_keys over SFTP changes nothing). Port 22 takes RFC4716
-# keys only; port 23 (needed for an `--append-only` guard) is closed.
+# services.restic — offsite backups to a Hetzner Storage Box (stardust); gaia overrides repository, paths, exclude and quiesceServices.
 {...}: {
   den.aspects.services.restic = {
     # No `includes = [services.prometheus]` for ResticStale: that would land
@@ -194,7 +187,8 @@
           passwordFile = config.sops.secrets."keys/stardust/password".path;
           initialize = true;
 
-          # -s sftp: the box runs mod_sftp, no shell to give.
+          # -s sftp: the box has no shell. Register keys in Hetzner's interface (authorized_keys over
+          # SFTP changes nothing); port 22 takes RFC4716 keys only.
           extraOptions = [
             "sftp.command='${lib.getExe pkgs.openssh} -p 22 -i ${sshKey} -o BatchMode=yes u649268@u649268.your-storagebox.de -s sftp'"
           ];

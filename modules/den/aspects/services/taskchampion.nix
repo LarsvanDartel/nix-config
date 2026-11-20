@@ -1,9 +1,4 @@
-# services.taskchampion — the sync server Taskwarrior 3 replicates against.
-#
-# Every client holds a full encrypted replica, so losing this directory loses
-# nothing. Published ungated: native clients cannot do a browser login. The
-# client ids are the only auth and arrive as a systemd credential, since
-# `--allow-client-id` on the command line is world-readable.
+# services.taskchampion — the Taskwarrior 3 sync server; every client holds a full encrypted replica.
 {...}: let
   # Option default and netbird-service target (see services/netbird.nix).
   defaultPort = 10222;
@@ -36,25 +31,19 @@ in {
     cfg = config.cosmos.services.taskchampion;
     serverCfg = config.services.taskchampion-sync-server;
 
-    # Rebuilds upstream's ExecStart from `serverCfg` so upstream changes still
-    # apply.
+    # Rebuilds upstream's ExecStart from `serverCfg`; client ids arrive as a systemd credential
+    # because `--allow-client-id` on the command line is world-readable.
     start = pkgs.writeShellApplication {
       name = "taskchampion-sync-server-start";
       text = ''
-        # `|| [ -n "$id" ]` because sops writes the secret with no trailing
-        # newline, and a bare `read` returns false on the last line when there
-        # is none — silently yielding an empty list, which the check below
-        # then turns into a server that will not start.
+        # `|| [ -n "$id" ]`: sops writes no trailing newline, so a bare `read` drops the last id.
         allow=()
         while read -r id || [ -n "$id" ]; do
           [ -n "$id" ] || continue
           allow+=(--allow-client-id "$id")
         done < "$CREDENTIALS_DIRECTORY/client-ids"
 
-        # Refuse to start rather than serve everyone. An empty or unreadable
-        # credential would otherwise produce a server with no allow-list at
-        # all, which on a published port is the one failure mode that must not
-        # be quiet.
+        # Refuse to start rather than serve everyone on a published port.
         if [ ''${#allow[@]} -eq 0 ]; then
           echo "no client ids in the credential; refusing to serve unrestricted" >&2
           exit 1
@@ -105,9 +94,8 @@ in {
         # Bound wide: endeavour is edgeTerminated; the firewall limits reach.
         host = "0.0.0.0";
 
-        # Pinned: upstream ties this to stateVersion (on from 26.05), and
-        # DynamicUser would put data in /var/lib/private, where the persist
-        # entry bind-mounts the symlink — every sync restarting from nothing.
+        # Pinned: upstream ties it to stateVersion, and with DynamicUser the persist entry bind-mounts
+        # the /var/lib/private symlink, so every sync starts from nothing.
         dynamicUser = false;
       };
 

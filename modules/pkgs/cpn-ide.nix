@@ -1,8 +1,4 @@
-# cpn-ide — the Coloured Petri net editor and simulator used in 2AMI10.
-# The "Windows-only" installer (innoextract, no Wine) carries a Linux build
-# of the 32-bit simulator (needs the pkgsi686 loader). The backend serves
-# the frontend to stay same-origin, and the Electron-4 shell is replaced by
-# _process-mining/cpn-ide-app.
+# cpn-ide — the Coloured Petri net editor and simulator, unpacked from the Windows installer, which carries a 32-bit Linux simulator.
 {...}: {
   nixpkgs.overlays = [
     (final: _prev: {
@@ -71,9 +67,7 @@
               install -Dm644 $share/web/assets/img/cpn-logo.svg \
                 $out/share/icons/hicolor/scalable/apps/cpn-ide.svg
 
-              # The engine unpacks the simulator for the current platform out of
-              # its own jar at runtime; the launcher seeds these where it looks,
-              # since it only unpacks what is not already there.
+              # The engine unpacks the simulator from its jar at runtime only when absent; the launcher seeds these.
               unzip -q -j $share/cpn-ide-back.jar 'BOOT-INF/lib/org.cpntools.accesscpn.engine_*.jar' -d engine
               mkdir -p $share/simulator
               unzip -q -j engine/org.cpntools.accesscpn.engine_*.jar 'simulator/*.x86-linux' -d $share/simulator

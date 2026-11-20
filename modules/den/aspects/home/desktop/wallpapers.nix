@@ -1,9 +1,7 @@
-# home.wallpapers — the background collection, symlinked into the picker's
-# directory. ranking.txt in the `wallpapers` input drives order, default and
-# rotation; re-rank, push, bump the input. `pinned` overrides default and rotation.
+# home.wallpapers — the ranked background collection, linked into the picker's directory, and its rotation.
 {...}: {
-  # Public HTTPS, not git@knot: keyless builds (spindle CI) have no SSH
-  # credential. `did:plc:` survives a repo rename. Run `nix run .#write-flake` after editing.
+  # Public HTTPS: keyless builds (spindle CI) have no SSH credential. `did:plc:` survives a repo rename.
+  # Its ranking.txt drives order, default and rotation: re-rank, push, bump the input.
   flake-file.inputs.wallpapers = {
     url = "git+https://knot.lvdar.nl/did:plc:nmkqw2d6qov4smqqvovwmwof?shallow=1";
     flake = false;
@@ -119,16 +117,12 @@
       i=$(( (i + 1) % n ))
       printf '%s\n' "$i" > "$state"
 
-      # Filenames are rank-prefixed, so sorting by name sorts by rank.
       pick=$(ls -1 "$dir" 2>/dev/null | sort | head -n "$n" | sed -n "$((i + 1))p")
       [ -n "$pick" ] || exit 0
       path="$dir/$pick"
       [ -e "$path" ] || exit 0
 
-      # Failing loudly matters here. An earlier version swallowed the error
-      # and exited 0, so a unit that could not reach the shell still looked
-      # perfectly healthy in `systemctl --user status` and left nothing in the
-      # journal to explain a background that never changed.
+      # Must exit 1 when noctalia can't set it, or the unit looks healthy while the background never changes.
       if command -v noctalia >/dev/null 2>&1 &&
          noctalia msg wallpaper-set "$path" >/dev/null 2>&1; then
         echo "set $pick via noctalia"
@@ -259,8 +253,7 @@
           Service = {
             Type = "oneshot";
             ExecStart = "${rotate}";
-            # User-manager PATH is not the session's. `home.profileDirectory`, not
-            # ~/.nix-profile (absent here) — that once left the rotation silently dead.
+            # User-manager PATH is not the session's; use home.profileDirectory, as ~/.nix-profile is absent.
             Environment = [
               "PATH=${lib.makeBinPath [pkgs.coreutils]}:/run/current-system/sw/bin:${config.home.profileDirectory}/bin"
             ];

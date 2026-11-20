@@ -1,20 +1,14 @@
-# services.minecraft — Minecraft servers for friends, declared here rather than
-# clicked into a panel.
-#
-# Deliberately no control panel (Pelican/Pterodactyl/Crafty move state into a
-# database outside Nix). Built on nix-minecraft rather than nixpkgs'
-# singular, vanilla-only services.minecraft-server; its systemd hardening is
-# not duplicated here. RCON stays off; console is a local socket.
+# services.minecraft — Minecraft servers on nix-minecraft, declared here rather than clicked into a panel.
 {
   den,
   inputs,
   ...
 }: {
+  # No control panel: Pelican/Pterodactyl/Crafty keep state in a database outside Nix.
   flake-file.inputs.nix-minecraft.url = "github:Infinidoge/nix-minecraft";
 
-  # The packwiz packs (pkgs.modpacks.<pack>), in their own repository so they
-  # are released and edited apart from the fleet. Public HTTPS, not git@knot:
-  # keyless builds (spindle CI) have no SSH credential. Run `nix run .#write-flake` after editing.
+  # The packwiz packs (pkgs.modpacks.<pack>), released apart from the fleet. HTTPS, not git@knot: keyless
+  # builds (spindle CI) have no SSH credential. Run `nix run .#write-flake` after editing.
   flake-file.inputs.modpacks = {
     url = "git+https://knot.lvdar.nl/did:plc:lz6wnhglzbatsbxadexhf3bx?shallow=1";
     inputs.nixpkgs.follows = "nixpkgs";
@@ -47,11 +41,7 @@
           mkdir -p "$out"
           ${lib.concatMapStringsSep "\n" (m: ''
               name=$(basename ${m} | cut -d- -f2-)
-              # Fabric loads *.jar and ignores anything else in silence, so a
-              # mod that lost its extension produces a server that starts
-              # cleanly and simply does not have the mod. Fail the build
-              # instead — this caught simple-voice-chat, whose store path was
-              # named from pname+version and had no suffix at all.
+              # Fabric silently ignores files not ending in .jar, leaving the mod missing: fail the build.
               case "$name" in
                 *.jar) ;;
                 *) echo "extraMods entry ${m} does not end in .jar" >&2; exit 1 ;;
@@ -69,7 +59,6 @@
             paths = lib.optional (s.modpack != null) "${s.modpack}/mods" ++ [extraDir];
           };
 
-      # Aikar's flags: G1GC tuned for pause time. Heap pinned (-Xms == -Xmx).
       aikarFlags = heapGiB: let
         large = heapGiB >= 12;
       in
@@ -352,9 +341,8 @@
           # Mesh exposure only; no game server on endeavour's LAN interface.
           openFirewall = false;
 
-          # systemd-socket, not tmux: under tmux stdout never reaches the
-          # journal, so the server log is invisible to loki and failure
-          # notifications. Console: echo 'cmd' > /run/minecraft/<name>.stdin
+          # systemd-socket, not tmux: under tmux stdout never reaches the journal (loki, failure alerts).
+          # Console: echo 'cmd' > /run/minecraft/<name>.stdin
           managementSystem = {
             tmux.enable = false;
             systemd-socket.enable = true;
@@ -406,9 +394,8 @@
               lib.mkIf cfg.requireMountedDataDir
               [(lib.getExe mountGuard)];
 
-            # mkForce: upstream defines this as `!conf.enableReload`. Nested,
-            # not at aspect top level, where mkForce recurses under facter
-            # (see hosts/pioneer.nix).
+            # mkForce: upstream defines this as `!conf.enableReload`. Nested, not at aspect top level,
+            # where mkForce recurses under facter (see hosts/pioneer.nix).
             restartIfChanged = lib.mkForce (!s.deferRestart);
           })
         cfg.servers;

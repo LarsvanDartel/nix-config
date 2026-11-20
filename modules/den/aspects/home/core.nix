@@ -1,5 +1,4 @@
-# home.core — the home baseline plumbing: cosmos.user/impermanence option
-# schema, nix settings, home-manager.enable, sops.
+# home.core — home baseline: cosmos.user/impermanence options, nix settings, sops.
 {inputs, ...}: {
   den.aspects.home.core.homeManager = {
     config,

@@ -1,5 +1,4 @@
-# The noctalia v5 home config (home-manager's `programs.noctalia`), as a plain
-# home-manager module factory imported by home.noctalia.
+# home.noctalia — noctalia v5 shell settings through home-manager's programs.noctalia.
 {
   inputs,
   cosmosStyling,
@@ -18,9 +17,7 @@ in {
   imports = [(import ./plugins.nix {inherit inputs;})];
 
   config = {
-    # Colours, popup opacity and the default mode come from stylix's `noctalia`
-    # target, primary aside; the light half of the palette from home.theme's
-    # light render.
+    # Colours come from stylix's noctalia target, primary aside; the light palette from home.theme.
     programs.noctalia = {
       enable = true;
       systemd.enable = true;
@@ -38,7 +35,6 @@ in {
           margin_ends = 0;
           margin_edge = 0;
           padding = 10;
-          # No capsules: the gap alone separates widgets.
           widget_spacing = 16;
           shadow = false;
           start = ["workspaces" "active_window" "media" "privacy"];
@@ -66,10 +62,9 @@ in {
             show_label = true;
             label_content = "percent";
           };
-          # Only draws while the mic, camera or a screencast is live.
           privacy.hide_inactive = true;
           workspaces = {
-            # stylix maps tertiary to base0C, the theme's accent.
+            # stylix maps tertiary to base0C.
             occupied_color = "tertiary";
             empty_color = "tertiary";
             labels_only_when_occupied = true;
@@ -104,12 +99,11 @@ in {
             transparency_mode = "soft";
             session_placement = "floating";
             session_position = "center";
-            # Volume, brightness, network and bluetooth open the control centre under the click.
             open_near_click_control_center = true;
           };
           session = {
             show_shortcuts = true;
-            # 5.3.0 has no hibernate or reboot-to-firmware action.
+            # noctalia has no built-in hibernate or reboot-to-firmware action.
             actions = [
               {
                 action = "lock";
@@ -170,8 +164,7 @@ in {
           default.path = lib.mkForce wallpapers.defaultWallpaper;
         };
 
-        # noctalia's own light/dark toggle (control center, bar,
-        # `theme-mode-*`) drives home.theme here; `theme` drives noctalia back.
+        # See docs/src/theming.md#switching.
         hooks.theme_mode_changed = lib.mkIf modes.enable ''${modes.package}/bin/theme sync "$NOCTALIA_THEME_MODE"'';
       };
 
@@ -199,9 +192,8 @@ in {
 
     cosmos.system.impermanence.persist.directories = [".local/state/noctalia"];
 
-    # GUI and IPC changes go to settings.toml, which overrides config.toml.
-    # Resetting it on every activation (switch and boot) keeps nix
-    # authoritative, except for the mode, which `theme` owns.
+    # settings.toml (GUI/IPC changes) overrides config.toml: reset it every activation so nix
+    # stays authoritative, keeping only the mode, which `theme` owns.
     home.activation.noctaliaResetOverrides = lib.hm.dag.entryAfter ["writeBoundary" "theme"] ''
       settings=${lib.escapeShellArg "${config.xdg.stateHome}/noctalia/settings.toml"}
       run rm -f "$settings"

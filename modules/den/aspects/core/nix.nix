@@ -1,4 +1,4 @@
-# core.nix — nix daemon settings + store GC (timer and min-free/max-free).
+# core.nix — nix daemon settings and store GC (timer and min-free/max-free).
 {...}: {
   den.aspects.core.nix.nixos = {
     config,
@@ -83,7 +83,6 @@
         dates = cfg.gcDates;
         options = "--delete-older-than ${cfg.gcOlderThan}";
 
-        # Spread collections so they don't overlap deploys/cache serving.
         randomizedDelaySec = "45min";
       };
     };

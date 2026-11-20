@@ -1,20 +1,9 @@
 # services.kavita — reading server for the ebook/light-novel library.
-#
-# Module traps:
-#   * appsettings.json is rewritten from the store on every start, so OIDC
-#     Authority/ClientId/Secret live here. The behavioural OIDC toggles live in
-#     kavita.db ServerSetting row 40 and *that copy wins*: fields below are
-#     first-run seeds. Never toggle them in the UI — "disable password auth"
-#     once locked the only account out; recovery was a sqlite UPDATE on row
-#     40 with the service stopped.
-#   * secrets reach appsettings.json as `@<key>@` placeholders that the module
-#     replaces from `credentials` on every start.
 {
   den,
   inputs,
   ...
 }: let
-  # Option default and netbird-service target (see services/netbird.nix).
   defaultPort = 5000;
 in {
   den.aspects.services.kavita = {
@@ -68,9 +57,8 @@ in {
         originLanding = "https://${cfg.domain}";
         scopeMaps.kavita-users = ["openid" "profile" "email"];
 
-        # Deliberately NOT allowInsecureClientDisablePkce (unlike jellyfin
-        # and traccar): ASP.NET Core sends PKCE. If token exchange fails with
-        # invalid_request, confirm the challenge is absent before using it.
+        # No allowInsecureClientDisablePkce: ASP.NET Core sends PKCE. On invalid_request at token
+        # exchange, confirm the challenge is absent before adding it.
         preferShortUsername = true;
       };
     };
@@ -136,6 +124,8 @@ in {
             # submodule and silently ignored by Kavita.
             Port = cfg.port;
 
+            # The toggles below are first-run seeds: kavita.db ServerSetting row 40 wins afterwards. Never
+            # disable password auth in the UI; recovery is a sqlite UPDATE on row 40 with kavita stopped.
             OpenIdConnectSettings = {
               Authority = "https://auth.lvdar.nl/oauth2/openid/kavita";
               ClientId = "kavita";
@@ -149,8 +139,7 @@ in {
               DefaultRoles = ["Login"];
               ProvisionAccounts = true;
 
-              # Seed only (see header). kanidm runs on this host, so OIDC-only
-              # is unreachable exactly when kanidm is.
+              # kanidm runs on this host, so OIDC-only is unreachable exactly when kanidm is.
               DisablePasswordAuthentication = false;
             };
           };

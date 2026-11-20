@@ -1,7 +1,4 @@
-# services.site — lvdar.nl, the personal website and blog.
-#
-# Nothing persisted on purpose: an impermanence entry under /var/lib/private
-# (DynamicUser) is the EBUSY that broke ntfy; the working copy is a cache.
+# services.site — lvdar.nl website and blog; unpersisted on purpose (a DynamicUser persist entry fails with EBUSY).
 {inputs, ...}: let
   # services.site.port and the netbird-service target. hosts/gaia.nix's
   # lvdar.nl localVhost also points here, as an address it must spell out.
@@ -9,9 +6,8 @@
 in {
   flake-file.inputs.site.url = "git+https://tangled.org/lvdar.nl/site";
 
-  # www only: the apex can't be a proxy service (management 422s
-  # non-subdomains, masked by the reconciler as "already taken"); gaia
-  # serves it via netbird.localVhosts. The app 301s www to the apex.
+  # www only: management rejects the apex as a proxy service, so gaia serves it via
+  # netbird.localVhosts. The app 301s www to the apex.
   den.aspects.services.site.netbird-service = {host, ...}: {
     www = {
       bearerAuth.enable = false;

@@ -1,4 +1,4 @@
-# Atkinson Hyperlegible Next — Braille Institute's low-vision sans (2025 redesign, 7 weights).
+# home.styling — the Atkinson Hyperlegible Next font family, Braille Institute's low-vision sans.
 {pkgs, ...}: {
   name = "Atkinson Hyperlegible Next";
   package = pkgs.atkinson-hyperlegible-next;
