@@ -126,6 +126,8 @@ in {
             };
             # Public: served by org.tangled.knot.describeKnot.
             contact.email = "lars@lvdar.nl";
+            # knot2 serves only `/` as HTML; repositories are browsed on the appview.
+            homepage.path = "${./_tangled/homepage.html}";
             # Required even without LFS in use.
             lfs.store_path = "${cfg.stateDir}/lfs";
             # The migrated repositories are SHA-1; the module defaults to sha256.
