@@ -110,14 +110,21 @@
 
     # recursiveUpdate, not `//`: a shallow merge silently drops thunderbird.enable.
     # No font-family: Calibri/Segoe UI fall back to a mismatched sans on Linux.
-    # Keep the tue/gewis svg inline (sized by height:100% of its row);
-    # display:block pins it to the cell top. Do not reintroduce.
+    # Logos are PNGs behind a file:// URL, never inline <svg>: Gmail and
+    # Outlook strip svg. Thunderbird turns file:// in htmlSigText into data:
+    # on insert and sends data: images as cid: parts.
     # The signature files mark their contact line with @addresses@.
+    logos = pkgs.runCommand "thunderbird-signature-logos" {nativeBuildInputs = [pkgs.resvg];} ''
+      mkdir $out
+      for name in tue gewis; do
+        resvg --height 192 ${./_thunderbird}/logo-$name.svg $out/$name.png
+      done
+    '';
     signature = name: addresses: {
       showSignature = "append";
       htmlFormat = true;
       text =
-        replaceStrings ["@addresses@"] [(concatMapStringsSep "<br>" mailto addresses)]
+        replaceStrings ["@addresses@" "@logo@"] [(concatMapStringsSep "<br>" mailto addresses) "file://${logos}/${name}.png"]
         (builtins.readFile ./_thunderbird/signature-${name}.html);
     };
     mailto = address: ''<a href="mailto:${address}" style="color:#1a1a1a;text-decoration:none;">${address}</a>'';
