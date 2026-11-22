@@ -91,7 +91,16 @@ in {
         domain = mkOption {
           type = str;
           default = "lvdar.nl";
-          description = "Mail domain; the catch-all covers all of it.";
+          description = "Mail domain; the catch-all covers all of it. Kanidm logins become `<user>@` it.";
+        };
+
+        extraDomains = mkOption {
+          type = listOf str;
+          default = ["vandar.tel"];
+          description = ''
+            More mail domains with the same catch-all. Their per-user addresses are aliases on the
+            kanidm accounts in `domain`, kept as database state (docs/src/hosts.md#gaia).
+          '';
         };
 
         hostname = mkOption {
@@ -369,15 +378,19 @@ in {
 
               Domain = {
                 match = ["name"];
-                objects.domain = {
-                  name = cfg.domain;
-                  # Unlike an MtaStageRcpt rewrite, the catch-all keeps the original recipient,
-                  # so per-service aliases are not scored FORGED_RECIPIENTS.
-                  catchAllAddress = "lars@${cfg.domain}";
-                  certificateManagement."@type" = "Manual";
-                  dkimManagement."@type" = "Manual";
-                  dnsManagement."@type" = "Manual";
-                };
+                objects = let
+                  mailDomain = name: {
+                    inherit name;
+                    # Unlike an MtaStageRcpt rewrite, the catch-all keeps the original recipient,
+                    # so per-service aliases are not scored FORGED_RECIPIENTS.
+                    catchAllAddress = "lars@${cfg.domain}";
+                    certificateManagement."@type" = "Manual";
+                    dkimManagement."@type" = "Manual";
+                    dnsManagement."@type" = "Manual";
+                  };
+                in
+                  {domain = mailDomain cfg.domain;}
+                  // lib.listToAttrs (map (name: lib.nameValuePair "domain-${lib.replaceStrings ["."] ["-"] name}" (mailDomain name)) cfg.extraDomains);
               };
 
               # Every service gets its own alias (steam@) and its mail names the service in the subject,
