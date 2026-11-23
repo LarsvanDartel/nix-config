@@ -244,6 +244,23 @@
         match.app_id = "^calculator$";
         default_floating = true;
       }
+      # Thunderbird's calendar picker leaves its list blank until resized off its own size.
+      (lib.warnIf (osConfig.programs.umbriel.package.version != "0-unstable-2026-11-18") ''
+          modules/den/aspects/home/desktop/_umbriel/home.nix: umbriel moved off
+          0-unstable-2026-11-18, the version the "Select Calendar" rule was written
+          against. Drop the rule, copy an event in Thunderbird and paste it; if the
+          calendar list shows without a resize, delete the rule, else bump this guard.
+        '' {
+          match = {
+            app_id = "^thunderbird$";
+            title = "^Select Calendar$";
+          };
+          default_floating = true;
+          default_floating_size_px = {
+            width = 509;
+            height = 240;
+          };
+        })
     ];
 
     layer_rule = [
