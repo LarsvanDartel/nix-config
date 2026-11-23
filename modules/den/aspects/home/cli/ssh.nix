@@ -83,18 +83,12 @@ in {
         };
       };
 
-      home.file =
-        mergeAttrsList (
-          map (key: {
-            "${ssh-file key}.pub".source = key;
-          })
-          keys
-        )
-        // lib.optionalAttrs (lib.elem osConfig.networking.hostName cfg.identities) {
-          # Default paths for tools that don't read IdentityFile; every device key is ed25519.
-          ".ssh/id_ed25519.pub".source = keys-path + "/id_${osConfig.networking.hostName}.pub";
-          ".ssh/id_ed25519".source = config.lib.file.mkOutOfStoreSymlink config.sops.secrets."keys/ssh/${osConfig.networking.hostName}".path;
-        };
+      home.file = mergeAttrsList (
+        map (key: {
+          "${ssh-file key}.pub".source = key;
+        })
+        keys
+      );
 
       sops.secrets = mergeAttrsList (
         map (name: {

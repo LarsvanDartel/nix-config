@@ -22,7 +22,7 @@ Values that aren't secret but should stay out of this public repo, such as the G
 |---|---|---|
 |host SSH keys (ed25519)|`/persist/etc/ssh/ssh_host_ed25519_key` (`/etc/ssh` on pioneer)|the host itself: its sops age identity (`ssh-to-age`), pinned fleet-wide via the `sshHostKey` fact, and voyager's remote-build identity|
 |user age key|`~/.config/sops/age/keys.txt` on voyager, a symlink to `/run/secrets/keys/age`|recipient of every file (`&lvdar` on every creation rule); home-manager's sops decrypts with it|
-|`keys/ssh/voyager` (device key), `keys/ssh/idrac`|`hosts/voyager/secrets.yaml`|voyager only, placed by `home.ssh` into `~/.ssh/id_voyager`, `~/.ssh/id_idrac` (and `~/.ssh/id_ed25519` for the device key). Public halves in `modules/den/aspects/core/_ssh-keys/`|
+|`keys/ssh/voyager` (device key), `keys/ssh/idrac`|`hosts/voyager/secrets.yaml`|voyager only, placed by `home.ssh` into `~/.ssh/id_voyager`, `~/.ssh/id_idrac`. Public halves in `modules/den/aspects/core/_ssh-keys/`|
 |`keys/knot/env` (`KNOT_MASTER_KEY`), `keys/knot/repo-signing-keys`|`hosts/endeavour/secrets.yaml`|knot2: the master key unseals `/tank/knot/sealed-keys` (both are needed to restore the knot); the archive is the old knot's per-repo did:plc rotation keys, re-sealed at every start|
 |knot2's SSH host key|`/tank/knot/ssh_host_key` (snapshotted, restic)|presented for `git@knot.lvdar.nl`; its public half is pinned in core.ssh|
 |`keys/spindle/key`|`hosts/endeavour/secrets.yaml`|the P-256 key behind the spindle's did:web document|

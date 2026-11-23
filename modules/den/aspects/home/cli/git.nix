@@ -94,7 +94,7 @@ in {
     inherit (lib.strings) fileContents;
 
     cfg = config.cosmos.cli.programs.git;
-    publicKey = "${config.cosmos.user.home}/.ssh/id_ed25519.pub";
+    publicKey = "${config.cosmos.user.home}/.ssh/id_${osConfig.networking.hostName}.pub";
 
     # `git agent-pull [branch]`: the agent's commits from endeavour, re-authored
     # (and re-signed) as this user on top of the current branch.
@@ -192,7 +192,7 @@ in {
             gpg.ssh.allowedSignersFile = "${config.cosmos.user.home}/.ssh/allowed_signers";
           };
 
-        # Only where home.ssh links ~/.ssh/id_ed25519 to this host's device key.
+        # Only where home.ssh places this host's device key.
         signing = lib.mkIf (lib.elem osConfig.networking.hostName config.cosmos.cli.programs.ssh.identities) {
           signByDefault = true;
           key = publicKey;
