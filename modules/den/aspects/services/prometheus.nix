@@ -78,11 +78,17 @@ in {
           secrets."keys/ntfy/password".sopsFile =
             builtins.toString inputs.nix-secrets + "/hosts/common/secrets.yaml";
 
-          templates."alertmanager-ntfy-auth.yml".content = ''
-            ntfy:
-              user: ${config.cosmos.system.notifyFailure.user}
-              password: ${config.sops.placeholder."keys/ntfy/password"}
-          '';
+          templates."alertmanager-ntfy-auth.yml" = {
+            content = ''
+              ntfy:
+                auth:
+                  basic:
+                    username: ${config.cosmos.system.notifyFailure.user}
+                    password: ${config.sops.placeholder."keys/ntfy/password"}
+            '';
+            # Loaded via LoadCredential at start; the unit file does not change with it.
+            restartUnits = ["alertmanager-ntfy.service"];
+          };
         };
 
         cosmos.system.impermanence.persist.directories = [
