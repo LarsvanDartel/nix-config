@@ -34,6 +34,7 @@ in {
       inherit publicPort adminPort;
       # 0.0.0.0, but exposedPorts opens it on the mesh interface only.
       adminAddress = "0.0.0.0";
+      leaderboardUrl = "https://gew.is/advent";
     };
   };
 }
