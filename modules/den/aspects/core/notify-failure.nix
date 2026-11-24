@@ -32,7 +32,7 @@
 
         # Retry: failures correlate with network trouble, so the first POST is the likeliest to fail.
         # --retry-all-errors makes curl retry connect failures and timeouts; --retry-max-time bounds it.
-        curl -sS --max-time 20 \
+        curl -sS --fail --max-time 20 \
           --retry 5 --retry-all-errors --retry-delay 20 --retry-max-time 300 \
           -u "${cfg.user}:$password" \
           -H "Title: ${config.networking.hostName}: $unit failed" \

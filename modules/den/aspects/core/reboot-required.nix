@@ -51,7 +51,7 @@
 
           # --max-time so a hung edge cannot wedge the unit. One attempt: this
           # runs again tomorrow, so a retry storm buys nothing.
-          curl -sS --max-time 20 \
+          curl -sS --fail --max-time 20 \
             -u "${notifyCfg.user}:$password" \
             -H "Title: ${config.networking.hostName}: reboot required" \
             -H "Priority: default" \

@@ -24,7 +24,7 @@
         # SMARTD_MESSAGE is the verdict; stdin adds the full `smartctl -a` dump. Truncated to fit a phone notification.
         body="$(printf '%s\n\n%s' "''${SMARTD_MESSAGE:-}" "$(cat)" | head -c 3000)"
 
-        curl -sS --max-time 20 \
+        curl -sS --fail --max-time 20 \
           -u "${notifyCfg.user}:$password" \
           -H "Title: ${config.networking.hostName}: SMART on ''${SMARTD_DEVICESTRING:-a disk}" \
           -H "Priority: urgent" \

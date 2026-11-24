@@ -168,7 +168,7 @@ in {
           # import silently stops working.
           if [ "$status" != "AUTHORIZED" ] || [ "$days_left" -le 14 ]; then
             password="$(cat "$CREDENTIALS_DIRECTORY/ntfy-password")"
-            curl -sS --max-time 20 --retry 3 --retry-all-errors --retry-delay 10 \
+            curl -sS --fail --max-time 20 --retry 3 --retry-all-errors --retry-delay 10 \
               -u "${notify.user}:$password" \
               -H "Title: Firefly III: bank connection needs re-authorising" \
               -H "Priority: default" \
