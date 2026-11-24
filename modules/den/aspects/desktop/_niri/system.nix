@@ -75,7 +75,7 @@
       };
 
       # Keep every output at scale 1: the pixel font is only crisp at whole multiples of its grid.
-      # The desk monitor's position matches Umbriel's (home/desktop/_umbriel/home.nix).
+      # The external monitors' positions match Umbriel's (home/desktop/_umbriel/home.nix).
       outputs = {
         "eDP-1" = {
           scale = 1;
@@ -92,6 +92,15 @@
             props = {
               x = 0;
               y = 120;
+            };
+          };
+        };
+        "Samsung Electric Company S24R35x H4TN203183" = {
+          scale = 1;
+          position = _: {
+            props = {
+              x = 1920;
+              y = -1080;
             };
           };
         };

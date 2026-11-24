@@ -180,6 +180,10 @@
         scale = 1.0;
         position = [0 120];
       };
+      "Samsung Electric Company S24R35x H4TN203183" = {
+        scale = 1.0;
+        position = [1920 (-1080)];
+      };
     };
 
     # As niri's layout: new columns at half width, Mod+R cycling 1/3, 1/2, 2/3.
