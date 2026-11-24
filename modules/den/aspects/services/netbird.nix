@@ -20,6 +20,18 @@ in {
     ])
   ];
 
+  den.quirks.netbird-proxy-reporter.description = "Mesh address of the host whose node-exporter reports netbird-proxy's mesh address, collected by services.netbird.proxy-target";
+
+  # deadnix: skip
+  den.policies.netbird-proxy-reporter = {host, ...}: [
+    (pipe.from "netbird-proxy-reporter" [
+      (pipe.collect (
+        # deadnix: skip
+        {host, ...}: true
+      ))
+    ])
+  ];
+
   den.aspects.services.netbird.client.nixos = {
     config,
     lib,
@@ -202,40 +214,47 @@ in {
           '';
         };
 
-        proxyAddress = mkOption {
-          type = nullOr str;
-          default = null;
-          example = "100.68.0.1";
-          description = ''
-            netbird-proxy's own mesh address: the source of every request it
-            forwards to this host. Set on hosts it targets.
+        proxy = {
+          reporter = mkOption {
+            type = nullOr str;
+            default = null;
+            description = ''
+              Mesh address of the host whose node-exporter reports netbird-proxy's
+              current mesh address. Set by services.netbird.proxy-target from the
+              `netbird-proxy-reporter` quirk; null on hosts netbird-proxy does not
+              target. See docs/src/notes/services-netbird.md#proxy-address.
+            '';
+          };
 
-            NOT gaia's address. netbird-proxy enrols as its own NetBird client,
-            with a WireGuard address separate from the host agent's, and dials
-            upstream targets from that one. It is also absent from /api/peers,
-            so the peer list does not show it and gaia's own 100.68.38.155 is
-            the wrong answer, which cost a round of 403s to discover.
+          stateDir = mkOption {
+            type = str;
+            default = "/var/lib/netbird-proxy-trust";
+            readOnly = true;
+            description = "Where the followed address and the files rendered from it live.";
+          };
 
-            Find it from the denial itself, in minecraft-control's nginx error
-            log (`access forbidden by rule, client: <address>`), or as the
-            mesh address suddenly dominating the proxied vhosts' access log.
-            gaia's /var/lib/netbird-proxy/state.json does not carry it.
+          addressFile = mkOption {
+            type = str;
+            default = "${cfg.client.proxy.stateDir}/address";
+            readOnly = true;
+            description = ''
+              netbird-proxy's mesh address, the source of every request it
+              forwards here. Empty until first learned, never cleared after.
+            '';
+          };
 
-            It is not stable: it moved to 100.68.186.229 by 2026-10-10 and to
-            100.68.223.154 at the 2026-10-21 deploy that upgraded netbird,
-            with persisted state both times. The symptom is every
-            minecraft-control request answering 403 and every proxied nginx
-            vhost logging the proxy instead of its visitors.
-          '';
+          restartUnits = mkOption {
+            type = listOf str;
+            default = [];
+            description = "Units that read the address only at start, restarted when it changes.";
+          };
         };
 
         proxyRealIp = mkOption {
           type = lines;
           readOnly = true;
-          default = lib.optionalString (cfg.client.proxyAddress != null) ''
-            set_real_ip_from ${cfg.client.proxyAddress};
-            real_ip_header X-Forwarded-For;
-            real_ip_recursive on;
+          default = lib.optionalString (cfg.client.proxy.reporter != null) ''
+            include ${cfg.client.proxy.stateDir}/nginx-realip.conf;
           '';
           description = ''
             nginx server-block directives restoring the visitor's address on
@@ -245,8 +264,20 @@ in {
             appends to X-Forwarded-For, and recursion from the right with only
             the proxy trusted lands on the address it actually saw.
 
-            Not for a vhost gated on `allow <proxy>`: access rules would then
+            Not for a vhost gated on proxyAllow: access rules would then
             see the visitor and refuse everyone.
+          '';
+        };
+
+        proxyAllow = mkOption {
+          type = lines;
+          readOnly = true;
+          default = lib.optionalString (cfg.client.proxy.reporter != null) ''
+            include ${cfg.client.proxy.stateDir}/nginx-allow.conf;
+          '';
+          description = ''
+            nginx `allow` for netbird-proxy alone. Follow it with `deny all;`:
+            the included file is empty until the address is first learned.
           '';
         };
       };
@@ -332,6 +363,105 @@ in {
     };
   };
 
+  den.aspects.services.netbird.proxy-target = {
+    includes = with den.aspects.services; [netbird.client node-exporter den.policies.netbird-proxy-reporter];
+
+    nixos = {
+      config,
+      lib,
+      pkgs,
+      netbird-proxy-reporter,
+      ...
+    }: let
+      cfg = config.cosmos.services.netbird.client.proxy;
+      dir = cfg.stateDir;
+
+      # Uniform across the fleet (services/node-exporter.nix), so this host's port is the reporter's.
+      metricsUrl = "http://${cfg.reporter}:${toString config.cosmos.services.node-exporter.port}/metrics?collect[]=textfile";
+
+      follow = pkgs.writeShellApplication {
+        name = "netbird-proxy-trust";
+        runtimeInputs = with pkgs; [curl gnused coreutils systemd];
+        text = ''
+          cd ${dir}
+          current="$(cat address)"
+
+          # Any doubt keeps the current address: a reporter outage must not cut off a proxy that still works.
+          if ! metrics="$(curl -fsSg --max-time 10 '${metricsUrl}')"; then
+            echo "reporter unreachable; keeping ''${current:-nothing}"
+            exit 0
+          fi
+          addr="$(sed -nE 's/^netbird_proxy_peer_info\{address="([0-9.]+)"\} 1$/\1/p' <<<"$metrics")"
+          if [[ ! $addr =~ ^[0-9]{1,3}(\.[0-9]{1,3}){3}$ ]]; then
+            echo "reporter names no single proxy peer; keeping ''${current:-nothing}"
+            exit 0
+          fi
+
+          if [[ $addr != "$current" ]]; then
+            printf 'set_real_ip_from %s;\nreal_ip_header X-Forwarded-For;\nreal_ip_recursive on;\n' "$addr" >nginx-realip.conf.tmp
+            printf 'allow %s;\n' "$addr" >nginx-allow.conf.tmp
+            printf '%s\n' "$addr" >address.tmp
+            mv nginx-realip.conf.tmp nginx-realip.conf
+            mv nginx-allow.conf.tmp nginx-allow.conf
+            mv address.tmp address
+            echo "netbird-proxy moved from ''${current:-nothing} to $addr"
+            ${lib.optionalString config.services.nginx.enable "systemctl try-reload-or-restart nginx.service"}
+            ${lib.optionalString (cfg.restartUnits != []) "systemctl try-restart ${lib.escapeShellArgs cfg.restartUnits}"}
+          fi
+
+          printf '# HELP netbird_proxy_trusted_info The netbird-proxy address this host trusts.\n# TYPE netbird_proxy_trusted_info gauge\nnetbird_proxy_trusted_info{address="%s"} 1\n' "$addr" >trusted.prom.tmp
+          mv trusted.prom.tmp trusted.prom
+        '';
+      };
+    in {
+      assertions = [
+        {
+          assertion = lib.length netbird-proxy-reporter == 1;
+          message = "services.netbird.proxy-target needs exactly one host with services.netbird; found ${toString (lib.length netbird-proxy-reporter)}.";
+        }
+      ];
+
+      cosmos.services.netbird.client.proxy.reporter = lib.head (netbird-proxy-reporter ++ [null]);
+
+      cosmos.system.impermanence.persist.directories = [
+        {
+          directory = dir;
+          user = "root";
+          group = "root";
+          mode = "0755";
+        }
+      ];
+
+      # nginx refuses to start on a missing include; empty files trust nobody.
+      systemd.tmpfiles.rules = [
+        "d ${dir} 0755 root root - -"
+        "f ${dir}/address 0644 root root - -"
+        "f ${dir}/nginx-realip.conf 0644 root root - -"
+        "f ${dir}/nginx-allow.conf 0644 root root - -"
+      ];
+
+      services.prometheus.exporters.node.extraFlags = ["--collector.textfile.directory=${dir}"];
+
+      systemd.services.netbird-proxy-trust = {
+        description = "Follow netbird-proxy's mesh address";
+        serviceConfig = {
+          Type = "oneshot";
+          ExecStart = lib.getExe follow;
+        };
+      };
+
+      systemd.timers.netbird-proxy-trust = {
+        description = "Periodic netbird-proxy address check";
+        wantedBy = ["timers.target"];
+        timerConfig = {
+          OnBootSec = "1min";
+          OnUnitActiveSec = "1min";
+          Unit = "netbird-proxy-trust.service";
+        };
+      };
+    };
+  };
+
   den.aspects.services.netbird = {
     # Only the server collects: a fleet-wide collect would make each host's
     # evaluation pull in every other host's config.
@@ -342,6 +472,8 @@ in {
       instance = host.name;
       port = 9090;
     };
+
+    netbird-proxy-reporter = {host, ...}: host.meshAddress;
 
     # NetBird replaces auto-groups with the token's claim, so omitting netbird-users strips mesh access
     # on next login; gated apps add their groups the same way (_netbird-groups.nix).
@@ -1094,6 +1226,32 @@ in {
           fi
 
           echo "netbird: API token '$name' expires in $days day(s); nothing to do"
+        '';
+      };
+
+      proxyAddressDir = "/var/lib/netbird-proxy-address";
+
+      reportProxyAddress = pkgs.writeShellApplication {
+        name = "netbird-proxy-address";
+        runtimeInputs = with pkgs; [sqlite coreutils];
+        text = ''
+          # Embedded proxy peers are hidden from the API. Newest session wins: a dead proxy's
+          # ephemeral peer can stay marked connected indefinitely.
+          addr="$(sqlite3 -readonly -cmd '.timeout 10000' \
+            'file:/var/lib/netbird-mgmt/data/store.db?mode=ro' \
+            "SELECT trim(ip, '\"') FROM peers
+             WHERE proxy_meta_embedded = 1 AND proxy_meta_cluster = '${cfg.baseDomain}' AND peer_status_connected = 1
+             ORDER BY peer_status_session_started_at DESC LIMIT 1")"
+
+          cd ${proxyAddressDir}
+          if [[ -z $addr ]]; then
+            echo "no connected netbird-proxy peer"
+            rm -f proxy.prom
+            exit 0
+          fi
+
+          printf '# HELP netbird_proxy_peer_info The mesh address netbird-proxy dials upstreams from.\n# TYPE netbird_proxy_peer_info gauge\nnetbird_proxy_peer_info{address="%s"} 1\n' "$addr" >proxy.prom.tmp
+          mv proxy.prom.tmp proxy.prom
         '';
       };
     in {
@@ -1890,6 +2048,37 @@ in {
             RandomizedDelaySec = "1h";
             Persistent = true;
             Unit = "netbird-token-expiry.service";
+          };
+        };
+
+        services.prometheus.exporters.node.extraFlags = ["--collector.textfile.directory=${proxyAddressDir}"];
+
+        systemd.services.netbird-proxy-address = {
+          description = "Export netbird-proxy's mesh address for the hosts it targets";
+          after = ["netbird-management.service"];
+          serviceConfig = {
+            Type = "oneshot";
+            ExecStart = lib.getExe reportProxyAddress;
+            StateDirectory = "netbird-proxy-address";
+            StateDirectoryMode = "0755";
+
+            CapabilityBoundingSet = [""];
+            NoNewPrivileges = true;
+            PrivateNetwork = true;
+            PrivateTmp = true;
+            ProtectHome = true;
+            ProtectSystem = "strict";
+          };
+        };
+
+        # Timer-driven: the proxy peer appears only once management is up and the proxy has enrolled.
+        systemd.timers.netbird-proxy-address = {
+          description = "Periodic netbird-proxy address export";
+          wantedBy = ["timers.target"];
+          timerConfig = {
+            OnBootSec = "1min";
+            OnUnitActiveSec = "1min";
+            Unit = "netbird-proxy-address.service";
           };
         };
       };

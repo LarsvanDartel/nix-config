@@ -275,8 +275,8 @@ in {
       config = mkIf cfg.enable {
         assertions = [
           {
-            assertion = config.cosmos.services.netbird.client.proxyAddress != null;
-            message = "minecraft-control accepts only netbird-proxy: set cosmos.services.netbird.client.proxyAddress.";
+            assertion = config.cosmos.services.netbird.client.proxy.reporter != null;
+            message = "minecraft-control accepts only netbird-proxy: include services.netbird.proxy-target.";
           }
         ];
 
@@ -386,7 +386,7 @@ in {
           # NOT gated by the wt0 firewall: the NetBird policy is All -> All, so any peer could bypass
           # gaia's kanidm gate and spoof identity headers. Hence this vhost must never get proxyRealIp.
           extraConfig = ''
-            allow ${config.cosmos.services.netbird.client.proxyAddress};
+            ${config.cosmos.services.netbird.client.proxyAllow}
             deny all;
           '';
 

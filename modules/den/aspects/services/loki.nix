@@ -15,30 +15,6 @@
       inherit (lib.types) port str path;
 
       cfg = config.cosmos.services.loki;
-      proxy = config.cosmos.services.netbird.client.proxyAddress;
-      alertmanager = config.services.prometheus.alertmanager;
-
-      # A store path, so a changed rule restarts loki with it. "fake" is the
-      # tenant loki assumes with auth_enabled = false.
-      rulesDir = pkgs.writeTextDir "fake/rules.yaml" (builtins.toJSON {
-        groups = lib.optional (proxy != null) {
-          name = "logs";
-          rules = [
-            {
-              # proxyAddress is hand-synced (hosts/endeavour.nix); if netbird-proxy moves, the mesh whitelist
-              # hides every visitor from crowdsec. Gatus keeps a steady trickle through the proxy, so drift shows.
-              alert = "ProxyAddressDrift";
-              expr = ''sum(count_over_time({job="nginx", log="access", host="${config.networking.hostName}"} |~ `^100\.(6[4-9]|[7-9][0-9]|1[01][0-9]|12[0-7])\.` !~ `^${lib.escapeRegex proxy} ` [15m])) > 5'';
-              for = "15m";
-              labels.severity = "warning";
-              annotations = {
-                summary = "netbird-proxy is no longer at ${proxy}";
-                description = "{{ $value }} proxied requests in 15 minutes came from another mesh address: update cosmos.services.netbird.client.proxyAddress.";
-              };
-            }
-          ];
-        };
-      });
     in {
       options.cosmos.services.loki = {
         port = mkOption {
@@ -93,12 +69,10 @@
               ring.kvstore.store = "inmemory";
             };
 
-            ruler = {
-              storage = {
-                type = "local";
-                local.directory = "${rulesDir}";
-              };
-              alertmanager_url = lib.mkIf alertmanager.enable "http://127.0.0.1:${toString alertmanager.port}";
+            # Loki refuses to start without a rules directory, even with no rules.
+            ruler.storage = {
+              type = "local";
+              local.directory = "${pkgs.emptyDirectory}";
             };
 
             schema_config.configs = [

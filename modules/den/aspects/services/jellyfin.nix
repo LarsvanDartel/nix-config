@@ -78,7 +78,7 @@ in {
     inherit (lib.strings) hasInfix;
 
     cfg = config.cosmos.services.jellyfin;
-    proxy = config.cosmos.services.netbird.client.proxyAddress;
+    proxy = config.cosmos.services.netbird.client.proxy;
 
     # jellarr sends only X-Emby-Token, which EnableLegacyAuthorization=false ignores (a silent 401);
     # the patch adds the Authorization header.
@@ -160,13 +160,17 @@ in {
 
       # jellarr has no network section. Without KnownProxies every visitor is netbird-proxy's address:
       # jellyfin counts all as LAN, and the crowdsec mesh whitelist drops every failed login.
-      systemd.services.jellyfin.preStart = mkIf (proxy != null) ''
+      systemd.services.jellyfin.preStart = mkIf (proxy.reporter != null) ''
         f=${config.services.jellyfin.configDir}/network.xml
+        addr="$(cat ${proxy.addressFile})"
         if [ -f "$f" ]; then
-          ${pkgs.xmlstarlet}/bin/xmlstarlet ed -L -d '//KnownProxies/*' \
-            -s '//KnownProxies' -t elem -n string -v ${proxy} "$f"
+          ${pkgs.xmlstarlet}/bin/xmlstarlet ed -L -d '//KnownProxies/*' "$f"
+          if [ -n "$addr" ]; then
+            ${pkgs.xmlstarlet}/bin/xmlstarlet ed -L -s '//KnownProxies' -t elem -n string -v "$addr" "$f"
+          fi
         fi
       '';
+      cosmos.services.netbird.client.proxy.restartUnits = ["jellyfin.service"];
 
       # Password logins reach jellyfin from the proxy, past nginx; jellyfin-bf bans brute force at the edge.
       services.crowdsec = mkIf config.services.crowdsec.enable {

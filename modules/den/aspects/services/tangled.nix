@@ -33,13 +33,22 @@ in {
     nixos = {
       config,
       lib,
+      pkgs,
       ...
     }: let
       inherit (lib.options) mkOption;
       inherit (lib.types) port str;
 
       cfg = config.cosmos.services.tangled;
-      proxy = config.cosmos.services.netbird.client.proxyAddress;
+      proxy = config.cosmos.services.netbird.client.proxy;
+
+      proxyEnv = "/run/knot-rs-proxy.env";
+      writeProxyEnv = pkgs.writeShellScript "knot-rs-proxy-env" ''
+        addr="$(cat ${proxy.addressFile})"
+        if [ -n "$addr" ]; then
+          printf 'KNOT_XRPC_TRUSTED_PROXY_HEADER=x-forwarded-for\nKNOT_XRPC_TRUSTED_PROXIES=%s\n' "$addr"
+        fi >${proxyEnv}
+      '';
     in {
       imports = [inputs.tangled.nixosModules.knot-rs];
 
@@ -134,13 +143,16 @@ in {
             git.object_format = "sha1";
             # TLS ends at netbird-proxy, so there is no certificate for h3.
             tls.http3 = false;
-            # Rate-limit visitors, not netbird-proxy.
-            xrpc = lib.optionalAttrs (proxy != null) {
-              trusted_proxy_header = "x-forwarded-for";
-              trusted_proxies = [proxy];
-            };
           };
         };
+
+        # Rate-limit visitors, not netbird-proxy. "+": the sandbox cannot write /run; "-": systemd reads
+        # environment files per command, so ExecStartPre runs before the file exists.
+        systemd.services.knot-rs.serviceConfig = lib.mkIf (proxy.reporter != null) {
+          ExecStartPre = ["+${writeProxyEnv}"];
+          EnvironmentFile = ["-${proxyEnv}"];
+        };
+        cosmos.services.netbird.client.proxy.restartUnits = ["knot-rs.service"];
 
         cosmos.services.netbird.client.exposedPorts = [cfg.port cfg.sshPort];
       };

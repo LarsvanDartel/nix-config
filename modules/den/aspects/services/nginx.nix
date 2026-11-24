@@ -56,6 +56,8 @@
             /var/lib/acme/*/ r,
             /var/lib/acme/*/{cert,chain,fullchain,key}.pem r,
             /run/phpfpm/*.sock rw,
+            # Rendered at runtime by services.netbird.proxy-target (services/netbird.nix).
+            /var/lib/netbird-proxy-trust/*.conf r,
 
             signal (send, receive) peer=nginx,
             signal (receive) peer=unconfined,
@@ -77,12 +79,14 @@
             nativeBuildInputs = [config.services.nginx.package pkgs.openssl];
           } ''
             # Certificates load during the parse but ACME writes them at runtime: point every acme path
-            # at a throwaway pair. Only the certificate paths differ from the shipped config.
+            # at a throwaway pair. Runtime-rendered includes under /var/lib parse as an empty file.
             openssl req -x509 -newkey rsa:2048 -nodes -days 1 -subj /CN=check \
               -keyout key.pem -out cert.pem 2>/dev/null
+            touch empty.conf
 
             sed -e "s#/var/lib/acme/[^ ;\"]*key\.pem#$PWD/key.pem#g" \
                 -e "s#/var/lib/acme/[^ ;\"]*\.pem#$PWD/cert.pem#g" \
+                -e "s#include /var/lib/[^;]*;#include $PWD/empty.conf;#g" \
               ${config.environment.etc."nginx/nginx.conf".source} > test.conf
 
             # Not the exit status: pid-file and access-log failures outside the sandbox follow the parse.

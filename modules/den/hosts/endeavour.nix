@@ -80,7 +80,7 @@ in {
       services.firefly
       services.traccar
       services.tile-traccar
-      services.netbird.client
+      services.netbird.proxy-target
       # The knot is here: exports main's head for the behind-main alert.
       services.deploy-drift
       services.suwayomi
@@ -223,10 +223,6 @@ in {
         enable = true;
         access = minecraftAccess;
       };
-
-      # netbird-proxy's embedded client peer, not gaia's agent. Literal:
-      # it is not a den host, so there is no entity to read it from.
-      cosmos.services.netbird.client.proxyAddress = "100.68.84.197";
 
       networking.hostId = "b8433556";
 

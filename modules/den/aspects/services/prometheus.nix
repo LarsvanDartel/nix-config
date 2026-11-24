@@ -295,6 +295,31 @@ in {
                     }
                   ];
                 }
+                {
+                  name = "netbird-proxy";
+                  rules = [
+                    {
+                      alert = "ProxyAddressUnknown";
+                      expr = "absent(netbird_proxy_peer_info)";
+                      for = "15m";
+                      labels.severity = "warning";
+                      annotations = {
+                        summary = "gaia reports no netbird-proxy address";
+                        description = "No connected proxy peer in management's store, or netbird-proxy-address.timer stopped. Targeted hosts keep trusting the last address.";
+                      };
+                    }
+                    {
+                      alert = "ProxyAddressDrift";
+                      expr = "max by (address) (netbird_proxy_peer_info) unless on(address) netbird_proxy_trusted_info";
+                      for = "10m";
+                      labels.severity = "warning";
+                      annotations = {
+                        summary = "netbird-proxy is at {{ $labels.address }}, which nothing trusts";
+                        description = "Proxied requests are refused or logged as the proxy. Check `journalctl -u netbird-proxy-trust` on the hosts it targets.";
+                      };
+                    }
+                  ];
+                }
               ];
             })
           ];

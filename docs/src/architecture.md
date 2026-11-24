@@ -41,4 +41,4 @@ Three tools, cheapest first:
 
 1. **Host entity facts** (`den.hosts.<sys>.<name>.meshAddress`, `.server`, `.users`, names): plain data, readable from any host or flake module without evaluating that host. Used for mesh IPs, host lists, deploy-rs nodes, ssh config.
 2. **Quirks** (`den.quirks.<q>` + a `pipe.collect`/`collectAll` policy included only by the consumer): producer aspects emit entries, the consumer gets the list as a module arg. `netbird-service` (gaia's netbird server), `kanidm-provision` (kanidm on endeavour), `scrape-target` (prometheus), `mesh-dns-record` (unbound). `collect` reaches same-system hosts only; `collectAll` also reaches pioneer. Keep payloads static or `{host, ...}:`; a `{config, ...}:` payload makes the consumer instantiate the producer host's whole config, and config-dependent quirks cannot be chained.
-3. **Literals**, only for what no config or entity holds (e.g. netbird-proxy's embedded-client address, preference-ordered resolver lists). Comment them as hand-synced.
+3. **Literals**, only for what no config or entity holds (e.g. preference-ordered resolver lists, `localVhosts` upstreams). Comment them as hand-synced.

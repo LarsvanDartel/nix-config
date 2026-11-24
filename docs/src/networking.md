@@ -9,6 +9,7 @@
 - `cosmos.services.netbird.localVhosts` (gaia) is the escape hatch for domains netbird-proxy *cannot* carry: management rejects any domain that is not a label beneath the proxy's `baseDomain`, so the apex `lvdar.nl` 422s and is served by gaia's own nginx over the mesh instead. Side effect when debugging: the apex keeps working when the proxy does not.
 - gaia's nginx (control plane, `oidc.idp`, `localVhosts`) uses its own `netbird-edge` cert naming only those domains, never the `*.lvdar.nl` wildcard. Both sit behind one IP, and with the wildcard, browsers reuse an `auth.lvdar.nl` HTTP/2 connection for proxy domains like `jellyfin.lvdar.nl` and get a 421 Misdirected Request, which not every client retries.
 - `cosmos.networking.edgeTerminated`: endeavour = `true` (gaia terminates TLS and forwards to each app's own port, so apps must bind `0.0.0.0` and local nginx vhosts are dropped), gaia = `false` (it *is* the edge). A new service answering locally but not publicly is almost always a missing bind/`edgeTerminated` issue.
+- **netbird-proxy's mesh address changes on every proxy start**, and it is the source of every proxied request. Hosts it targets include `services.netbird.proxy-target`, which follows the address gaia reports and feeds nginx realip, minecraft-control's gate, jellyfin and the knot. Do not hardcode it ([notes](notes/services-netbird.md#proxy-address)).
 - Smoke check when debugging publishing/ingress: `curl -I` against the public name (probes DNS → edge TLS → netbird-proxy → app).
 
 ## SSH
