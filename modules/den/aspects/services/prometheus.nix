@@ -309,7 +309,8 @@ in {
                 {
                   name = "ntfy";
                   webhook_configs = [
-                    {url = "http://127.0.0.1:${toString cfg.bridgePort}/";}
+                    # alertmanager-ntfy only routes /hook; / answers 404.
+                    {url = "http://127.0.0.1:${toString cfg.bridgePort}/hook";}
                   ];
                 }
               ];

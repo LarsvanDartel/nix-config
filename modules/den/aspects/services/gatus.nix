@@ -145,12 +145,11 @@ in {
             };
 
             alerting.ntfy = {
-              url = "https://${ntfy.domain}";
+              # Deny-all topic; the ntfy provider only knows `token` (needs a provisioned user).
+              # Go sends URL userinfo as Basic auth when no Authorization header is set.
+              url = "https://${ntfy.user}:\${NTFY_PASSWORD}@${ntfy.domain}";
               topic = ntfy.topic;
               priority = 4;
-              # The topic is deny-all.
-              username = ntfy.user;
-              password = "\${NTFY_PASSWORD}";
             };
 
             endpoints =
