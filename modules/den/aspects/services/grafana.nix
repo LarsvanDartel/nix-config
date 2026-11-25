@@ -217,7 +217,7 @@ in {
                 # Loki's drilldown-limits route 401s "no org id" unless the tenant is sent. A tenant name, not
                 # a secret: via $__file only because the module warns on inline secureJsonData.
                 jsonData.httpHeaderName1 = "X-Scope-OrgID";
-                secureJsonData.httpHeaderValue1 = lib.warnIf (config.services.loki.package.version != "3.7.9") ''
+                secureJsonData.httpHeaderValue1 = lib.warnIf (config.services.loki.package.version != "3.7.10") ''
                   modules/den/aspects/services/grafana.nix: nixpkgs' loki is now ${config.services.loki.package.version}.
                   Check whether /loki/api/v1/drilldown-limits still 401s without X-Scope-OrgID; drop the header or bump this guard.
                 '' "$__file{${pkgs.writeText "loki-tenant" "fake"}}";
