@@ -253,8 +253,9 @@ in {
         proxyRealIp = mkOption {
           type = lines;
           readOnly = true;
+          # Glob: a missing file matches nothing instead of failing nginx, which then trusts nobody.
           default = lib.optionalString (cfg.client.proxy.reporter != null) ''
-            include ${cfg.client.proxy.stateDir}/nginx-realip.conf;
+            include ${cfg.client.proxy.stateDir}/nginx-realip.conf*;
           '';
           description = ''
             nginx server-block directives restoring the visitor's address on
@@ -273,11 +274,11 @@ in {
           type = lines;
           readOnly = true;
           default = lib.optionalString (cfg.client.proxy.reporter != null) ''
-            include ${cfg.client.proxy.stateDir}/nginx-allow.conf;
+            include ${cfg.client.proxy.stateDir}/nginx-allow.conf*;
           '';
           description = ''
             nginx `allow` for netbird-proxy alone. Follow it with `deny all;`:
-            the included file is empty until the address is first learned.
+            the include matches nothing until the address is first learned.
           '';
         };
       };
@@ -384,7 +385,7 @@ in {
         runtimeInputs = with pkgs; [curl gnused coreutils systemd];
         text = ''
           cd ${dir}
-          current="$(cat address)"
+          current="$(cat address 2>/dev/null || true)"
 
           # Any doubt keeps the current address: a reporter outage must not cut off a proxy that still works.
           if ! metrics="$(curl -fsSg --max-time 10 '${metricsUrl}')"; then
@@ -432,20 +433,14 @@ in {
         }
       ];
 
-      # nginx refuses to start on a missing include; empty files trust nobody.
-      systemd.tmpfiles.rules = [
-        "d ${dir} 0755 root root - -"
-        "f ${dir}/address 0644 root root - -"
-        "f ${dir}/nginx-realip.conf 0644 root root - -"
-        "f ${dir}/nginx-allow.conf 0644 root root - -"
-      ];
-
       services.prometheus.exporters.node.extraFlags = ["--collector.textfile.directory=${dir}"];
 
       systemd.services.netbird-proxy-trust = {
         description = "Follow netbird-proxy's mesh address";
         serviceConfig = {
           Type = "oneshot";
+          StateDirectory = "netbird-proxy-trust";
+          StateDirectoryMode = "0755";
           ExecStart = lib.getExe follow;
         };
       };

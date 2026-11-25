@@ -162,7 +162,7 @@ in {
       # jellyfin counts all as LAN, and the crowdsec mesh whitelist drops every failed login.
       systemd.services.jellyfin.preStart = mkIf (proxy.reporter != null) ''
         f=${config.services.jellyfin.configDir}/network.xml
-        addr="$(cat ${proxy.addressFile})"
+        addr="$(cat ${proxy.addressFile} 2>/dev/null || true)"
         if [ -f "$f" ]; then
           ${pkgs.xmlstarlet}/bin/xmlstarlet ed -L -d '//KnownProxies/*' "$f"
           if [ -n "$addr" ]; then

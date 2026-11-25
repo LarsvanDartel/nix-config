@@ -44,7 +44,7 @@ in {
 
       proxyEnv = "/run/knot-rs-proxy.env";
       writeProxyEnv = pkgs.writeShellScript "knot-rs-proxy-env" ''
-        addr="$(cat ${proxy.addressFile})"
+        addr="$(cat ${proxy.addressFile} 2>/dev/null || true)"
         if [ -n "$addr" ]; then
           printf 'KNOT_XRPC_TRUSTED_PROXY_HEADER=x-forwarded-for\nKNOT_XRPC_TRUSTED_PROXIES=%s\n' "$addr"
         fi >${proxyEnv}
