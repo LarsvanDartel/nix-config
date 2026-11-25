@@ -205,9 +205,11 @@
             realName = "Lars van Dartel";
             thunderbird = {
               enable = true;
-              # Unset, Thunderbird falls back to <server>/Sent and creates it beside Exchange's Sent Items.
+              # Exchange already files SMTP-sent mail in Sent Items: a Thunderbird copy duplicates it, and
+              # an unset fcc_folder falls back to <server>/Sent, which Thunderbird then creates.
               settings = id: {
                 "mail.server.server_${id}.using_subscription" = false;
+                "mail.identity.id_${id}.fcc" = false;
                 "mail.identity.id_${id}.fcc_folder" = "imap://${replaceStrings ["@"] ["%40"] address}@outlook.office365.com/Sent Items";
                 "mail.identity.id_${id}.fcc_folder_picker_mode" = "1";
               };
